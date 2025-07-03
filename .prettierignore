@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+build/
+dist/
+.output/
+
+# Generated files
+*.min.js
+*.min.css
+
+# Other
+.env*
