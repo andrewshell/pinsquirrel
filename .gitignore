@@ -4,8 +4,8 @@
 local.db
 
 # React Router
-/.react-router/
-/build/
+.react-router/
+build/
 
 # Testing
 /coverage/
@@ -29,3 +29,8 @@ lerna-debug.log*
 # Temporary files
 .tmp/
 .temp/
+
+# Nx
+.nx/
+dist/
+tmp/

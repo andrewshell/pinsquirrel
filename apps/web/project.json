@@ -1,0 +1,63 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "web",
+  "sourceRoot": "apps/web",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/build"],
+      "options": {
+        "command": "react-router build",
+        "cwd": "apps/web"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "react-router dev",
+        "cwd": "apps/web"
+      }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "react-router dev",
+        "cwd": "apps/web"
+      }
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "react-router-serve ./build/server/index.js",
+        "cwd": "apps/web"
+      },
+      "dependsOn": ["build"]
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "outputs": [],
+      "options": {
+        "command": "react-router typegen && tsc",
+        "cwd": "apps/web"
+      }
+    },
+    "test": {
+      "executor": "@nx/vite:test",
+      "outputs": ["{workspaceRoot}/coverage/apps/web"],
+      "options": {
+        "config": "apps/web/vitest.config.ts",
+        "passWithNoTests": true
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "outputs": [],
+      "options": {
+        "command": "eslint .",
+        "cwd": "apps/web"
+      }
+    }
+  },
+  "tags": []
+}
