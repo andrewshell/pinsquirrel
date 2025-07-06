@@ -1,0 +1,1 @@
+[[ -f ~/.zshenv ]] && source ~/.zshenv
