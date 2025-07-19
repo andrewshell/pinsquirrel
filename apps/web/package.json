@@ -12,7 +12,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest --run",
-    "test:watch": "vitest --watch --coverage"
+    "test:watch": "vitest --watch --coverage",
+    "test:coverage": "vitest --run --coverage"
   },
   "dependencies": {
     "@react-router/node": "^7.5.3",
