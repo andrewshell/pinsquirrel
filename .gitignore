@@ -11,3 +11,11 @@ build/
 *.log
 .DS_Store
 coverage/
+
+# IDE - keep shared config, exclude user-specific files
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/*.code-workspace
+.idea/
+*.swp
+*.swo
