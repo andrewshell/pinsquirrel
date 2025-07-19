@@ -9,7 +9,9 @@
     "typecheck": "turbo typecheck",
     "lint": "turbo lint",
     "format": "turbo format",
-    "test": "turbo test"
+    "test": "turbo test",
+    "db:up": "docker compose -f docker-compose.dev.yml down && docker compose -f docker-compose.dev.yml up -d postgres",
+    "db:down": "docker compose -f docker-compose.dev.yml down"
   },
   "devDependencies": {
     "turbo": "latest"

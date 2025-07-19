@@ -8,8 +8,9 @@ This is a pnpm monorepo with Turbo orchestration:
 
 - `apps/` - Applications and end-user facing packages
   - `web/` - React Router 7 (Framework mode) application with SSR
-  - `api/` - Hono-based TypeScript API server
 - `libs/` - Shared libraries and utilities
+  - `core/` - Core business logic and domain entities
+  - `database/` - Database layer with Drizzle ORM for PostgreSQL
 - `pnpm-workspace.yaml` - Defines workspace packages
 - `package.json` - Root package with Turbo scripts
 - `turbo.json` - Turbo task configuration
@@ -30,6 +31,10 @@ This is a pnpm monorepo with Turbo orchestration:
 - `pnpm add <pkg> -w` - Add dependency to workspace root
 - `pnpm --filter <workspace> <command>` - Run command in specific workspace
 
+### Database Management
+- `pnpm db:up` - Start development PostgreSQL database via Docker
+- `pnpm db:down` - Stop development database
+
 ### Workspace Operations
 - `pnpm -r <command>` - Run command in all workspaces
 - `pnpm --filter "./apps/*" <command>` - Run command in all apps
@@ -42,7 +47,8 @@ This is a pnpm monorepo with Turbo orchestration:
 - **NEVER navigate to subdirectories** to run commands unless absolutely necessary
 - If you must navigate to a subdirectory, **ALWAYS return to root** immediately after
 - Use `pnpm --filter @pinsquirrel/web <command>` instead of `cd apps/web && pnpm <command>`
-- Use `pnpm --filter @pinsquirrel/api <command>` instead of `cd apps/api && pnpm <command>`
+- Use `pnpm --filter @pinsquirrel/core <command>` instead of `cd libs/core && pnpm <command>`
+- Use `pnpm --filter @pinsquirrel/database <command>` instead of `cd libs/database && pnpm <command>`
 
 ### Test-Driven Development (TDD) Workflow
 When developing new features or fixing bugs, **ALWAYS follow the TDD red-green-refactor cycle**:
@@ -113,28 +119,50 @@ The web app uses React Router 7 in Framework mode with SSR enabled:
 - `pnpm test --filter @pinsquirrel/web -- <pattern>` - Run specific test files
 - `pnpm test --filter @pinsquirrel/web -- --watch` - Run tests in watch mode for TDD
 
-## Hono API App (apps/api)
+## Core Library (libs/core)
 
-The API app uses Hono framework for high-performance TypeScript APIs:
+Business logic and domain entities:
 
-- **Development**: `pnpm dev --filter @pinsquirrel/api`
-- **Build**: Creates production bundle in `dist/`
-- **Start**: `pnpm start --filter @pinsquirrel/api` (requires build first)
-- **Type Generation**: Supports Hono client type generation
-- **Validation**: Uses Zod for request/response validation
-- **Logging**: Pino for structured logging
+- **Development**: `pnpm dev --filter @pinsquirrel/core` (TypeScript watch mode)
+- **Build**: `pnpm build --filter @pinsquirrel/core` (creates `dist/`)
+- **Type Check**: `pnpm typecheck --filter @pinsquirrel/core`
+- **Testing**: Vitest for unit tests
 
-### API Architecture
-- `src/index.ts` - Application entry point and server setup
-- `src/app.ts` - Main Hono app with middleware configuration
-- `src/routes/` - Modular route handlers
-- `src/middleware/` - Custom middleware (logging, error handling)
-- Environment-based configuration via `process.env`
+### Core Architecture
+- `src/entities/` - Domain entities and interfaces (e.g., User)
+- `src/interfaces/` - Repository contracts and abstractions
+- `src/errors/` - Custom domain error classes
+- Uses clean architecture principles with dependency inversion
 
-### API Testing
-- `pnpm test --filter @pinsquirrel/api` - Run all tests once
-- `pnpm test --filter @pinsquirrel/api -- --watch` - Run tests in watch mode for TDD
-- Tests use supertest-like patterns with Hono's test utilities
+### Running Tests
+- `pnpm test --filter @pinsquirrel/core` - Run all tests once
+- `pnpm test --filter @pinsquirrel/core -- --watch` - Run tests in watch mode for TDD
+
+## Database Library (libs/database)
+
+Database layer with Drizzle ORM for PostgreSQL:
+
+- **Development**: `pnpm dev --filter @pinsquirrel/database` (TypeScript watch mode)
+- **Build**: `pnpm build --filter @pinsquirrel/database` (creates `dist/`)
+- **Database Operations**:
+  - `pnpm --filter @pinsquirrel/database db:generate` - Generate migrations
+  - `pnpm --filter @pinsquirrel/database db:migrate` - Run migrations
+  - `pnpm --filter @pinsquirrel/database db:studio` - Open Drizzle Studio
+
+### Database Architecture
+- `src/schema/` - Drizzle schema definitions (e.g., users table)
+- `src/repositories/` - Repository implementations using Drizzle
+- `src/client.ts` - Database connection configuration
+- `drizzle.config.ts` - Drizzle kit configuration
+- Implements repository interfaces from `@pinsquirrel/core`
+
+### Database Configuration
+- Uses PostgreSQL with connection via `DATABASE_URL` environment variable
+- Default: `postgresql://localhost:5432/pinsquirrel`
+
+### Running Tests
+- `pnpm test --filter @pinsquirrel/database` - Run all tests once
+- `pnpm test --filter @pinsquirrel/database -- --watch` - Run tests in watch mode for TDD
 
 ## Code Quality Tools
 
@@ -158,3 +186,59 @@ The API app uses Hono framework for high-performance TypeScript APIs:
 ## Package Manager
 
 This repository uses pnpm with version specified in `packageManager` field. Always use pnpm commands, not npm or yarn. Node.js version requirement: >= 22.0.0
+
+## Docker Support
+
+### Development Workflow
+
+For local development with containerized database:
+
+```bash
+# Start development database
+pnpm db:up
+
+# Run development servers (connects to containerized DB)
+pnpm dev
+
+# Stop database when done
+pnpm db:down
+```
+
+### Production Deployment
+
+#### Building Docker Image
+
+```bash
+# Build from monorepo root (required for proper build context)
+cd /path/to/pinsquirrel
+docker build -f apps/web/Dockerfile -t your-username/pinsquirrel-web:latest .
+
+# Push to Docker Hub
+docker push your-username/pinsquirrel-web:latest
+```
+
+#### Deployment Options
+
+**Option 1: Self-hosted with Dockge**
+- Create your own docker-compose.yml in Dockge
+- Reference your published Docker Hub image
+- Configure `DATABASE_URL` environment variable
+
+**Option 2: DigitalOcean App Platform**
+- Point to repository with `apps/web/Dockerfile`
+- Use managed PostgreSQL database
+- Set `DATABASE_URL` environment variable
+
+### Docker Configuration Files
+
+- `docker-compose.dev.yml` - Development database only
+- `apps/web/Dockerfile` - Production-ready web app image
+- `apps/web/.dockerignore` - Optimized build context
+- `.env.example` / `apps/web/.env.example` - Environment templates
+
+### Database Connection
+
+All environments use the `DATABASE_URL` environment variable:
+- **Development**: `postgresql://pinsquirrel:pinsquirrel@localhost:5432/pinsquirrel`
+- **Docker deployment**: `postgresql://pinsquirrel:pinsquirrel@postgres:5432/pinsquirrel`
+- **Managed database**: `postgresql://username:password@hostname:25060/database?sslmode=require`
