@@ -19,8 +19,10 @@ export function meta(_: Route.MetaArgs) {
 export default function Home() {
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-8 text-center">shadcn/ui Component Test</h1>
-      
+      <h1 className="text-3xl font-bold mb-8 text-center">
+        shadcn/ui Component Test
+      </h1>
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
         {/* Basic Card */}
         <Card>
@@ -30,7 +32,8 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              This card demonstrates the basic structure with header, content, and footer sections.
+              This card demonstrates the basic structure with header, content,
+              and footer sections.
             </p>
           </CardContent>
           <CardFooter>
@@ -50,11 +53,14 @@ export default function Home() {
               <span className="text-sm">Status: Active</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              This card has hover effects and demonstrates different styling options.
+              This card has hover effects and demonstrates different styling
+              options.
             </p>
           </CardContent>
           <CardFooter className="flex justify-between">
-            <Button variant="outline" size="sm">Cancel</Button>
+            <Button variant="outline" size="sm">
+              Cancel
+            </Button>
             <Button size="sm">Confirm</Button>
           </CardFooter>
         </Card>
@@ -66,11 +72,21 @@ export default function Home() {
             <CardDescription>Multiple button variants</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button variant="default" className="w-full">Default</Button>
-            <Button variant="secondary" className="w-full">Secondary</Button>
-            <Button variant="outline" className="w-full">Outline</Button>
-            <Button variant="ghost" className="w-full">Ghost</Button>
-            <Button variant="destructive" className="w-full" size="sm">Destructive</Button>
+            <Button variant="default" className="w-full">
+              Default
+            </Button>
+            <Button variant="secondary" className="w-full">
+              Secondary
+            </Button>
+            <Button variant="outline" className="w-full">
+              Outline
+            </Button>
+            <Button variant="ghost" className="w-full">
+              Ghost
+            </Button>
+            <Button variant="destructive" className="w-full" size="sm">
+              Destructive
+            </Button>
           </CardContent>
         </Card>
 
@@ -118,7 +134,8 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <p className="text-sm">
-              This card uses custom classes to create a minimal appearance without borders.
+              This card uses custom classes to create a minimal appearance
+              without borders.
             </p>
           </CardContent>
         </Card>
