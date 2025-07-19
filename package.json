@@ -4,8 +4,9 @@
   "description": "A pnpm monorepo",
   "private": true,
   "scripts": {
-    "dev": "CI=true turbo dev",
     "build": "turbo build",
+    "dev": "CI=true turbo dev",
+    "typecheck": "turbo typecheck",
     "lint": "turbo lint",
     "format": "turbo format",
     "test": "turbo test"
