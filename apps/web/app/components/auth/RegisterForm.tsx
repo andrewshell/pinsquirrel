@@ -13,11 +13,6 @@ export function RegisterForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('🎯 RegisterForm.handleSubmit called with:', {
-      username,
-      hasPassword: !!password,
-      email: email.trim() || 'none',
-    })
 
     const formData = new FormData()
     formData.append('username', username)

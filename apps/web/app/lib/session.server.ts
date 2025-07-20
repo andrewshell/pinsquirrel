@@ -1,5 +1,6 @@
 import { createCookieSessionStorage, redirect } from 'react-router'
 import { DrizzleUserRepository, db } from '@pinsquirrel/database'
+import { logger } from './logger.server'
 
 const userRepository = new DrizzleUserRepository(db)
 
@@ -31,8 +32,12 @@ export async function getUser(request: Request) {
 
   try {
     const user = await userRepository.findById(userId)
+    if (!user) {
+      logger.warn('User not found for valid session', { userId })
+    }
     return user
-  } catch {
+  } catch (error) {
+    logger.exception(error, 'Failed to fetch user from session', { userId })
     // If user lookup fails, clear the session
     // eslint-disable-next-line @typescript-eslint/only-throw-error
     throw redirect('/login', {
@@ -61,6 +66,8 @@ export async function createUserSession(
   const session = await sessionStorage.getSession()
   session.set('userId', userId)
 
+  logger.info('User session created', { userId, redirectTo })
+
   return redirect(redirectTo, {
     headers: {
       'Set-Cookie': await sessionStorage.commitSession(session),
@@ -70,6 +77,11 @@ export async function createUserSession(
 
 export async function logout(request: Request) {
   const session = await getSession(request)
+  const userId = session.get('userId') as string | undefined
+
+  if (userId) {
+    logger.info('User logout', { userId })
+  }
 
   return redirect('/login', {
     headers: {

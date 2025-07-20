@@ -5,6 +5,7 @@ import { DrizzleUserRepository, db } from '@pinsquirrel/database'
 import { createUserSession, getUserId } from '~/lib/session.server'
 import { LoginForm } from '~/components/auth/LoginForm'
 import { loginSchema, parseFormData } from '~/lib/validation'
+import { logger } from '~/lib/logger.server'
 
 // Server-side authentication service
 const userRepository = new DrizzleUserRepository(db)
@@ -20,9 +21,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
+  logger.request(request, { action: 'login' })
+
   const result = await parseFormData(request, loginSchema)
 
   if (!result.success) {
+    logger.debug('Login validation failed', { errors: result.errors })
     return {
       errors: result.errors,
     }
@@ -34,10 +38,17 @@ export async function action({ request }: Route.ActionArgs) {
       result.data.password
     )
 
+    logger.info('User login successful', {
+      userId: user.id,
+      username: user.username,
+    })
+
     // Create session and redirect
     return await createUserSession(user.id, '/')
   } catch (error) {
-    console.error('Login error:', error)
+    logger.exception(error, 'Login failed', {
+      username: result.data.username,
+    })
     const message = error instanceof Error ? error.message : 'Login failed'
     return {
       errors: {

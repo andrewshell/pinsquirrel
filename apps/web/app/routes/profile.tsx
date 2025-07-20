@@ -5,6 +5,7 @@ import { AuthenticationServiceImpl } from '@pinsquirrel/core'
 import { DrizzleUserRepository, db } from '@pinsquirrel/database'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
+import { logger } from '~/lib/logger.server'
 
 // Server-side authentication service
 const userRepository = new DrizzleUserRepository(db)
@@ -20,6 +21,12 @@ export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData()
   const intent = formData.get('intent') as string
 
+  logger.request(request, {
+    action: 'profile-update',
+    intent,
+    userId: user.id,
+  })
+
   try {
     if (intent === 'update-email') {
       const email = formData.get('email') as string
@@ -33,6 +40,11 @@ export async function action({ request }: Route.ActionArgs) {
       }
 
       await authService.updateEmail(user.id, email.trim())
+
+      logger.info('User email updated', {
+        userId: user.id,
+        hasEmail: true,
+      })
 
       return {
         error: null,
@@ -63,6 +75,10 @@ export async function action({ request }: Route.ActionArgs) {
 
       await authService.changePassword(user.id, currentPassword, newPassword)
 
+      logger.info('User password changed', {
+        userId: user.id,
+      })
+
       return {
         error: null,
         success: 'Password changed successfully',
@@ -76,7 +92,10 @@ export async function action({ request }: Route.ActionArgs) {
       field: null,
     }
   } catch (error) {
-    console.error('Profile update error:', error)
+    logger.exception(error, 'Profile update failed', {
+      userId: user.id,
+      intent,
+    })
     const message = error instanceof Error ? error.message : 'Update failed'
     return {
       error: message,

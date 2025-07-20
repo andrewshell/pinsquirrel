@@ -12,10 +12,6 @@ export function LoginForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('🎯 LoginForm.handleSubmit called with:', {
-      username,
-      hasPassword: !!password,
-    })
 
     const formData = new FormData()
     formData.append('username', username)
