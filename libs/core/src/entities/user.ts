@@ -1,16 +1,19 @@
 export interface User {
-  id: string;
-  email: string;
-  name: string;
-  createdAt: Date;
-  updatedAt: Date;
+  id: string
+  username: string
+  passwordHash: string
+  emailHash: string | null
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface CreateUserData {
-  email: string;
-  name: string;
+  username: string
+  passwordHash: string
+  emailHash?: string | null
 }
 
 export interface UpdateUserData {
-  name?: string;
+  passwordHash?: string
+  emailHash?: string | null
 }

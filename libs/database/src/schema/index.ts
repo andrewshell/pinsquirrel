@@ -1,1 +1,1 @@
-export { users } from "./users.js";
+export { users } from './users'
