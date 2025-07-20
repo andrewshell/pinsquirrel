@@ -2,13 +2,14 @@ import React, { useState } from 'react'
 import { useSubmit, useActionData } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
+import type { FieldErrors } from '~/lib/validation'
 
 export function RegisterForm() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [email, setEmail] = useState('')
   const submit = useSubmit()
-  const actionData = useActionData<{ error: string | null }>()
+  const actionData = useActionData<{ errors?: FieldErrors }>()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,9 +38,9 @@ export function RegisterForm() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {actionData?.error && (
+          {actionData?.errors?._form && (
             <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
-              {actionData.error}
+              {actionData.errors._form}
             </div>
           )}
 
@@ -56,8 +57,17 @@ export function RegisterForm() {
               value={username}
               onChange={e => setUsername(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                actionData?.errors?.username
+                  ? 'border-red-500 focus:border-red-500'
+                  : 'border-gray-300 focus:border-blue-500'
+              }`}
             />
+            {actionData?.errors?.username && (
+              <p className="mt-1 text-sm text-red-600">
+                {actionData.errors.username}
+              </p>
+            )}
           </div>
 
           <div>
@@ -73,8 +83,17 @@ export function RegisterForm() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                actionData?.errors?.password
+                  ? 'border-red-500 focus:border-red-500'
+                  : 'border-gray-300 focus:border-blue-500'
+              }`}
             />
+            {actionData?.errors?.password && (
+              <p className="mt-1 text-sm text-red-600">
+                {actionData.errors.password}
+              </p>
+            )}
           </div>
 
           <div>
@@ -86,8 +105,17 @@ export function RegisterForm() {
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                actionData?.errors?.email
+                  ? 'border-red-500 focus:border-red-500'
+                  : 'border-gray-300 focus:border-blue-500'
+              }`}
             />
+            {actionData?.errors?.email && (
+              <p className="mt-1 text-sm text-red-600">
+                {actionData.errors.email}
+              </p>
+            )}
           </div>
 
           <Button type="submit" className="w-full">

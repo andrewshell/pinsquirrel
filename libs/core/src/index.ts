@@ -1,5 +1,9 @@
 // Entities
-export type { User, CreateUserData, UpdateUserData } from './entities/user.js'
+export type { 
+  User, 
+  CreateUserData, 
+  UpdateUserData
+} from './entities/user.js'
 
 // Interfaces
 export type { Repository } from './interfaces/repository.js'
@@ -14,3 +18,6 @@ export { AuthenticationError, InvalidCredentialsError, UserAlreadyExistsError } 
 
 // Utils
 export { hashPassword, verifyPassword, hashEmail } from './utils/crypto.js'
+
+// Validation
+export * from './validation/index.js'

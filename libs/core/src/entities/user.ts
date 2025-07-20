@@ -7,6 +7,7 @@ export interface User {
   updatedAt: Date
 }
 
+// These are for the repository layer - they work with hashed data
 export interface CreateUserData {
   username: string
   passwordHash: string

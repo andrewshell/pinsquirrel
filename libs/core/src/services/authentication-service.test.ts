@@ -89,6 +89,48 @@ describe('AuthenticationService', () => {
 
       expect(mockUserRepository.create).not.toHaveBeenCalled()
     })
+
+    it('should throw validation error for invalid username', async () => {
+      await expect(
+        authService.register('ab', 'password123') // too short
+      ).rejects.toThrow('Invalid username')
+    })
+
+    it('should throw validation error for invalid password', async () => {
+      await expect(
+        authService.register('testuser', 'short') // too short
+      ).rejects.toThrow('Invalid password')
+    })
+
+    it('should throw validation error for invalid email', async () => {
+      await expect(
+        authService.register('testuser', 'password123', 'invalid-email')
+      ).rejects.toThrow('Invalid email')
+    })
+
+    it('should register user with undefined email', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+
+      const result = await authService.register(
+        'testuser',
+        'password123',
+        undefined
+      )
+
+      expect(mockUserRepository.create).toHaveBeenCalledWith({
+        username: 'testuser',
+        passwordHash: 'hashed_password123',
+        emailHash: null,
+      })
+      expect(result).toEqual(mockUser)
+    })
+
+    it('should throw validation error for empty string email', async () => {
+      await expect(
+        authService.register('testuser', 'password123', '') // empty string is invalid
+      ).rejects.toThrow('Invalid email')
+    })
   })
 
   describe('login', () => {
@@ -128,6 +170,18 @@ describe('AuthenticationService', () => {
         authService.login('testuser', 'wrongpassword')
       ).rejects.toThrow(InvalidCredentialsError)
     })
+
+    it('should throw validation error for invalid username', async () => {
+      await expect(
+        authService.login('ab', 'password123') // too short
+      ).rejects.toThrow('Invalid username')
+    })
+
+    it('should throw validation error for invalid password', async () => {
+      await expect(
+        authService.login('testuser', 'short') // too short
+      ).rejects.toThrow('Invalid password')
+    })
   })
 
   describe('changePassword', () => {
@@ -136,15 +190,15 @@ describe('AuthenticationService', () => {
       vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
       vi.mocked(verifyPassword).mockResolvedValue(true)
 
-      await authService.changePassword('123', 'currentpass', 'newpass')
+      await authService.changePassword('123', 'currentpass123', 'newpass123')
 
       expect(mockUserRepository.findById).toHaveBeenCalledWith('123')
       expect(verifyPassword).toHaveBeenCalledWith(
-        'currentpass',
+        'currentpass123',
         mockUser.passwordHash
       )
       expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
-        passwordHash: 'hashed_newpass',
+        passwordHash: 'hashed_newpass123',
       })
     })
 
@@ -153,7 +207,7 @@ describe('AuthenticationService', () => {
       vi.mocked(verifyPassword).mockResolvedValue(false)
 
       await expect(
-        authService.changePassword('123', 'wrongpass', 'newpass')
+        authService.changePassword('123', 'wrongpass123', 'newpass123')
       ).rejects.toThrow(InvalidCredentialsError)
 
       expect(mockUserRepository.update).not.toHaveBeenCalled()
@@ -163,8 +217,20 @@ describe('AuthenticationService', () => {
       vi.mocked(mockUserRepository.findById).mockResolvedValue(null)
 
       await expect(
-        authService.changePassword('999', 'currentpass', 'newpass')
+        authService.changePassword('999', 'currentpass123', 'newpass123')
       ).rejects.toThrow(InvalidCredentialsError)
+    })
+
+    it('should throw validation error for invalid current password', async () => {
+      await expect(
+        authService.changePassword('123', 'short', 'newpass123') // current password too short
+      ).rejects.toThrow('Invalid current password')
+    })
+
+    it('should throw validation error for invalid new password', async () => {
+      await expect(
+        authService.changePassword('123', 'currentpass123', 'short') // new password too short
+      ).rejects.toThrow('Invalid new password')
     })
   })
 
@@ -188,6 +254,12 @@ describe('AuthenticationService', () => {
         emailHash: null,
       })
     })
+
+    it('should throw validation error for invalid email', async () => {
+      await expect(
+        authService.updateEmail('123', 'invalid-email')
+      ).rejects.toThrow('Invalid email')
+    })
   })
 
   describe('findByEmail', () => {
@@ -208,6 +280,12 @@ describe('AuthenticationService', () => {
       const result = await authService.findByEmail('nonexistent@example.com')
 
       expect(result).toBeNull()
+    })
+
+    it('should throw validation error for invalid email', async () => {
+      await expect(authService.findByEmail('invalid-email')).rejects.toThrow(
+        'Invalid email'
+      )
     })
   })
 })

@@ -4,6 +4,7 @@ import { AuthenticationServiceImpl } from '@pinsquirrel/core'
 import { DrizzleUserRepository, db } from '@pinsquirrel/database'
 import { createUserSession, getUserId } from '~/lib/session.server'
 import { LoginForm } from '~/components/auth/LoginForm'
+import { loginSchema, parseFormData } from '~/lib/validation'
 
 // Server-side authentication service
 const userRepository = new DrizzleUserRepository(db)
@@ -19,18 +20,19 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const formData = await request.formData()
-  const username = formData.get('username') as string
-  const password = formData.get('password') as string
+  const result = await parseFormData(request, loginSchema)
+
+  if (!result.success) {
+    return {
+      errors: result.errors,
+    }
+  }
 
   try {
-    if (!username || !password) {
-      return {
-        error: 'Username and password are required',
-      }
-    }
-
-    const user = await authService.login(username, password)
+    const user = await authService.login(
+      result.data.username,
+      result.data.password
+    )
 
     // Create session and redirect
     return await createUserSession(user.id, '/')
@@ -38,7 +40,9 @@ export async function action({ request }: Route.ActionArgs) {
     console.error('Login error:', error)
     const message = error instanceof Error ? error.message : 'Login failed'
     return {
-      error: message,
+      errors: {
+        _form: message,
+      },
     }
   }
 }
