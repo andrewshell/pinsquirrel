@@ -16,6 +16,8 @@
     "test:coverage": "vitest --run --coverage"
   },
   "dependencies": {
+    "@pinsquirrel/core": "workspace:*",
+    "@pinsquirrel/database": "workspace:*",
     "@radix-ui/react-slot": "^1.2.3",
     "@react-router/node": "^7.5.3",
     "@react-router/serve": "^7.5.3",

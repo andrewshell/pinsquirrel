@@ -1,163 +1,115 @@
+import { Link, useLoaderData, Form } from 'react-router'
 import type { Route } from './+types/home'
+import { getUser } from '~/lib/session.server'
 import { Button } from '~/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '~/components/ui/card'
+
+export async function loader({ request }: Route.LoaderArgs) {
+  const user = await getUser(request)
+  return { user }
+}
 
 export function meta(_: Route.MetaArgs) {
   return [
-    { title: 'shadcn/ui Test' },
-    { name: 'description', content: 'Testing shadcn/ui components' },
+    { title: 'PinSquirrel Boilerplate' },
+    { name: 'description', content: 'A sensible start to a new project' },
   ]
 }
 
 export default function Home() {
+  const { user } = useLoaderData<typeof loader>()
+
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-8 text-center">
-        shadcn/ui Component Test
-      </h1>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
-        {/* Basic Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Basic Card</CardTitle>
-            <CardDescription>This is a simple card example</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              This card demonstrates the basic structure with header, content,
-              and footer sections.
-            </p>
-          </CardContent>
-          <CardFooter>
-            <Button className="w-full">Action</Button>
-          </CardFooter>
-        </Card>
-
-        {/* Interactive Card */}
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-          <CardHeader>
-            <CardTitle>Interactive Card</CardTitle>
-            <CardDescription>Hover over this card</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center space-x-2">
-              <div className="h-4 w-4 rounded-full bg-primary" />
-              <span className="text-sm">Status: Active</span>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-16">
+        {/* Hero Section */}
+        <div className="text-center max-w-4xl mx-auto">
+          {/* Hero Icon/Logo */}
+          <div className="mb-8">
+            <div className="w-16 h-16 mx-auto bg-muted rounded-lg flex items-center justify-center">
+              <span className="text-2xl">🐿️</span>
             </div>
-            <p className="text-sm text-muted-foreground">
-              This card has hover effects and demonstrates different styling
-              options.
-            </p>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" size="sm">
-              Cancel
-            </Button>
-            <Button size="sm">Confirm</Button>
-          </CardFooter>
-        </Card>
-
-        {/* Feature Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Feature Showcase</CardTitle>
-            <CardDescription>Multiple button variants</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button variant="default" className="w-full">
-              Default
-            </Button>
-            <Button variant="secondary" className="w-full">
-              Secondary
-            </Button>
-            <Button variant="outline" className="w-full">
-              Outline
-            </Button>
-            <Button variant="ghost" className="w-full">
-              Ghost
-            </Button>
-            <Button variant="destructive" className="w-full" size="sm">
-              Destructive
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Stats Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Statistics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">2,543</div>
-            <p className="text-xs text-muted-foreground">
-              +20.1% from last month
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Card with List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Your latest actions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              <li className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full" />
-                <span className="text-sm">Project deployed</span>
-              </li>
-              <li className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                <span className="text-sm">New user registered</span>
-              </li>
-              <li className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full" />
-                <span className="text-sm">Payment pending</span>
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
-
-        {/* Minimal Card */}
-        <Card className="border-0 shadow-none bg-muted">
-          <CardHeader>
-            <CardTitle className="text-lg">Minimal Style</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm">
-              This card uses custom classes to create a minimal appearance
-              without borders.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Dark Mode Toggle Test */}
-      <div className="mt-12 text-center">
-        <p className="text-sm text-muted-foreground mb-4">
-          Toggle your system&apos;s dark mode to see how the components adapt
-        </p>
-        <div className="flex justify-center gap-4">
-          <div className="px-4 py-2 rounded bg-background border">
-            <span className="text-foreground">Background</span>
           </div>
-          <div className="px-4 py-2 rounded bg-card border">
-            <span className="text-card-foreground">Card</span>
+
+          {/* Hero Text */}
+          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
+            PinSquirrel Boilerplate
+          </h1>
+
+          <p className="text-lg md:text-xl text-muted-foreground mb-12 max-w-2xl mx-auto">
+            A sensible start to a new project
+          </p>
+
+          {/* Call to Action */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-20">
+            {user ? (
+              // Logged in state
+              <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <p className="text-foreground">
+                  Welcome back,{' '}
+                  <span className="font-medium">{user.username}</span>
+                </p>
+                <Form method="post" action="/logout">
+                  <Button variant="outline" type="submit">
+                    Logout
+                  </Button>
+                </Form>
+              </div>
+            ) : (
+              // Logged out state
+              <>
+                <Button asChild>
+                  <Link to="/register">Get Started</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link to="/login">Sign In</Link>
+                </Button>
+              </>
+            )}
           </div>
-          <div className="px-4 py-2 rounded bg-primary">
-            <span className="text-primary-foreground">Primary</span>
-          </div>
-          <div className="px-4 py-2 rounded bg-secondary">
-            <span className="text-secondary-foreground">Secondary</span>
+
+          {/* Features */}
+          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+            <div className="text-center space-y-4">
+              <div className="w-12 h-12 mx-auto bg-muted rounded-md flex items-center justify-center">
+                <span className="text-xl">🚀</span>
+              </div>
+              <div>
+                <h3 className="font-medium text-foreground mb-2">
+                  Ready to Go
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Complete authentication system with secure sessions and user
+                  management
+                </p>
+              </div>
+            </div>
+
+            <div className="text-center space-y-4">
+              <div className="w-12 h-12 mx-auto bg-muted rounded-md flex items-center justify-center">
+                <span className="text-xl">🔒</span>
+              </div>
+              <div>
+                <h3 className="font-medium text-foreground mb-2">Secure</h3>
+                <p className="text-sm text-muted-foreground">
+                  HTTP-only cookies, server-side sessions, and proper security
+                  practices
+                </p>
+              </div>
+            </div>
+
+            <div className="text-center space-y-4">
+              <div className="w-12 h-12 mx-auto bg-muted rounded-md flex items-center justify-center">
+                <span className="text-xl">⚡</span>
+              </div>
+              <div>
+                <h3 className="font-medium text-foreground mb-2">
+                  Modern Stack
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  React Router 7, TypeScript, Tailwind CSS, and PostgreSQL
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
