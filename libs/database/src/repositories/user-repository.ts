@@ -1,19 +1,16 @@
-import { eq } from 'drizzle-orm'
 import type {
-  User,
   CreateUserData,
   UpdateUserData,
+  User,
   UserRepository,
 } from '@pinsquirrel/core'
-import { db as defaultDb } from '../client.js'
+import { eq } from 'drizzle-orm'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { users } from '../schema/users.js'
 
 export class DrizzleUserRepository implements UserRepository {
-  private db: typeof defaultDb
+  constructor(private db: PostgresJsDatabase<Record<string, unknown>>) {}
 
-  constructor(database?: typeof defaultDb) {
-    this.db = database || defaultDb
-  }
   async findById(id: string): Promise<User | null> {
     const result = await this.db
       .select()
@@ -103,6 +100,6 @@ export class DrizzleUserRepository implements UserRepository {
 
   async delete(id: string): Promise<boolean> {
     const result = await this.db.delete(users).where(eq(users.id, id))
-    return (result.rowCount ?? 0) > 0
+    return result.rowCount > 0
   }
 }
