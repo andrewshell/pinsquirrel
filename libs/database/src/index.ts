@@ -6,3 +6,5 @@ export * from './schema/index.js'
 
 // Repository implementations
 export { DrizzleUserRepository } from './repositories/user-repository.js'
+export { DrizzlePinRepository } from './repositories/pin-repository.js'
+export { DrizzleTagRepository } from './repositories/tag-repository.js'
