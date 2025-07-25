@@ -142,11 +142,11 @@ describe('PinsPage Integration', () => {
     
     expect(screen.getByText('Example Pin')).toBeInTheDocument()
     expect(screen.getByText('Another Pin')).toBeInTheDocument()
-    expect(screen.getByText('example.com')).toBeInTheDocument()
-    expect(screen.getByText('example2.com')).toBeInTheDocument()
+    expect(screen.getByText('https://example.com')).toBeInTheDocument()
+    expect(screen.getByText('https://example2.com')).toBeInTheDocument()
   })
 
-  it('renders pins in responsive grid layout', () => {
+  it('renders pins in vertical list layout', () => {
     mockUseLoaderData.mockReturnValue({
       pins: mockPins,
       totalPages: 1,
@@ -156,9 +156,9 @@ describe('PinsPage Integration', () => {
 
     render(<PinsPage />)
     
-    // Check that the grid container has the correct classes
-    const gridContainer = screen.getByTestId('pin-list-grid')
-    expect(gridContainer).toHaveClass('grid', 'gap-4', 'md:grid-cols-2', 'lg:grid-cols-3')
+    // Check that the list container has the correct classes
+    const listContainer = screen.getByTestId('pin-list')
+    expect(listContainer).toHaveClass('space-y-4')
   })
 
   it('shows loading state when navigation state is loading', () => {
@@ -175,7 +175,7 @@ describe('PinsPage Integration', () => {
     
     // Should show loading skeleton instead of actual pins
     expect(screen.getByTestId('pin-list-loading')).toBeInTheDocument()
-    expect(screen.queryByTestId('pin-list-grid')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('pin-list')).not.toBeInTheDocument()
     expect(screen.queryByText('Example Pin')).not.toBeInTheDocument()
   })
 
@@ -192,10 +192,10 @@ describe('PinsPage Integration', () => {
     // Check main container structure - need to go up one more level
     const headerContainer = screen.getByText('My Pins').closest('div')  // mb-8 div
     const mainContainer = headerContainer?.parentElement  // max-w-7xl mx-auto div
-    expect(mainContainer).toHaveClass('max-w-7xl', 'mx-auto')
+    expect(mainContainer).toHaveClass('max-w-7xl', 'mx-auto', 'px-4', 'sm:px-6', 'lg:px-8')
     
     const pageContainer = mainContainer?.parentElement
-    expect(pageContainer).toHaveClass('min-h-screen', 'bg-background', 'py-12', 'px-4', 'sm:px-6', 'lg:px-8')
+    expect(pageContainer).toHaveClass('min-h-screen', 'bg-background', 'py-12')
   })
 
   it('shows correct header spacing and typography', () => {
@@ -233,8 +233,8 @@ describe('PinsPage Integration', () => {
     expect(screen.getByText('Example Pin')).toBeInTheDocument()
     expect(screen.queryByText("You don't have any pins yet")).not.toBeInTheDocument()
     
-    // Verify grid layout is used
-    expect(screen.getByTestId('pin-list-grid')).toBeInTheDocument()
+    // Verify list layout is used
+    expect(screen.getByTestId('pin-list')).toBeInTheDocument()
   })
 
   it('handles navigation state changes correctly', () => {
@@ -251,7 +251,7 @@ describe('PinsPage Integration', () => {
     const { rerender } = render(<PinsPage />)
     
     // Should show actual content
-    expect(screen.getByTestId('pin-list-grid')).toBeInTheDocument()
+    expect(screen.getByTestId('pin-list')).toBeInTheDocument()
     expect(screen.getByText('Example Pin')).toBeInTheDocument()
 
     // Change to loading state
@@ -261,6 +261,6 @@ describe('PinsPage Integration', () => {
     
     // Should show loading state
     expect(screen.getByTestId('pin-list-loading')).toBeInTheDocument()
-    expect(screen.queryByTestId('pin-list-grid')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('pin-list')).not.toBeInTheDocument()
   })
 })

@@ -45,6 +45,16 @@ describe('Pin List Accessibility', () => {
       const user = userEvent.setup()
       render(<PinCard pin={mockPin} />)
 
+      // Tab to title link
+      await user.tab()
+      const titleLink = screen.getByRole('link', { name: 'Test Article' })
+      expect(titleLink).toHaveFocus()
+
+      // Tab to URL link
+      await user.tab()
+      const urlLink = screen.getByRole('link', { name: 'https://example.com/article' })
+      expect(urlLink).toHaveFocus()
+
       // Tab to first action button (Edit)
       await user.tab()
       const editButton = screen.getByLabelText('Edit Test Article')
@@ -60,12 +70,16 @@ describe('Pin List Accessibility', () => {
       const user = userEvent.setup()
       render(<PinCard pin={mockPin} />)
 
-      // Tab to edit button and activate with Enter
+      // Tab to title link
+      await user.tab()
+      // Tab to URL link
+      await user.tab()
+      // Tab to edit button and verify focus
       await user.tab()
       const editButton = screen.getByLabelText('Edit Test Article')
       expect(editButton).toHaveFocus()
 
-      // Tab to delete button and activate with Space
+      // Tab to delete button and verify focus
       await user.tab()
       const deleteButton = screen.getByLabelText('Delete Test Article')
       expect(deleteButton).toHaveFocus()
@@ -190,7 +204,14 @@ describe('Pin List Accessibility', () => {
       const user = userEvent.setup()
       render(<PinList pins={mockPins} isLoading={false} />)
 
-      // Should be able to tab through all pin action buttons
+      // Tab through first pin's elements: title link, URL link, edit button, delete button
+      await user.tab()
+      const titleLinks = screen.getAllByRole('link', { name: /Pin/ })
+      expect(titleLinks[0]).toHaveFocus() // First pin's title link
+
+      await user.tab()
+      // Should focus URL link of first pin
+      
       await user.tab()
       const editButtons = screen.getAllByLabelText(/Edit/)
       expect(editButtons[0]).toHaveFocus()
@@ -200,8 +221,8 @@ describe('Pin List Accessibility', () => {
       expect(deleteButtons[0]).toHaveFocus()
 
       await user.tab()
-      // Should move to next pin's edit button
-      expect(editButtons[1]).toHaveFocus()
+      // Should move to second pin's title link
+      expect(titleLinks[1]).toHaveFocus()
     })
 
     it('has proper heading hierarchy', () => {
@@ -214,18 +235,18 @@ describe('Pin List Accessibility', () => {
       expect(headings[2]).toHaveTextContent('Third Pin')
     })
 
-    it('maintains proper focus order in grid layout', async () => {
+    it('maintains proper focus order in list layout', async () => {
       const user = userEvent.setup()
       render(<PinList pins={mockPins} isLoading={false} />)
 
-      // Grid should maintain logical tab order
-      const gridContainer = screen.getByTestId('pin-list-grid')
-      expect(gridContainer).toHaveClass('grid')
+      // List should maintain logical tab order
+      const listContainer = screen.getByTestId('pin-list')
+      expect(listContainer).toHaveClass('space-y-4')
 
-      // First tab should go to first pin's first button
+      // First tab should go to first pin's title link
       await user.tab()
-      const firstEditButton = screen.getAllByLabelText(/Edit/)[0]
-      expect(firstEditButton).toHaveFocus()
+      const titleLinks = screen.getAllByRole('link', { name: /Pin/ })
+      expect(titleLinks[0]).toHaveFocus()
     })
 
     it('handles empty state accessibility', () => {
@@ -267,9 +288,9 @@ describe('Pin List Accessibility', () => {
     it('respects reduced motion preferences for animations', () => {
       render(<PinCard pin={mockPin} />)
 
-      // Action buttons should have transition classes
+      // Action buttons should be always visible (no transition needed)
       const actionsContainer = screen.getByLabelText('Edit Test Article').parentElement
-      expect(actionsContainer).toHaveClass('transition-opacity')
+      expect(actionsContainer).toHaveClass('flex', 'gap-2')
     })
   })
 
@@ -321,8 +342,8 @@ describe('Pin List Accessibility', () => {
       const description = screen.getByTestId('pin-description')
       expect(description).toHaveTextContent('A test article description')
 
-      // Domain should be clear
-      expect(screen.getByText('example.com')).toBeInTheDocument()
+      // URL should be clear
+      expect(screen.getByText('https://example.com/article')).toBeInTheDocument()
     })
   })
 
@@ -349,7 +370,7 @@ describe('Pin List Accessibility', () => {
       expect(mobileNav).toHaveClass('flex', 'sm:hidden')
     })
 
-    it('maintains proper grid responsiveness in pin list', () => {
+    it('maintains proper vertical layout in pin list', () => {
       const mockPins = [
         { ...mockPin, id: 'pin-1', title: 'First Pin' },
         { ...mockPin, id: 'pin-2', title: 'Second Pin' }
@@ -357,10 +378,10 @@ describe('Pin List Accessibility', () => {
 
       render(<PinList pins={mockPins} isLoading={false} />)
 
-      const gridContainer = screen.getByTestId('pin-list-grid')
+      const listContainer = screen.getByTestId('pin-list')
       
-      // Check responsive grid classes
-      expect(gridContainer).toHaveClass('grid', 'gap-4', 'md:grid-cols-2', 'lg:grid-cols-3')
+      // Check vertical list classes
+      expect(listContainer).toHaveClass('space-y-4')
     })
 
     it('ensures pin cards adapt to different screen sizes', () => {
@@ -368,11 +389,11 @@ describe('Pin List Accessibility', () => {
 
       // Pin card should be flexible and adapt to parent container
       const card = screen.getByRole('article')
-      expect(card).toHaveClass('group', 'relative')
+      expect(card).toHaveClass('py-1')
 
-      // Content should have proper responsive spacing
-      const content = card.querySelector('[data-slot="card-content"]')
-      expect(content).toHaveClass('p-6')
+      // Content should have proper compact spacing
+      const content = card.querySelector('.flex-1')
+      expect(content).toHaveClass('flex-1', 'min-w-0')
     })
 
     it('provides accessible navigation on all screen sizes', () => {

@@ -1,4 +1,4 @@
-import { eq, and, count } from 'drizzle-orm'
+import { eq, and, count, desc } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type {
   Pin,
@@ -37,7 +37,7 @@ export class DrizzlePinRepository implements PinRepository {
       .select()
       .from(pins)
       .where(eq(pins.userId, userId))
-      .orderBy(pins.createdAt)
+      .orderBy(desc(pins.createdAt))
 
     let query
     if (options?.limit !== undefined && options?.offset !== undefined) {
@@ -77,6 +77,7 @@ export class DrizzlePinRepository implements PinRepository {
       .from(pins)
       .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
       .where(and(eq(pins.userId, userId), eq(pinsTags.tagId, tagId)))
+      .orderBy(desc(pins.createdAt))
 
     const uniquePins = Array.from(
       new Map(result.map(r => [r.pin.id, r.pin])).values()
@@ -98,6 +99,7 @@ export class DrizzlePinRepository implements PinRepository {
       .select()
       .from(pins)
       .where(and(eq(pins.userId, userId), eq(pins.readLater, readLater)))
+      .orderBy(desc(pins.createdAt))
 
     return Promise.all(
       result.map(async pin => {
@@ -125,7 +127,7 @@ export class DrizzlePinRepository implements PinRepository {
   }
 
   async findAll(): Promise<Pin[]> {
-    const result = await this.db.select().from(pins)
+    const result = await this.db.select().from(pins).orderBy(desc(pins.createdAt))
 
     return Promise.all(
       result.map(async pin => {
@@ -136,7 +138,7 @@ export class DrizzlePinRepository implements PinRepository {
   }
 
   async list(limit?: number, offset?: number): Promise<Pin[]> {
-    const baseQuery = this.db.select().from(pins)
+    const baseQuery = this.db.select().from(pins).orderBy(desc(pins.createdAt))
 
     let query
     if (limit !== undefined && offset !== undefined) {

@@ -26,18 +26,15 @@ describe('PinCard', () => {
     expect(screen.getByText('Example Pin')).toBeInTheDocument()
   })
 
-  it('displays URL with proper formatting', () => {
+  it('displays full URL', () => {
     render(<PinCard pin={mockPin} />)
-    expect(screen.getByText('example.com')).toBeInTheDocument()
+    expect(screen.getByText('https://example.com')).toBeInTheDocument()
   })
 
-  it('displays truncated description with ellipsis for long text', () => {
-    const longDescription = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.'
-    const pinWithLongDesc = { ...mockPin, description: longDescription }
-    
-    render(<PinCard pin={pinWithLongDesc} />)
+  it('displays description when present', () => {
+    render(<PinCard pin={mockPin} />)
     const description = screen.getByTestId('pin-description')
-    expect(description).toHaveClass('line-clamp-3')
+    expect(description).toHaveTextContent('This is a test pin description')
   })
 
   it('shows all associated tags as badges', () => {
@@ -46,10 +43,10 @@ describe('PinCard', () => {
     expect(screen.getByText('react')).toBeInTheDocument()
   })
 
-  it('shows placeholder when no description provided', () => {
+  it('hides description when not provided', () => {
     const pinWithoutDesc = { ...mockPin, description: null }
     render(<PinCard pin={pinWithoutDesc} />)
-    expect(screen.getByText('No description')).toBeInTheDocument()
+    expect(screen.queryByTestId('pin-description')).not.toBeInTheDocument()
   })
 
   it('renders action buttons appropriately', () => {
@@ -61,7 +58,7 @@ describe('PinCard', () => {
   it('handles pins with no tags', () => {
     const pinWithoutTags = { ...mockPin, tags: [] }
     render(<PinCard pin={pinWithoutTags} />)
-    expect(screen.queryByTestId('pin-tags')).toBeEmptyDOMElement()
+    expect(screen.queryByTestId('pin-tags')).not.toBeInTheDocument()
   })
 
   it('handles invalid URLs gracefully', () => {
@@ -70,24 +67,36 @@ describe('PinCard', () => {
     expect(screen.getByText('not-a-valid-url')).toBeInTheDocument()
   })
 
-  it('removes www from domain display', () => {
+  it('displays full URL including www and path', () => {
     const pinWithWww = { ...mockPin, url: 'https://www.example.com/path' }
     render(<PinCard pin={pinWithWww} />)
-    expect(screen.getByText('example.com')).toBeInTheDocument()
+    expect(screen.getByText('https://www.example.com/path')).toBeInTheDocument()
   })
 
   it('handles empty description with null value', () => {
     const pinWithNullDesc = { ...mockPin, description: null }
     render(<PinCard pin={pinWithNullDesc} />)
-    expect(screen.getByText('No description')).toBeInTheDocument()
+    expect(screen.queryByTestId('pin-description')).not.toBeInTheDocument()
   })
 
-  it('renders action buttons with proper accessibility', () => {
+  it('renders action buttons as text links with proper accessibility', () => {
     render(<PinCard pin={mockPin} />)
     const editButton = screen.getByLabelText('Edit Example Pin')
     const deleteButton = screen.getByLabelText('Delete Example Pin')
     
-    expect(editButton).toHaveClass('h-8', 'w-8')
-    expect(deleteButton).toHaveClass('h-8', 'w-8')
+    expect(editButton).toHaveTextContent('edit')
+    expect(deleteButton).toHaveTextContent('delete')
+    expect(editButton).toHaveClass('text-xs', 'text-blue-600')
+    expect(deleteButton).toHaveClass('text-xs', 'text-blue-600')
+  })
+
+  it('displays relative time correctly', () => {
+    // Create a pin from 2 days ago
+    const twoDaysAgo = new Date()
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
+    const pinWithOldDate = { ...mockPin, createdAt: twoDaysAgo }
+    
+    render(<PinCard pin={pinWithOldDate} />)
+    expect(screen.getByText('2 days ago')).toBeInTheDocument()
   })
 })
