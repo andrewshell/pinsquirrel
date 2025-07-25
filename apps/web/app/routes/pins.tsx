@@ -1,9 +1,8 @@
-import { useLoaderData } from 'react-router'
+import { useLoaderData, useNavigation } from 'react-router'
 import type { Route } from './+types/pins'
 import { requireUser } from '~/lib/session.server'
 import { DrizzlePinRepository, DrizzleTagRepository, db } from '@pinsquirrel/database'
-import { EmptyState } from '~/components/pins/EmptyState'
-import { PinCard } from '~/components/pins/PinCard'
+import { PinList } from '~/components/pins/PinList'
 
 // Server-side repositories
 const tagRepository = new DrizzleTagRepository(db)
@@ -38,6 +37,10 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export default function PinsPage() {
   const { pins, totalPages: _totalPages, currentPage: _currentPage, totalCount: _totalCount } = useLoaderData<typeof loader>()
+  const navigation = useNavigation()
+  
+  // Check if we're loading (navigating or submitting)
+  const isLoading = navigation.state === 'loading'
 
   return (
     <div className="min-h-screen bg-background py-12 px-4 sm:px-6 lg:px-8">
@@ -49,15 +52,7 @@ export default function PinsPage() {
           </p>
         </div>
 
-        {pins.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {pins.map((pin) => (
-              <PinCard key={pin.id} pin={pin} />
-            ))}
-          </div>
-        )}
+        <PinList pins={pins} isLoading={isLoading} />
       </div>
     </div>
   )
