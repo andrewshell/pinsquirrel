@@ -1,6 +1,7 @@
 import { Link } from 'react-router'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '~/components/ui/button'
+import { useEffect, useRef } from 'react'
 
 interface PaginationProps {
   currentPage: number
@@ -9,8 +10,33 @@ interface PaginationProps {
 }
 
 export function Pagination({ currentPage, totalPages, totalCount }: PaginationProps) {
+  const paginationRef = useRef<HTMLElement>(null)
+  const shouldRender = totalPages > 1 && totalCount > 0
+
+  // Announce page changes to screen readers
+  useEffect(() => {
+    if (shouldRender && paginationRef.current) {
+      // Create a live region announcement for page changes
+      const announcement = `Page ${currentPage} of ${totalPages} loaded`
+      const announcer = document.createElement('div')
+      announcer.setAttribute('aria-live', 'polite')
+      announcer.setAttribute('aria-atomic', 'true')
+      announcer.className = 'sr-only'
+      announcer.textContent = announcement
+      
+      document.body.appendChild(announcer)
+      
+      // Clean up after announcement
+      setTimeout(() => {
+        if (document.body.contains(announcer)) {
+          document.body.removeChild(announcer)
+        }
+      }, 1000)
+    }
+  }, [currentPage, totalPages, shouldRender])
+
   // Don't render pagination if there's only one page or no items
-  if (totalPages <= 1 || totalCount === 0) {
+  if (!shouldRender) {
     return null
   }
 
@@ -59,6 +85,7 @@ export function Pagination({ currentPage, totalPages, totalCount }: PaginationPr
 
   return (
     <nav
+      ref={paginationRef}
       role="navigation"
       aria-label="Pagination navigation"
       className="flex items-center justify-between px-4 py-3 sm:px-6"

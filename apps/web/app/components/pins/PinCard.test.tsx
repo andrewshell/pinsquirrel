@@ -54,8 +54,8 @@ describe('PinCard', () => {
 
   it('renders action buttons appropriately', () => {
     render(<PinCard pin={mockPin} />)
-    expect(screen.getByLabelText('Edit pin')).toBeInTheDocument()
-    expect(screen.getByLabelText('Delete pin')).toBeInTheDocument()
+    expect(screen.getByLabelText('Edit Example Pin')).toBeInTheDocument()
+    expect(screen.getByLabelText('Delete Example Pin')).toBeInTheDocument()
   })
 
   it('handles pins with no tags', () => {
@@ -84,8 +84,8 @@ describe('PinCard', () => {
 
   it('renders action buttons with proper accessibility', () => {
     render(<PinCard pin={mockPin} />)
-    const editButton = screen.getByLabelText('Edit pin')
-    const deleteButton = screen.getByLabelText('Delete pin')
+    const editButton = screen.getByLabelText('Edit Example Pin')
+    const deleteButton = screen.getByLabelText('Delete Example Pin')
     
     expect(editButton).toHaveClass('h-8', 'w-8')
     expect(deleteButton).toHaveClass('h-8', 'w-8')
