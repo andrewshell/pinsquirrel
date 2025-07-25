@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm'
+import { eq, and, count } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type {
   Pin,
@@ -32,11 +32,25 @@ export class DrizzlePinRepository implements PinRepository {
     return this.mapToPin(pin, pinTags)
   }
 
-  async findByUserId(userId: string): Promise<Pin[]> {
-    const result = await this.db
+  async findByUserId(userId: string, options?: { limit?: number; offset?: number }): Promise<Pin[]> {
+    const baseQuery = this.db
       .select()
       .from(pins)
       .where(eq(pins.userId, userId))
+      .orderBy(pins.createdAt)
+
+    let query
+    if (options?.limit !== undefined && options?.offset !== undefined) {
+      query = baseQuery.limit(options.limit).offset(options.offset)
+    } else if (options?.limit !== undefined) {
+      query = baseQuery.limit(options.limit)
+    } else if (options?.offset !== undefined) {
+      query = baseQuery.offset(options.offset)
+    } else {
+      query = baseQuery
+    }
+
+    const result = await query
 
     return Promise.all(
       result.map(async pin => {
@@ -44,6 +58,15 @@ export class DrizzlePinRepository implements PinRepository {
         return this.mapToPin(pin, pinTags)
       })
     )
+  }
+
+  async countByUserId(userId: string): Promise<number> {
+    const result = await this.db
+      .select({ count: count() })
+      .from(pins)
+      .where(eq(pins.userId, userId))
+
+    return result[0]?.count ?? 0
   }
 
   async findByUserIdAndTag(userId: string, tagId: string): Promise<Pin[]> {

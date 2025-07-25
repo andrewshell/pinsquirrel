@@ -7,21 +7,21 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
 
 ## Tasks
 
-- [ ] 1. Set up pin list route and basic components
-  - [ ] 1.1 Write tests for PinCard component rendering
-  - [ ] 1.2 Implement PinCard component with title, URL, description, and tags
-  - [ ] 1.3 Write tests for EmptyState component
-  - [ ] 1.4 Implement EmptyState component with message and CTA
-  - [ ] 1.5 Create /pins route file with basic structure
-  - [ ] 1.6 Verify all component tests pass
+- [x] 1. Set up pin list route and basic components
+  - [x] 1.1 Write tests for PinCard component rendering
+  - [x] 1.2 Implement PinCard component with title, URL, description, and tags
+  - [x] 1.3 Write tests for EmptyState component
+  - [x] 1.4 Implement EmptyState component with message and CTA
+  - [x] 1.5 Create /pins route file with basic structure
+  - [x] 1.6 Verify all component tests pass
 
-- [ ] 2. Implement data loading with pagination
-  - [ ] 2.1 Write tests for loader function with pagination
-  - [ ] 2.2 Implement loader with PinRepository integration
-  - [ ] 2.3 Add countByUserId method to PinRepository if missing
-  - [ ] 2.4 Write tests for authentication in loader
-  - [ ] 2.5 Implement requireUser helper function
-  - [ ] 2.6 Verify all loader tests pass
+- [x] 2. Implement data loading with pagination
+  - [x] 2.1 Write tests for loader function with pagination
+  - [x] 2.2 Implement loader with PinRepository integration
+  - [x] 2.3 Add countByUserId method to PinRepository if missing
+  - [x] 2.4 Write tests for authentication in loader
+  - [x] 2.5 Implement requireUser helper function
+  - [x] 2.6 Verify all loader tests pass
 
 - [ ] 3. Build pin list display with loader integration
   - [ ] 3.1 Write tests for PinList component
