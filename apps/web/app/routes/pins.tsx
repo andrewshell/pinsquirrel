@@ -3,6 +3,7 @@ import type { Route } from './+types/pins'
 import { requireUser } from '~/lib/session.server'
 import { DrizzlePinRepository, DrizzleTagRepository, db } from '@pinsquirrel/database'
 import { PinList } from '~/components/pins/PinList'
+import { Pagination } from '~/components/pins/Pagination'
 
 // Server-side repositories
 const tagRepository = new DrizzleTagRepository(db)
@@ -36,7 +37,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function PinsPage() {
-  const { pins, totalPages: _totalPages, currentPage: _currentPage, totalCount: _totalCount } = useLoaderData<typeof loader>()
+  const { pins, totalPages, currentPage, totalCount } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
   
   // Check if we're loading (navigating or submitting)
@@ -53,6 +54,12 @@ export default function PinsPage() {
         </div>
 
         <PinList pins={pins} isLoading={isLoading} />
+        
+        <Pagination 
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalCount={totalCount}
+        />
       </div>
     </div>
   )

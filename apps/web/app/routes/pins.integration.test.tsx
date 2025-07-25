@@ -20,6 +20,13 @@ vi.mock('@pinsquirrel/database', () => ({
   db: {},
 }))
 
+interface MockLinkProps {
+  to: string
+  children: React.ReactNode
+  className?: string
+  'aria-label'?: string
+}
+
 // Mock React Router hooks
 vi.mock('react-router', async () => {
   const actual = await vi.importActual('react-router')
@@ -27,6 +34,11 @@ vi.mock('react-router', async () => {
     ...actual,
     useLoaderData: vi.fn(),
     useNavigation: vi.fn(),
+    Link: ({ to, children, className, 'aria-label': ariaLabel }: MockLinkProps) => (
+      <a href={to} className={className} aria-label={ariaLabel}>
+        {children}
+      </a>
+    ),
   }
 })
 
