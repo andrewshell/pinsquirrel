@@ -43,14 +43,14 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 4.5 Implement page boundary logic and disabled states
   - [x] 4.6 Verify all pagination tests pass
 
-- [ ] 5. Polish and accessibility
+- [x] 5. Polish and accessibility
 
-  - [ ] 5.1 Write accessibility tests for keyboard navigation
-  - [ ] 5.2 Add ARIA labels and screen reader support
-  - [ ] 5.3 Implement focus management on page changes
-  - [ ] 5.4 Add loading skeletons for better UX
-  - [ ] 5.5 Test responsive behavior on different screens
-  - [ ] 5.6 Verify all tests pass including accessibility
+  - [x] 5.1 Write accessibility tests for keyboard navigation
+  - [x] 5.2 Add ARIA labels and screen reader support
+  - [x] 5.3 Implement focus management on page changes
+  - [x] 5.4 Add loading skeletons for better UX
+  - [x] 5.5 Test responsive behavior on different screens
+  - [x] 5.6 Verify all tests pass including accessibility
 
 - [ ] 6. Create seeding script for manual testing
 
