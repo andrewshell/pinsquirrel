@@ -5,6 +5,7 @@ export default [
   route('login', 'routes/login.tsx'),
   route('register', 'routes/register.tsx'),
   route('profile', 'routes/profile.tsx'),
+  route('pins', 'routes/pins.tsx'),
   route('logout', 'routes/logout.tsx'),
 
   // Catch-all route for 404s and well-known requests (must be last)
