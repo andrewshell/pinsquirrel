@@ -25,7 +25,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "seed:pins": "tsx src/scripts/seed-pins.ts"
+    "seed:pins": "tsx src/scripts/seed-pins.ts",
+    "import:pinboard": "tsx src/scripts/import-pinboard.ts"
   },
   "dependencies": {
     "@pinsquirrel/core": "workspace:*",

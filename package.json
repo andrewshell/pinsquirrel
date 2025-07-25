@@ -11,8 +11,7 @@
     "format": "turbo format",
     "test": "turbo test",
     "db:up": "docker compose -f docker-compose.dev.yml down && docker compose -f docker-compose.dev.yml up -d postgres",
-    "db:down": "docker compose -f docker-compose.dev.yml down",
-    "seed:pins": "pnpm --filter @pinsquirrel/database seed:pins"
+    "db:down": "docker compose -f docker-compose.dev.yml down"
   },
   "devDependencies": {
     "turbo": "latest"

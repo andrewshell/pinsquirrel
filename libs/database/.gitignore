@@ -17,3 +17,4 @@ drizzle/
 # Misc
 .DS_Store
 *.log
+pinboard_export.json
