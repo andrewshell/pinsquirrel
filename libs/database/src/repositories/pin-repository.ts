@@ -1,4 +1,4 @@
-import { eq, and, count, desc } from 'drizzle-orm'
+import { eq, and, count, desc, inArray } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type {
   Pin,
@@ -52,12 +52,7 @@ export class DrizzlePinRepository implements PinRepository {
 
     const result = await query
 
-    return Promise.all(
-      result.map(async pin => {
-        const pinTags = await this.getPinTags(pin.id)
-        return this.mapToPin(pin, pinTags)
-      })
-    )
+    return this.mapPinsBulk(result)
   }
 
   async countByUserId(userId: string): Promise<number> {
@@ -83,12 +78,7 @@ export class DrizzlePinRepository implements PinRepository {
       new Map(result.map(r => [r.pin.id, r.pin])).values()
     )
 
-    return Promise.all(
-      uniquePins.map(async pin => {
-        const pinTags = await this.getPinTags(pin.id)
-        return this.mapToPin(pin, pinTags)
-      })
-    )
+    return this.mapPinsBulk(uniquePins)
   }
 
   async findByUserIdAndReadLater(
@@ -101,12 +91,7 @@ export class DrizzlePinRepository implements PinRepository {
       .where(and(eq(pins.userId, userId), eq(pins.readLater, readLater)))
       .orderBy(desc(pins.createdAt))
 
-    return Promise.all(
-      result.map(async pin => {
-        const pinTags = await this.getPinTags(pin.id)
-        return this.mapToPin(pin, pinTags)
-      })
-    )
+    return this.mapPinsBulk(result)
   }
 
   async findByUserIdAndUrl(userId: string, url: string): Promise<Pin | null> {
@@ -129,12 +114,7 @@ export class DrizzlePinRepository implements PinRepository {
   async findAll(): Promise<Pin[]> {
     const result = await this.db.select().from(pins).orderBy(desc(pins.createdAt))
 
-    return Promise.all(
-      result.map(async pin => {
-        const pinTags = await this.getPinTags(pin.id)
-        return this.mapToPin(pin, pinTags)
-      })
-    )
+    return this.mapPinsBulk(result)
   }
 
   async list(limit?: number, offset?: number): Promise<Pin[]> {
@@ -153,12 +133,7 @@ export class DrizzlePinRepository implements PinRepository {
 
     const result = await query
 
-    return Promise.all(
-      result.map(async pin => {
-        const pinTags = await this.getPinTags(pin.id)
-        return this.mapToPin(pin, pinTags)
-      })
-    )
+    return this.mapPinsBulk(result)
   }
 
   async create(data: CreatePinData): Promise<Pin> {
@@ -274,6 +249,47 @@ export class DrizzlePinRepository implements PinRepository {
   async delete(id: string): Promise<boolean> {
     const result = await this.db.delete(pins).where(eq(pins.id, id))
     return result.rowCount > 0
+  }
+
+  private async getBulkPinTags(
+    pinIds: string[]
+  ): Promise<Map<string, (typeof tags.$inferSelect)[]>> {
+    if (pinIds.length === 0) {
+      return new Map()
+    }
+
+    const result = await this.db
+      .select({
+        pinId: pinsTags.pinId,
+        tag: tags,
+      })
+      .from(pinsTags)
+      .innerJoin(tags, eq(pinsTags.tagId, tags.id))
+      .where(inArray(pinsTags.pinId, pinIds))
+
+    const tagsByPinId = new Map<string, (typeof tags.$inferSelect)[]>()
+    
+    for (const row of result) {
+      const existing = tagsByPinId.get(row.pinId) || []
+      existing.push(row.tag)
+      tagsByPinId.set(row.pinId, existing)
+    }
+
+    return tagsByPinId
+  }
+
+  private async mapPinsBulk(pinsData: (typeof pins.$inferSelect)[]): Promise<Pin[]> {
+    if (pinsData.length === 0) {
+      return []
+    }
+
+    const pinIds = pinsData.map((pin: typeof pins.$inferSelect) => pin.id)
+    const tagsByPinId = await this.getBulkPinTags(pinIds)
+
+    return pinsData.map((pin: typeof pins.$inferSelect) => {
+      const pinTags = tagsByPinId.get(pin.id) || []
+      return this.mapToPin(pin, pinTags)
+    })
   }
 
   private async getPinTags(
