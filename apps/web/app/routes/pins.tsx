@@ -4,27 +4,35 @@ import { requireUser } from '~/lib/session.server'
 import { DrizzlePinRepository, DrizzleTagRepository, db } from '@pinsquirrel/database'
 import { EmptyState } from '~/components/pins/EmptyState'
 import { PinCard } from '~/components/pins/PinCard'
-import type { Pin } from '@pinsquirrel/core'
 
 // Server-side repositories
 const tagRepository = new DrizzleTagRepository(db)
-const _pinRepository = new DrizzlePinRepository(db, tagRepository)
+const pinRepository = new DrizzlePinRepository(db, tagRepository)
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url)
-  const page = Number(url.searchParams.get('page')) || 1
-  const _pageSize = 25
+  const page = Math.max(1, Number(url.searchParams.get('page')) || 1)
+  const pageSize = 25
 
   // Get authenticated user
-  const _user = await requireUser(request)
+  const user = await requireUser(request)
 
-  // For now, return empty data structure
-  // Full implementation will come in Task 2
+  // Fetch pins with pagination
+  const offset = (page - 1) * pageSize
+  const pins = await pinRepository.findByUserId(user.id, {
+    limit: pageSize,
+    offset: offset,
+  })
+
+  // Get total count for pagination
+  const totalCount = await pinRepository.countByUserId(user.id)
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+
   return {
-    pins: [] as Pin[],
-    totalPages: 1,
+    pins,
+    totalPages,
     currentPage: page,
-    totalCount: 0,
+    totalCount,
   }
 }
 
