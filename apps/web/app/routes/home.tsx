@@ -1,10 +1,17 @@
-import { Link, useLoaderData, Form } from 'react-router'
+import { Link, redirect } from 'react-router'
 import type { Route } from './+types/home'
 import { getUser } from '~/lib/session.server'
 import { Button } from '~/components/ui/button'
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await getUser(request)
+  
+  // Redirect logged-in users to pins page
+  if (user) {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error
+    throw redirect('/pins')
+  }
+  
   return { user }
 }
 
@@ -16,7 +23,7 @@ export function meta(_: Route.MetaArgs) {
 }
 
 export default function Home() {
-  const { user } = useLoaderData<typeof loader>()
+  // No need to access user data since logged-in users are redirected
 
   return (
     <div className="min-h-screen bg-background">
@@ -41,30 +48,13 @@ export default function Home() {
 
           {/* Call to Action */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-20">
-            {user ? (
-              // Logged in state
-              <div className="flex flex-col sm:flex-row gap-4 items-center">
-                <p className="text-foreground">
-                  Welcome back,{' '}
-                  <span className="font-medium">{user.username}</span>
-                </p>
-                <Form method="post" action="/logout">
-                  <Button variant="outline" type="submit">
-                    Logout
-                  </Button>
-                </Form>
-              </div>
-            ) : (
-              // Logged out state
-              <>
-                <Button asChild>
-                  <Link to="/register">Get Started</Link>
-                </Button>
-                <Button variant="outline" asChild>
-                  <Link to="/login">Sign In</Link>
-                </Button>
-              </>
-            )}
+            {/* Since logged-in users are redirected, we only show logged out state */}
+            <Button asChild>
+              <Link to="/register">Get Started</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/login">Sign In</Link>
+            </Button>
           </div>
 
           {/* Features */}

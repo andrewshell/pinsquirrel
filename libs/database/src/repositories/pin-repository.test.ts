@@ -143,6 +143,31 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       const result = await pinRepository.findByUserId(testUser.id)
       expect(result).toEqual([])
     })
+
+    it('should return pins in descending order by createdAt (newest first)', async () => {
+      const pin1Id = crypto.randomUUID()
+      const pin2Id = crypto.randomUUID()
+      const pin3Id = crypto.randomUUID()
+      
+      // Create pins with different creation times
+      await testPool.query(
+        `
+        INSERT INTO pins (id, user_id, url, title, created_at, updated_at) VALUES
+        ($2, $1, 'https://example1.com', 'Pin 1', '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z'),
+        ($3, $1, 'https://example2.com', 'Pin 2', '2023-01-03T00:00:00Z', '2023-01-03T00:00:00Z'),
+        ($4, $1, 'https://example3.com', 'Pin 3', '2023-01-02T00:00:00Z', '2023-01-02T00:00:00Z')
+      `,
+        [testUser.id, pin1Id, pin2Id, pin3Id]
+      )
+
+      const result = await pinRepository.findByUserId(testUser.id)
+
+      expect(result).toHaveLength(3)
+      // Should be ordered by createdAt descending (newest first)
+      expect(result[0].title).toBe('Pin 2') // 2023-01-03 (newest)
+      expect(result[1].title).toBe('Pin 3') // 2023-01-02 (middle)
+      expect(result[2].title).toBe('Pin 1') // 2023-01-01 (oldest)
+    })
   })
 
   describe('findByUserIdAndTag', () => {

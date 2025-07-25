@@ -73,17 +73,17 @@ describe('PinList', () => {
     render(<PinList pins={[]} isLoading={false} />)
     
     expect(screen.getByTestId('empty-state')).toBeInTheDocument()
-    expect(screen.queryByTestId('pin-list-grid')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('pin-list')).not.toBeInTheDocument()
   })
 
-  it('renders pin cards in grid layout when pins provided', () => {
+  it('renders pin cards in list layout when pins provided', () => {
     render(<PinList pins={mockPins} isLoading={false} />)
     
     // Should not show empty state
     expect(screen.queryByTestId('empty-state')).not.toBeInTheDocument()
     
-    // Should show grid container
-    expect(screen.getByTestId('pin-list-grid')).toBeInTheDocument()
+    // Should show list container
+    expect(screen.getByTestId('pin-list')).toBeInTheDocument()
     
     // Should render all pin cards
     expect(screen.getByTestId('pin-card-pin-1')).toBeInTheDocument()
@@ -96,18 +96,18 @@ describe('PinList', () => {
     expect(screen.getByText('Mock PinCard: Third Pin')).toBeInTheDocument()
   })
 
-  it('applies correct CSS classes for responsive grid layout', () => {
+  it('applies correct CSS classes for vertical list layout', () => {
     render(<PinList pins={mockPins} isLoading={false} />)
     
-    const gridContainer = screen.getByTestId('pin-list-grid')
-    expect(gridContainer).toHaveClass('grid', 'gap-4', 'md:grid-cols-2', 'lg:grid-cols-3')
+    const listContainer = screen.getByTestId('pin-list')
+    expect(listContainer).toHaveClass('space-y-4')
   })
 
   it('shows loading state when isLoading is true', () => {
     render(<PinList pins={mockPins} isLoading={true} />)
     
     expect(screen.getByTestId('pin-list-loading')).toBeInTheDocument()
-    expect(screen.queryByTestId('pin-list-grid')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('pin-list')).not.toBeInTheDocument()
     expect(screen.queryByTestId('empty-state')).not.toBeInTheDocument()
   })
 
@@ -127,7 +127,7 @@ describe('PinList', () => {
     render(<PinList pins={mockPins} isLoading={true} />)
     
     expect(screen.getByTestId('pin-list-loading')).toBeInTheDocument()
-    expect(screen.queryByTestId('pin-list-grid')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('pin-list')).not.toBeInTheDocument()
     expect(screen.queryByTestId('pin-card-pin-1')).not.toBeInTheDocument()
   })
 
@@ -135,18 +135,18 @@ describe('PinList', () => {
     const singlePin = [mockPins[0]]
     render(<PinList pins={singlePin} isLoading={false} />)
     
-    expect(screen.getByTestId('pin-list-grid')).toBeInTheDocument()
+    expect(screen.getByTestId('pin-list')).toBeInTheDocument()
     expect(screen.getByTestId('pin-card-pin-1')).toBeInTheDocument()
     expect(screen.queryByTestId('pin-card-pin-2')).not.toBeInTheDocument()
   })
 
-  it('maintains grid layout with different numbers of pins', () => {
-    // Test with 2 pins (should still use grid layout)
+  it('maintains list layout with different numbers of pins', () => {
+    // Test with 2 pins (should use vertical list layout)
     const twoPins = mockPins.slice(0, 2)
     render(<PinList pins={twoPins} isLoading={false} />)
     
-    const gridContainer = screen.getByTestId('pin-list-grid')
-    expect(gridContainer).toHaveClass('grid', 'gap-4', 'md:grid-cols-2', 'lg:grid-cols-3')
+    const listContainer = screen.getByTestId('pin-list')
+    expect(listContainer).toHaveClass('space-y-4')
     expect(screen.getByTestId('pin-card-pin-1')).toBeInTheDocument()
     expect(screen.getByTestId('pin-card-pin-2')).toBeInTheDocument()
   })

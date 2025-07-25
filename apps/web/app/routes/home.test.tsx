@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { createMemoryRouter, RouterProvider } from 'react-router'
+import { createMemoryRouter, RouterProvider, redirect } from 'react-router'
 import Home from './home'
 
 // Mock the session server module
@@ -16,7 +16,19 @@ function renderWithRouter(
     {
       path: '/',
       element: <Home />,
-      loader: () => ({ user }),
+      loader: () => {
+        // Simulate the redirect behavior for logged-in users
+        if (user) {
+          // eslint-disable-next-line @typescript-eslint/only-throw-error
+          throw redirect('/pins')
+        }
+        return { user }
+      },
+    },
+    {
+      // Add pins route to handle redirects
+      path: '/pins',
+      element: <div data-testid="pins-page">Pins Page</div>,
     },
   ]
 
@@ -50,7 +62,7 @@ describe('Home Page', () => {
     expect(await screen.findByText('🐿️')).toBeInTheDocument()
   })
 
-  it('should render login and register buttons when logged out', async () => {
+  it('should render login and register buttons', async () => {
     renderWithRouter(null)
 
     expect(
@@ -59,13 +71,13 @@ describe('Home Page', () => {
     expect(screen.getByRole('link', { name: 'Sign In' })).toBeInTheDocument()
   })
 
-  it('should render welcome message and logout button when logged in', async () => {
+  it('should redirect logged-in users to pins page', async () => {
     const user = { id: '1', username: 'testuser' }
     renderWithRouter(user)
 
-    expect(await screen.findByText(/Welcome back,/)).toBeInTheDocument()
-    expect(screen.getByText('testuser')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Logout' })).toBeInTheDocument()
+    // Should be redirected to pins page instead of seeing home content
+    expect(await screen.findByTestId('pins-page')).toBeInTheDocument()
+    expect(screen.queryByText('PinSquirrel Boilerplate')).not.toBeInTheDocument()
   })
 
   it('should render all three feature cards', async () => {
