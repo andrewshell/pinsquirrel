@@ -34,14 +34,14 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 3.5 Connect EmptyState for no pins scenario
   - [x] 3.6 Verify integration tests pass
 
-- [ ] 4. Add pagination controls
+- [x] 4. Add pagination controls
 
-  - [ ] 4.1 Write tests for Pagination component
-  - [ ] 4.2 Implement Pagination component with shadcn/ui
-  - [ ] 4.3 Add page navigation with React Router links
-  - [ ] 4.4 Write tests for URL parameter handling
-  - [ ] 4.5 Implement page boundary logic and disabled states
-  - [ ] 4.6 Verify all pagination tests pass
+  - [x] 4.1 Write tests for Pagination component
+  - [x] 4.2 Implement Pagination component with shadcn/ui
+  - [x] 4.3 Add page navigation with React Router links
+  - [x] 4.4 Write tests for URL parameter handling
+  - [x] 4.5 Implement page boundary logic and disabled states
+  - [x] 4.6 Verify all pagination tests pass
 
 - [ ] 5. Polish and accessibility
 
