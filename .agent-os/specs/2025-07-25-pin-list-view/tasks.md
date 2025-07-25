@@ -23,13 +23,13 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 2.5 Implement requireUser helper function
   - [x] 2.6 Verify all loader tests pass
 
-- [ ] 3. Build pin list display with loader integration
-  - [ ] 3.1 Write tests for PinList component
-  - [ ] 3.2 Implement PinList component using useLoaderData
-  - [ ] 3.3 Add responsive grid layout with Tailwind
-  - [ ] 3.4 Integrate loading states using useNavigation
-  - [ ] 3.5 Connect EmptyState for no pins scenario
-  - [ ] 3.6 Verify integration tests pass
+- [x] 3. Build pin list display with loader integration
+  - [x] 3.1 Write tests for PinList component
+  - [x] 3.2 Implement PinList component using useLoaderData
+  - [x] 3.3 Add responsive grid layout with Tailwind
+  - [x] 3.4 Integrate loading states using useNavigation
+  - [x] 3.5 Connect EmptyState for no pins scenario
+  - [x] 3.6 Verify integration tests pass
 
 - [ ] 4. Add pagination controls
   - [ ] 4.1 Write tests for Pagination component
