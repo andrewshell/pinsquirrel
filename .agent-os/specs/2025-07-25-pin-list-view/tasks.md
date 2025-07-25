@@ -52,11 +52,11 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 5.5 Test responsive behavior on different screens
   - [x] 5.6 Verify all tests pass including accessibility
 
-- [ ] 6. Create seeding script for manual testing
+- [x] 6. Create seeding script for manual testing
 
-  - [ ] 6.1 Write script to create sample pins for an existing user
-  - [ ] 6.2 Generate diverse pin data (various URLs, titles, descriptions, tags)
-  - [ ] 6.3 Create enough pins to test pagination (30+ pins)
-  - [ ] 6.4 Include pins with different states (readLater true/false)
-  - [ ] 6.5 Add variety in tag usage for realistic testing
-  - [ ] 6.6 Verify seeding script works and data displays correctly
+  - [x] 6.1 Write script to create sample pins for an existing user
+  - [x] 6.2 Generate diverse pin data (various URLs, titles, descriptions, tags)
+  - [x] 6.3 Create enough pins to test pagination (30+ pins)
+  - [x] 6.4 Include pins with different states (readLater true/false)
+  - [x] 6.5 Add variety in tag usage for realistic testing
+  - [x] 6.6 Verify seeding script works and data displays correctly
