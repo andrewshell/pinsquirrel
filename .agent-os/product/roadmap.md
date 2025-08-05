@@ -1,6 +1,6 @@
 # Product Roadmap
 
-> Last Updated: 2025-07-24
+> Last Updated: 2025-08-05
 > Version: 1.0.0
 > Status: Planning
 
@@ -17,6 +17,7 @@ The following features have been implemented:
 - [x] Test coverage - Comprehensive unit tests for all repositories `M`
 - [x] Monorepo setup - pnpm workspace with Turbo orchestration `S`
 - [x] Development tooling - ESLint, Prettier, TypeScript configuration `S`
+- [x] Pin list view - Display all user pins with pagination `M`
 
 ## Phase 1: Pin Management UI (1-2 weeks)
 
@@ -24,8 +25,6 @@ The following features have been implemented:
 **Success Criteria:** Users can create, view, edit, and delete pins through the web interface
 
 ### Must-Have Features
-
-- [ ] Pin list view - Display all user pins with pagination `M`
 - [ ] Pin creation form - Add new pins with URL, title, description `S`
 - [ ] Pin editing - Update existing pin information `S`
 - [ ] Tag management UI - Add/remove tags from pins `M`
