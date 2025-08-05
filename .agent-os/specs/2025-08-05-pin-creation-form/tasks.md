@@ -15,13 +15,13 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 1.5 Add form field components using shadcn/ui
   - [x] 1.6 Verify all component tests pass
 
-- [ ] 2. Implement pin creation route and action
-  - [ ] 2.1 Write tests for /pins/new route component
-  - [ ] 2.2 Create /pins/new route file
-  - [ ] 2.3 Write tests for createPin action function
-  - [ ] 2.4 Implement action with PinRepository integration
-  - [ ] 2.5 Add authentication check in action
-  - [ ] 2.6 Verify all route tests pass
+- [x] 2. Implement pin creation route and action
+  - [x] 2.1 Write tests for /pins/new route component
+  - [x] 2.2 Create /pins/new route file
+  - [x] 2.3 Write tests for createPin action function
+  - [x] 2.4 Implement action with PinRepository integration
+  - [x] 2.5 Add authentication check in action
+  - [x] 2.6 Verify all route tests pass
 
 - [ ] 3. Add metadata fetching functionality
   - [ ] 3.1 Write tests for useMetadataFetch hook
