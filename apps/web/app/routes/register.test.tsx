@@ -1,11 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { loader, action } from './register'
+import { loader } from './register'
 import type { Route } from './+types/register'
-import { getUserId, createUserSession } from '~/lib/session.server'
-import { parseFormData, registerSchema } from '~/lib/validation'
-import { AuthenticationServiceImpl } from '@pinsquirrel/core'
-import { DrizzleUserRepository } from '@pinsquirrel/database'
-import { logger } from '~/lib/logger.server'
+import { getUserId } from '~/lib/session.server'
 
 // Mock all dependencies
 vi.mock('~/lib/session.server')
@@ -22,7 +19,7 @@ vi.mock('react-router', () => ({
     getSession: vi.fn(),
     commitSession: vi.fn(),
     destroySession: vi.fn(),
-  }),
+  } as any),
 }))
 
 describe('Register Route', () => {
@@ -136,7 +133,7 @@ describe('Register Route', () => {
           { username: 'validuser', password: 'validpass', email: 'test@example.com', expected: true },
         ]
 
-        testCases.forEach(({ username, password, email, expected }) => {
+        testCases.forEach(({ username, password, expected }) => {
           const hasRequiredFields = !!(username && password)
           expect(hasRequiredFields).toBe(expected)
         })
@@ -274,7 +271,7 @@ describe('Register Route', () => {
       })
 
       it('should handle unknown errors', () => {
-        const unknownError = 'Some string error'
+        const unknownError: unknown = 'Some string error'
         const errorMessage = unknownError instanceof Error ? unknownError.message : 'Registration failed'
 
         expect(errorMessage).toBe('Registration failed')

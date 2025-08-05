@@ -39,7 +39,7 @@ export function PinCreationForm({
   })
 
   const onSubmitWrapper = (data: PinCreationFormData) => {
-    onSubmit(data)
+    void onSubmit(data)
   }
 
   const urlValue = watch('url')
@@ -64,7 +64,7 @@ export function PinCreationForm({
 
   return (
     <form 
-      onSubmit={handleSubmit(onSubmitWrapper)} 
+      onSubmit={(e) => void handleSubmit(onSubmitWrapper)(e)} 
       method="post" 
       action="/pins/new" 
       className="space-y-4"
@@ -85,7 +85,6 @@ export function PinCreationForm({
         <Label htmlFor="url">URL</Label>
         <Input
           id="url"
-          name="url"
           type="url"
           placeholder="https://example.com"
           {...register('url', { onBlur: handleUrlBlur })}
@@ -104,7 +103,6 @@ export function PinCreationForm({
         <div className="relative">
           <Input
             id="title"
-            name="title"
             type="text"
             placeholder="Enter a title"
             {...register('title')}
@@ -133,7 +131,6 @@ export function PinCreationForm({
         <Label htmlFor="description">Description (optional)</Label>
         <Textarea
           id="description"
-          name="description"
           placeholder="Add a description..."
           {...register('description')}
           rows={4}

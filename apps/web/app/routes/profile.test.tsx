@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unnecessary-type-assertion */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { loader, action } from './profile'
 import type { Route } from './+types/profile'
@@ -39,8 +40,17 @@ describe('Profile Route', () => {
       updateEmail: vi.fn(),
       changePassword: vi.fn(),
     }
-    vi.mocked(AuthenticationServiceImpl).mockImplementation(() => mockAuthService)
-    vi.mocked(DrizzleUserRepository).mockImplementation(() => ({}))
+    vi.mocked(AuthenticationServiceImpl).mockImplementation(() => mockAuthService as any)
+    vi.mocked(DrizzleUserRepository).mockImplementation(() => ({
+      findById: vi.fn(),
+      findByEmailHash: vi.fn(),
+      findByUsername: vi.fn(),
+      findAll: vi.fn(),
+      list: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    } as unknown as DrizzleUserRepository))
   })
 
   describe('loader', () => {
@@ -168,7 +178,7 @@ describe('Profile Route', () => {
 
       const result = await action(args)
 
-      expect(mockAuthService.updateEmail).not.toHaveBeenCalled()
+      expect((mockAuthService as any).updateEmail).not.toHaveBeenCalled()
       expect(result).toEqual({
         error: 'Email is required',
         success: null,
@@ -190,7 +200,7 @@ describe('Profile Route', () => {
 
       const result = await action(args)
 
-      expect(mockAuthService.updateEmail).not.toHaveBeenCalled()
+      expect((mockAuthService as any).updateEmail).not.toHaveBeenCalled()
       expect(result).toEqual({
         error: 'Email is required',
         success: null,
@@ -214,7 +224,7 @@ describe('Profile Route', () => {
 
       const result = await action(args)
 
-      expect(mockAuthService.changePassword).not.toHaveBeenCalled()
+      expect((mockAuthService as any).changePassword).not.toHaveBeenCalled()
       expect(result).toEqual({
         error: 'Current password and new password are required',
         success: null,
@@ -237,7 +247,7 @@ describe('Profile Route', () => {
 
       const result = await action(args)
 
-      expect(mockAuthService.changePassword).not.toHaveBeenCalled()
+      expect((mockAuthService as any).changePassword).not.toHaveBeenCalled()
       expect(result).toEqual({
         error: 'Current password and new password are required',
         success: null,
@@ -260,7 +270,7 @@ describe('Profile Route', () => {
 
       const result = await action(args)
 
-      expect(mockAuthService.changePassword).not.toHaveBeenCalled()
+      expect((mockAuthService as any).changePassword).not.toHaveBeenCalled()
       expect(result).toEqual({
         error: 'Current password and new password are required',
         success: null,
@@ -283,7 +293,7 @@ describe('Profile Route', () => {
 
       const result = await action(args)
 
-      expect(mockAuthService.changePassword).not.toHaveBeenCalled()
+      expect((mockAuthService as any).changePassword).not.toHaveBeenCalled()
       expect(result).toEqual({
         error: 'New password must be at least 6 characters',
         success: null,
@@ -304,8 +314,8 @@ describe('Profile Route', () => {
 
       const result = await action(args)
 
-      expect(mockAuthService.updateEmail).not.toHaveBeenCalled()
-      expect(mockAuthService.changePassword).not.toHaveBeenCalled()
+      expect((mockAuthService as any).updateEmail).not.toHaveBeenCalled()
+      expect((mockAuthService as any).changePassword).not.toHaveBeenCalled()
       expect(result).toEqual({
         error: 'Invalid action',
         success: null,
@@ -328,7 +338,7 @@ describe('Profile Route', () => {
 
       await action(args)
 
-      expect(logger.request).toHaveBeenCalledWith(request, {
+      expect((logger as any).request).toHaveBeenCalledWith(request, {
         action: 'profile-update',
         intent: 'update-email',
         userId: mockUser.id,

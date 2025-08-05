@@ -105,7 +105,7 @@ describe('PinCreationForm', () => {
     )
 
     const urlInput = screen.getByLabelText(/url/i)
-    const titleInput = screen.getByLabelText(/title/i) as HTMLInputElement
+    const titleInput = screen.getByLabelText(/title/i)
 
     await user.type(urlInput, 'https://example.com')
     await user.tab() // Trigger blur event
@@ -115,7 +115,7 @@ describe('PinCreationForm', () => {
     })
 
     // Simulate metadata being fetched and passed back
-    expect(titleInput.value).toBe('Fetched Page Title')
+    expect((titleInput as HTMLInputElement).value).toBe('Fetched Page Title')
   })
 
   it('allows manual override of auto-populated title', async () => {
@@ -127,13 +127,13 @@ describe('PinCreationForm', () => {
       />
     )
 
-    const titleInput = screen.getByLabelText(/title/i) as HTMLInputElement
+    const titleInput = screen.getByLabelText(/title/i)
     
     // Clear and type new title
     await user.clear(titleInput)
     await user.type(titleInput, 'My Custom Title')
 
-    expect(titleInput.value).toBe('My Custom Title')
+    expect((titleInput as HTMLInputElement).value).toBe('My Custom Title')
   })
 
   it('handles metadata fetching errors gracefully', async () => {
@@ -158,7 +158,7 @@ describe('PinCreationForm', () => {
     expect(screen.queryByText(/failed to fetch metadata/i)).toBeInTheDocument()
   })
 
-  it('shows loading state during metadata fetch', async () => {
+  it('shows loading state during metadata fetch', () => {
     render(
       <PinCreationForm 
         onSubmit={mockOnSubmit} 

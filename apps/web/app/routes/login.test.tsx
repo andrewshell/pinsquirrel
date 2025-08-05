@@ -1,11 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { loader, action } from './login'
+import { loader } from './login'
 import type { Route } from './+types/login'
-import { parseFormData, loginSchema } from '~/lib/validation'
-import { getUserId, createUserSession } from '~/lib/session.server'
-import { AuthenticationServiceImpl } from '@pinsquirrel/core'
-import { DrizzleUserRepository } from '@pinsquirrel/database'
-import { logger } from '~/lib/logger.server'
+import { getUserId } from '~/lib/session.server'
 
 // Mock session server
 vi.mock('~/lib/session.server')
