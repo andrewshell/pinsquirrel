@@ -8,6 +8,7 @@ export default [
   route('pins', 'routes/pins.tsx'),
   route('pins/new', 'routes/pins.new.tsx'),
   route('logout', 'routes/logout.tsx'),
+  route('api/metadata', 'routes/api.metadata.tsx'),
 
   // Catch-all route for 404s and well-known requests (must be last)
   route('*', 'routes/$.tsx'),

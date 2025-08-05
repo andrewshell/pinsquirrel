@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider, redirect } from 'react-router'
@@ -11,10 +12,10 @@ vi.mock('react-router', async () => {
   const actual = await vi.importActual('react-router')
   return {
     ...actual,
-    redirect: vi.fn().mockImplementation((to) => ({ 
+    redirect: vi.fn().mockImplementation((to: string) => ({ 
       url: to, 
       status: 302 
-    })),
+    } as any)),
   }
 })
 

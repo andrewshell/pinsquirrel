@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { User } from '@pinsquirrel/core'
 
@@ -20,10 +21,10 @@ vi.mock('@pinsquirrel/database', () => ({
 
 // Mock react-router
 vi.mock('react-router', () => ({
-  redirect: vi.fn().mockImplementation((to) => ({ 
+  redirect: vi.fn().mockImplementation((to: string) => ({ 
     url: to, 
     status: 302 
-  })),
+  } as any)),
 }))
 
 // Mock logger
@@ -130,7 +131,6 @@ describe('pins/new route', () => {
         title: 'Test Pin',
         description: 'Test description',
         readLater: false,
-        tags: [],
       })
 
       expect(response).toEqual(
@@ -174,7 +174,6 @@ describe('pins/new route', () => {
         title: 'Test Pin',
         description: '',
         readLater: false,
-        tags: [],
       })
     })
 

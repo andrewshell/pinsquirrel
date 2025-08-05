@@ -83,9 +83,9 @@ describe('Session Server - Configuration Tests', () => {
       const mockedLogger = vi.mocked(logger)
       
       expect(mockedRedirect).toBeDefined()
-      expect(mockedLogger.warn).toBeDefined()
-      expect(mockedLogger.exception).toBeDefined()
-      expect(mockedLogger.info).toBeDefined()
+      expect(mockedLogger).toHaveProperty('warn')
+      expect(mockedLogger).toHaveProperty('exception')
+      expect(mockedLogger).toHaveProperty('info')
     })
   })
 })
@@ -107,7 +107,7 @@ describe('Session Server - Logic Tests', () => {
       const validValues = ['user-123', 'abc', '1']
       
       validValues.forEach(value => {
-        const result = (value as string) || null
+        const result = (value) || null
         expect(result).toBe(value)
       })
     })
@@ -307,7 +307,8 @@ describe('Session Server - Integration Behavior', () => {
       ]
       
       functions.forEach(funcName => {
-        expect(typeof sessionModule[funcName]).toBe('function')
+        const func = sessionModule[funcName as keyof typeof sessionModule]
+        expect(typeof func).toBe('function')
       })
     })
   })

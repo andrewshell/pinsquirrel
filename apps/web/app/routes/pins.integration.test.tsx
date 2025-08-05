@@ -189,8 +189,10 @@ describe('PinsPage Integration', () => {
 
     render(<PinsPage />)
 
-    // Check main container structure - need to go up one more level
-    const headerContainer = screen.getByText('My Pins').closest('div')  // mb-8 div
+    // Check main container structure - traverse from h1 -> div -> div -> div
+    const titleElement = screen.getByText('My Pins')  // h1 element
+    const titleWrapper = titleElement.parentElement   // div wrapper for title
+    const headerContainer = titleWrapper?.parentElement  // mb-8 flex div
     const mainContainer = headerContainer?.parentElement  // max-w-7xl mx-auto div
     expect(mainContainer).toHaveClass('max-w-7xl', 'mx-auto', 'px-4', 'sm:px-6', 'lg:px-8')
     
@@ -208,7 +210,10 @@ describe('PinsPage Integration', () => {
 
     render(<PinsPage />)
 
-    const headerSection = screen.getByText('My Pins').closest('div')
+    // Find the header section (mb-8 flex div) - traverse from h1 -> div -> div
+    const titleElement = screen.getByText('My Pins')  // h1 element
+    const titleWrapper = titleElement.parentElement   // div wrapper for title
+    const headerSection = titleWrapper?.parentElement  // mb-8 flex div
     expect(headerSection).toHaveClass('mb-8')
     
     const title = screen.getByRole('heading', { level: 1 })

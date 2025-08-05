@@ -509,7 +509,7 @@ describe('Validation Helpers', () => {
       const errors = {
         field1: 'Simple error',
         field2: ['Multiple', 'Errors'],
-        nested: { subfield: 'Nested error' },
+        nested: 'Nested error', // Changed from object to string
         _form: ['Form error 1', 'Form error 2'],
       }
 

@@ -49,7 +49,6 @@ export async function action({ request }: Route.ActionArgs) {
       title: validation.data.title,
       description: validation.data.description || '',
       readLater: false,
-      tags: [],
     })
 
     logger.info('Pin created successfully', { 
@@ -75,7 +74,7 @@ export async function action({ request }: Route.ActionArgs) {
 export default function PinsNewPage() {
   const actionData = useActionData<typeof action>()
 
-  const handleSubmit = async (data: PinCreationFormData) => {
+  const handleSubmit = async (_data: PinCreationFormData) => {
     // This will be handled by the form's own submission when using the regular form
     // The component still needs this prop for compatibility
   }

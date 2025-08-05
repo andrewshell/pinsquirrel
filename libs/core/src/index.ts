@@ -26,6 +26,7 @@ export type { PinService } from './interfaces/pin-service.js'
 // Services
 export { AuthenticationServiceImpl } from './services/authentication-service.js'
 export { PinServiceImpl } from './services/pin-service.js'
+export { HttpMetadataService, type MetadataService, type MetadataResult } from './services/metadata-service.js'
 
 // Errors
 export { AuthenticationError, InvalidCredentialsError, UserAlreadyExistsError } from './errors/auth-errors.js'
@@ -42,6 +43,8 @@ export {
 
 // Utils
 export { hashPassword, verifyPassword, hashEmail } from './utils/crypto.js'
+export { CheerioHtmlParser, type HtmlParser } from './utils/html-parser.js'
+export { NodeHttpFetcher, type HttpFetcher } from './utils/http-fetcher.js'
 
 // Validation
 export * from './validation/index.js'

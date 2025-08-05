@@ -23,13 +23,13 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 2.5 Add authentication check in action
   - [x] 2.6 Verify all route tests pass
 
-- [ ] 3. Add metadata fetching functionality
-  - [ ] 3.1 Write tests for useMetadataFetch hook
-  - [ ] 3.2 Implement custom hook with debouncing
-  - [ ] 3.3 Write tests for /api/metadata endpoint
-  - [ ] 3.4 Create API route for title extraction
-  - [ ] 3.5 Add error handling for failed fetches
-  - [ ] 3.6 Verify all metadata tests pass
+- [x] 3. Add metadata fetching functionality
+  - [x] 3.1 Write tests for useMetadataFetch hook
+  - [x] 3.2 Implement custom hook with debouncing
+  - [x] 3.3 Write tests for /api/metadata endpoint
+  - [x] 3.4 Create API route for title extraction
+  - [x] 3.5 Add error handling for failed fetches
+  - [x] 3.6 Verify all metadata tests pass
 
 - [ ] 4. Build form UI with interactions
   - [ ] 4.1 Write tests for form field interactions
