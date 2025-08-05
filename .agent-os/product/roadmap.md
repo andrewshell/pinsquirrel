@@ -18,6 +18,7 @@ The following features have been implemented:
 - [x] Monorepo setup - pnpm workspace with Turbo orchestration `S`
 - [x] Development tooling - ESLint, Prettier, TypeScript configuration `S`
 - [x] Pin list view - Display all user pins with pagination `M`
+- [x] Pin creation form - Add new pins with URL, title, description `S`
 
 ## Phase 1: Pin Management UI (1-2 weeks)
 
@@ -25,7 +26,7 @@ The following features have been implemented:
 **Success Criteria:** Users can create, view, edit, and delete pins through the web interface
 
 ### Must-Have Features
-- [ ] Pin creation form - Add new pins with URL, title, description `S`
+
 - [ ] Pin editing - Update existing pin information `S`
 - [ ] Tag management UI - Add/remove tags from pins `M`
 - [ ] Basic search - Search pins by title and description `M`

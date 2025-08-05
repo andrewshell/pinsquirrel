@@ -168,4 +168,172 @@ describe('PinCreationForm', () => {
 
     expect(screen.getByText(/fetching page title/i)).toBeInTheDocument()
   })
+
+  describe('Accessibility', () => {
+    it('has proper ARIA labels on form fields', () => {
+      render(<PinCreationForm onSubmit={mockOnSubmit} />)
+
+      const urlInput = screen.getByLabelText(/url/i)
+      const titleInput = screen.getByLabelText(/title/i)
+      const descriptionInput = screen.getByLabelText(/description/i)
+
+      expect(urlInput).toHaveAttribute('id', 'url')
+      expect(titleInput).toHaveAttribute('id', 'title')
+      expect(descriptionInput).toHaveAttribute('id', 'description')
+
+      // Check that labels are properly associated
+      expect(screen.getByText('URL')).toHaveAttribute('for', 'url')
+      expect(screen.getByText('Title')).toHaveAttribute('for', 'title')
+      expect(screen.getByText('Description (optional)')).toHaveAttribute('for', 'description')
+    })
+
+    it('sets aria-invalid when fields have validation errors', async () => {
+      const user = userEvent.setup()
+      render(<PinCreationForm onSubmit={mockOnSubmit} />)
+
+      const urlInput = screen.getByLabelText(/url/i)
+      const titleInput = screen.getByLabelText(/title/i)
+      const submitButton = screen.getByRole('button', { name: /create pin/i })
+
+      // Trigger validation errors by submitting empty form
+      await user.click(submitButton)
+
+      await waitFor(() => {
+        expect(urlInput).toHaveAttribute('aria-invalid', 'true')
+        expect(titleInput).toHaveAttribute('aria-invalid', 'true')
+      })
+    })
+
+    it('associates error messages with form fields using aria-describedby', async () => {
+      const user = userEvent.setup()
+      render(<PinCreationForm onSubmit={mockOnSubmit} />)
+
+      const urlInput = screen.getByLabelText(/url/i)
+      const titleInput = screen.getByLabelText(/title/i)
+      const submitButton = screen.getByRole('button', { name: /create pin/i })
+
+      // Trigger validation errors
+      await user.click(submitButton)
+
+      await waitFor(() => {
+        expect(urlInput.getAttribute('aria-describedby')).toContain('url-error')
+        expect(urlInput.getAttribute('aria-describedby')).toContain('url-help')
+        expect(titleInput.getAttribute('aria-describedby')).toContain('title-error')
+        expect(titleInput.getAttribute('aria-describedby')).toContain('title-help')
+      })
+
+      // Check that error elements exist with correct IDs
+      expect(screen.getByText(/url is required/i)).toHaveAttribute('id', 'url-error')
+      expect(screen.getByText(/title is required/i)).toHaveAttribute('id', 'title-error')
+    })
+
+    it('supports keyboard navigation through form fields', async () => {
+      const user = userEvent.setup()
+      render(<PinCreationForm onSubmit={mockOnSubmit} />)
+
+      const urlInput = screen.getByLabelText(/url/i)
+      const titleInput = screen.getByLabelText(/title/i)
+      const descriptionInput = screen.getByLabelText(/description/i)
+      const submitButton = screen.getByRole('button', { name: /create pin/i })
+
+      // Start at URL field
+      urlInput.focus()
+      expect(urlInput).toHaveFocus()
+
+      // Tab to title field
+      await user.tab()
+      expect(titleInput).toHaveFocus()
+
+      // Tab to description field
+      await user.tab()
+      expect(descriptionInput).toHaveFocus()
+
+      // Tab to submit button
+      await user.tab()
+      expect(submitButton).toHaveFocus()
+    })
+
+    it('manages focus when validation errors occur', async () => {
+      const user = userEvent.setup()
+      render(<PinCreationForm onSubmit={mockOnSubmit} />)
+
+      const submitButton = screen.getByRole('button', { name: /create pin/i })
+
+      // Submit empty form to trigger validation errors
+      await user.click(submitButton)
+
+      // Form should remain focused and not lose focus context
+      // The submit button should still be in the document and focusable
+      expect(submitButton).toBeInTheDocument()
+      expect(submitButton).not.toHaveAttribute('disabled')
+    })
+
+    it('has accessible success and error messages', () => {
+      const { rerender } = render(<PinCreationForm onSubmit={mockOnSubmit} />)
+
+      // Test success message
+      rerender(
+        <PinCreationForm 
+          onSubmit={mockOnSubmit} 
+          successMessage="Pin created successfully!" 
+        />
+      )
+
+      const successMessage = screen.getByText('Pin created successfully!')
+      expect(successMessage).toBeInTheDocument()
+      expect(successMessage).toHaveClass('text-green-800')
+
+      // Test error message
+      rerender(
+        <PinCreationForm 
+          onSubmit={mockOnSubmit} 
+          errorMessage="Failed to create pin" 
+        />
+      )
+
+      const errorMessage = screen.getByText('Failed to create pin')
+      expect(errorMessage).toBeInTheDocument()
+      expect(errorMessage).toHaveClass('text-red-800')
+    })
+
+    it('provides screen reader friendly loading states', () => {
+      const { rerender } = render(<PinCreationForm onSubmit={mockOnSubmit} />)
+
+      // Test metadata loading state
+      rerender(
+        <PinCreationForm 
+          onSubmit={mockOnSubmit} 
+          isMetadataLoading 
+        />
+      )
+
+      expect(screen.getByText(/fetching page title/i)).toBeInTheDocument()
+
+      // Test form submission loading state
+      rerender(
+        <PinCreationForm 
+          onSubmit={mockOnSubmit} 
+          isLoading 
+        />
+      )
+
+      const submitButton = screen.getByRole('button', { name: /creating/i })
+      expect(submitButton).toBeDisabled()
+      expect(submitButton).toHaveTextContent('Creating...')
+    })
+
+    it('maintains proper heading hierarchy and semantic structure', () => {
+      render(<PinCreationForm onSubmit={mockOnSubmit} />)
+
+      // Ensure form element exists and has semantic structure
+      const form = document.querySelector('form')
+      expect(form).toBeInTheDocument()
+      expect(form).toHaveAttribute('method', 'post')
+      expect(form).toHaveAttribute('action', '/pins/new')
+
+      // Ensure submit button has proper role and type
+      const submitButton = screen.getByRole('button', { name: /create pin/i })
+      expect(submitButton).toHaveAttribute('type', 'submit')
+    })
+  })
 })

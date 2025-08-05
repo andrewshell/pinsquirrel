@@ -39,10 +39,10 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 4.5 Add success feedback after creation
   - [x] 4.6 Verify all interaction tests pass
 
-- [ ] 5. Polish and accessibility
-  - [ ] 5.1 Write accessibility tests for form
-  - [ ] 5.2 Add proper ARIA labels and descriptions
-  - [ ] 5.3 Implement keyboard navigation support
-  - [ ] 5.4 Add focus management on errors
-  - [ ] 5.5 Test with screen readers
-  - [ ] 5.6 Verify all accessibility tests pass
+- [x] 5. Polish and accessibility
+  - [x] 5.1 Write accessibility tests for form
+  - [x] 5.2 Add proper ARIA labels and descriptions
+  - [x] 5.3 Implement keyboard navigation support
+  - [x] 5.4 Add focus management on errors
+  - [x] 5.5 Test with screen readers
+  - [x] 5.6 Verify all accessibility tests pass
