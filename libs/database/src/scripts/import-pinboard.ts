@@ -3,12 +3,10 @@
 import 'dotenv/config'
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
-import { eq, and, asc } from 'drizzle-orm'
+import { eq, asc } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import { db } from '../client.js'
 import { users, pins, tags, pinsTags } from '../schema/index.js'
-import { DrizzleUserRepository } from '../repositories/user-repository.js'
-import { DrizzlePinRepository } from '../repositories/pin-repository.js'
 import { DrizzleTagRepository } from '../repositories/tag-repository.js'
 
 interface PinboardPin {
@@ -55,9 +53,7 @@ async function importPinboard() {
     console.log(`👤 Importing for oldest user: ${user.username} (created: ${user.createdAt})`)
 
     // Initialize repositories
-    const userRepo = new DrizzleUserRepository(db)
     const tagRepo = new DrizzleTagRepository(db)
-    const pinRepo = new DrizzlePinRepository(db, tagRepo)
 
     // Delete all existing pins for this user (cascades to pinsTags)
     console.log('🗑️  Deleting existing pins...')

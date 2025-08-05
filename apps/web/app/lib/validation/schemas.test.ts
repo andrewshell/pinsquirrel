@@ -7,6 +7,9 @@ import {
   emailSchema,
   paginationSchema,
   userCreateSchema,
+  userUpdateSchema,
+  updateProfileSchema,
+  idParamSchema,
 } from './schemas'
 
 describe('Schema Validation', () => {
@@ -168,6 +171,268 @@ describe('Schema Validation', () => {
           role: 'superuser', // invalid role
         })
       ).toThrow()
+    })
+  })
+
+  describe('updateProfileSchema', () => {
+    it('should accept email-only updates', () => {
+      const updateData = {
+        email: 'newemail@example.com',
+      }
+      expect(updateProfileSchema.parse(updateData)).toEqual(updateData)
+    })
+
+    it('should accept password change with both passwords', () => {
+      const updateData = {
+        currentPassword: 'oldpassword',
+        newPassword: 'newpassword123',
+      }
+      expect(updateProfileSchema.parse(updateData)).toEqual(updateData)
+    })
+
+    it('should accept email and password change together', () => {
+      const updateData = {
+        email: 'newemail@example.com',
+        currentPassword: 'oldpassword',
+        newPassword: 'newpassword123',
+      }
+      expect(updateProfileSchema.parse(updateData)).toEqual(updateData)
+    })
+
+    it('should accept empty updates', () => {
+      const updateData = {}
+      expect(updateProfileSchema.parse(updateData)).toEqual({
+        email: undefined,
+        currentPassword: undefined,
+        newPassword: undefined,
+      })
+    })
+
+    it('should reject new password without current password', () => {
+      expect(() =>
+        updateProfileSchema.parse({
+          newPassword: 'newpassword123',
+        })
+      ).toThrow('Current password is required to change password')
+    })
+
+    it('should allow current password without new password (should be handled by app logic)', () => {
+      const updateData = {
+        currentPassword: 'oldpassword',
+      }
+      expect(updateProfileSchema.parse(updateData)).toEqual({
+        ...updateData,
+        email: undefined,
+        newPassword: undefined,
+      })
+    })
+
+    it('should reject invalid email in profile update', () => {
+      expect(() =>
+        updateProfileSchema.parse({
+          email: 'invalid-email',
+        })
+      ).toThrow()
+    })
+
+    it('should reject invalid passwords in profile update', () => {
+      expect(() =>
+        updateProfileSchema.parse({
+          currentPassword: 'short', // too short
+          newPassword: 'validpassword',
+        })
+      ).toThrow()
+
+      expect(() =>
+        updateProfileSchema.parse({
+          currentPassword: 'validpassword',
+          newPassword: 'short', // too short
+        })
+      ).toThrow()
+    })
+  })
+
+  describe('idParamSchema', () => {
+    it('should accept valid UUID', () => {
+      const validId = '123e4567-e89b-12d3-a456-426614174000'
+      expect(idParamSchema.parse({ id: validId })).toEqual({ id: validId })
+    })
+
+    it('should reject invalid UUID format', () => {
+      expect(() =>
+        idParamSchema.parse({ id: 'invalid-uuid' })
+      ).toThrow('Invalid ID format')
+    })
+
+    it('should reject missing id', () => {
+      expect(() => idParamSchema.parse({})).toThrow()
+    })
+
+    it('should reject empty string id', () => {
+      expect(() => idParamSchema.parse({ id: '' })).toThrow('Invalid ID format')
+    })
+
+    it('should reject non-string id', () => {
+      expect(() => idParamSchema.parse({ id: 123 })).toThrow()
+    })
+  })
+
+  describe('userUpdateSchema', () => {
+    it('should accept email-only updates', () => {
+      const updateData = { email: 'newemail@example.com' }
+      expect(userUpdateSchema.parse(updateData)).toEqual(updateData)
+    })
+
+    it('should accept role-only updates', () => {
+      const updateData = { role: 'admin' as const }
+      expect(userUpdateSchema.parse(updateData)).toEqual(updateData)
+    })
+
+    it('should accept email and role updates', () => {
+      const updateData = {
+        email: 'newemail@example.com',
+        role: 'admin' as const,
+      }
+      expect(userUpdateSchema.parse(updateData)).toEqual(updateData)
+    })
+
+    it('should accept empty updates', () => {
+      const updateData = {}
+      expect(userUpdateSchema.parse(updateData)).toEqual({
+        email: undefined,
+        role: undefined,
+      })
+    })
+
+    it('should reject invalid emails', () => {
+      expect(() =>
+        userUpdateSchema.parse({ email: 'invalid-email' })
+      ).toThrow()
+    })
+
+    it('should reject invalid roles', () => {
+      expect(() =>
+        userUpdateSchema.parse({ role: 'superuser' })
+      ).toThrow()
+    })
+
+    it('should accept user role', () => {
+      const updateData = { role: 'user' as const }
+      expect(userUpdateSchema.parse(updateData)).toEqual(updateData)
+    })
+  })
+
+  describe('schema edge cases', () => {
+    describe('pagination schema edge cases', () => {
+      it('should handle string numbers correctly', () => {
+        expect(paginationSchema.parse({ page: '5', limit: '50' })).toEqual({
+          page: 5,
+          limit: 50,
+        })
+      })
+
+      it('should handle mixed types with coercion', () => {
+        expect(paginationSchema.parse({ page: 3, limit: '25' })).toEqual({
+          page: 3,
+          limit: 25,
+        })
+      })
+
+      it('should reject negative numbers', () => {
+        expect(() => paginationSchema.parse({ page: '-1' })).toThrow()
+        expect(() => paginationSchema.parse({ limit: '-5' })).toThrow()
+      })
+
+      it('should reject non-integer numbers', () => {
+        expect(() => paginationSchema.parse({ page: '1.5' })).toThrow()
+        expect(() => paginationSchema.parse({ limit: '10.7' })).toThrow()
+      })
+
+      it('should reject very large limit', () => {
+        expect(() => paginationSchema.parse({ limit: '1000' })).toThrow()
+      })
+
+      it('should handle partial params with defaults', () => {
+        expect(paginationSchema.parse({ page: '3' })).toEqual({
+          page: 3,
+          limit: 20,
+        })
+        expect(paginationSchema.parse({ limit: '50' })).toEqual({
+          page: 1,
+          limit: 50,
+        })
+      })
+    })
+
+    describe('register schema edge cases', () => {
+      it('should reject empty email string', () => {
+        expect(() =>
+          registerSchema.parse({
+            username: 'testuser',
+            password: 'password123',
+            email: '',
+          })
+        ).toThrow('Invalid email address')
+      })
+
+      it('should handle explicit undefined email', () => {
+        const registrationData = {
+          username: 'testuser',
+          password: 'password123',
+          email: undefined,
+        }
+        const result = registerSchema.parse(registrationData)
+        expect(result.email).toBeUndefined()
+      })
+    })
+
+    describe('user create schema edge cases', () => {
+      it('should reject empty email string', () => {
+        expect(() =>
+          userCreateSchema.parse({
+            username: 'testuser',
+            password: 'password123',
+            email: '',
+          })
+        ).toThrow('Invalid email address')
+      })
+
+      it('should handle explicit undefined email', () => {
+        const userData = {
+          username: 'testuser',
+          password: 'password123',
+          email: undefined,
+        }
+        const result = userCreateSchema.parse(userData)
+        expect(result.email).toBeUndefined()
+        expect(result.role).toBe('user')
+      })
+    })
+
+    describe('login schema edge cases', () => {
+      it('should handle exact minimum length requirements', () => {
+        const loginData = {
+          username: 'abc', // exactly 3 characters (minimum)
+          password: '12345678', // exactly 8 characters (minimum)
+        }
+        expect(loginSchema.parse(loginData)).toEqual(loginData)
+      })
+
+      it('should reject exactly below minimum', () => {
+        expect(() =>
+          loginSchema.parse({
+            username: 'ab', // 2 characters (below minimum)
+            password: 'password123',
+          })
+        ).toThrow()
+
+        expect(() =>
+          loginSchema.parse({
+            username: 'validuser',
+            password: '1234567', // 7 characters (below minimum of 8)
+          })
+        ).toThrow()
+      })
     })
   })
 })
