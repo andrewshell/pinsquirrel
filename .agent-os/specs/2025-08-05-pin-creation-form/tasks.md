@@ -7,13 +7,13 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
 
 ## Tasks
 
-- [ ] 1. Create form components and validation
-  - [ ] 1.1 Write tests for PinCreationForm component
-  - [ ] 1.2 Implement PinCreationForm with React Hook Form
-  - [ ] 1.3 Write tests for form validation schema
-  - [ ] 1.4 Implement zod validation for URL, title, description
-  - [ ] 1.5 Add form field components using shadcn/ui
-  - [ ] 1.6 Verify all component tests pass
+- [x] 1. Create form components and validation
+  - [x] 1.1 Write tests for PinCreationForm component
+  - [x] 1.2 Implement PinCreationForm with React Hook Form
+  - [x] 1.3 Write tests for form validation schema
+  - [x] 1.4 Implement zod validation for URL, title, description
+  - [x] 1.5 Add form field components using shadcn/ui
+  - [x] 1.6 Verify all component tests pass
 
 - [ ] 2. Implement pin creation route and action
   - [ ] 2.1 Write tests for /pins/new route component
