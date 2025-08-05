@@ -1,6 +1,6 @@
 import { useLoaderData, useNavigation, Link } from 'react-router'
 import type { Route } from './+types/pins'
-import { requireUser } from '~/lib/session.server'
+import { requireUser, getFlashMessage } from '~/lib/session.server'
 import { DrizzlePinRepository, DrizzleTagRepository, db } from '@pinsquirrel/database'
 import { PinList } from '~/components/pins/PinList'
 import { Pagination } from '~/components/pins/Pagination'
@@ -19,6 +19,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Get authenticated user
   const user = await requireUser(request)
 
+  // Check for flash messages
+  const successMessage = await getFlashMessage(request, 'success')
+  const errorMessage = await getFlashMessage(request, 'error')
+
   // Fetch pins with pagination
   const offset = (page - 1) * pageSize
   const pins = await pinRepository.findByUserId(user.id, {
@@ -30,16 +34,20 @@ export async function loader({ request }: Route.LoaderArgs) {
   const totalCount = await pinRepository.countByUserId(user.id)
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
 
+  // Note: Flash messages are automatically cleared by the session system
+
   return {
     pins,
     totalPages,
     currentPage: page,
     totalCount,
+    successMessage,
+    errorMessage,
   }
 }
 
 export default function PinsPage() {
-  const { pins, totalPages, currentPage, totalCount } = useLoaderData<typeof loader>()
+  const { pins, totalPages, currentPage, totalCount, successMessage, errorMessage } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
   
   // Check if we're loading (navigating or submitting)
@@ -62,6 +70,18 @@ export default function PinsPage() {
             </Link>
           </Button>
         </div>
+
+        {successMessage && (
+          <div className="mb-6 rounded-md bg-green-50 p-4 text-sm text-green-800">
+            {successMessage}
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="mb-6 rounded-md bg-red-50 p-4 text-sm text-red-800">
+            {errorMessage}
+          </div>
+        )}
 
         <PinList pins={pins} isLoading={isLoading} />
         

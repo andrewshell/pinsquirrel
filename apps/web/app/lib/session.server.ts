@@ -89,3 +89,33 @@ export async function logout(request: Request) {
     },
   })
 }
+
+export async function setFlashMessage(
+  request: Request,
+  type: 'success' | 'error',
+  message: string,
+  redirectTo: string
+) {
+  const session = await getSession(request)
+  session.flash(`flash-${type}`, message)
+
+  return redirect(redirectTo, {
+    headers: {
+      'Set-Cookie': await sessionStorage.commitSession(session),
+    },
+  })
+}
+
+export async function getFlashMessage(
+  request: Request,
+  type: 'success' | 'error'
+): Promise<string | null> {
+  const session = await getSession(request)
+  const message = session.get(`flash-${type}`) as string | null
+  
+  return message
+}
+
+export async function commitSession(session: Awaited<ReturnType<typeof getSession>>) {
+  return sessionStorage.commitSession(session)
+}

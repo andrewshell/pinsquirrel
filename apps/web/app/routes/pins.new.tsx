@@ -1,9 +1,10 @@
-import { useActionData, redirect } from 'react-router'
+import { useActionData } from 'react-router'
 import type { Route } from './+types/pins.new'
-import { requireUser } from '~/lib/session.server'
+import { requireUser, setFlashMessage } from '~/lib/session.server'
 import { DrizzlePinRepository, DrizzleTagRepository, db } from '@pinsquirrel/database'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
 import { pinCreationSchema, type PinCreationFormData } from '~/lib/validation/pin-schema'
+import { useMetadataFetch } from '~/lib/useMetadataFetch'
 import { logger } from '~/lib/logger.server'
 
 // Server-side repositories
@@ -57,8 +58,8 @@ export async function action({ request }: Route.ActionArgs) {
       url: pin.url 
     })
 
-    // Redirect to pins list after successful creation
-    return redirect('/pins')
+    // Redirect to pins list with success message
+    return setFlashMessage(request, 'success', 'Pin created successfully!', '/pins')
   } catch (error) {
     logger.exception(error, 'Failed to create pin', { 
       userId: user.id,
@@ -73,6 +74,7 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function PinsNewPage() {
   const actionData = useActionData<typeof action>()
+  const { loading: isMetadataLoading, error: metadataError, metadata, fetchMetadata } = useMetadataFetch()
 
   const handleSubmit = async (_data: PinCreationFormData) => {
     // This will be handled by the form's own submission when using the regular form
@@ -92,6 +94,10 @@ export default function PinsNewPage() {
         <div className="bg-card rounded-lg shadow-sm p-6">
           <PinCreationForm
             onSubmit={handleSubmit}
+            onMetadataFetch={fetchMetadata}
+            metadataTitle={metadata?.title}
+            metadataError={metadataError || undefined}
+            isMetadataLoading={isMetadataLoading}
             errorMessage={actionData?.error}
           />
         </div>

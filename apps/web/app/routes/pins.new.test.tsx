@@ -8,6 +8,10 @@ const mockCreate = vi.hoisted(() => vi.fn())
 // Mock the session.server module
 vi.mock('~/lib/session.server', () => ({
   requireUser: vi.fn(),
+  setFlashMessage: vi.fn().mockImplementation((request: Request, type: string, message: string, redirectTo: string) => ({ 
+    url: redirectTo, 
+    status: 302 
+  } as any)),
 }))
 
 // Mock the database repositories

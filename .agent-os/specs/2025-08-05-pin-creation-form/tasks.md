@@ -31,13 +31,13 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 3.5 Add error handling for failed fetches
   - [x] 3.6 Verify all metadata tests pass
 
-- [ ] 4. Build form UI with interactions
-  - [ ] 4.1 Write tests for form field interactions
-  - [ ] 4.2 Connect metadata fetching to URL field
-  - [ ] 4.3 Add loading states during fetch
-  - [ ] 4.4 Implement error display for validation
-  - [ ] 4.5 Add success feedback after creation
-  - [ ] 4.6 Verify all interaction tests pass
+- [x] 4. Build form UI with interactions
+  - [x] 4.1 Write tests for form field interactions
+  - [x] 4.2 Connect metadata fetching to URL field
+  - [x] 4.3 Add loading states during fetch
+  - [x] 4.4 Implement error display for validation
+  - [x] 4.5 Add success feedback after creation
+  - [x] 4.6 Verify all interaction tests pass
 
 - [ ] 5. Polish and accessibility
   - [ ] 5.1 Write accessibility tests for form

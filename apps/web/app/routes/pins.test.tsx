@@ -8,6 +8,9 @@ const mockCountByUserId = vi.hoisted(() => vi.fn())
 // Mock the session.server module
 vi.mock('~/lib/session.server', () => ({
   requireUser: vi.fn(),
+  getSession: vi.fn().mockResolvedValue({}),
+  getFlashMessage: vi.fn().mockResolvedValue(null),
+  commitSession: vi.fn().mockResolvedValue('cookie-string'),
 }))
 
 // Mock the database repositories
@@ -83,6 +86,8 @@ describe('pins route loader', () => {
       totalPages: 2, // Math.ceil(50 / 25)
       currentPage: 1,
       totalCount: 50,
+      successMessage: null,
+      errorMessage: null,
     })
 
     expect(mockFindByUserId).toHaveBeenCalledWith('user-1', {
@@ -168,6 +173,8 @@ describe('pins route loader', () => {
       totalPages: 1, // Always at least 1 page
       currentPage: 1,
       totalCount: 0,
+      successMessage: null,
+      errorMessage: null,
     })
   })
 
