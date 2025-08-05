@@ -65,8 +65,8 @@ describe('LoginForm', () => {
     
     // Verify FormData contents
     const [[formData]] = mockSubmit.mock.calls
-    expect(formData.get('username')).toBe('testuser')
-    expect(formData.get('password')).toBe('testpass')
+    expect((formData as FormData).get('username')).toBe('testuser')
+    expect((formData as FormData).get('password')).toBe('testpass')
   })
 
   it('displays form-level error message', () => {

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { BrowserRouter } from 'react-router'
 import { Header } from './Header'
 import type { User } from '@pinsquirrel/core'
 
@@ -9,8 +8,8 @@ vi.mock('react-router', async () => {
   const actual = await vi.importActual('react-router')
   return {
     ...actual,
-    Form: ({ children, ...props }: any) => <form {...props}>{children}</form>,
-    Link: ({ children, to, ...props }: any) => <a href={to} {...props}>{children}</a>,
+    Form: ({ children, ...props }: React.FormHTMLAttributes<HTMLFormElement>) => <form {...props}>{children}</form>,
+    Link: ({ children, to, ...props }: { children: React.ReactNode; to: string } & React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={to} {...props}>{children}</a>,
   }
 })
 

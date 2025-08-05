@@ -66,9 +66,9 @@ describe('RegisterForm', () => {
     
     // Verify FormData contents
     const [[formData]] = mockSubmit.mock.calls
-    expect(formData.get('username')).toBe('testuser')
-    expect(formData.get('password')).toBe('testpass')
-    expect(formData.get('email')).toBe('test@example.com')
+    expect((formData as FormData).get('username')).toBe('testuser')
+    expect((formData as FormData).get('password')).toBe('testpass')
+    expect((formData as FormData).get('email')).toBe('test@example.com')
   })
 
   it('submits form without email when email is empty', async () => {
@@ -87,9 +87,9 @@ describe('RegisterForm', () => {
     })
     
     const [[formData]] = mockSubmit.mock.calls
-    expect(formData.get('username')).toBe('testuser')
-    expect(formData.get('password')).toBe('testpass')
-    expect(formData.get('email')).toBe(null)
+    expect((formData as FormData).get('username')).toBe('testuser')
+    expect((formData as FormData).get('password')).toBe('testpass')
+    expect((formData as FormData).get('email')).toBe(null)
   })
 
   it('trims whitespace from email before submitting', async () => {
@@ -110,7 +110,7 @@ describe('RegisterForm', () => {
     })
     
     const [[formData]] = mockSubmit.mock.calls
-    expect(formData.get('email')).toBe('test@example.com')
+    expect((formData as FormData).get('email')).toBe('test@example.com')
   })
 
   it('does not submit email when only whitespace', async () => {
@@ -131,7 +131,7 @@ describe('RegisterForm', () => {
     })
     
     const [[formData]] = mockSubmit.mock.calls
-    expect(formData.get('email')).toBe(null)
+    expect((formData as FormData).get('email')).toBe(null)
   })
 
   it('displays form-level error message', () => {
