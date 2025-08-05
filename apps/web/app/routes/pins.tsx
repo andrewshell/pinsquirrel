@@ -1,9 +1,11 @@
-import { useLoaderData, useNavigation } from 'react-router'
+import { useLoaderData, useNavigation, Link } from 'react-router'
 import type { Route } from './+types/pins'
 import { requireUser } from '~/lib/session.server'
 import { DrizzlePinRepository, DrizzleTagRepository, db } from '@pinsquirrel/database'
 import { PinList } from '~/components/pins/PinList'
 import { Pagination } from '~/components/pins/Pagination'
+import { Button } from '~/components/ui/button'
+import { Plus } from 'lucide-react'
 
 // Server-side repositories
 const tagRepository = new DrizzleTagRepository(db)
@@ -46,11 +48,19 @@ export default function PinsPage() {
   return (
     <div className="min-h-screen bg-background py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">My Pins</h1>
-          <p className="mt-2 text-muted-foreground">
-            Manage your saved bookmarks, images, and articles
-          </p>
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">My Pins</h1>
+            <p className="mt-2 text-muted-foreground">
+              Manage your saved bookmarks, images, and articles
+            </p>
+          </div>
+          <Button asChild>
+            <Link to="/pins/new">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Pin
+            </Link>
+          </Button>
         </div>
 
         <PinList pins={pins} isLoading={isLoading} />
