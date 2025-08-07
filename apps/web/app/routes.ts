@@ -7,6 +7,7 @@ export default [
   route('profile', 'routes/profile.tsx'),
   route('pins', 'routes/pins.tsx'),
   route('pins/new', 'routes/pins.new.tsx'),
+  route('pins/:id/edit', 'routes/pins.$id.edit.tsx'),
   route('logout', 'routes/logout.tsx'),
   route('api/metadata', 'routes/api.metadata.tsx'),
 
