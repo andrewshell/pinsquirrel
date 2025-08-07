@@ -20,18 +20,16 @@ export function EmptyState() {
             <Bookmark className="h-8 w-8 text-primary" aria-hidden="true" />
           </div>
         </div>
-        
-        <h3 
-          id="empty-state-heading"
-          className="text-lg font-semibold mb-2"
-        >
+
+        <h3 id="empty-state-heading" className="text-lg font-semibold mb-2">
           You don&apos;t have any pins yet
         </h3>
-        
+
         <p className="text-muted-foreground mb-6">
-          Start saving your favorite links, images, and articles to build your personal library.
+          Start saving your favorite links, images, and articles to build your
+          personal library.
         </p>
-        
+
         <Button aria-describedby="empty-state-heading">
           Create your first pin
         </Button>

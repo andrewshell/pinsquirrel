@@ -15,7 +15,12 @@ interface MockLinkProps {
 
 // Mock React Router Link component
 vi.mock('react-router', () => ({
-  Link: ({ to, children, className, 'aria-label': ariaLabel }: MockLinkProps) => (
+  Link: ({
+    to,
+    children,
+    className,
+    'aria-label': ariaLabel,
+  }: MockLinkProps) => (
     <a href={to} className={className} aria-label={ariaLabel}>
       {children}
     </a>
@@ -33,8 +38,20 @@ describe('Pin List Accessibility', () => {
     contentPath: null,
     imagePath: null,
     tags: [
-      { id: 'tag-1', userId: 'user-1', name: 'javascript', createdAt: new Date(), updatedAt: new Date() },
-      { id: 'tag-2', userId: 'user-1', name: 'react', createdAt: new Date(), updatedAt: new Date() }
+      {
+        id: 'tag-1',
+        userId: 'user-1',
+        name: 'javascript',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 'tag-2',
+        userId: 'user-1',
+        name: 'react',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     ],
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -52,7 +69,9 @@ describe('Pin List Accessibility', () => {
 
       // Tab to URL link
       await user.tab()
-      const urlLink = screen.getByRole('link', { name: 'https://example.com/article' })
+      const urlLink = screen.getByRole('link', {
+        name: 'https://example.com/article',
+      })
       expect(urlLink).toHaveFocus()
 
       // Tab to first action button (Edit)
@@ -83,7 +102,7 @@ describe('Pin List Accessibility', () => {
       await user.tab()
       const deleteButton = screen.getByLabelText('Delete Test Article')
       expect(deleteButton).toHaveFocus()
-      
+
       // Verify buttons are focusable and have proper attributes
       expect(editButton).toHaveAttribute('aria-label', 'Edit Test Article')
       expect(deleteButton).toHaveAttribute('aria-label', 'Delete Test Article')
@@ -91,18 +110,18 @@ describe('Pin List Accessibility', () => {
 
     it('has proper heading structure for screen readers', () => {
       render(<PinCard pin={mockPin} />)
-      
+
       const heading = screen.getByRole('heading', { level: 3 })
       expect(heading).toHaveTextContent('Test Article')
     })
 
     it('has semantic markup for tags', () => {
       render(<PinCard pin={mockPin} />)
-      
+
       // Tags should be in a container with proper text content
       const tagsContainer = screen.getByTestId('pin-tags')
       expect(tagsContainer).toBeInTheDocument()
-      
+
       const jsTag = screen.getByText('javascript')
       const reactTag = screen.getByText('react')
       expect(jsTag).toBeInTheDocument()
@@ -113,13 +132,7 @@ describe('Pin List Accessibility', () => {
   describe('Pagination Keyboard Navigation', () => {
     it('allows keyboard navigation through pagination controls', async () => {
       const user = userEvent.setup()
-      render(
-        <Pagination 
-          currentPage={2} 
-          totalPages={5} 
-          totalCount={125} 
-        />
-      )
+      render(<Pagination currentPage={2} totalPages={5} totalCount={125} />)
 
       // Tab through pagination controls in desktop view
       await user.tab()
@@ -142,13 +155,7 @@ describe('Pin List Accessibility', () => {
 
     it('properly handles disabled pagination buttons', async () => {
       const user = userEvent.setup()
-      render(
-        <Pagination 
-          currentPage={1} 
-          totalPages={5} 
-          totalCount={125} 
-        />
-      )
+      render(<Pagination currentPage={1} totalPages={5} totalCount={125} />)
 
       // Previous button should be disabled on first page
       const prevButton = screen.getByLabelText('Go to previous page')
@@ -163,33 +170,23 @@ describe('Pin List Accessibility', () => {
     })
 
     it('has proper navigation landmark', () => {
-      render(
-        <Pagination 
-          currentPage={2} 
-          totalPages={5} 
-          totalCount={125} 
-        />
-      )
+      render(<Pagination currentPage={2} totalPages={5} totalCount={125} />)
 
       const nav = screen.getByRole('navigation')
       expect(nav).toHaveAttribute('aria-label', 'Pagination navigation')
     })
 
     it('announces page changes for screen readers', () => {
-      render(
-        <Pagination 
-          currentPage={3} 
-          totalPages={10} 
-          totalCount={250} 
-        />
-      )
+      render(<Pagination currentPage={3} totalPages={10} totalCount={250} />)
 
       // Current page should be announced
       const currentPage = screen.getByText('3')
       expect(currentPage).toHaveAttribute('aria-current', 'page')
 
       // Page info should be available
-      expect(screen.getByText('Page 3 of 10 (250 total pins)')).toBeInTheDocument()
+      expect(
+        screen.getByText('Page 3 of 10 (250 total pins)')
+      ).toBeInTheDocument()
     })
   })
 
@@ -197,7 +194,7 @@ describe('Pin List Accessibility', () => {
     const mockPins = [
       { ...mockPin, id: 'pin-1', title: 'First Pin' },
       { ...mockPin, id: 'pin-2', title: 'Second Pin' },
-      { ...mockPin, id: 'pin-3', title: 'Third Pin' }
+      { ...mockPin, id: 'pin-3', title: 'Third Pin' },
     ]
 
     it('allows sequential keyboard navigation through pin cards', async () => {
@@ -211,7 +208,7 @@ describe('Pin List Accessibility', () => {
 
       await user.tab()
       // Should focus URL link of first pin
-      
+
       await user.tab()
       const editButtons = screen.getAllByLabelText(/Edit/)
       expect(editButtons[0]).toHaveFocus()
@@ -255,9 +252,11 @@ describe('Pin List Accessibility', () => {
       // Empty state should be announced to screen readers (h3 level)
       const emptyHeading = screen.getByRole('heading', { level: 3 })
       expect(emptyHeading).toHaveTextContent("You don't have any pins yet")
-      
+
       // Should have descriptive text
-      expect(screen.getByText(/Start saving your favorite links/)).toBeInTheDocument()
+      expect(
+        screen.getByText(/Start saving your favorite links/)
+      ).toBeInTheDocument()
     })
 
     it('provides loading state announcements', () => {
@@ -266,7 +265,7 @@ describe('Pin List Accessibility', () => {
       // Loading state should be accessible
       const loadingContainer = screen.getByTestId('pin-list-loading')
       expect(loadingContainer).toBeInTheDocument()
-      
+
       // Should have accessible loading indicators with proper test IDs
       const skeletons = screen.getAllByTestId(/pin-skeleton-\d+/)
       expect(skeletons.length).toBeGreaterThan(0)
@@ -289,7 +288,8 @@ describe('Pin List Accessibility', () => {
       render(<PinCard pin={mockPin} />)
 
       // Action buttons should be always visible (no transition needed)
-      const actionsContainer = screen.getByLabelText('Edit Test Article').parentElement
+      const actionsContainer =
+        screen.getByLabelText('Edit Test Article').parentElement
       expect(actionsContainer).toHaveClass('flex', 'gap-2')
     })
   })
@@ -307,26 +307,20 @@ describe('Pin List Accessibility', () => {
 
     it('announces pagination state changes', () => {
       const { rerender } = render(
-        <Pagination 
-          currentPage={1} 
-          totalPages={5} 
-          totalCount={125} 
-        />
+        <Pagination currentPage={1} totalPages={5} totalCount={125} />
       )
 
       // First page state
-      expect(screen.getByText('Page 1 of 5 (125 total pins)')).toBeInTheDocument()
+      expect(
+        screen.getByText('Page 1 of 5 (125 total pins)')
+      ).toBeInTheDocument()
 
       // Change to different page
-      rerender(
-        <Pagination 
-          currentPage={3} 
-          totalPages={5} 
-          totalCount={125} 
-        />
-      )
+      rerender(<Pagination currentPage={3} totalPages={5} totalCount={125} />)
 
-      expect(screen.getByText('Page 3 of 5 (125 total pins)')).toBeInTheDocument()
+      expect(
+        screen.getByText('Page 3 of 5 (125 total pins)')
+      ).toBeInTheDocument()
       const currentPage = screen.getByText('3')
       expect(currentPage).toHaveAttribute('aria-current', 'page')
     })
@@ -343,43 +337,48 @@ describe('Pin List Accessibility', () => {
       expect(description).toHaveTextContent('A test article description')
 
       // URL should be clear
-      expect(screen.getByText('https://example.com/article')).toBeInTheDocument()
+      expect(
+        screen.getByText('https://example.com/article')
+      ).toBeInTheDocument()
     })
   })
 
   describe('Responsive Behavior', () => {
     it('adapts pagination layout for mobile and desktop screens', () => {
-      render(
-        <Pagination 
-          currentPage={2} 
-          totalPages={5} 
-          totalCount={125} 
-        />
-      )
+      render(<Pagination currentPage={2} totalPages={5} totalCount={125} />)
 
       // Mobile info section should be hidden on larger screens
       const mobileInfo = screen.getByText('Page 2 of 5').parentElement
-      expect(mobileInfo).toHaveClass('flex', 'flex-1', 'justify-between', 'sm:hidden')
+      expect(mobileInfo).toHaveClass(
+        'flex',
+        'flex-1',
+        'justify-between',
+        'sm:hidden'
+      )
 
       // Desktop pagination controls should be hidden on mobile
-      const desktopPagination = screen.getByText('Page 2 of 5 (125 total pins)').parentElement
+      const desktopPagination = screen.getByText(
+        'Page 2 of 5 (125 total pins)'
+      ).parentElement
       expect(desktopPagination).toHaveClass('hidden', 'sm:flex')
 
       // Mobile navigation buttons should be hidden on desktop
-      const mobileNav = screen.getByLabelText('Go to previous page (mobile)').parentElement
+      const mobileNav = screen.getByLabelText(
+        'Go to previous page (mobile)'
+      ).parentElement
       expect(mobileNav).toHaveClass('flex', 'sm:hidden')
     })
 
     it('maintains proper vertical layout in pin list', () => {
       const mockPins = [
         { ...mockPin, id: 'pin-1', title: 'First Pin' },
-        { ...mockPin, id: 'pin-2', title: 'Second Pin' }
+        { ...mockPin, id: 'pin-2', title: 'Second Pin' },
       ]
 
       render(<PinList pins={mockPins} isLoading={false} />)
 
       const listContainer = screen.getByTestId('pin-list')
-      
+
       // Check vertical list classes
       expect(listContainer).toHaveClass('space-y-4')
     })
@@ -397,13 +396,7 @@ describe('Pin List Accessibility', () => {
     })
 
     it('provides accessible navigation on all screen sizes', () => {
-      render(
-        <Pagination 
-          currentPage={3} 
-          totalPages={10} 
-          totalCount={250} 
-        />
-      )
+      render(<Pagination currentPage={3} totalPages={10} totalCount={250} />)
 
       // Both mobile and desktop navigation should be accessible
       const mobilePrev = screen.getByLabelText('Go to previous page (mobile)')

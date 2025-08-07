@@ -5,13 +5,13 @@ import { Button } from '~/components/ui/button'
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await getUser(request)
-  
+
   // Redirect logged-in users to pins page
   if (user) {
     // eslint-disable-next-line @typescript-eslint/only-throw-error
     throw redirect('/pins')
   }
-  
+
   return { user }
 }
 

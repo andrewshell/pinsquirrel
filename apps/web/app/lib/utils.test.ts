@@ -59,29 +59,19 @@ describe('cn utility', () => {
   })
 
   it('handles complex tailwind utilities', () => {
-    const result = cn(
-      'px-2 py-1 text-xs',
-      'p-4 text-sm',
-      'text-base'
-    )
+    const result = cn('px-2 py-1 text-xs', 'p-4 text-sm', 'text-base')
     // p-4 should override px-2 and py-1
     // text-base should override text-sm and text-xs
     expect(result).toBe('p-4 text-base')
   })
 
   it('handles responsive breakpoint classes', () => {
-    const result = cn(
-      'text-sm md:text-base',
-      'md:text-lg lg:text-xl'
-    )
+    const result = cn('text-sm md:text-base', 'md:text-lg lg:text-xl')
     expect(result).toBe('text-sm md:text-lg lg:text-xl')
   })
 
   it('handles arbitrary value classes', () => {
-    const result = cn(
-      'top-[10px]',
-      'top-[20px]'
-    )
+    const result = cn('top-[10px]', 'top-[20px]')
     expect(result).toBe('top-[20px]')
   })
 

@@ -50,7 +50,7 @@ export const useMetadataFetch = (): UseMetadataFetchResult => {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`)
           }
 
-          const result = await response.json() as MetadataResult
+          const result = (await response.json()) as MetadataResult
           setMetadata(result)
           setError(null)
         } catch (err) {
@@ -61,7 +61,7 @@ export const useMetadataFetch = (): UseMetadataFetchResult => {
           setLoading(false)
         }
       }
-      
+
       void fetchData()
     }, 300) // 300ms debounce delay
   }, [])
@@ -70,6 +70,6 @@ export const useMetadataFetch = (): UseMetadataFetchResult => {
     loading,
     error,
     metadata,
-    fetchMetadata
+    fetchMetadata,
   }
 }

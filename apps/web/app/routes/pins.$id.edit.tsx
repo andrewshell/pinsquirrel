@@ -3,14 +3,17 @@ import type { Route } from './+types/pins.$id.edit'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
 import { pinService } from '~/lib/services/pinService.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
-import { pinCreationSchema, type PinCreationFormData } from '~/lib/validation/pin-schema'
+import {
+  pinCreationSchema,
+  type PinCreationFormData,
+} from '~/lib/validation/pin-schema'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
 import { logger } from '~/lib/logger.server'
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   // Ensure user is authenticated
   const user = await requireUser(request)
-  
+
   // Get pin ID from params
   const pinId = params.id
   if (!pinId) {
@@ -23,11 +26,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     const pin = await pinService.getPin(user.id, pinId)
     return data({ pin })
   } catch (error) {
-    logger.exception(error, 'Failed to load pin for editing', { 
+    logger.exception(error, 'Failed to load pin for editing', {
       pinId,
-      userId: user.id 
+      userId: user.id,
     })
-    
+
     // If pin not found or unauthorized, throw 404
     // eslint-disable-next-line @typescript-eslint/only-throw-error
     throw new Response('Pin not found', { status: 404 })
@@ -37,7 +40,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 export async function action({ request, params }: Route.ActionArgs) {
   // Ensure user is authenticated
   const user = await requireUser(request)
-  
+
   // Get pin ID from params
   const pinId = params.id
   if (!pinId) {
@@ -59,7 +62,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (!validation.success) {
     const errors: Record<string, string> = {}
-    validation.error.issues.forEach((error) => {
+    validation.error.issues.forEach(error => {
       const field = error.path[0] as string
       errors[field] = error.message
     })
@@ -75,31 +78,44 @@ export async function action({ request, params }: Route.ActionArgs) {
       readLater: false, // Keep existing readLater value (not edited in this form)
     })
 
-    logger.info('Pin updated successfully', { 
+    logger.info('Pin updated successfully', {
       pinId,
       userId: user.id,
-      url: validation.data.url 
+      url: validation.data.url,
     })
 
     // Redirect to pins list with success message
-    return setFlashMessage(request, 'success', 'Pin updated successfully!', '/pins')
+    return setFlashMessage(
+      request,
+      'success',
+      'Pin updated successfully!',
+      '/pins'
+    )
   } catch (error) {
-    logger.exception(error, 'Failed to update pin', { 
+    logger.exception(error, 'Failed to update pin', {
       pinId,
       userId: user.id,
-      url: validation.data.url 
+      url: validation.data.url,
     })
-    
-    return data({
-      error: 'Failed to update pin. Please try again.',
-    }, { status: 400 })
+
+    return data(
+      {
+        error: 'Failed to update pin. Please try again.',
+      },
+      { status: 400 }
+    )
   }
 }
 
 export default function PinEditPage() {
   const { pin: _pin } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
-  const { loading: isMetadataLoading, error: metadataError, metadata, fetchMetadata } = useMetadataFetch()
+  const {
+    loading: isMetadataLoading,
+    error: metadataError,
+    metadata,
+    fetchMetadata,
+  } = useMetadataFetch()
 
   const handleSubmit = async (_data: PinCreationFormData) => {
     // This will be handled by the form's own submission
@@ -111,9 +127,7 @@ export default function PinEditPage() {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground">Edit Pin</h1>
-          <p className="mt-2 text-muted-foreground">
-            Update your pin details
-          </p>
+          <p className="mt-2 text-muted-foreground">Update your pin details</p>
         </div>
 
         <div className="bg-card rounded-lg shadow-sm p-6">
@@ -123,7 +137,9 @@ export default function PinEditPage() {
             metadataTitle={metadata?.title}
             metadataError={metadataError || undefined}
             isMetadataLoading={isMetadataLoading}
-            errorMessage={actionData && 'error' in actionData ? actionData.error : undefined}
+            errorMessage={
+              actionData && 'error' in actionData ? actionData.error : undefined
+            }
           />
           {/* TODO: Pre-populate form with pin data when editMode is implemented */}
         </div>

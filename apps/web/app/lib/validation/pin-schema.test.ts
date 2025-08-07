@@ -156,8 +156,12 @@ describe('pinCreationSchema', () => {
       if (!result.success) {
         // Should have at least URL and title errors (description is optional)
         expect(result.error.issues.length).toBeGreaterThanOrEqual(2)
-        const urlError = result.error.issues.find(issue => issue.path.includes('url'))
-        const titleError = result.error.issues.find(issue => issue.path.includes('title'))
+        const urlError = result.error.issues.find(issue =>
+          issue.path.includes('url')
+        )
+        const titleError = result.error.issues.find(issue =>
+          issue.path.includes('title')
+        )
         expect(urlError?.message).toBe('URL is required')
         expect(titleError?.message).toBe('Title is required')
       }

@@ -8,10 +8,13 @@ const mockCreate = vi.hoisted(() => vi.fn())
 // Mock the session.server module
 vi.mock('~/lib/session.server', () => ({
   requireUser: vi.fn(),
-  setFlashMessage: vi.fn().mockImplementation((request: Request, type: string, message: string, redirectTo: string) => ({ 
-    url: redirectTo, 
-    status: 302 
-  } as any)),
+  setFlashMessage: vi.fn().mockImplementation(
+    (request: Request, type: string, message: string, redirectTo: string) =>
+      ({
+        url: redirectTo,
+        status: 302,
+      }) as any
+  ),
 }))
 
 // Mock the database repositories
@@ -25,10 +28,13 @@ vi.mock('@pinsquirrel/database', () => ({
 
 // Mock react-router
 vi.mock('react-router', () => ({
-  redirect: vi.fn().mockImplementation((to: string) => ({ 
-    url: to, 
-    status: 302 
-  } as any)),
+  redirect: vi.fn().mockImplementation(
+    (to: string) =>
+      ({
+        url: to,
+        status: 302,
+      }) as any
+  ),
 }))
 
 // Mock logger
@@ -51,7 +57,7 @@ describe('pins/new route', () => {
     passwordHash: 'hash',
     emailHash: 'emailhash',
     createdAt: new Date(),
-    updatedAt: new Date()
+    updatedAt: new Date(),
   }
 
   beforeEach(() => {
@@ -78,9 +84,10 @@ describe('pins/new route', () => {
       mockRequireUser.mockRejectedValue(new Error('Unauthorized'))
 
       const request = new Request('http://localhost/pins/new')
-      
-      await expect(loader({ request } as Parameters<typeof loader>[0]))
-        .rejects.toThrow('Unauthorized')
+
+      await expect(
+        loader({ request } as Parameters<typeof loader>[0])
+      ).rejects.toThrow('Unauthorized')
     })
   })
 
@@ -89,12 +96,12 @@ describe('pins/new route', () => {
       const formData = new FormData()
       formData.append('url', 'https://example.com')
       formData.append('title', 'Test Pin')
-      
+
       const request = new Request('http://localhost/pins/new', {
         method: 'POST',
-        body: formData
+        body: formData,
       })
-      
+
       await action({ request } as Parameters<typeof action>[0])
 
       expect(mockRequireUser).toHaveBeenCalledWith(request)
@@ -114,19 +121,19 @@ describe('pins/new route', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       }
-      
+
       mockCreate.mockResolvedValue(mockPin)
 
       const formData = new FormData()
       formData.append('url', 'https://example.com')
       formData.append('title', 'Test Pin')
       formData.append('description', 'Test description')
-      
+
       const request = new Request('http://localhost/pins/new', {
         method: 'POST',
-        body: formData
+        body: formData,
       })
-      
+
       const response = await action({ request } as Parameters<typeof action>[0])
 
       expect(mockCreate).toHaveBeenCalledWith({
@@ -158,18 +165,18 @@ describe('pins/new route', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       }
-      
+
       mockCreate.mockResolvedValue(mockPin)
 
       const formData = new FormData()
       formData.append('url', 'https://example.com')
       formData.append('title', 'Test Pin')
-      
+
       const request = new Request('http://localhost/pins/new', {
         method: 'POST',
-        body: formData
+        body: formData,
       })
-      
+
       await action({ request } as Parameters<typeof action>[0])
 
       expect(mockCreate).toHaveBeenCalledWith({
@@ -185,12 +192,12 @@ describe('pins/new route', () => {
       const formData = new FormData()
       formData.append('url', 'invalid-url')
       formData.append('title', '')
-      
+
       const request = new Request('http://localhost/pins/new', {
         method: 'POST',
-        body: formData
+        body: formData,
       })
-      
+
       const result = await action({ request } as Parameters<typeof action>[0])
 
       expect(result).toEqual({
@@ -206,12 +213,12 @@ describe('pins/new route', () => {
     it('returns validation error for missing URL', async () => {
       const formData = new FormData()
       formData.append('title', 'Test Pin')
-      
+
       const request = new Request('http://localhost/pins/new', {
         method: 'POST',
-        body: formData
+        body: formData,
       })
-      
+
       const result = await action({ request } as Parameters<typeof action>[0])
 
       expect(result).toEqual({
@@ -226,12 +233,12 @@ describe('pins/new route', () => {
     it('returns validation error for missing title', async () => {
       const formData = new FormData()
       formData.append('url', 'https://example.com')
-      
+
       const request = new Request('http://localhost/pins/new', {
         method: 'POST',
-        body: formData
+        body: formData,
       })
-      
+
       const result = await action({ request } as Parameters<typeof action>[0])
 
       expect(result).toEqual({
@@ -249,12 +256,12 @@ describe('pins/new route', () => {
       const formData = new FormData()
       formData.append('url', 'https://example.com')
       formData.append('title', 'Test Pin')
-      
+
       const request = new Request('http://localhost/pins/new', {
         method: 'POST',
-        body: formData
+        body: formData,
       })
-      
+
       const result = await action({ request } as Parameters<typeof action>[0])
 
       expect(result).toEqual({
@@ -268,15 +275,15 @@ describe('pins/new route', () => {
       const formData = new FormData()
       formData.append('url', 'https://example.com')
       formData.append('title', 'Test Pin')
-      
+
       const request = new Request('http://localhost/pins/new', {
         method: 'POST',
-        body: formData
+        body: formData,
       })
-      
-      await expect(action({ request } as Parameters<typeof action>[0]))
-        .rejects.toThrow('Unauthorized')
+
+      await expect(
+        action({ request } as Parameters<typeof action>[0])
+      ).rejects.toThrow('Unauthorized')
     })
   })
-
 })

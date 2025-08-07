@@ -67,18 +67,37 @@ When developing new features or fixing bugs, **ALWAYS follow the TDD red-green-r
    - Extract reusable components/functions
    - Ensure all tests still pass
 
-### Quality Check Requirements
+### 🚨 CRITICAL: Quality Check Requirements
+
+**NEVER mark any task as complete until ALL quality checks pass!**
+
 Before considering any work "done", **ALL of the following must pass**:
 
-1. **Type Check**: `pnpm typecheck` - Must pass with no errors
-2. **Lint**: `pnpm lint` - Must pass with no errors (warnings should be addressed)
-3. **Tests**: `pnpm test` - All tests must pass
+1. **Type Check**: `pnpm typecheck` - Must pass with zero errors
+2. **Lint**: `pnpm lint` - Must pass with zero errors (warnings should be addressed)
+3. **Tests**: `pnpm test` - All tests must pass (100% success rate)
 4. **Format**: `pnpm format` - Code must be properly formatted
 
-Run all checks from the root:
+**💡 Quick Quality Check Commands:**
 ```bash
+# Single command to run all quality checks:
+pnpm quality
+
+# Or run individually:
 pnpm typecheck && pnpm lint && pnpm test && pnpm format
 ```
+
+**❌ If ANY check fails:**
+- Fix typecheck errors first
+- Then fix lint errors  
+- Then fix test failures
+- Finally run format
+- Re-run all checks until 100% pass
+
+**✅ Only when ALL checks pass should you:**
+- Mark tasks as complete
+- Commit changes  
+- Create pull requests
 
 ### Adding New Packages
 1. Create directory in `apps/` or `libs/`
@@ -269,6 +288,9 @@ When asked to work on this codebase:
    - For new features: @.agent-os/instructions/create-spec.md
    - For tasks execution: @.agent-os/instructions/execute-tasks.md
 3. **Always**, adhere to the standards in the files listed above
+4. **🚨 BEFORE marking ANY task complete**: Run ALL quality checks (see Quality Check Requirements above)
+   - `pnpm quality` (runs all checks) OR `pnpm typecheck && pnpm lint && pnpm test && pnpm format`
+   - ALL must pass with zero errors before task completion
 
 ## Important Notes
 

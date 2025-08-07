@@ -35,22 +35,27 @@ describe('Profile Route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(requireUser).mockResolvedValue(mockUser)
-    
+
     mockAuthService = {
       updateEmail: vi.fn(),
       changePassword: vi.fn(),
     }
-    vi.mocked(AuthenticationServiceImpl).mockImplementation(() => mockAuthService as any)
-    vi.mocked(DrizzleUserRepository).mockImplementation(() => ({
-      findById: vi.fn(),
-      findByEmailHash: vi.fn(),
-      findByUsername: vi.fn(),
-      findAll: vi.fn(),
-      list: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    } as unknown as DrizzleUserRepository))
+    vi.mocked(AuthenticationServiceImpl).mockImplementation(
+      () => mockAuthService as any
+    )
+    vi.mocked(DrizzleUserRepository).mockImplementation(
+      () =>
+        ({
+          findById: vi.fn(),
+          findByEmailHash: vi.fn(),
+          findByUsername: vi.fn(),
+          findAll: vi.fn(),
+          list: vi.fn(),
+          create: vi.fn(),
+          update: vi.fn(),
+          delete: vi.fn(),
+        }) as unknown as DrizzleUserRepository
+    )
   })
 
   describe('loader', () => {
@@ -80,21 +85,21 @@ describe('Profile Route', () => {
       // Test the validation logic that would be used in the action
       const email: string = ''
       const isValid = Boolean(email && email.trim())
-      
+
       expect(isValid).toBe(false)
     })
 
     it('should accept valid email for update-email intent', () => {
       const email = 'test@example.com'
       const isValid = email && email.trim()
-      
+
       expect(isValid).toBeTruthy()
     })
 
     it('should trim whitespace from email', () => {
       const email = '  test@example.com  '
       const trimmedEmail = email.trim()
-      
+
       expect(trimmedEmail).toBe('test@example.com')
     })
 
@@ -102,27 +107,27 @@ describe('Profile Route', () => {
       const currentPassword = 'oldpass'
       const newPassword = ''
       const isValid = !!(currentPassword && newPassword)
-      
+
       expect(isValid).toBe(false)
     })
 
     it('should validate minimum password length', () => {
       const newPassword = '123'
       const isValidLength = newPassword.length >= 6
-      
+
       expect(isValidLength).toBe(false)
     })
 
     it('should accept valid password length', () => {
       const newPassword = 'newpassword'
       const isValidLength = newPassword.length >= 6
-      
+
       expect(isValidLength).toBe(true)
     })
 
     it('should validate intent values', () => {
       const validIntents = ['update-email', 'change-password']
-      
+
       expect(validIntents.includes('update-email')).toBe(true)
       expect(validIntents.includes('change-password')).toBe(true)
       expect(validIntents.includes('invalid-action')).toBe(false)
@@ -162,8 +167,6 @@ describe('Profile Route', () => {
   })
 
   describe('action function', () => {
-
-
     it('should return error for empty email', async () => {
       const formData = new FormData()
       formData.append('intent', 'update-email')
@@ -207,7 +210,6 @@ describe('Profile Route', () => {
         field: 'email',
       })
     })
-
 
     it('should return error for missing passwords', async () => {
       const formData = new FormData()
@@ -323,7 +325,6 @@ describe('Profile Route', () => {
       })
     })
 
-
     it('should log request with correct parameters', async () => {
       const formData = new FormData()
       formData.append('intent', 'update-email')
@@ -360,14 +361,14 @@ describe('Profile Route', () => {
         testCases.forEach(({ email, expected }) => {
           const isValid = !!(email && email.trim())
           expect(isValid).toBe(expected)
-          
+
           if (isValid && email) {
             const trimmedEmail = email.trim()
             expect(trimmedEmail).toBe(email.trim())
           }
         })
       })
-      
+
       it('should return correct error response format for missing email', () => {
         const errorResponse = {
           error: 'Email is required',
@@ -427,8 +428,12 @@ describe('Profile Route', () => {
           field: 'password',
         }
 
-        expect(missingPasswordsError.error).toBe('Current password and new password are required')
-        expect(shortPasswordError.error).toBe('New password must be at least 6 characters')
+        expect(missingPasswordsError.error).toBe(
+          'Current password and new password are required'
+        )
+        expect(shortPasswordError.error).toBe(
+          'New password must be at least 6 characters'
+        )
         expect(missingPasswordsError.field).toBe('password')
         expect(shortPasswordError.field).toBe('password')
       })

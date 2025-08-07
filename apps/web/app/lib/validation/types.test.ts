@@ -22,9 +22,9 @@ describe('Validation Types', () => {
     it('should have correct structure for success response', () => {
       const response: ApiSuccessResponse<string> = {
         success: true,
-        data: 'test data'
+        data: 'test data',
       }
-      
+
       expect(response.success).toBe(true)
       expect(response.data).toBe('test data')
     })
@@ -32,14 +32,14 @@ describe('Validation Types', () => {
     it('should work with different data types', () => {
       const numberResponse: ApiSuccessResponse<number> = {
         success: true,
-        data: 42
+        data: 42,
       }
-      
+
       const objectResponse: ApiSuccessResponse<{ id: string }> = {
         success: true,
-        data: { id: '123' }
+        data: { id: '123' },
       }
-      
+
       expect(numberResponse.data).toBe(42)
       expect(objectResponse.data.id).toBe('123')
     })
@@ -49,9 +49,9 @@ describe('Validation Types', () => {
     it('should have correct structure for error response', () => {
       const response: ApiErrorResponse = {
         success: false,
-        errors: { username: 'Username is required' }
+        errors: { username: 'Username is required' },
       }
-      
+
       expect(response.success).toBe(false)
       expect(response.errors.username).toBe('Username is required')
     })
@@ -62,10 +62,10 @@ describe('Validation Types', () => {
         errors: {
           username: 'Username is required',
           password: 'Password too short',
-          _form: 'General error'
-        }
+          _form: 'General error',
+        },
       }
-      
+
       expect(Object.keys(response.errors)).toHaveLength(3)
     })
   })
@@ -74,9 +74,9 @@ describe('Validation Types', () => {
     it('should allow success response', () => {
       const response: ApiResponse<string> = {
         success: true,
-        data: 'success'
+        data: 'success',
       }
-      
+
       if (response.success) {
         expect(response.data).toBe('success')
       }
@@ -85,9 +85,9 @@ describe('Validation Types', () => {
     it('should allow error response', () => {
       const response: ApiResponse<string> = {
         success: false,
-        errors: { field: 'error' }
+        errors: { field: 'error' },
       }
-      
+
       if (!response.success) {
         expect(response.errors.field).toBe('error')
       }
@@ -100,9 +100,9 @@ describe('Validation Types', () => {
         id: '123',
         username: 'testuser',
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       }
-      
+
       expect(user.id).toBe('123')
       expect(user.username).toBe('testuser')
       expect(user.createdAt).toBeInstanceOf(Date)
@@ -115,16 +115,16 @@ describe('Validation Types', () => {
         username: 'testuser',
         email: 'test@example.com',
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       }
-      
+
       const userWithoutEmail: User = {
         id: '123',
         username: 'testuser',
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       }
-      
+
       expect(userWithEmail.email).toBe('test@example.com')
       expect(userWithoutEmail.email).toBeUndefined()
     })
@@ -137,9 +137,9 @@ describe('Validation Types', () => {
         total: 10,
         page: 1,
         limit: 5,
-        pages: 2
+        pages: 2,
       }
-      
+
       expect(response.items).toHaveLength(2)
       expect(response.total).toBe(10)
       expect(response.page).toBe(1)
@@ -153,22 +153,24 @@ describe('Validation Types', () => {
         total: 3,
         page: 1,
         limit: 10,
-        pages: 1
+        pages: 1,
       }
-      
+
       const objectResponse: PaginatedResponse<User> = {
-        items: [{
-          id: '1',
-          username: 'user1',
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }],
+        items: [
+          {
+            id: '1',
+            username: 'user1',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
         total: 1,
         page: 1,
         limit: 10,
-        pages: 1
+        pages: 1,
       }
-      
+
       expect(numberResponse.items[0]).toBe(1)
       expect(objectResponse.items[0].username).toBe('user1')
     })
@@ -314,7 +316,10 @@ describe('Validation Types', () => {
         expect(errorResult.success).toBe(false)
         expect(errorResult.errors.username).toBe('Required')
         expect(Array.isArray(errorResult.errors.password)).toBe(true)
-        expect(errorResult.errors.password).toEqual(['Too short', 'Invalid characters'])
+        expect(errorResult.errors.password).toEqual([
+          'Too short',
+          'Invalid characters',
+        ])
         expect(errorResult.errors._form).toBe('General error')
       })
     })
@@ -370,7 +375,10 @@ describe('Validation Types', () => {
 
         expect(fieldErrors.username).toBe('Username is required')
         expect(Array.isArray(fieldErrors.password)).toBe(true)
-        expect(fieldErrors.password).toEqual(['Too short', 'Must contain numbers'])
+        expect(fieldErrors.password).toEqual([
+          'Too short',
+          'Must contain numbers',
+        ])
         expect(fieldErrors.email).toBe('Invalid format')
         expect(Array.isArray(fieldErrors._form)).toBe(true)
         expect(fieldErrors._form).toEqual(['Server error', 'Connection failed'])

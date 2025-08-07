@@ -17,11 +17,11 @@ describe('Logout Route', () => {
     it('calls logout with request', async () => {
       const request = new Request('http://localhost/logout', { method: 'POST' })
       const args: Route.ActionArgs = { request, params: {}, context: {} }
-      
+
       vi.mocked(logout).mockResolvedValue(new Response('', { status: 302 }))
-      
+
       await action(args)
-      
+
       expect(logout).toHaveBeenCalledWith(request)
     })
 
@@ -29,11 +29,11 @@ describe('Logout Route', () => {
       const request = new Request('http://localhost/logout', { method: 'POST' })
       const args: Route.ActionArgs = { request, params: {}, context: {} }
       const logoutResponse = new Response('', { status: 302 })
-      
+
       vi.mocked(logout).mockResolvedValue(logoutResponse)
-      
+
       const result = await action(args)
-      
+
       expect(result).toBe(logoutResponse)
     })
   })
@@ -42,11 +42,11 @@ describe('Logout Route', () => {
     it('calls logout with request', async () => {
       const request = new Request('http://localhost/logout')
       const args: Route.LoaderArgs = { request, params: {}, context: {} }
-      
+
       vi.mocked(logout).mockResolvedValue(new Response('', { status: 302 }))
-      
+
       await loader(args)
-      
+
       expect(logout).toHaveBeenCalledWith(request)
     })
 
@@ -54,11 +54,11 @@ describe('Logout Route', () => {
       const request = new Request('http://localhost/logout')
       const args: Route.LoaderArgs = { request, params: {}, context: {} }
       const logoutResponse = new Response('', { status: 302 })
-      
+
       vi.mocked(logout).mockResolvedValue(logoutResponse)
-      
+
       const result = await loader(args)
-      
+
       expect(result).toBe(logoutResponse)
     })
   })

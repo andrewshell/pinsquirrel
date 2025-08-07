@@ -109,9 +109,11 @@ describe('Button Component', () => {
     })
 
     it('applies icon size classes', () => {
-      render(<Button size="icon" aria-label="Icon button">
-        <svg data-testid="icon" />
-      </Button>)
+      render(
+        <Button size="icon" aria-label="Icon button">
+          <svg data-testid="icon" />
+        </Button>
+      )
       const button = screen.getByRole('button', { name: 'Icon button' })
       expect(button).toHaveClass('size-9')
     })
@@ -121,10 +123,10 @@ describe('Button Component', () => {
     it('handles click events', async () => {
       const user = userEvent.setup()
       const handleClick = vi.fn()
-      
+
       render(<Button onClick={handleClick}>Click me</Button>)
       const button = screen.getByRole('button', { name: 'Click me' })
-      
+
       await user.click(button)
       expect(handleClick).toHaveBeenCalledTimes(1)
     })
@@ -132,14 +134,14 @@ describe('Button Component', () => {
     it('does not trigger click when disabled', async () => {
       const user = userEvent.setup()
       const handleClick = vi.fn()
-      
+
       render(
         <Button disabled onClick={handleClick}>
           Disabled
         </Button>
       )
       const button = screen.getByRole('button', { name: 'Disabled' })
-      
+
       await user.click(button)
       expect(handleClick).not.toHaveBeenCalled()
     })
@@ -159,9 +161,9 @@ describe('Button Component', () => {
     })
 
     it('allows className override', () => {
-      const classes = buttonVariants({ 
-        variant: 'default', 
-        className: 'custom-override' 
+      const classes = buttonVariants({
+        variant: 'default',
+        className: 'custom-override',
       })
       expect(classes).toContain('custom-override')
     })

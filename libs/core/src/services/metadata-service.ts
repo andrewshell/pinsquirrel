@@ -28,7 +28,9 @@ export class HttpMetadataService implements MetadataService {
       return this.htmlParser.parseMetadata(html)
     } catch (error) {
       // Re-throw with consistent error handling
-      throw new Error(`Failed to fetch metadata: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      throw new Error(
+        `Failed to fetch metadata: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
     }
   }
 }

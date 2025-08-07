@@ -10,9 +10,9 @@ vi.mock('@pinsquirrel/core')
 vi.mock('@pinsquirrel/database')
 vi.mock('~/lib/logger.server')
 vi.mock('react-router', () => ({
-  redirect: vi.fn().mockImplementation((to) => ({ 
-    url: to, 
-    status: 302 
+  redirect: vi.fn().mockImplementation(to => ({
+    url: to,
+    status: 302,
   })),
   Link: 'a',
   createCookieSessionStorage: vi.fn().mockReturnValue({
@@ -31,11 +31,11 @@ describe('Login Route', () => {
     it('redirects to home when user is already logged in', async () => {
       const request = new Request('http://localhost/login')
       const args: Route.LoaderArgs = { request, params: {}, context: {} }
-      
+
       vi.mocked(getUserId).mockResolvedValue('user-123')
-      
+
       const { redirect } = await import('react-router')
-      
+
       await loader(args)
 
       expect(getUserId).toHaveBeenCalledWith(request)
@@ -45,7 +45,7 @@ describe('Login Route', () => {
     it('returns null when user is not logged in', async () => {
       const request = new Request('http://localhost/login')
       const args: Route.LoaderArgs = { request, params: {}, context: {} }
-      
+
       vi.mocked(getUserId).mockResolvedValue(null)
 
       const result = await loader(args)
@@ -71,7 +71,7 @@ describe('Login Route', () => {
           expect(hasValidCredentials).toBe(valid)
         })
       })
-      
+
       it('should validate username requirements', () => {
         const testCases = [
           { username: 'ab', expected: false }, // too short
@@ -84,11 +84,11 @@ describe('Login Route', () => {
           const isValidLength = username.length >= 3 && username.length <= 20
           const hasValidChars = /^[a-zA-Z0-9_]+$/.test(username)
           const isValid = isValidLength && hasValidChars
-          
+
           expect(isValid).toBe(expected)
         })
       })
-      
+
       it('should validate password requirements', () => {
         const testCases = [
           { password: '1234567', expected: false }, // too short
@@ -126,7 +126,9 @@ describe('Login Route', () => {
 
         expect(validationError).toHaveProperty('errors')
         expect(validationError.errors.username).toBe('Username is required')
-        expect(validationError.errors.password).toBe('Password must be at least 8 characters')
+        expect(validationError.errors.password).toBe(
+          'Password must be at least 8 characters'
+        )
       })
     })
 
@@ -149,10 +151,11 @@ describe('Login Route', () => {
 
       it('should validate authentication failure pattern', () => {
         const authError = new Error('Invalid credentials')
-        
+
         // Test error handling patterns
         const hasError = !!authError
-        const errorMessage = authError instanceof Error ? authError.message : 'Login failed'
+        const errorMessage =
+          authError instanceof Error ? authError.message : 'Login failed'
         const shouldReturnError = hasError
 
         expect(hasError).toBe(true)
@@ -161,5 +164,4 @@ describe('Login Route', () => {
       })
     })
   })
-
 })

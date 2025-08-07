@@ -37,12 +37,15 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     it('should find user by id', async () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-      
+
       // Insert test data directly
-      await testPool.query(`
+      await testPool.query(
+        `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
         VALUES ($1, $2, 'hashed_password', 'hashed_email', '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
-      `, [userId, username])
+      `,
+        [userId, username]
+      )
 
       const result = await repository.findById(userId)
 
@@ -63,12 +66,15 @@ describe('DrizzleUserRepository - Integration Tests', () => {
   describe('findByEmailHash', () => {
     it('should find user by email hash', async () => {
       const testUserId = crypto.randomUUID()
-      const testUsername = `testuser-${crypto.randomUUID().slice(0,8)}`
-      
-      await testPool.query(`
+      const testUsername = `testuser-${crypto.randomUUID().slice(0, 8)}`
+
+      await testPool.query(
+        `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
         VALUES ($1, $2, 'hashed_password', 'specific_email_hash', '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
-      `, [testUserId, testUsername])
+      `,
+        [testUserId, testUsername]
+      )
 
       const result = await repository.findByEmailHash('specific_email_hash')
 
@@ -85,12 +91,15 @@ describe('DrizzleUserRepository - Integration Tests', () => {
   describe('findByUsername', () => {
     it('should find user by username', async () => {
       const userId = crypto.randomUUID()
-      const username = `specific_username-${crypto.randomUUID().slice(0,8)}`
-      
-      await testPool.query(`
+      const username = `specific_username-${crypto.randomUUID().slice(0, 8)}`
+
+      await testPool.query(
+        `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
         VALUES ($1, $2, 'hashed_password', 'hashed_email', '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
-      `, [userId, username])
+      `,
+        [userId, username]
+      )
 
       const result = await repository.findByUsername(username)
 
@@ -108,21 +117,24 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     it('should return all users', async () => {
       const user1Id = crypto.randomUUID()
       const user2Id = crypto.randomUUID()
-      const user1Name = `user1-${crypto.randomUUID().slice(0,8)}`
-      const user2Name = `user2-${crypto.randomUUID().slice(0,8)}`
-      
-      await testPool.query(`
+      const user1Name = `user1-${crypto.randomUUID().slice(0, 8)}`
+      const user2Name = `user2-${crypto.randomUUID().slice(0, 8)}`
+
+      await testPool.query(
+        `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at) VALUES
         ($1, $3, 'hash1', 'email1', '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z'),
         ($2, $4, 'hash2', 'email2', '2023-01-02T00:00:00Z', '2023-01-02T00:00:00Z')
-      `, [user1Id, user2Id, user1Name, user2Name])
+      `,
+        [user1Id, user2Id, user1Name, user2Name]
+      )
 
       const result = await repository.findAll()
 
       // Find our specific users in the results
       const ourUser1 = result.find(u => u.id === user1Id)
       const ourUser2 = result.find(u => u.id === user2Id)
-      
+
       expect(ourUser1).toBeDefined()
       expect(ourUser2).toBeDefined()
       expect(ourUser1!.username).toBe(user1Name)
@@ -141,9 +153,18 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     it('should return users with limit', async () => {
       // Create test users for this test
       await Promise.all([
-        repository.create({ username: `user1-${crypto.randomUUID().slice(0,8)}`, passwordHash: 'hash1' }),
-        repository.create({ username: `user2-${crypto.randomUUID().slice(0,8)}`, passwordHash: 'hash2' }),
-        repository.create({ username: `user3-${crypto.randomUUID().slice(0,8)}`, passwordHash: 'hash3' })
+        repository.create({
+          username: `user1-${crypto.randomUUID().slice(0, 8)}`,
+          passwordHash: 'hash1',
+        }),
+        repository.create({
+          username: `user2-${crypto.randomUUID().slice(0, 8)}`,
+          passwordHash: 'hash2',
+        }),
+        repository.create({
+          username: `user3-${crypto.randomUUID().slice(0, 8)}`,
+          passwordHash: 'hash3',
+        }),
       ])
 
       const result = await repository.list(2)
@@ -153,9 +174,18 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     it('should return users with offset', async () => {
       // Create test users for this test
       await Promise.all([
-        repository.create({ username: `user1-${crypto.randomUUID().slice(0,8)}`, passwordHash: 'hash1' }),
-        repository.create({ username: `user2-${crypto.randomUUID().slice(0,8)}`, passwordHash: 'hash2' }),
-        repository.create({ username: `user3-${crypto.randomUUID().slice(0,8)}`, passwordHash: 'hash3' })
+        repository.create({
+          username: `user1-${crypto.randomUUID().slice(0, 8)}`,
+          passwordHash: 'hash1',
+        }),
+        repository.create({
+          username: `user2-${crypto.randomUUID().slice(0, 8)}`,
+          passwordHash: 'hash2',
+        }),
+        repository.create({
+          username: `user3-${crypto.randomUUID().slice(0, 8)}`,
+          passwordHash: 'hash3',
+        }),
       ])
 
       const result = await repository.list(undefined, 1)
@@ -165,9 +195,18 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     it('should return users with both limit and offset', async () => {
       // Create test users for this test
       await Promise.all([
-        repository.create({ username: `user1-${crypto.randomUUID().slice(0,8)}`, passwordHash: 'hash1' }),
-        repository.create({ username: `user2-${crypto.randomUUID().slice(0,8)}`, passwordHash: 'hash2' }),
-        repository.create({ username: `user3-${crypto.randomUUID().slice(0,8)}`, passwordHash: 'hash3' })
+        repository.create({
+          username: `user1-${crypto.randomUUID().slice(0, 8)}`,
+          passwordHash: 'hash1',
+        }),
+        repository.create({
+          username: `user2-${crypto.randomUUID().slice(0, 8)}`,
+          passwordHash: 'hash2',
+        }),
+        repository.create({
+          username: `user3-${crypto.randomUUID().slice(0, 8)}`,
+          passwordHash: 'hash3',
+        }),
       ])
 
       const result = await repository.list(1, 1)
@@ -177,9 +216,18 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     it('should return all users when no limit or offset provided', async () => {
       // Create test users for this test
       await Promise.all([
-        repository.create({ username: `user1-${crypto.randomUUID().slice(0,8)}`, passwordHash: 'hash1' }),
-        repository.create({ username: `user2-${crypto.randomUUID().slice(0,8)}`, passwordHash: 'hash2' }),
-        repository.create({ username: `user3-${crypto.randomUUID().slice(0,8)}`, passwordHash: 'hash3' })
+        repository.create({
+          username: `user1-${crypto.randomUUID().slice(0, 8)}`,
+          passwordHash: 'hash1',
+        }),
+        repository.create({
+          username: `user2-${crypto.randomUUID().slice(0, 8)}`,
+          passwordHash: 'hash2',
+        }),
+        repository.create({
+          username: `user3-${crypto.randomUUID().slice(0, 8)}`,
+          passwordHash: 'hash3',
+        }),
       ])
 
       const result = await repository.list()
@@ -189,8 +237,14 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     it('should return all users when called with undefined for both parameters', async () => {
       // Create test users for this test
       await Promise.all([
-        repository.create({ username: `user1-${crypto.randomUUID().slice(0,8)}`, passwordHash: 'hash1' }),
-        repository.create({ username: `user2-${crypto.randomUUID().slice(0,8)}`, passwordHash: 'hash2' })
+        repository.create({
+          username: `user1-${crypto.randomUUID().slice(0, 8)}`,
+          passwordHash: 'hash1',
+        }),
+        repository.create({
+          username: `user2-${crypto.randomUUID().slice(0, 8)}`,
+          passwordHash: 'hash2',
+        }),
       ])
 
       // Explicitly pass undefined to hit the else branch
@@ -202,7 +256,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
   describe('create', () => {
     it('should create user with username and password hash', async () => {
       const createData = {
-        username: `newuser-${crypto.randomUUID().slice(0,8)}`,
+        username: `newuser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'already_hashed_password',
       }
 
@@ -222,7 +276,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
 
     it('should create user with username, password hash and email hash', async () => {
       const createData = {
-        username: `newuser-${crypto.randomUUID().slice(0,8)}`,
+        username: `newuser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'already_hashed_password',
         emailHash: 'already_hashed_email',
       }
@@ -238,7 +292,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
 
     it('should create user with undefined email hash as null', async () => {
       const createData = {
-        username: `newuser-${crypto.randomUUID().slice(0,8)}`,
+        username: `newuser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'already_hashed_password',
         emailHash: undefined,
       }
@@ -259,7 +313,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     beforeEach(async () => {
       // Create a user to update in each test
       const user = await repository.create({
-        username: `updateuser-${crypto.randomUUID().slice(0,8)}`,
+        username: `updateuser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'original_password',
         emailHash: 'original_email',
       })
@@ -359,7 +413,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     it('should delete user and return true when user exists', async () => {
       // Create user to delete
       const user = await repository.create({
-        username: `deleteuser-${crypto.randomUUID().slice(0,8)}`,
+        username: `deleteuser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'password',
       })
 

@@ -11,10 +11,12 @@ vi.mock('~/lib/session.server', () => ({
   getSession: vi.fn().mockResolvedValue({}),
   getFlashMessage: vi.fn().mockResolvedValue(null),
   commitSession: vi.fn().mockResolvedValue('cookie-string'),
-  setFlashMessage: vi.fn().mockResolvedValue(new Response(null, {
-    status: 302,
-    headers: { Location: '/pins' }
-  })),
+  setFlashMessage: vi.fn().mockResolvedValue(
+    new Response(null, {
+      status: 302,
+      headers: { Location: '/pins' },
+    })
+  ),
 }))
 
 // Mock the database repositories
@@ -38,14 +40,20 @@ vi.mock('~/lib/services/pinService.server', () => ({
 // Mock react-router
 vi.mock('react-router', () => ({
   data: vi.fn((data: unknown) => data),
-  json: vi.fn((data: unknown, init?: { status?: number }) => new Response(JSON.stringify(data), {
-    status: init?.status ?? 200,
-    headers: { 'Content-Type': 'application/json' }
-  })),
-  redirect: vi.fn((url: string) => new Response(null, {
-    status: 302,
-    headers: { Location: url }
-  })),
+  json: vi.fn(
+    (data: unknown, init?: { status?: number }) =>
+      new Response(JSON.stringify(data), {
+        status: init?.status ?? 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+  ),
+  redirect: vi.fn(
+    (url: string) =>
+      new Response(null, {
+        status: 302,
+        headers: { Location: url },
+      })
+  ),
   useLoaderData: vi.fn(),
   useActionData: vi.fn(),
 }))
@@ -83,8 +91,20 @@ describe('pins.$id.edit route', () => {
     createdAt: mockDate,
     updatedAt: mockDate,
     tags: [
-      { id: 'tag-1', name: 'test', userId: 'user-1', createdAt: mockDate, updatedAt: mockDate },
-      { id: 'tag-2', name: 'example', userId: 'user-1', createdAt: mockDate, updatedAt: mockDate },
+      {
+        id: 'tag-1',
+        name: 'test',
+        userId: 'user-1',
+        createdAt: mockDate,
+        updatedAt: mockDate,
+      },
+      {
+        id: 'tag-2',
+        name: 'example',
+        userId: 'user-1',
+        createdAt: mockDate,
+        updatedAt: mockDate,
+      },
     ],
   }
 
@@ -113,7 +133,7 @@ describe('pins.$id.edit route', () => {
       const params = { id: 'pin-1' }
 
       const result = await loader({ request, params, context: {} })
-      
+
       // The data function returns the data directly in our mock
       expect(mockGetPin).toHaveBeenCalledWith('user-1', 'pin-1')
       // In our mock, data() just returns the object directly
@@ -198,16 +218,12 @@ describe('pins.$id.edit route', () => {
 
       const response = await action({ request, params, context: {} })
 
-      expect(mockUpdatePinService).toHaveBeenCalledWith(
-        'user-1',
-        'pin-1',
-        {
-          url: 'https://updated.com',
-          title: 'Updated Pin',
-          description: 'Updated description',
-          readLater: false,
-        }
-      )
+      expect(mockUpdatePinService).toHaveBeenCalledWith('user-1', 'pin-1', {
+        url: 'https://updated.com',
+        title: 'Updated Pin',
+        description: 'Updated description',
+        readLater: false,
+      })
       // setFlashMessage returns a Response with redirect
       expect(response).toBeInstanceOf(Response)
       expect((response as Response).status).toBe(302)
@@ -229,7 +245,7 @@ describe('pins.$id.edit route', () => {
       const params = { id: 'pin-1' }
 
       const result = await action({ request, params, context: {} })
-      
+
       // In our mock, data() just returns the object directly
       expect(result).toHaveProperty('errors')
       expect(mockUpdatePinService).not.toHaveBeenCalled()

@@ -47,7 +47,7 @@ describe('DrizzleTagRepository - Integration Tests', () => {
   describe('findById', () => {
     it('should find tag by id', async () => {
       const testTagId = crypto.randomUUID()
-      
+
       // Insert test tag
       await testPool.query(
         `
@@ -75,14 +75,14 @@ describe('DrizzleTagRepository - Integration Tests', () => {
     it('should find all tags for a user', async () => {
       // Create another user to ensure we only get tags for the correct user
       const otherUser = await userRepository.create({
-        username: `otheruser-${crypto.randomUUID().slice(0,8)}`,
+        username: `otheruser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'password',
       })
 
       const tag1Id = crypto.randomUUID()
       const tag2Id = crypto.randomUUID()
       const tag3Id = crypto.randomUUID()
-      
+
       // Create tags for test user
       await testPool.query(
         `
@@ -119,8 +119,8 @@ describe('DrizzleTagRepository - Integration Tests', () => {
   describe('findByUserIdAndName', () => {
     it('should find tag by user and name', async () => {
       const tagId = crypto.randomUUID()
-      const tagName = `specific-tag-${crypto.randomUUID().slice(0,8)}`
-      
+      const tagName = `specific-tag-${crypto.randomUUID().slice(0, 8)}`
+
       await testPool.query(
         `
         INSERT INTO tags (id, user_id, name, created_at, updated_at)
@@ -148,13 +148,13 @@ describe('DrizzleTagRepository - Integration Tests', () => {
 
     it('should not find tag from different user', async () => {
       const otherUser = await userRepository.create({
-        username: `otheruser-${crypto.randomUUID().slice(0,8)}`,
+        username: `otheruser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'password',
       })
 
       const tagId = crypto.randomUUID()
-      const tagName = `shared-name-${crypto.randomUUID().slice(0,8)}`
-      
+      const tagName = `shared-name-${crypto.randomUUID().slice(0, 8)}`
+
       await testPool.query(
         `
         INSERT INTO tags (id, user_id, name, created_at, updated_at)
@@ -334,18 +334,24 @@ describe('DrizzleTagRepository - Integration Tests', () => {
 
   describe('findAll', () => {
     it('should return all tags', async () => {
-      const tag1Name = `tag1-${crypto.randomUUID().slice(0,8)}`
-      const tag2Name = `tag2-${crypto.randomUUID().slice(0,8)}`
-      
-      const tag1 = await tagRepository.create({ userId: testUser.id, name: tag1Name })
-      const tag2 = await tagRepository.create({ userId: testUser.id, name: tag2Name })
+      const tag1Name = `tag1-${crypto.randomUUID().slice(0, 8)}`
+      const tag2Name = `tag2-${crypto.randomUUID().slice(0, 8)}`
+
+      const tag1 = await tagRepository.create({
+        userId: testUser.id,
+        name: tag1Name,
+      })
+      const tag2 = await tagRepository.create({
+        userId: testUser.id,
+        name: tag2Name,
+      })
 
       const result = await tagRepository.findAll()
 
       // Find our specific tags in the results
       const ourTag1 = result.find(t => t.id === tag1.id)
       const ourTag2 = result.find(t => t.id === tag2.id)
-      
+
       expect(ourTag1).toBeDefined()
       expect(ourTag2).toBeDefined()
       expect(ourTag1!.name).toBe(tag1Name)
@@ -359,10 +365,10 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       for (let i = 1; i <= 5; i++) {
         await tagRepository.create({
           userId: testUser.id,
-          name: `tag${i}-${crypto.randomUUID().slice(0,8)}`,
+          name: `tag${i}-${crypto.randomUUID().slice(0, 8)}`,
         })
       }
-      
+
       const result = await tagRepository.list(3)
       expect(result.length).toBeGreaterThanOrEqual(3)
     })
@@ -372,10 +378,10 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       for (let i = 1; i <= 5; i++) {
         await tagRepository.create({
           userId: testUser.id,
-          name: `tag${i}-${crypto.randomUUID().slice(0,8)}`,
+          name: `tag${i}-${crypto.randomUUID().slice(0, 8)}`,
         })
       }
-      
+
       const result = await tagRepository.list(undefined, 2)
       expect(result.length).toBeGreaterThanOrEqual(3)
     })
@@ -385,10 +391,10 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       for (let i = 1; i <= 5; i++) {
         await tagRepository.create({
           userId: testUser.id,
-          name: `tag${i}-${crypto.randomUUID().slice(0,8)}`,
+          name: `tag${i}-${crypto.randomUUID().slice(0, 8)}`,
         })
       }
-      
+
       const result = await tagRepository.list(2, 2)
       expect(result).toHaveLength(2)
     })
@@ -398,10 +404,10 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       for (let i = 1; i <= 3; i++) {
         await tagRepository.create({
           userId: testUser.id,
-          name: `tag${i}-${crypto.randomUUID().slice(0,8)}`,
+          name: `tag${i}-${crypto.randomUUID().slice(0, 8)}`,
         })
       }
-      
+
       const result = await tagRepository.list()
       expect(result.length).toBeGreaterThanOrEqual(3)
     })

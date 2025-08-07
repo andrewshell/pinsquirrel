@@ -10,7 +10,9 @@ describe('EmptyState', () => {
 
   it('shows call-to-action button to create first pin', () => {
     render(<EmptyState />)
-    const ctaButton = screen.getByRole('button', { name: /create your first pin/i })
+    const ctaButton = screen.getByRole('button', {
+      name: /create your first pin/i,
+    })
     expect(ctaButton).toBeInTheDocument()
   })
 
@@ -27,12 +29,16 @@ describe('EmptyState', () => {
 
   it('displays descriptive help text', () => {
     render(<EmptyState />)
-    expect(screen.getByText(/start saving your favorite links/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/start saving your favorite links/i)
+    ).toBeInTheDocument()
   })
 
   it('has accessible button with proper role', () => {
     render(<EmptyState />)
-    const button = screen.getByRole('button', { name: /create your first pin/i })
+    const button = screen.getByRole('button', {
+      name: /create your first pin/i,
+    })
     expect(button).toBeInTheDocument()
     expect(button).toBeEnabled()
   })

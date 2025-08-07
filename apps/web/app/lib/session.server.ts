@@ -112,10 +112,12 @@ export async function getFlashMessage(
 ): Promise<string | null> {
   const session = await getSession(request)
   const message = session.get(`flash-${type}`) as string | null
-  
+
   return message
 }
 
-export async function commitSession(session: Awaited<ReturnType<typeof getSession>>) {
+export async function commitSession(
+  session: Awaited<ReturnType<typeof getSession>>
+) {
   return sessionStorage.commitSession(session)
 }

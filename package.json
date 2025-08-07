@@ -10,6 +10,7 @@
     "lint": "turbo lint",
     "format": "turbo format",
     "test": "turbo test",
+    "quality": "turbo typecheck && turbo lint && turbo test && turbo format",
     "db:up": "docker compose -f docker-compose.dev.yml down && docker compose -f docker-compose.dev.yml up -d postgres",
     "db:down": "docker compose -f docker-compose.dev.yml down"
   },

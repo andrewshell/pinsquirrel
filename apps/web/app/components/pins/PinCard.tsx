@@ -8,30 +8,31 @@ export function PinCard({ pin }: PinCardProps) {
   // Format relative time (simplified for now)
   const getRelativeTime = (date: Date) => {
     const now = new Date()
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
+    const diffInHours = Math.floor(
+      (now.getTime() - date.getTime()) / (1000 * 60 * 60)
+    )
     const diffInDays = Math.floor(diffInHours / 24)
-    
+
     if (diffInHours < 1) return 'just now'
-    if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`
+    if (diffInHours < 24)
+      return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`
     if (diffInDays === 1) return 'yesterday'
     if (diffInDays < 7) return `${diffInDays} days ago`
-    if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} week${Math.floor(diffInDays / 7) > 1 ? 's' : ''} ago`
+    if (diffInDays < 30)
+      return `${Math.floor(diffInDays / 7)} week${Math.floor(diffInDays / 7) > 1 ? 's' : ''} ago`
     return `${Math.floor(diffInDays / 30)} month${Math.floor(diffInDays / 30) > 1 ? 's' : ''} ago`
   }
 
   return (
-    <div 
+    <div
       className="py-1"
-      role="article" 
+      role="article"
       aria-labelledby={`pin-title-${pin.id}`}
     >
       {/* Main content */}
       <div className="flex-1 min-w-0">
         {/* Title as link */}
-        <h3 
-          id={`pin-title-${pin.id}`}
-          className="mb-0.5"
-        >
+        <h3 id={`pin-title-${pin.id}`} className="mb-0.5">
           <a
             href={pin.url}
             target="_blank"
@@ -56,7 +57,7 @@ export function PinCard({ pin }: PinCardProps) {
 
         {/* Description (if exists) */}
         {pin.description && (
-          <div 
+          <div
             data-testid="pin-description"
             className="text-xs text-muted-foreground mb-1"
           >
@@ -66,13 +67,13 @@ export function PinCard({ pin }: PinCardProps) {
 
         {/* Tags */}
         {pin.tags.length > 0 && (
-          <div 
-            className="flex flex-wrap gap-1 mb-1" 
+          <div
+            className="flex flex-wrap gap-1 mb-1"
             data-testid="pin-tags"
             role="list"
             aria-label={`Tags: ${pin.tags.map(t => t.name).join(', ')}`}
           >
-            {pin.tags.map((tag) => (
+            {pin.tags.map(tag => (
               <span
                 key={tag.id}
                 className="text-xs text-orange-600 hover:text-orange-800 cursor-pointer"
@@ -85,16 +86,12 @@ export function PinCard({ pin }: PinCardProps) {
         )}
 
         {/* Bottom row: Timestamp and Actions */}
-        <div 
-          className="flex items-center gap-2 text-xs text-muted-foreground"
-        >
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {/* Timestamp */}
-          <span>
-            {getRelativeTime(pin.createdAt)}
-          </span>
+          <span>{getRelativeTime(pin.createdAt)}</span>
 
           {/* Actions */}
-          <div 
+          <div
             className="flex gap-2"
             role="group"
             aria-label={`Actions for ${pin.title}`}

@@ -1,9 +1,16 @@
 import { useActionData } from 'react-router'
 import type { Route } from './+types/pins.new'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
-import { DrizzlePinRepository, DrizzleTagRepository, db } from '@pinsquirrel/database'
+import {
+  DrizzlePinRepository,
+  DrizzleTagRepository,
+  db,
+} from '@pinsquirrel/database'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
-import { pinCreationSchema, type PinCreationFormData } from '~/lib/validation/pin-schema'
+import {
+  pinCreationSchema,
+  type PinCreationFormData,
+} from '~/lib/validation/pin-schema'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
 import { logger } from '~/lib/logger.server'
 
@@ -35,7 +42,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (!validation.success) {
     const errors: Record<string, string> = {}
-    validation.error.issues.forEach((error) => {
+    validation.error.issues.forEach(error => {
       const field = error.path[0] as string
       errors[field] = error.message
     })
@@ -52,20 +59,25 @@ export async function action({ request }: Route.ActionArgs) {
       readLater: false,
     })
 
-    logger.info('Pin created successfully', { 
-      pinId: pin.id, 
+    logger.info('Pin created successfully', {
+      pinId: pin.id,
       userId: user.id,
-      url: pin.url 
+      url: pin.url,
     })
 
     // Redirect to pins list with success message
-    return setFlashMessage(request, 'success', 'Pin created successfully!', '/pins')
+    return setFlashMessage(
+      request,
+      'success',
+      'Pin created successfully!',
+      '/pins'
+    )
   } catch (error) {
-    logger.exception(error, 'Failed to create pin', { 
+    logger.exception(error, 'Failed to create pin', {
       userId: user.id,
-      url: validation.data.url 
+      url: validation.data.url,
     })
-    
+
     return {
       error: 'Failed to create pin. Please try again.',
     }
@@ -74,7 +86,12 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function PinsNewPage() {
   const actionData = useActionData<typeof action>()
-  const { loading: isMetadataLoading, error: metadataError, metadata, fetchMetadata } = useMetadataFetch()
+  const {
+    loading: isMetadataLoading,
+    error: metadataError,
+    metadata,
+    fetchMetadata,
+  } = useMetadataFetch()
 
   const handleSubmit = async (_data: PinCreationFormData) => {
     // This will be handled by the form's own submission when using the regular form

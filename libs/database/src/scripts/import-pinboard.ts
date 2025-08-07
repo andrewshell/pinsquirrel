@@ -34,7 +34,9 @@ async function importPinboard() {
 
   try {
     // Parse the export file
-    const exportData: PinboardPin[] = JSON.parse(readFileSync(exportPath, 'utf-8'))
+    const exportData: PinboardPin[] = JSON.parse(
+      readFileSync(exportPath, 'utf-8')
+    )
     console.log(`📄 Found ${exportData.length} pins to import`)
 
     // Find the oldest user
@@ -50,16 +52,16 @@ async function importPinboard() {
     }
 
     const user = oldestUser[0]
-    console.log(`👤 Importing for oldest user: ${user.username} (created: ${user.createdAt})`)
+    console.log(
+      `👤 Importing for oldest user: ${user.username} (created: ${user.createdAt})`
+    )
 
     // Initialize repositories
     const tagRepo = new DrizzleTagRepository(db)
 
     // Delete all existing pins for this user (cascades to pinsTags)
     console.log('🗑️  Deleting existing pins...')
-    const deletedPins = await db
-      .delete(pins)
-      .where(eq(pins.userId, user.id))
+    const deletedPins = await db.delete(pins).where(eq(pins.userId, user.id))
     console.log(`   Deleted ${deletedPins.rowCount || 0} existing pins`)
 
     // Delete all existing tags for this user (if they're not referenced by other users)
@@ -68,7 +70,7 @@ async function importPinboard() {
       .select({ id: tags.id })
       .from(tags)
       .where(eq(tags.userId, user.id))
-    
+
     for (const tag of userTags) {
       // Check if this tag is still referenced by any pins
       const referencedPins = await db
@@ -77,7 +79,7 @@ async function importPinboard() {
         .innerJoin(pins, eq(pinsTags.pinId, pins.id))
         .where(eq(pinsTags.tagId, tag.id))
         .limit(1)
-      
+
       if (referencedPins.length === 0) {
         await db.delete(tags).where(eq(tags.id, tag.id))
       }
@@ -86,11 +88,11 @@ async function importPinboard() {
     // Import pins from Pinboard
     console.log('📥 Importing pins...')
     let importedCount = 0
-    
+
     for (const pinboardPin of exportData) {
       // Parse the timestamp from Pinboard format (ISO 8601)
       const pinboardDate = new Date(pinboardPin.time)
-      
+
       // Parse tags from space-separated string
       const tagNames = pinboardPin.tags
         .split(' ')
@@ -99,7 +101,7 @@ async function importPinboard() {
 
       // Create pin directly in database with custom timestamp
       const pinId = randomUUID()
-      
+
       await db.insert(pins).values({
         id: pinId,
         userId: user.id,
@@ -116,8 +118,11 @@ async function importPinboard() {
       // Handle tags if present
       if (tagNames.length > 0) {
         // Fetch or create tags
-        const createdTags = await tagRepo.fetchOrCreateByNames(user.id, tagNames)
-        
+        const createdTags = await tagRepo.fetchOrCreateByNames(
+          user.id,
+          tagNames
+        )
+
         // Associate tags with pin
         if (createdTags.length > 0) {
           await db.insert(pinsTags).values(
@@ -142,7 +147,7 @@ async function importPinboard() {
       .select({ count: pins.id })
       .from(pins)
       .where(eq(pins.userId, user.id))
-    
+
     const finalTagCount = await db
       .select({ count: tags.id })
       .from(tags)
@@ -151,7 +156,6 @@ async function importPinboard() {
     console.log(`📊 Final stats for ${user.username}:`)
     console.log(`   - Pins: ${finalPinCount.length}`)
     console.log(`   - Tags: ${finalTagCount.length}`)
-
   } catch (error) {
     console.error('❌ Import failed:', error)
     process.exit(1)

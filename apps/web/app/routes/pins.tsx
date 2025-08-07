@@ -1,7 +1,11 @@
 import { useLoaderData, useNavigation, Link } from 'react-router'
 import type { Route } from './+types/pins'
 import { requireUser, getFlashMessage } from '~/lib/session.server'
-import { DrizzlePinRepository, DrizzleTagRepository, db } from '@pinsquirrel/database'
+import {
+  DrizzlePinRepository,
+  DrizzleTagRepository,
+  db,
+} from '@pinsquirrel/database'
 import { PinList } from '~/components/pins/PinList'
 import { Pagination } from '~/components/pins/Pagination'
 import { Button } from '~/components/ui/button'
@@ -47,9 +51,16 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function PinsPage() {
-  const { pins, totalPages, currentPage, totalCount, successMessage, errorMessage } = useLoaderData<typeof loader>()
+  const {
+    pins,
+    totalPages,
+    currentPage,
+    totalCount,
+    successMessage,
+    errorMessage,
+  } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
-  
+
   // Check if we're loading (navigating or submitting)
   const isLoading = navigation.state === 'loading'
 
@@ -84,8 +95,8 @@ export default function PinsPage() {
         )}
 
         <PinList pins={pins} isLoading={isLoading} />
-        
-        <Pagination 
+
+        <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
           totalCount={totalCount}

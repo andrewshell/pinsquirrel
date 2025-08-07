@@ -17,12 +17,12 @@ describe('CheerioHtmlParser', () => {
         </head>
       </html>
     `
-    
+
     const result = parser.parseMetadata(html)
-    
+
     expect(result).toEqual({
       title: 'Test Page Title',
-      description: 'Test description'
+      description: 'Test description',
     })
   })
 
@@ -34,11 +34,11 @@ describe('CheerioHtmlParser', () => {
         </head>
       </html>
     `
-    
+
     const result = parser.parseMetadata(html)
 
     expect(result).toEqual({
-      description: 'Test description'
+      description: 'Test description',
     })
   })
 
@@ -50,17 +50,17 @@ describe('CheerioHtmlParser', () => {
         </head>
       </html>
     `
-    
+
     const result = parser.parseMetadata(html)
 
     expect(result).toEqual({
-      title: 'Test Title'
+      title: 'Test Title',
     })
   })
 
   it('should return empty object when no metadata found', () => {
     const html = '<html><head></head></html>'
-    
+
     const result = parser.parseMetadata(html)
 
     expect(result).toEqual({})
@@ -75,12 +75,12 @@ describe('CheerioHtmlParser', () => {
         </head>
       </html>
     `
-    
+
     const result = parser.parseMetadata(html)
 
     expect(result).toEqual({
       title: 'Title with spaces',
-      description: 'Description with spaces'
+      description: 'Description with spaces',
     })
   })
 })

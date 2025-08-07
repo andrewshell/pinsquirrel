@@ -16,9 +16,21 @@ describe('PinCard', () => {
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
     tags: [
-      { id: 'tag-1', userId: 'user-1', name: 'javascript', createdAt: new Date(), updatedAt: new Date() },
-      { id: 'tag-2', userId: 'user-1', name: 'react', createdAt: new Date(), updatedAt: new Date() }
-    ]
+      {
+        id: 'tag-1',
+        userId: 'user-1',
+        name: 'javascript',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 'tag-2',
+        userId: 'user-1',
+        name: 'react',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ],
   }
 
   it('renders pin title correctly', () => {
@@ -83,7 +95,7 @@ describe('PinCard', () => {
     render(<PinCard pin={mockPin} />)
     const editButton = screen.getByLabelText('Edit Example Pin')
     const deleteButton = screen.getByLabelText('Delete Example Pin')
-    
+
     expect(editButton).toHaveTextContent('edit')
     expect(deleteButton).toHaveTextContent('delete')
     expect(editButton).toHaveClass('text-xs', 'text-blue-600')
@@ -95,7 +107,7 @@ describe('PinCard', () => {
     const twoDaysAgo = new Date()
     twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
     const pinWithOldDate = { ...mockPin, createdAt: twoDaysAgo }
-    
+
     render(<PinCard pin={pinWithOldDate} />)
     expect(screen.getByText('2 days ago')).toBeInTheDocument()
   })

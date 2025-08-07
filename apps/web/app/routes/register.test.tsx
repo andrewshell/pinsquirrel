@@ -10,9 +10,9 @@ vi.mock('@pinsquirrel/core')
 vi.mock('@pinsquirrel/database')
 vi.mock('~/lib/logger.server')
 vi.mock('react-router', () => ({
-  redirect: vi.fn().mockImplementation((to) => ({ 
-    url: to, 
-    status: 302 
+  redirect: vi.fn().mockImplementation(to => ({
+    url: to,
+    status: 302,
   })),
   Link: 'a',
   createCookieSessionStorage: vi.fn().mockReturnValue({
@@ -31,11 +31,11 @@ describe('Register Route', () => {
     it('redirects to home when user is already logged in', async () => {
       const request = new Request('http://localhost/register')
       const args: Route.LoaderArgs = { request, params: {}, context: {} }
-      
+
       vi.mocked(getUserId).mockResolvedValue('user-123')
-      
+
       const { redirect } = await import('react-router')
-      
+
       await loader(args)
 
       expect(getUserId).toHaveBeenCalledWith(request)
@@ -45,7 +45,7 @@ describe('Register Route', () => {
     it('returns null when user is not logged in', async () => {
       const request = new Request('http://localhost/register')
       const args: Route.LoaderArgs = { request, params: {}, context: {} }
-      
+
       vi.mocked(getUserId).mockResolvedValue(null)
 
       const result = await loader(args)
@@ -59,18 +59,33 @@ describe('Register Route', () => {
     it('should validate registration requirements structure', () => {
       // Test the validation patterns used in registerSchema
       const testCases = [
-        { username: 'validuser', password: 'validpass123', email: 'test@example.com', expected: true },
-        { username: 'validuser', password: 'validpass123', email: null, expected: true },
-        { username: '', password: 'validpass123', email: null, expected: false },
+        {
+          username: 'validuser',
+          password: 'validpass123',
+          email: 'test@example.com',
+          expected: true,
+        },
+        {
+          username: 'validuser',
+          password: 'validpass123',
+          email: null,
+          expected: true,
+        },
+        {
+          username: '',
+          password: 'validpass123',
+          email: null,
+          expected: false,
+        },
         { username: 'validuser', password: '', email: null, expected: false },
       ]
 
       testCases.forEach(({ username, password, email, expected }) => {
         const hasUsername = !!(username && username.length >= 3)
-        const hasPassword = !!(password && password.length >= 8) 
+        const hasPassword = !!(password && password.length >= 8)
         const emailValid = !email || email.includes('@')
         const isValid = hasUsername && hasPassword && emailValid
-        
+
         expect(isValid).toBe(expected)
       })
     })
@@ -88,7 +103,7 @@ describe('Register Route', () => {
         const isValidLength = username.length >= 3 && username.length <= 20
         const hasValidChars = /^[a-zA-Z0-9_]+$/.test(username)
         const isValid = isValidLength && hasValidChars
-        
+
         expect(isValid).toBe(expected)
       })
     })
@@ -127,10 +142,30 @@ describe('Register Route', () => {
         const testCases = [
           { username: null, password: null, email: null, expected: false },
           { username: '', password: '', email: '', expected: false },
-          { username: 'validuser', password: null, email: null, expected: false },
-          { username: null, password: 'validpass', email: null, expected: false },
-          { username: 'validuser', password: 'validpass', email: null, expected: true },
-          { username: 'validuser', password: 'validpass', email: 'test@example.com', expected: true },
+          {
+            username: 'validuser',
+            password: null,
+            email: null,
+            expected: false,
+          },
+          {
+            username: null,
+            password: 'validpass',
+            email: null,
+            expected: false,
+          },
+          {
+            username: 'validuser',
+            password: 'validpass',
+            email: null,
+            expected: true,
+          },
+          {
+            username: 'validuser',
+            password: 'validpass',
+            email: 'test@example.com',
+            expected: true,
+          },
         ]
 
         testCases.forEach(({ username, password, expected }) => {
@@ -191,8 +226,12 @@ describe('Register Route', () => {
         expect(validationErrorResponse).toHaveProperty('errors')
         expect(validationErrorResponse.errors).toHaveProperty('username')
         expect(validationErrorResponse.errors).toHaveProperty('password')
-        expect(Array.isArray(validationErrorResponse.errors.username)).toBe(true)
-        expect(Array.isArray(validationErrorResponse.errors.password)).toBe(true)
+        expect(Array.isArray(validationErrorResponse.errors.username)).toBe(
+          true
+        )
+        expect(Array.isArray(validationErrorResponse.errors.password)).toBe(
+          true
+        )
       })
 
       it('should return correct registration error response format', () => {
@@ -204,7 +243,9 @@ describe('Register Route', () => {
 
         expect(registrationErrorResponse).toHaveProperty('errors')
         expect(registrationErrorResponse.errors).toHaveProperty('_form')
-        expect(registrationErrorResponse.errors._form).toBe('Username already exists')
+        expect(registrationErrorResponse.errors._form).toBe(
+          'Username already exists'
+        )
       })
 
       it('should return correct general error response format', () => {
@@ -242,7 +283,11 @@ describe('Register Route', () => {
         const testCases = [
           { inputEmail: null, expectedForService: undefined, hasEmail: false },
           { inputEmail: '', expectedForService: undefined, hasEmail: false },
-          { inputEmail: 'test@example.com', expectedForService: 'test@example.com', hasEmail: true },
+          {
+            inputEmail: 'test@example.com',
+            expectedForService: 'test@example.com',
+            hasEmail: true,
+          },
         ]
 
         testCases.forEach(({ inputEmail, expectedForService, hasEmail }) => {
@@ -258,21 +303,30 @@ describe('Register Route', () => {
     describe('duplicate user handling logic', () => {
       it('should handle duplicate username error scenarios', () => {
         const duplicateUserError = new Error('Username already exists')
-        const errorMessage = duplicateUserError instanceof Error ? duplicateUserError.message : 'Registration failed'
+        const errorMessage =
+          duplicateUserError instanceof Error
+            ? duplicateUserError.message
+            : 'Registration failed'
 
         expect(errorMessage).toBe('Username already exists')
       })
 
       it('should handle general registration errors', () => {
         const generalError = new Error('Database connection failed')
-        const errorMessage = generalError instanceof Error ? generalError.message : 'Registration failed'
+        const errorMessage =
+          generalError instanceof Error
+            ? generalError.message
+            : 'Registration failed'
 
         expect(errorMessage).toBe('Database connection failed')
       })
 
       it('should handle unknown errors', () => {
         const unknownError: unknown = 'Some string error'
-        const errorMessage = unknownError instanceof Error ? unknownError.message : 'Registration failed'
+        const errorMessage =
+          unknownError instanceof Error
+            ? unknownError.message
+            : 'Registration failed'
 
         expect(errorMessage).toBe('Registration failed')
       })
@@ -287,7 +341,11 @@ describe('Register Route', () => {
         username: 'testuser',
       }
 
-      const isSuccessfulRegistration = !!(mockUser && mockUser.id && mockUser.username)
+      const isSuccessfulRegistration = !!(
+        mockUser &&
+        mockUser.id &&
+        mockUser.username
+      )
       const shouldCreateSession = isSuccessfulRegistration
       const shouldRedirect = isSuccessfulRegistration
 
@@ -298,9 +356,12 @@ describe('Register Route', () => {
 
     it('should validate registration error flow pattern', () => {
       const registrationError = new Error('Username already exists')
-      
+
       const hasError = !!registrationError
-      const errorMessage = registrationError instanceof Error ? registrationError.message : 'Registration failed'
+      const errorMessage =
+        registrationError instanceof Error
+          ? registrationError.message
+          : 'Registration failed'
       const shouldReturnError = hasError
 
       expect(hasError).toBe(true)
@@ -344,7 +405,10 @@ describe('Register Route', () => {
         const testCases = [
           { formEmail: '', expectedServiceParam: undefined },
           { formEmail: null, expectedServiceParam: undefined },
-          { formEmail: 'test@example.com', expectedServiceParam: 'test@example.com' },
+          {
+            formEmail: 'test@example.com',
+            expectedServiceParam: 'test@example.com',
+          },
         ]
 
         testCases.forEach(({ formEmail, expectedServiceParam }) => {
@@ -375,7 +439,11 @@ describe('Register Route', () => {
           username: 'testuser',
         }
 
-        const isValidRegistration = !!(mockUser && mockUser.id && mockUser.username)
+        const isValidRegistration = !!(
+          mockUser &&
+          mockUser.id &&
+          mockUser.username
+        )
         const shouldCreateSession = isValidRegistration
         const shouldRedirect = isValidRegistration
 
@@ -386,9 +454,12 @@ describe('Register Route', () => {
 
       it('should validate error handling pattern', () => {
         const registrationError = new Error('Username already exists')
-        
+
         const hasError = !!registrationError
-        const errorMessage = registrationError instanceof Error ? registrationError.message : 'Registration failed'
+        const errorMessage =
+          registrationError instanceof Error
+            ? registrationError.message
+            : 'Registration failed'
         const shouldReturnError = hasError
 
         expect(hasError).toBe(true)
@@ -415,10 +486,16 @@ describe('Register Route', () => {
       it('should validate registration requirements vs login requirements', () => {
         // Registration requires username + password (email optional)
         // Login requires username + password
-        const registrationFields = { username: 'user', password: 'pass', email: null }
+        const registrationFields = {
+          username: 'user',
+          password: 'pass',
+          email: null,
+        }
         const loginFields = { username: 'user', password: 'pass' }
 
-        const isValidRegistration = !!(registrationFields.username && registrationFields.password)
+        const isValidRegistration = !!(
+          registrationFields.username && registrationFields.password
+        )
         const isValidLogin = !!(loginFields.username && loginFields.password)
 
         expect(isValidRegistration).toBe(true)

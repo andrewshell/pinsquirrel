@@ -259,9 +259,9 @@ describe('Schema Validation', () => {
     })
 
     it('should reject invalid UUID format', () => {
-      expect(() =>
-        idParamSchema.parse({ id: 'invalid-uuid' })
-      ).toThrow('Invalid ID format')
+      expect(() => idParamSchema.parse({ id: 'invalid-uuid' })).toThrow(
+        'Invalid ID format'
+      )
     })
 
     it('should reject missing id', () => {
@@ -305,15 +305,11 @@ describe('Schema Validation', () => {
     })
 
     it('should reject invalid emails', () => {
-      expect(() =>
-        userUpdateSchema.parse({ email: 'invalid-email' })
-      ).toThrow()
+      expect(() => userUpdateSchema.parse({ email: 'invalid-email' })).toThrow()
     })
 
     it('should reject invalid roles', () => {
-      expect(() =>
-        userUpdateSchema.parse({ role: 'superuser' })
-      ).toThrow()
+      expect(() => userUpdateSchema.parse({ role: 'superuser' })).toThrow()
     })
 
     it('should accept user role', () => {

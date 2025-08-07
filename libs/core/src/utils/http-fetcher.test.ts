@@ -14,7 +14,7 @@ describe('NodeHttpFetcher', () => {
     const mockHtml = '<html><head><title>Test</title></head></html>'
     mockFetch.mockResolvedValue({
       ok: true,
-      text: () => Promise.resolve(mockHtml)
+      text: () => Promise.resolve(mockHtml),
     })
 
     const result = await fetcher.fetch('https://example.com')
@@ -23,7 +23,7 @@ describe('NodeHttpFetcher', () => {
       headers: {
         'User-Agent': 'PinSquirrel/1.0 (Bookmark Metadata Fetcher)',
       },
-      signal: expect.any(AbortSignal)
+      signal: expect.any(AbortSignal),
     })
     expect(result).toBe(mockHtml)
   })
@@ -32,25 +32,27 @@ describe('NodeHttpFetcher', () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 404,
-      statusText: 'Not Found'
+      statusText: 'Not Found',
     })
 
-    await expect(fetcher.fetch('https://example.com'))
-      .rejects.toThrow('HTTP 404: Not Found')
+    await expect(fetcher.fetch('https://example.com')).rejects.toThrow(
+      'HTTP 404: Not Found'
+    )
   })
 
   it('should handle network errors', async () => {
     mockFetch.mockRejectedValue(new Error('Network error'))
 
-    await expect(fetcher.fetch('https://example.com'))
-      .rejects.toThrow('Network error')
+    await expect(fetcher.fetch('https://example.com')).rejects.toThrow(
+      'Network error'
+    )
   })
 
   it('should use custom timeout', async () => {
     const customFetcher = new NodeHttpFetcher(mockFetch, 3000)
     mockFetch.mockResolvedValue({
       ok: true,
-      text: () => Promise.resolve('<html></html>')
+      text: () => Promise.resolve('<html></html>'),
     })
 
     await customFetcher.fetch('https://example.com')
@@ -59,7 +61,7 @@ describe('NodeHttpFetcher', () => {
       headers: {
         'User-Agent': 'PinSquirrel/1.0 (Bookmark Metadata Fetcher)',
       },
-      signal: expect.any(AbortSignal)
+      signal: expect.any(AbortSignal),
     })
   })
 })

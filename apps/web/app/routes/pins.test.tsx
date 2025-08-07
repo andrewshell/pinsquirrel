@@ -29,15 +29,15 @@ import { loader } from './pins'
 const mockRequireUser = vi.mocked(requireUser)
 
 describe('pins route loader', () => {
-  const mockUser = { 
-    id: 'user-1', 
+  const mockUser = {
+    id: 'user-1',
     username: 'testuser',
     passwordHash: 'hash',
     emailHash: 'emailhash',
     createdAt: new Date(),
-    updatedAt: new Date()
+    updatedAt: new Date(),
   }
-  
+
   const mockPins: Pin[] = [
     {
       id: 'pin-1',
@@ -49,7 +49,13 @@ describe('pins route loader', () => {
       contentPath: null,
       imagePath: null,
       tags: [
-        { id: 'tag-1', userId: 'user-1', name: 'javascript', createdAt: new Date(), updatedAt: new Date() }
+        {
+          id: 'tag-1',
+          userId: 'user-1',
+          name: 'javascript',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
       ],
       createdAt: new Date('2025-01-01'),
       updatedAt: new Date('2025-01-01'),
@@ -66,7 +72,7 @@ describe('pins route loader', () => {
       tags: [],
       createdAt: new Date('2025-01-02'),
       updatedAt: new Date('2025-01-02'),
-    }
+    },
   ]
 
   beforeEach(() => {
@@ -106,7 +112,7 @@ describe('pins route loader', () => {
 
     expect(result.currentPage).toBe(3)
     expect(result.totalPages).toBe(3) // Math.ceil(75 / 25)
-    
+
     expect(mockFindByUserId).toHaveBeenCalledWith('user-1', {
       limit: 25,
       offset: 50, // (page 3 - 1) * 25
@@ -180,7 +186,7 @@ describe('pins route loader', () => {
 
   it('calculates totalPages correctly for edge cases', async () => {
     mockFindByUserId.mockResolvedValue([])
-    
+
     // Exactly divisible by page size
     mockCountByUserId.mockResolvedValue(25)
     let request = new Request('http://localhost/pins')
@@ -206,17 +212,19 @@ describe('pins route loader', () => {
     mockCountByUserId.mockResolvedValue(0)
 
     const request = new Request('http://localhost/pins')
-    
-    await expect(loader({ request } as Parameters<typeof loader>[0]))
-      .rejects.toThrow('Database error')
+
+    await expect(
+      loader({ request } as Parameters<typeof loader>[0])
+    ).rejects.toThrow('Database error')
   })
 
   it('handles authentication errors', async () => {
     mockRequireUser.mockRejectedValue(new Error('Unauthorized'))
 
     const request = new Request('http://localhost/pins')
-    
-    await expect(loader({ request } as Parameters<typeof loader>[0]))
-      .rejects.toThrow('Unauthorized')
+
+    await expect(
+      loader({ request } as Parameters<typeof loader>[0])
+    ).rejects.toThrow('Unauthorized')
   })
 })

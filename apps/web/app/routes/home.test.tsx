@@ -12,10 +12,13 @@ vi.mock('react-router', async () => {
   const actual = await vi.importActual('react-router')
   return {
     ...actual,
-    redirect: vi.fn().mockImplementation((to: string) => ({ 
-      url: to, 
-      status: 302 
-    } as any)),
+    redirect: vi.fn().mockImplementation(
+      (to: string) =>
+        ({
+          url: to,
+          status: 302,
+        }) as any
+    ),
   }
 })
 
@@ -182,7 +185,6 @@ describe('Home Page', () => {
       ).toBeInTheDocument()
       expect(screen.getByRole('link', { name: 'Sign In' })).toBeInTheDocument()
     })
-
 
     it('should render all three feature cards', async () => {
       renderWithRouter()

@@ -58,7 +58,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         userId: testUser.id,
         name: 'test-tag-2',
       })
-      
+
       const testPinId = crypto.randomUUID()
 
       // Insert test pin
@@ -104,14 +104,14 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     it('should find all pins for a user', async () => {
       // Create another user to ensure we only get pins for the correct user
       const otherUser = await userRepository.create({
-        username: `otheruser-${crypto.randomUUID().slice(0,8)}`,
+        username: `otheruser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'password',
       })
 
       const pin1Id = crypto.randomUUID()
       const pin2Id = crypto.randomUUID()
       const pin3Id = crypto.randomUUID()
-      
+
       // Create pins for test user
       await testPool.query(
         `
@@ -148,7 +148,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       const pin1Id = crypto.randomUUID()
       const pin2Id = crypto.randomUUID()
       const pin3Id = crypto.randomUUID()
-      
+
       // Create pins with different creation times
       await testPool.query(
         `
@@ -185,7 +185,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       const pin1Id = crypto.randomUUID()
       const pin2Id = crypto.randomUUID()
       const pin3Id = crypto.randomUUID()
-      
+
       // Create pins
       await testPool.query(
         `
@@ -233,9 +233,9 @@ describe('DrizzlePinRepository - Integration Tests', () => {
   describe('findByUserIdAndReadLater', () => {
     it('should find pins by user and read later status', async () => {
       const pinId1 = crypto.randomUUID()
-      const pinId2 = crypto.randomUUID() 
+      const pinId2 = crypto.randomUUID()
       const pinId3 = crypto.randomUUID()
-      
+
       // Create pins with different read later status
       await testPool.query(
         `
@@ -244,7 +244,15 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         ($3, $1, $6, 'Pin 2', true, '2023-01-02T00:00:00Z', '2023-01-02T00:00:00Z'),
         ($4, $1, $7, 'Pin 3', false, '2023-01-03T00:00:00Z', '2023-01-03T00:00:00Z')
       `,
-        [testUser.id, pinId1, pinId2, pinId3, `https://example${pinId1.slice(0,8)}.com`, `https://example${pinId2.slice(0,8)}.com`, `https://example${pinId3.slice(0,8)}.com`]
+        [
+          testUser.id,
+          pinId1,
+          pinId2,
+          pinId3,
+          `https://example${pinId1.slice(0, 8)}.com`,
+          `https://example${pinId2.slice(0, 8)}.com`,
+          `https://example${pinId3.slice(0, 8)}.com`,
+        ]
       )
 
       const readLaterPins = await pinRepository.findByUserIdAndReadLater(
@@ -258,15 +266,21 @@ describe('DrizzlePinRepository - Integration Tests', () => {
 
       expect(readLaterPins).toHaveLength(2)
       expect(
-        readLaterPins.find(p => p.url === `https://example${pinId1.slice(0,8)}.com`)
+        readLaterPins.find(
+          p => p.url === `https://example${pinId1.slice(0, 8)}.com`
+        )
       ).toBeDefined()
       expect(
-        readLaterPins.find(p => p.url === `https://example${pinId2.slice(0,8)}.com`)
+        readLaterPins.find(
+          p => p.url === `https://example${pinId2.slice(0, 8)}.com`
+        )
       ).toBeDefined()
 
       expect(notReadLaterPins).toHaveLength(1)
       expect(
-        notReadLaterPins.find(p => p.url === `https://example${pinId3.slice(0,8)}.com`)
+        notReadLaterPins.find(
+          p => p.url === `https://example${pinId3.slice(0, 8)}.com`
+        )
       ).toBeDefined()
     })
   })
@@ -274,8 +288,8 @@ describe('DrizzlePinRepository - Integration Tests', () => {
   describe('findByUserIdAndUrl', () => {
     it('should find pin by user and url', async () => {
       const pinId = crypto.randomUUID()
-      const testUrl = `https://example-${pinId.slice(0,8)}.com/page`
-      
+      const testUrl = `https://example-${pinId.slice(0, 8)}.com/page`
+
       await testPool.query(
         `
         INSERT INTO pins (id, user_id, url, title, created_at, updated_at) VALUES
@@ -490,19 +504,19 @@ describe('DrizzlePinRepository - Integration Tests', () => {
   describe('findAll', () => {
     it('should return all pins with tags', async () => {
       // Create pins with tags for this user
-      const uniqueTagName = `shared-tag-${crypto.randomUUID().slice(0,8)}`
+      const uniqueTagName = `shared-tag-${crypto.randomUUID().slice(0, 8)}`
       await tagRepository.create({ userId: testUser.id, name: uniqueTagName })
 
       const pin1 = await pinRepository.create({
         userId: testUser.id,
-        url: `https://example1-${crypto.randomUUID().slice(0,8)}.com`,
+        url: `https://example1-${crypto.randomUUID().slice(0, 8)}.com`,
         title: 'Pin 1',
         tagNames: [uniqueTagName],
       })
 
       const pin2 = await pinRepository.create({
         userId: testUser.id,
-        url: `https://example2-${crypto.randomUUID().slice(0,8)}.com`,
+        url: `https://example2-${crypto.randomUUID().slice(0, 8)}.com`,
         title: 'Pin 2',
         tagNames: [uniqueTagName],
       })
@@ -512,7 +526,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       // Find our specific pins in the results
       const ourPin1 = result.find(p => p.id === pin1.id)
       const ourPin2 = result.find(p => p.id === pin2.id)
-      
+
       expect(ourPin1).toBeDefined()
       expect(ourPin2).toBeDefined()
       expect(ourPin1!.tags).toHaveLength(1)

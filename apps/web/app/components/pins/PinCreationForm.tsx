@@ -5,7 +5,10 @@ import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Textarea } from '~/components/ui/textarea'
 import { Label } from '~/components/ui/label'
-import { pinCreationSchema, type PinCreationFormData } from '~/lib/validation/pin-schema'
+import {
+  pinCreationSchema,
+  type PinCreationFormData,
+} from '~/lib/validation/pin-schema'
 
 interface PinCreationFormProps {
   onSubmit: (data: PinCreationFormData) => void | Promise<void>
@@ -77,16 +80,16 @@ export function PinCreationForm({
   }
 
   return (
-    <form 
-      onSubmit={(e) => void handleSubmit(onSubmitWrapper)(e)} 
-      method="post" 
-      action="/pins/new" 
+    <form
+      onSubmit={e => void handleSubmit(onSubmitWrapper)(e)}
+      method="post"
+      action="/pins/new"
       className="space-y-4"
       noValidate
       aria-label="Create new pin"
     >
       {successMessage && (
-        <div 
+        <div
           className="rounded-md bg-green-50 p-4 text-sm text-green-800"
           role="alert"
           aria-live="polite"
@@ -96,7 +99,7 @@ export function PinCreationForm({
       )}
 
       {errorMessage && (
-        <div 
+        <div
           className="rounded-md bg-red-50 p-4 text-sm text-red-800"
           role="alert"
           aria-live="assertive"
@@ -136,16 +139,16 @@ export function PinCreationForm({
             {...register('title')}
             aria-invalid={!!errors.title}
             aria-describedby={
-              errors.title 
-                ? 'title-error title-help' 
-                : isMetadataLoading 
+              errors.title
+                ? 'title-error title-help'
+                : isMetadataLoading
                   ? 'title-loading title-help'
                   : 'title-help'
             }
             aria-required="true"
           />
           {isMetadataLoading && (
-            <span 
+            <span
               id="title-loading"
               className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"
               aria-live="polite"
@@ -155,7 +158,8 @@ export function PinCreationForm({
           )}
         </div>
         <p id="title-help" className="text-xs text-muted-foreground">
-          A descriptive title for your pin. We&apos;ll try to auto-fill this from the page.
+          A descriptive title for your pin. We&apos;ll try to auto-fill this
+          from the page.
         </p>
         {errors.title && (
           <p id="title-error" className="text-sm text-destructive" role="alert">
@@ -184,9 +188,9 @@ export function PinCreationForm({
         </p>
       </div>
 
-      <Button 
-        type="submit" 
-        disabled={isLoading || isSubmitting} 
+      <Button
+        type="submit"
+        disabled={isLoading || isSubmitting}
         className="w-full"
         aria-describedby={isLoading ? 'submit-status' : undefined}
       >

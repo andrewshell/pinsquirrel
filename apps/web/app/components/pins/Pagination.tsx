@@ -9,7 +9,11 @@ interface PaginationProps {
   totalCount: number
 }
 
-export function Pagination({ currentPage, totalPages, totalCount }: PaginationProps) {
+export function Pagination({
+  currentPage,
+  totalPages,
+  totalCount,
+}: PaginationProps) {
   const paginationRef = useRef<HTMLElement>(null)
   const shouldRender = totalPages > 1 && totalCount > 0
 
@@ -23,9 +27,9 @@ export function Pagination({ currentPage, totalPages, totalCount }: PaginationPr
       announcer.setAttribute('aria-atomic', 'true')
       announcer.className = 'sr-only'
       announcer.textContent = announcement
-      
+
       document.body.appendChild(announcer)
-      
+
       // Clean up after announcement
       setTimeout(() => {
         if (document.body.contains(announcer)) {
@@ -46,7 +50,7 @@ export function Pagination({ currentPage, totalPages, totalCount }: PaginationPr
   // Generate page numbers to display
   const getPageNumbers = () => {
     const pages: (number | 'ellipsis')[] = []
-    
+
     if (totalPages <= 7) {
       // Show all pages if total is small
       for (let i = 1; i <= totalPages; i++) {
@@ -55,29 +59,29 @@ export function Pagination({ currentPage, totalPages, totalCount }: PaginationPr
     } else {
       // Always show first page
       pages.push(1)
-      
+
       if (currentPage > 4) {
         pages.push('ellipsis')
       }
-      
+
       // Show pages around current page
       const start = Math.max(2, currentPage - 1)
       const end = Math.min(totalPages - 1, currentPage + 1)
-      
+
       for (let i = start; i <= end; i++) {
         pages.push(i)
       }
-      
+
       if (currentPage < totalPages - 3) {
         pages.push('ellipsis')
       }
-      
+
       // Always show last page (if not already included)
       if (totalPages > 1) {
         pages.push(totalPages)
       }
     }
-    
+
     return pages
   }
 
@@ -103,9 +107,10 @@ export function Pagination({ currentPage, totalPages, totalCount }: PaginationPr
       {/* Desktop pagination */}
       <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
         <div className="text-sm text-muted-foreground">
-          Page {currentPage} of {totalPages} ({totalCount === 1 ? '1 total pin' : `${totalCount} total pins`})
+          Page {currentPage} of {totalPages} (
+          {totalCount === 1 ? '1 total pin' : `${totalCount} total pins`})
         </div>
-        
+
         <div className="flex items-center space-x-1">
           {/* Previous button */}
           <Button
@@ -162,9 +167,7 @@ export function Pagination({ currentPage, totalPages, totalCount }: PaginationPr
                   asChild
                   aria-label={`Go to page ${page}`}
                 >
-                  <Link to={`/pins?page=${page}`}>
-                    {page}
-                  </Link>
+                  <Link to={`/pins?page=${page}`}>{page}</Link>
                 </Button>
               )
             })}

@@ -32,7 +32,10 @@ export class DrizzlePinRepository implements PinRepository {
     return this.mapToPin(pin, pinTags)
   }
 
-  async findByUserId(userId: string, options?: { limit?: number; offset?: number }): Promise<Pin[]> {
+  async findByUserId(
+    userId: string,
+    options?: { limit?: number; offset?: number }
+  ): Promise<Pin[]> {
     const baseQuery = this.db
       .select()
       .from(pins)
@@ -112,7 +115,10 @@ export class DrizzlePinRepository implements PinRepository {
   }
 
   async findAll(): Promise<Pin[]> {
-    const result = await this.db.select().from(pins).orderBy(desc(pins.createdAt))
+    const result = await this.db
+      .select()
+      .from(pins)
+      .orderBy(desc(pins.createdAt))
 
     return this.mapPinsBulk(result)
   }
@@ -268,7 +274,7 @@ export class DrizzlePinRepository implements PinRepository {
       .where(inArray(pinsTags.pinId, pinIds))
 
     const tagsByPinId = new Map<string, (typeof tags.$inferSelect)[]>()
-    
+
     for (const row of result) {
       const existing = tagsByPinId.get(row.pinId) || []
       existing.push(row.tag)
@@ -278,7 +284,9 @@ export class DrizzlePinRepository implements PinRepository {
     return tagsByPinId
   }
 
-  private async mapPinsBulk(pinsData: (typeof pins.$inferSelect)[]): Promise<Pin[]> {
+  private async mapPinsBulk(
+    pinsData: (typeof pins.$inferSelect)[]
+  ): Promise<Pin[]> {
     if (pinsData.length === 0) {
       return []
     }

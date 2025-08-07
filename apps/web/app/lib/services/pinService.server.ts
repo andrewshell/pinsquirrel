@@ -1,5 +1,9 @@
 import { PinServiceImpl } from '@pinsquirrel/core'
-import { DrizzlePinRepository, DrizzleTagRepository, db } from '@pinsquirrel/database'
+import {
+  DrizzlePinRepository,
+  DrizzleTagRepository,
+  db,
+} from '@pinsquirrel/database'
 
 // Create singleton instances
 const tagRepository = new DrizzleTagRepository(db)

@@ -1,16 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-// Mock dependencies 
+// Mock dependencies
 vi.mock('react-router', () => ({
   createCookieSessionStorage: vi.fn(() => ({
-    getSession: vi.fn(() => Promise.resolve({
-      get: vi.fn(() => null),
-      set: vi.fn(),
-    })),
+    getSession: vi.fn(() =>
+      Promise.resolve({
+        get: vi.fn(() => null),
+        set: vi.fn(),
+      })
+    ),
     commitSession: vi.fn(() => Promise.resolve('session-cookie')),
     destroySession: vi.fn(() => Promise.resolve('destroyed-cookie')),
   })),
-  redirect: vi.fn(() => { throw new Error('Redirect called') }),
+  redirect: vi.fn(() => {
+    throw new Error('Redirect called')
+  }),
 }))
 
 vi.mock('@pinsquirrel/database', () => ({
@@ -45,22 +49,24 @@ describe('Session Server - Configuration Tests', () => {
   describe('session storage configuration', () => {
     it('should configure secure cookies in production', () => {
       process.env.NODE_ENV = 'production'
-      
+
       const isProduction = process.env.NODE_ENV === 'production'
       expect(isProduction).toBe(true)
     })
 
     it('should use dev secret when SESSION_SECRET not provided', () => {
       delete process.env.SESSION_SECRET
-      
-      const secret = process.env.SESSION_SECRET || 'dev-secret-change-in-production'
+
+      const secret =
+        process.env.SESSION_SECRET || 'dev-secret-change-in-production'
       expect(secret).toBe('dev-secret-change-in-production')
     })
 
     it('should use provided SESSION_SECRET', () => {
       process.env.SESSION_SECRET = 'production-secret'
-      
-      const secret = process.env.SESSION_SECRET || 'dev-secret-change-in-production'
+
+      const secret =
+        process.env.SESSION_SECRET || 'dev-secret-change-in-production'
       expect(secret).toBe('production-secret')
     })
   })
@@ -69,7 +75,7 @@ describe('Session Server - Configuration Tests', () => {
     it('should import all required functions', async () => {
       // Dynamic import to test module loading
       const sessionModule = await import('./session.server')
-      
+
       expect(typeof sessionModule.getSession).toBe('function')
       expect(typeof sessionModule.getUserId).toBe('function')
       expect(typeof sessionModule.getUser).toBe('function')
@@ -81,7 +87,7 @@ describe('Session Server - Configuration Tests', () => {
     it('should have mocked dependencies properly', () => {
       const mockedRedirect = vi.mocked(redirect)
       const mockedLogger = vi.mocked(logger)
-      
+
       expect(mockedRedirect).toBeDefined()
       expect(mockedLogger).toHaveProperty('warn')
       expect(mockedLogger).toHaveProperty('exception')
@@ -96,7 +102,7 @@ describe('Session Server - Logic Tests', () => {
     it('should handle falsy session values correctly', () => {
       // Test the logical pattern used in getUserId
       const testValues = [undefined, null, '', 0, false]
-      
+
       testValues.forEach(value => {
         const result = (value as string) || null
         expect(result).toBeNull()
@@ -105,9 +111,9 @@ describe('Session Server - Logic Tests', () => {
 
     it('should return truthy session values', () => {
       const validValues = ['user-123', 'abc', '1']
-      
+
       validValues.forEach(value => {
-        const result = (value) || null
+        const result = value || null
         expect(result).toBe(value)
       })
     })
@@ -170,7 +176,7 @@ describe('Session Server - Logic Tests', () => {
       ]
 
       logoutScenarios.forEach(({ userId, shouldLog }) => {
-        const shouldLogUser = !!(userId)
+        const shouldLogUser = !!userId
         expect(shouldLogUser).toBe(shouldLog)
       })
     })
@@ -221,9 +227,9 @@ describe('Session Server - Logic Tests', () => {
 
       sessionValues.forEach(({ value, expected, valid }) => {
         // Simulate the type coercion pattern used in getUserId
-        const result = (typeof value === 'string' && value) ? value : null
+        const result = typeof value === 'string' && value ? value : null
         const isValidType = typeof value === 'string' && !!value
-        
+
         expect(result).toBe(expected)
         expect(isValidType).toBe(valid)
       })
@@ -243,7 +249,7 @@ describe('Session Server - Logic Tests', () => {
         const isChangingPassword = !!newPassword
         const hasCurrentPassword = !!currentPassword
         const isValid = !isChangingPassword || hasCurrentPassword
-        
+
         expect(isValid).toBe(valid)
       })
     })
@@ -255,13 +261,13 @@ describe('Session Server - Integration Behavior', () => {
     it('should validate getUserId function behavior pattern', async () => {
       // Import and test basic function behavior
       const { getUserId } = await import('./session.server')
-      
+
       const request = new Request('http://test.com')
-      
+
       // This should not throw and should return a Promise
       const result = getUserId(request)
       expect(result).toBeInstanceOf(Promise)
-      
+
       // Should resolve to string or null
       const resolved = await result
       expect(typeof resolved === 'string' || resolved === null).toBe(true)
@@ -269,12 +275,12 @@ describe('Session Server - Integration Behavior', () => {
 
     it('should validate getUser function behavior pattern', async () => {
       const { getUser } = await import('./session.server')
-      
+
       const request = new Request('http://test.com')
-      
+
       // Function should exist and be callable
       expect(typeof getUser).toBe('function')
-      
+
       // Should return a Promise
       const result = getUser(request)
       expect(result).toBeInstanceOf(Promise)
@@ -282,30 +288,34 @@ describe('Session Server - Integration Behavior', () => {
 
     it('should validate session creation patterns', async () => {
       const { createUserSession } = await import('./session.server')
-      
+
       // Function should exist
       expect(typeof createUserSession).toBe('function')
-      
+
       // Should handle different parameter patterns and throw redirect error
-      await expect(createUserSession('user-123')).rejects.toThrow('Redirect called')
-      await expect(createUserSession('user-123', '/profile')).rejects.toThrow('Redirect called')
+      await expect(createUserSession('user-123')).rejects.toThrow(
+        'Redirect called'
+      )
+      await expect(createUserSession('user-123', '/profile')).rejects.toThrow(
+        'Redirect called'
+      )
     })
   })
 
   describe('error boundary behavior', () => {
     it('should handle function call patterns without crashing', async () => {
       const sessionModule = await import('./session.server')
-      
+
       // All functions should be callable without immediate errors
       const functions = [
         'getSession',
-        'getUserId', 
+        'getUserId',
         'getUser',
         'requireUser',
         'createUserSession',
-        'logout'
+        'logout',
       ]
-      
+
       functions.forEach(funcName => {
         const func = sessionModule[funcName as keyof typeof sessionModule]
         expect(typeof func).toBe('function')

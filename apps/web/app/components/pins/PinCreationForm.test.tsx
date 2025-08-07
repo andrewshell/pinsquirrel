@@ -17,7 +17,9 @@ describe('PinCreationForm', () => {
     expect(screen.getByLabelText(/url/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/title/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/description/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /create pin/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /create pin/i })
+    ).toBeInTheDocument()
   })
 
   it('does not call onSubmit when URL is invalid', async () => {
@@ -70,7 +72,7 @@ describe('PinCreationForm', () => {
       expect(mockOnSubmit).toHaveBeenCalledWith({
         url: 'https://example.com',
         title: 'Example Title',
-        description: 'Example description'
+        description: 'Example description',
       })
     })
   })
@@ -83,13 +85,23 @@ describe('PinCreationForm', () => {
   })
 
   it('displays success message after successful submission', () => {
-    render(<PinCreationForm onSubmit={mockOnSubmit} successMessage="Pin created successfully!" />)
+    render(
+      <PinCreationForm
+        onSubmit={mockOnSubmit}
+        successMessage="Pin created successfully!"
+      />
+    )
 
     expect(screen.getByText('Pin created successfully!')).toBeInTheDocument()
   })
 
   it('displays error message when submission fails', () => {
-    render(<PinCreationForm onSubmit={mockOnSubmit} errorMessage="Failed to create pin" />)
+    render(
+      <PinCreationForm
+        onSubmit={mockOnSubmit}
+        errorMessage="Failed to create pin"
+      />
+    )
 
     expect(screen.getByText('Failed to create pin')).toBeInTheDocument()
   })
@@ -97,8 +109,8 @@ describe('PinCreationForm', () => {
   it('auto-populates title when URL metadata is fetched', async () => {
     const user = userEvent.setup()
     render(
-      <PinCreationForm 
-        onSubmit={mockOnSubmit} 
+      <PinCreationForm
+        onSubmit={mockOnSubmit}
         onMetadataFetch={mockOnMetadataFetch}
         metadataTitle="Fetched Page Title"
       />
@@ -121,14 +133,14 @@ describe('PinCreationForm', () => {
   it('allows manual override of auto-populated title', async () => {
     const user = userEvent.setup()
     render(
-      <PinCreationForm 
-        onSubmit={mockOnSubmit} 
+      <PinCreationForm
+        onSubmit={mockOnSubmit}
         metadataTitle="Fetched Page Title"
       />
     )
 
     const titleInput = screen.getByLabelText(/title/i)
-    
+
     // Clear and type new title
     await user.clear(titleInput)
     await user.type(titleInput, 'My Custom Title')
@@ -139,8 +151,8 @@ describe('PinCreationForm', () => {
   it('handles metadata fetching errors gracefully', async () => {
     const user = userEvent.setup()
     render(
-      <PinCreationForm 
-        onSubmit={mockOnSubmit} 
+      <PinCreationForm
+        onSubmit={mockOnSubmit}
         onMetadataFetch={mockOnMetadataFetch}
         metadataError="Failed to fetch metadata"
       />
@@ -153,18 +165,13 @@ describe('PinCreationForm', () => {
     // Should not prevent form submission
     const submitButton = screen.getByRole('button', { name: /create pin/i })
     expect(submitButton).not.toBeDisabled()
-    
+
     // Optionally show error but don't block functionality
     expect(screen.queryByText(/failed to fetch metadata/i)).toBeInTheDocument()
   })
 
   it('shows loading state during metadata fetch', () => {
-    render(
-      <PinCreationForm 
-        onSubmit={mockOnSubmit} 
-        isMetadataLoading
-      />
-    )
+    render(<PinCreationForm onSubmit={mockOnSubmit} isMetadataLoading />)
 
     expect(screen.getByText(/fetching page title/i)).toBeInTheDocument()
   })
@@ -184,7 +191,10 @@ describe('PinCreationForm', () => {
       // Check that labels are properly associated
       expect(screen.getByText('URL')).toHaveAttribute('for', 'url')
       expect(screen.getByText('Title')).toHaveAttribute('for', 'title')
-      expect(screen.getByText('Description (optional)')).toHaveAttribute('for', 'description')
+      expect(screen.getByText('Description (optional)')).toHaveAttribute(
+        'for',
+        'description'
+      )
     })
 
     it('sets aria-invalid when fields have validation errors', async () => {
@@ -218,13 +228,23 @@ describe('PinCreationForm', () => {
       await waitFor(() => {
         expect(urlInput.getAttribute('aria-describedby')).toContain('url-error')
         expect(urlInput.getAttribute('aria-describedby')).toContain('url-help')
-        expect(titleInput.getAttribute('aria-describedby')).toContain('title-error')
-        expect(titleInput.getAttribute('aria-describedby')).toContain('title-help')
+        expect(titleInput.getAttribute('aria-describedby')).toContain(
+          'title-error'
+        )
+        expect(titleInput.getAttribute('aria-describedby')).toContain(
+          'title-help'
+        )
       })
 
       // Check that error elements exist with correct IDs
-      expect(screen.getByText(/url is required/i)).toHaveAttribute('id', 'url-error')
-      expect(screen.getByText(/title is required/i)).toHaveAttribute('id', 'title-error')
+      expect(screen.getByText(/url is required/i)).toHaveAttribute(
+        'id',
+        'url-error'
+      )
+      expect(screen.getByText(/title is required/i)).toHaveAttribute(
+        'id',
+        'title-error'
+      )
     })
 
     it('supports keyboard navigation through form fields', async () => {
@@ -273,9 +293,9 @@ describe('PinCreationForm', () => {
 
       // Test success message
       rerender(
-        <PinCreationForm 
-          onSubmit={mockOnSubmit} 
-          successMessage="Pin created successfully!" 
+        <PinCreationForm
+          onSubmit={mockOnSubmit}
+          successMessage="Pin created successfully!"
         />
       )
 
@@ -285,9 +305,9 @@ describe('PinCreationForm', () => {
 
       // Test error message
       rerender(
-        <PinCreationForm 
-          onSubmit={mockOnSubmit} 
-          errorMessage="Failed to create pin" 
+        <PinCreationForm
+          onSubmit={mockOnSubmit}
+          errorMessage="Failed to create pin"
         />
       )
 
@@ -300,22 +320,12 @@ describe('PinCreationForm', () => {
       const { rerender } = render(<PinCreationForm onSubmit={mockOnSubmit} />)
 
       // Test metadata loading state
-      rerender(
-        <PinCreationForm 
-          onSubmit={mockOnSubmit} 
-          isMetadataLoading 
-        />
-      )
+      rerender(<PinCreationForm onSubmit={mockOnSubmit} isMetadataLoading />)
 
       expect(screen.getByText(/fetching page title/i)).toBeInTheDocument()
 
       // Test form submission loading state
-      rerender(
-        <PinCreationForm 
-          onSubmit={mockOnSubmit} 
-          isLoading 
-        />
-      )
+      rerender(<PinCreationForm onSubmit={mockOnSubmit} isLoading />)
 
       const submitButton = screen.getByRole('button', { name: /creating/i })
       expect(submitButton).toBeDisabled()

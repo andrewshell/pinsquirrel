@@ -9,7 +9,7 @@ interface PinListProps {
 
 function PinSkeleton({ index }: { index: number }) {
   return (
-    <div 
+    <div
       data-testid={`pin-skeleton-${index}`}
       className="py-1 animate-pulse"
       role="status"
@@ -18,10 +18,10 @@ function PinSkeleton({ index }: { index: number }) {
       <div className="flex-1 min-w-0 space-y-1">
         {/* Title skeleton */}
         <div className="h-4 bg-muted rounded w-3/4" aria-hidden="true"></div>
-        
+
         {/* URL skeleton */}
         <div className="h-3 bg-muted rounded w-2/3" aria-hidden="true"></div>
-        
+
         {/* Tags skeleton */}
         <div className="flex gap-1">
           <div className="h-3 bg-muted rounded w-12" aria-hidden="true"></div>
@@ -44,7 +44,7 @@ export function PinList({ pins, isLoading }: PinListProps) {
   // Show loading state with skeleton cards
   if (isLoading) {
     return (
-      <div 
+      <div
         data-testid="pin-list-loading"
         role="status"
         aria-live="polite"
@@ -67,13 +67,13 @@ export function PinList({ pins, isLoading }: PinListProps) {
 
   // Show pins in vertical list
   return (
-    <div 
+    <div
       data-testid="pin-list"
       className="space-y-4"
       role="region"
       aria-label={`${pins.length} pins`}
     >
-      {pins.map((pin) => (
+      {pins.map(pin => (
         <PinCard key={pin.id} pin={pin} />
       ))}
     </div>
