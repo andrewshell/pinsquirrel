@@ -108,7 +108,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function PinEditPage() {
-  const { pin: _pin } = useLoaderData<typeof loader>()
+  const { pin } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
   const {
     loading: isMetadataLoading,
@@ -122,6 +122,13 @@ export default function PinEditPage() {
     // The component still needs this prop for compatibility
   }
 
+  // Prepare initial data for the form
+  const initialData: PinCreationFormData = {
+    url: pin.url,
+    title: pin.title,
+    description: pin.description || '',
+  }
+
   return (
     <div className="min-h-screen bg-background py-12">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -132,6 +139,8 @@ export default function PinEditPage() {
 
         <div className="bg-card rounded-lg shadow-sm p-6">
           <PinCreationForm
+            editMode
+            initialData={initialData}
             onSubmit={handleSubmit}
             onMetadataFetch={fetchMetadata}
             metadataTitle={metadata?.title}
@@ -141,7 +150,6 @@ export default function PinEditPage() {
               actionData && 'error' in actionData ? actionData.error : undefined
             }
           />
-          {/* TODO: Pre-populate form with pin data when editMode is implemented */}
         </div>
       </div>
     </div>

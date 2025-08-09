@@ -21,12 +21,12 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 2.4 Update submit button text based on mode
   - [x] 2.5 Verify all tests pass
 
-- [ ] 3. Implement Edit Action Handler
-  - [ ] 3.1 Write tests for edit action validation and submission
-  - [ ] 3.2 Add action handler to pins.$id.edit route
-  - [ ] 3.3 Integrate with pinService.updatePin method
-  - [ ] 3.4 Add success redirect with flash message
-  - [ ] 3.5 Verify all tests pass
+- [x] 3. Implement Edit Action Handler
+  - [x] 3.1 Write tests for edit action validation and submission
+  - [x] 3.2 Add action handler to pins.$id.edit route
+  - [x] 3.3 Integrate with pinService.updatePin method
+  - [x] 3.4 Add success redirect with flash message
+  - [x] 3.5 Verify all tests pass
 
 - [ ] 4. Add Edit Navigation Links
   - [ ] 4.1 Write tests for edit button rendering in PinCard
