@@ -58,6 +58,16 @@ vi.mock('react-router', () => ({
   useActionData: vi.fn(),
 }))
 
+// Mock useMetadataFetch hook
+vi.mock('~/lib/useMetadataFetch', () => ({
+  useMetadataFetch: vi.fn(() => ({
+    loading: false,
+    error: null,
+    metadata: null,
+    fetchMetadata: vi.fn(),
+  })),
+}))
+
 import { requireUser } from '~/lib/session.server'
 import { pinService } from '~/lib/services/pinService.server'
 import { loader, action } from './pins.$id.edit'
@@ -273,6 +283,29 @@ describe('pins.$id.edit route', () => {
         expect(response.status).toBe(404)
         expect(await response.text()).toBe('Pin ID is required')
       }
+    })
+
+    it('should handle service errors during update', async () => {
+      mockRequireUser.mockResolvedValue(mockUser)
+      mockUpdatePinService.mockRejectedValue(new Error('Database error'))
+
+      const formData = new FormData()
+      formData.append('url', 'https://updated.com')
+      formData.append('title', 'Updated Pin')
+      formData.append('description', 'Updated description')
+
+      const request = new Request('http://localhost:3000/pins/pin-1/edit', {
+        method: 'POST',
+        body: formData,
+      })
+      const params = { id: 'pin-1' }
+
+      const result = await action({ request, params, context: {} })
+
+      expect(result).toHaveProperty(
+        'error',
+        'Failed to update pin. Please try again.'
+      )
     })
   })
 })

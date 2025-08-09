@@ -117,11 +117,6 @@ export default function PinEditPage() {
     fetchMetadata,
   } = useMetadataFetch()
 
-  const handleSubmit = async (_data: PinCreationFormData) => {
-    // This will be handled by the form's own submission
-    // The component still needs this prop for compatibility
-  }
-
   // Prepare initial data for the form
   const initialData: PinCreationFormData = {
     url: pin.url,
@@ -141,7 +136,7 @@ export default function PinEditPage() {
           <PinCreationForm
             editMode
             initialData={initialData}
-            onSubmit={handleSubmit}
+            actionUrl={`/pins/${pin.id}/edit`}
             onMetadataFetch={fetchMetadata}
             metadataTitle={metadata?.title}
             metadataError={metadataError || undefined}

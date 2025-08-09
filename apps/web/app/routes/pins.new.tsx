@@ -7,10 +7,7 @@ import {
   db,
 } from '@pinsquirrel/database'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
-import {
-  pinCreationSchema,
-  type PinCreationFormData,
-} from '~/lib/validation/pin-schema'
+import { pinCreationSchema } from '~/lib/validation/pin-schema'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
 import { logger } from '~/lib/logger.server'
 
@@ -93,11 +90,6 @@ export default function PinsNewPage() {
     fetchMetadata,
   } = useMetadataFetch()
 
-  const handleSubmit = async (_data: PinCreationFormData) => {
-    // This will be handled by the form's own submission when using the regular form
-    // The component still needs this prop for compatibility
-  }
-
   return (
     <div className="min-h-screen bg-background py-12">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -110,7 +102,6 @@ export default function PinsNewPage() {
 
         <div className="bg-card rounded-lg shadow-sm p-6">
           <PinCreationForm
-            onSubmit={handleSubmit}
             onMetadataFetch={fetchMetadata}
             metadataTitle={metadata?.title}
             metadataError={metadataError || undefined}

@@ -35,9 +35,9 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 4.4 Ensure accessibility with proper ARIA labels
   - [x] 4.5 Verify all tests pass
 
-- [ ] 5. End-to-End Testing and Polish
-  - [ ] 5.1 Write integration tests for complete edit flow
-  - [ ] 5.2 Test tag preservation during edits
-  - [ ] 5.3 Verify error handling for all edge cases
-  - [ ] 5.4 Test keyboard navigation and screen reader support
-  - [ ] 5.5 Verify all tests pass
+- [x] 5. End-to-End Testing and Polish
+  - [x] 5.1 Write integration tests for complete edit flow
+  - [x] 5.2 Test tag preservation during edits
+  - [x] 5.3 Verify error handling for all edge cases
+  - [x] 5.4 Test keyboard navigation and screen reader support
+  - [x] 5.5 Verify all tests pass

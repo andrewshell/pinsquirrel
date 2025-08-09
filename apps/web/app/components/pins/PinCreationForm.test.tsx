@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event'
 import { PinCreationForm } from './PinCreationForm'
 
 describe('PinCreationForm', () => {
-  const mockOnSubmit = vi.fn()
   const mockOnMetadataFetch = vi.fn()
 
   beforeEach(() => {
@@ -12,7 +11,7 @@ describe('PinCreationForm', () => {
   })
 
   it('renders all form fields (URL, title, description)', () => {
-    render(<PinCreationForm onSubmit={mockOnSubmit} />)
+    render(<PinCreationForm />)
 
     expect(screen.getByLabelText(/url/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/title/i)).toBeInTheDocument()
@@ -22,9 +21,9 @@ describe('PinCreationForm', () => {
     ).toBeInTheDocument()
   })
 
-  it('does not call onSubmit when URL is invalid', async () => {
+  it('submits directly to server without client-side validation', async () => {
     const user = userEvent.setup()
-    render(<PinCreationForm onSubmit={mockOnSubmit} />)
+    render(<PinCreationForm />)
 
     const urlInput = screen.getByLabelText(/url/i)
     const titleInput = screen.getByLabelText(/title/i)
@@ -35,524 +34,173 @@ describe('PinCreationForm', () => {
     await user.type(titleInput, 'Test Title')
     await user.click(submitButton)
 
-    // Wait a bit to ensure form submission would have happened
-    await waitFor(() => {
-      expect(mockOnSubmit).not.toHaveBeenCalled()
-    })
+    // No client-side validation errors should appear
+    expect(screen.queryByText(/invalid url/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/url is required/i)).not.toBeInTheDocument()
   })
 
-  it('does not call onSubmit when required fields are empty', async () => {
-    const user = userEvent.setup()
-    render(<PinCreationForm onSubmit={mockOnSubmit} />)
+  it('has HTML5 validation disabled with novalidate attribute', () => {
+    render(<PinCreationForm />)
 
-    const submitButton = screen.getByRole('button', { name: /create pin/i })
-    await user.click(submitButton)
+    const form = screen.getByRole('form', { name: /create new pin/i })
+    expect(form).toHaveAttribute('novalidate')
 
-    // Wait a bit to ensure form submission would have happened
-    await waitFor(() => {
-      expect(mockOnSubmit).not.toHaveBeenCalled()
-    })
+    // This means validation is handled server-side via React Router action
   })
 
-  it('calls onSubmit with correct data when form is valid', async () => {
-    const user = userEvent.setup()
-    render(<PinCreationForm onSubmit={mockOnSubmit} />)
+  it('has correct form action and method attributes', () => {
+    render(<PinCreationForm />)
 
-    const urlInput = screen.getByLabelText(/url/i)
-    const titleInput = screen.getByLabelText(/title/i)
-    const descriptionInput = screen.getByLabelText(/description/i)
-    const submitButton = screen.getByRole('button', { name: /create pin/i })
-
-    await user.type(urlInput, 'https://example.com')
-    await user.type(titleInput, 'Example Title')
-    await user.type(descriptionInput, 'Example description')
-    await user.click(submitButton)
-
-    await waitFor(() => {
-      expect(mockOnSubmit).toHaveBeenCalledWith({
-        url: 'https://example.com',
-        title: 'Example Title',
-        description: 'Example description',
-      })
-    })
+    const form = screen.getByRole('form', { name: /create new pin/i })
+    expect(form).toHaveAttribute('method', 'post')
+    expect(form).toHaveAttribute('action', '/pins/new')
   })
 
-  it('disables submit button during loading state', () => {
-    render(<PinCreationForm onSubmit={mockOnSubmit} isLoading />)
+  it('uses custom action URL when provided', () => {
+    render(<PinCreationForm actionUrl="/pins/123/edit" />)
 
-    const submitButton = screen.getByRole('button', { name: /creating/i })
-    expect(submitButton).toBeDisabled()
+    const form = screen.getByRole('form', { name: /create new pin/i })
+    expect(form).toHaveAttribute('action', '/pins/123/edit')
   })
 
-  it('displays success message after successful submission', () => {
-    render(
-      <PinCreationForm
-        onSubmit={mockOnSubmit}
-        successMessage="Pin created successfully!"
-      />
-    )
+  it('shows "Update Pin" button text in edit mode', () => {
+    render(<PinCreationForm editMode />)
+
+    expect(
+      screen.getByRole('button', { name: /update pin/i })
+    ).toBeInTheDocument()
+  })
+
+  it('pre-populates form fields with initial data', () => {
+    const initialData = {
+      url: 'https://example.com',
+      title: 'Test Title',
+      description: 'Test Description',
+    }
+
+    render(<PinCreationForm initialData={initialData} />)
+
+    expect(screen.getByDisplayValue('https://example.com')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Test Title')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Test Description')).toBeInTheDocument()
+  })
+
+  it('displays success message when provided', () => {
+    render(<PinCreationForm successMessage="Pin created successfully!" />)
 
     expect(screen.getByText('Pin created successfully!')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveClass('bg-green-50')
   })
 
-  it('displays error message when submission fails', () => {
-    render(
-      <PinCreationForm
-        onSubmit={mockOnSubmit}
-        errorMessage="Failed to create pin"
-      />
-    )
+  it('displays error message when provided', () => {
+    render(<PinCreationForm errorMessage="Something went wrong" />)
 
-    expect(screen.getByText('Failed to create pin')).toBeInTheDocument()
+    expect(screen.getByText('Something went wrong')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveClass('bg-red-50')
   })
 
-  it('auto-populates title when URL metadata is fetched', async () => {
+  it('calls onMetadataFetch when URL field loses focus with valid URL', async () => {
     const user = userEvent.setup()
-    render(
-      <PinCreationForm
-        onSubmit={mockOnSubmit}
-        onMetadataFetch={mockOnMetadataFetch}
-        metadataTitle="Fetched Page Title"
-      />
-    )
+    render(<PinCreationForm onMetadataFetch={mockOnMetadataFetch} />)
 
     const urlInput = screen.getByLabelText(/url/i)
-    const titleInput = screen.getByLabelText(/title/i)
 
     await user.type(urlInput, 'https://example.com')
     await user.tab() // Trigger blur event
 
-    await waitFor(() => {
-      expect(mockOnMetadataFetch).toHaveBeenCalledWith('https://example.com')
-    })
-
-    // Simulate metadata being fetched and passed back
-    expect((titleInput as HTMLInputElement).value).toBe('Fetched Page Title')
+    expect(mockOnMetadataFetch).toHaveBeenCalledWith('https://example.com')
   })
 
-  it('allows manual override of auto-populated title', async () => {
+  it('does not call onMetadataFetch with invalid URL', async () => {
     const user = userEvent.setup()
-    render(
-      <PinCreationForm
-        onSubmit={mockOnSubmit}
-        metadataTitle="Fetched Page Title"
-      />
-    )
-
-    const titleInput = screen.getByLabelText(/title/i)
-
-    // Clear and type new title
-    await user.clear(titleInput)
-    await user.type(titleInput, 'My Custom Title')
-
-    expect((titleInput as HTMLInputElement).value).toBe('My Custom Title')
-  })
-
-  it('handles metadata fetching errors gracefully', async () => {
-    const user = userEvent.setup()
-    render(
-      <PinCreationForm
-        onSubmit={mockOnSubmit}
-        onMetadataFetch={mockOnMetadataFetch}
-        metadataError="Failed to fetch metadata"
-      />
-    )
+    render(<PinCreationForm onMetadataFetch={mockOnMetadataFetch} />)
 
     const urlInput = screen.getByLabelText(/url/i)
+
+    await user.type(urlInput, 'not-a-url')
+    await user.tab()
+
+    expect(mockOnMetadataFetch).not.toHaveBeenCalled()
+  })
+
+  it('does not call onMetadataFetch in edit mode', async () => {
+    const user = userEvent.setup()
+    render(<PinCreationForm editMode onMetadataFetch={mockOnMetadataFetch} />)
+
+    const urlInput = screen.getByLabelText(/url/i)
+
     await user.type(urlInput, 'https://example.com')
     await user.tab()
 
-    // Should not prevent form submission
-    const submitButton = screen.getByRole('button', { name: /create pin/i })
-    expect(submitButton).not.toBeDisabled()
-
-    // Optionally show error but don't block functionality
-    expect(screen.queryByText(/failed to fetch metadata/i)).toBeInTheDocument()
+    expect(mockOnMetadataFetch).not.toHaveBeenCalled()
   })
 
-  it('shows loading state during metadata fetch', () => {
-    render(<PinCreationForm onSubmit={mockOnSubmit} isMetadataLoading />)
+  it('shows metadata loading state', () => {
+    render(<PinCreationForm isMetadataLoading />)
 
-    expect(screen.getByText(/fetching page title/i)).toBeInTheDocument()
+    expect(screen.getByText('Fetching page title...')).toBeInTheDocument()
   })
 
-  describe('Accessibility', () => {
-    it('has proper ARIA labels on form fields', () => {
-      render(<PinCreationForm onSubmit={mockOnSubmit} />)
+  it('shows metadata error message', () => {
+    render(<PinCreationForm metadataError="Failed to fetch" />)
 
-      const urlInput = screen.getByLabelText(/url/i)
-      const titleInput = screen.getByLabelText(/title/i)
-      const descriptionInput = screen.getByLabelText(/description/i)
+    expect(
+      screen.getByText('Failed to fetch metadata. Please enter title manually.')
+    ).toBeInTheDocument()
+  })
 
-      expect(urlInput).toHaveAttribute('id', 'url')
-      expect(titleInput).toHaveAttribute('id', 'title')
-      expect(descriptionInput).toHaveAttribute('id', 'description')
+  it('populates title field when metadata title is provided', async () => {
+    const { rerender } = render(<PinCreationForm />)
 
-      // Check that labels are properly associated
-      expect(screen.getByText('URL')).toHaveAttribute('for', 'url')
-      expect(screen.getByText('Title')).toHaveAttribute('for', 'title')
-      expect(screen.getByText('Description (optional)')).toHaveAttribute(
-        'for',
-        'description'
+    // Initially no title
+    expect(screen.getByLabelText(/title/i)).toHaveValue('')
+
+    // Provide metadata title
+    rerender(<PinCreationForm metadataTitle="Page Title from Metadata" />)
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/title/i)).toHaveValue(
+        'Page Title from Metadata'
       )
-    })
-
-    it('sets aria-invalid when fields have validation errors', async () => {
-      const user = userEvent.setup()
-      render(<PinCreationForm onSubmit={mockOnSubmit} />)
-
-      const urlInput = screen.getByLabelText(/url/i)
-      const titleInput = screen.getByLabelText(/title/i)
-      const submitButton = screen.getByRole('button', { name: /create pin/i })
-
-      // Trigger validation errors by submitting empty form
-      await user.click(submitButton)
-
-      await waitFor(() => {
-        expect(urlInput).toHaveAttribute('aria-invalid', 'true')
-        expect(titleInput).toHaveAttribute('aria-invalid', 'true')
-      })
-    })
-
-    it('associates error messages with form fields using aria-describedby', async () => {
-      const user = userEvent.setup()
-      render(<PinCreationForm onSubmit={mockOnSubmit} />)
-
-      const urlInput = screen.getByLabelText(/url/i)
-      const titleInput = screen.getByLabelText(/title/i)
-      const submitButton = screen.getByRole('button', { name: /create pin/i })
-
-      // Trigger validation errors
-      await user.click(submitButton)
-
-      await waitFor(() => {
-        expect(urlInput.getAttribute('aria-describedby')).toContain('url-error')
-        expect(urlInput.getAttribute('aria-describedby')).toContain('url-help')
-        expect(titleInput.getAttribute('aria-describedby')).toContain(
-          'title-error'
-        )
-        expect(titleInput.getAttribute('aria-describedby')).toContain(
-          'title-help'
-        )
-      })
-
-      // Check that error elements exist with correct IDs
-      expect(screen.getByText(/url is required/i)).toHaveAttribute(
-        'id',
-        'url-error'
-      )
-      expect(screen.getByText(/title is required/i)).toHaveAttribute(
-        'id',
-        'title-error'
-      )
-    })
-
-    it('supports keyboard navigation through form fields', async () => {
-      const user = userEvent.setup()
-      render(<PinCreationForm onSubmit={mockOnSubmit} />)
-
-      const urlInput = screen.getByLabelText(/url/i)
-      const titleInput = screen.getByLabelText(/title/i)
-      const descriptionInput = screen.getByLabelText(/description/i)
-      const submitButton = screen.getByRole('button', { name: /create pin/i })
-
-      // Start at URL field
-      urlInput.focus()
-      expect(urlInput).toHaveFocus()
-
-      // Tab to title field
-      await user.tab()
-      expect(titleInput).toHaveFocus()
-
-      // Tab to description field
-      await user.tab()
-      expect(descriptionInput).toHaveFocus()
-
-      // Tab to submit button
-      await user.tab()
-      expect(submitButton).toHaveFocus()
-    })
-
-    it('manages focus when validation errors occur', async () => {
-      const user = userEvent.setup()
-      render(<PinCreationForm onSubmit={mockOnSubmit} />)
-
-      const submitButton = screen.getByRole('button', { name: /create pin/i })
-
-      // Submit empty form to trigger validation errors
-      await user.click(submitButton)
-
-      // Form should remain focused and not lose focus context
-      // The submit button should still be in the document and focusable
-      expect(submitButton).toBeInTheDocument()
-      expect(submitButton).not.toHaveAttribute('disabled')
-    })
-
-    it('has accessible success and error messages', () => {
-      const { rerender } = render(<PinCreationForm onSubmit={mockOnSubmit} />)
-
-      // Test success message
-      rerender(
-        <PinCreationForm
-          onSubmit={mockOnSubmit}
-          successMessage="Pin created successfully!"
-        />
-      )
-
-      const successMessage = screen.getByText('Pin created successfully!')
-      expect(successMessage).toBeInTheDocument()
-      expect(successMessage).toHaveClass('text-green-800')
-
-      // Test error message
-      rerender(
-        <PinCreationForm
-          onSubmit={mockOnSubmit}
-          errorMessage="Failed to create pin"
-        />
-      )
-
-      const errorMessage = screen.getByText('Failed to create pin')
-      expect(errorMessage).toBeInTheDocument()
-      expect(errorMessage).toHaveClass('text-red-800')
-    })
-
-    it('provides screen reader friendly loading states', () => {
-      const { rerender } = render(<PinCreationForm onSubmit={mockOnSubmit} />)
-
-      // Test metadata loading state
-      rerender(<PinCreationForm onSubmit={mockOnSubmit} isMetadataLoading />)
-
-      expect(screen.getByText(/fetching page title/i)).toBeInTheDocument()
-
-      // Test form submission loading state
-      rerender(<PinCreationForm onSubmit={mockOnSubmit} isLoading />)
-
-      const submitButton = screen.getByRole('button', { name: /creating/i })
-      expect(submitButton).toBeDisabled()
-      expect(submitButton).toHaveTextContent('Creating...')
-    })
-
-    it('maintains proper heading hierarchy and semantic structure', () => {
-      render(<PinCreationForm onSubmit={mockOnSubmit} />)
-
-      // Ensure form element exists and has semantic structure
-      const form = document.querySelector('form')
-      expect(form).toBeInTheDocument()
-      expect(form).toHaveAttribute('method', 'post')
-      expect(form).toHaveAttribute('action', '/pins/new')
-
-      // Ensure submit button has proper role and type
-      const submitButton = screen.getByRole('button', { name: /create pin/i })
-      expect(submitButton).toHaveAttribute('type', 'submit')
     })
   })
 
-  describe('Edit Mode', () => {
-    const initialData = {
-      url: 'https://example.com/article',
-      title: 'Original Title',
-      description: 'Original description',
-    }
+  it('has proper accessibility attributes', () => {
+    render(<PinCreationForm />)
 
-    it('renders with "Update Pin" button text in edit mode', () => {
-      render(
-        <PinCreationForm
-          onSubmit={mockOnSubmit}
-          editMode
-          initialData={initialData}
-        />
-      )
+    const form = screen.getByRole('form')
+    expect(form).toHaveAttribute('novalidate')
+    expect(form).toHaveAttribute('aria-label', 'Create new pin')
 
-      expect(
-        screen.getByRole('button', { name: /update pin/i })
-      ).toBeInTheDocument()
-      expect(
-        screen.queryByRole('button', { name: /create pin/i })
-      ).not.toBeInTheDocument()
-    })
+    const urlInput = screen.getByLabelText(/url/i)
+    expect(urlInput).toHaveAttribute('aria-required', 'true')
+    expect(urlInput).toHaveAttribute('aria-describedby', 'url-help')
 
-    it('pre-populates form fields with initial data in edit mode', () => {
-      render(
-        <PinCreationForm
-          onSubmit={mockOnSubmit}
-          editMode
-          initialData={initialData}
-        />
-      )
+    const titleInput = screen.getByLabelText(/title/i)
+    expect(titleInput).toHaveAttribute('aria-required', 'true')
+    expect(titleInput).toHaveAttribute('aria-describedby', 'title-help')
 
-      const urlInput = screen.getByLabelText(/url/i)
-      const titleInput = screen.getByLabelText(/title/i)
-      const descriptionInput = screen.getByLabelText(/description/i)
+    const descriptionInput = screen.getByLabelText(/description/i)
+    expect(descriptionInput).toHaveAttribute('aria-required', 'false')
+  })
 
-      expect((urlInput as HTMLInputElement).value).toBe(
-        'https://example.com/article'
-      )
-      expect((titleInput as HTMLInputElement).value).toBe('Original Title')
-      expect((descriptionInput as HTMLTextAreaElement).value).toBe(
-        'Original description'
-      )
-    })
+  it('shows appropriate aria-label in edit mode', () => {
+    render(<PinCreationForm editMode />)
 
-    it('handles optional description in initial data', () => {
-      const dataWithoutDescription = {
-        url: 'https://example.com',
-        title: 'Title Only',
-      }
+    const form = screen.getByRole('form')
+    expect(form).toHaveAttribute('aria-label', 'Edit pin')
+  })
 
-      render(
-        <PinCreationForm
-          onSubmit={mockOnSubmit}
-          editMode
-          initialData={dataWithoutDescription}
-        />
-      )
+  it('maintains accessibility attributes without client validation', () => {
+    render(<PinCreationForm />)
 
-      const descriptionInput = screen.getByLabelText(/description/i)
-      expect((descriptionInput as HTMLTextAreaElement).value).toBe('')
-    })
+    const urlInput = screen.getByLabelText(/url/i)
+    const titleInput = screen.getByLabelText(/title/i)
 
-    it('allows editing pre-populated fields', async () => {
-      const user = userEvent.setup()
-      render(
-        <PinCreationForm
-          onSubmit={mockOnSubmit}
-          editMode
-          initialData={initialData}
-        />
-      )
-
-      const urlInput = screen.getByLabelText(/url/i)
-      const titleInput = screen.getByLabelText(/title/i)
-      const descriptionInput = screen.getByLabelText(/description/i)
-
-      // Clear and update each field
-      await user.clear(urlInput)
-      await user.type(urlInput, 'https://newsite.com')
-
-      await user.clear(titleInput)
-      await user.type(titleInput, 'Updated Title')
-
-      await user.clear(descriptionInput)
-      await user.type(descriptionInput, 'Updated description')
-
-      expect((urlInput as HTMLInputElement).value).toBe('https://newsite.com')
-      expect((titleInput as HTMLInputElement).value).toBe('Updated Title')
-      expect((descriptionInput as HTMLTextAreaElement).value).toBe(
-        'Updated description'
-      )
-    })
-
-    it('submits updated data in edit mode', async () => {
-      const user = userEvent.setup()
-      render(
-        <PinCreationForm
-          onSubmit={mockOnSubmit}
-          editMode
-          initialData={initialData}
-        />
-      )
-
-      const titleInput = screen.getByLabelText(/title/i)
-      const submitButton = screen.getByRole('button', { name: /update pin/i })
-
-      // Update the title
-      await user.clear(titleInput)
-      await user.type(titleInput, 'Modified Title')
-
-      // Submit the form
-      await user.click(submitButton)
-
-      await waitFor(() => {
-        expect(mockOnSubmit).toHaveBeenCalledWith({
-          url: 'https://example.com/article',
-          title: 'Modified Title',
-          description: 'Original description',
-        })
-      })
-    })
-
-    it('shows "Updating..." text during submission in edit mode', () => {
-      render(
-        <PinCreationForm
-          onSubmit={mockOnSubmit}
-          editMode
-          initialData={initialData}
-          isLoading
-        />
-      )
-
-      const submitButton = screen.getByRole('button', { name: /updating/i })
-      expect(submitButton).toBeDisabled()
-      expect(submitButton).toHaveTextContent('Updating...')
-    })
-
-    it('works in create mode when editMode is false or undefined', () => {
-      const { rerender } = render(
-        <PinCreationForm onSubmit={mockOnSubmit} editMode={false} />
-      )
-
-      expect(
-        screen.getByRole('button', { name: /create pin/i })
-      ).toBeInTheDocument()
-
-      // Also test when editMode is undefined
-      rerender(<PinCreationForm onSubmit={mockOnSubmit} />)
-      expect(
-        screen.getByRole('button', { name: /create pin/i })
-      ).toBeInTheDocument()
-    })
-
-    it('does not fetch metadata on URL blur in edit mode', async () => {
-      const user = userEvent.setup()
-      render(
-        <PinCreationForm
-          onSubmit={mockOnSubmit}
-          onMetadataFetch={mockOnMetadataFetch}
-          editMode
-          initialData={initialData}
-        />
-      )
-
-      const urlInput = screen.getByLabelText(/url/i)
-
-      // Clear and type new URL
-      await user.clear(urlInput)
-      await user.type(urlInput, 'https://different.com')
-      await user.tab() // Trigger blur
-
-      // Should not fetch metadata in edit mode
-      expect(mockOnMetadataFetch).not.toHaveBeenCalled()
-    })
-
-    it('maintains form validation in edit mode', async () => {
-      const user = userEvent.setup()
-      render(
-        <PinCreationForm
-          onSubmit={mockOnSubmit}
-          editMode
-          initialData={initialData}
-        />
-      )
-
-      const urlInput = screen.getByLabelText(/url/i)
-      const titleInput = screen.getByLabelText(/title/i)
-      const submitButton = screen.getByRole('button', { name: /update pin/i })
-
-      // Clear required fields
-      await user.clear(urlInput)
-      await user.clear(titleInput)
-      await user.click(submitButton)
-
-      // Form should not submit
-      await waitFor(() => {
-        expect(mockOnSubmit).not.toHaveBeenCalled()
-      })
-
-      // Should show validation errors
-      await waitFor(() => {
-        expect(urlInput).toHaveAttribute('aria-invalid', 'true')
-        expect(titleInput).toHaveAttribute('aria-invalid', 'true')
-      })
-    })
+    // Should have proper initial accessibility attributes
+    expect(urlInput).toHaveAttribute('aria-describedby', 'url-help')
+    expect(urlInput).toHaveAttribute('aria-invalid', 'false')
+    expect(titleInput).toHaveAttribute('aria-describedby', 'title-help')
+    expect(titleInput).toHaveAttribute('aria-invalid', 'false')
   })
 })

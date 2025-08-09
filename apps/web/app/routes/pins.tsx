@@ -1,6 +1,7 @@
-import { useLoaderData, useNavigation, Link } from 'react-router'
+import { useLoaderData, useNavigation, Link, data } from 'react-router'
+import { useState } from 'react'
 import type { Route } from './+types/pins'
-import { requireUser, getFlashMessage } from '~/lib/session.server'
+import { requireUser, getSession, commitSession } from '~/lib/session.server'
 import {
   DrizzlePinRepository,
   DrizzleTagRepository,
@@ -9,6 +10,7 @@ import {
 import { PinList } from '~/components/pins/PinList'
 import { Pagination } from '~/components/pins/Pagination'
 import { Button } from '~/components/ui/button'
+import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import { Plus } from 'lucide-react'
 
 // Server-side repositories
@@ -23,9 +25,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Get authenticated user
   const user = await requireUser(request)
 
-  // Check for flash messages
-  const successMessage = await getFlashMessage(request, 'success')
-  const errorMessage = await getFlashMessage(request, 'error')
+  // Get session for flash messages
+  const session = await getSession(request)
+
+  // Check for flash messages (these are automatically removed when accessed)
+  const successMessage = session.get('flash-success') as string | null
+  const errorMessage = session.get('flash-error') as string | null
 
   // Fetch pins with pagination
   const offset = (page - 1) * pageSize
@@ -38,16 +43,22 @@ export async function loader({ request }: Route.LoaderArgs) {
   const totalCount = await pinRepository.countByUserId(user.id)
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
 
-  // Note: Flash messages are automatically cleared by the session system
-
-  return {
-    pins,
-    totalPages,
-    currentPage: page,
-    totalCount,
-    successMessage,
-    errorMessage,
-  }
+  // Return with updated session to clear flash messages
+  return data(
+    {
+      pins,
+      totalPages,
+      currentPage: page,
+      totalCount,
+      successMessage,
+      errorMessage,
+    },
+    {
+      headers: {
+        'Set-Cookie': await commitSession(session),
+      },
+    }
+  )
 }
 
 export default function PinsPage() {
@@ -60,6 +71,10 @@ export default function PinsPage() {
     errorMessage,
   } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
+
+  // Client-side state for dismissing flash messages
+  const [showSuccessMessage, setShowSuccessMessage] = useState(!!successMessage)
+  const [showErrorMessage, setShowErrorMessage] = useState(!!errorMessage)
 
   // Check if we're loading (navigating or submitting)
   const isLoading = navigation.state === 'loading'
@@ -83,15 +98,23 @@ export default function PinsPage() {
         </div>
 
         {successMessage && (
-          <div className="mb-6 rounded-md bg-green-50 p-4 text-sm text-green-800">
-            {successMessage}
-          </div>
+          <DismissibleAlert
+            message={successMessage}
+            type="success"
+            show={showSuccessMessage}
+            onDismiss={() => setShowSuccessMessage(false)}
+            className="mb-6"
+          />
         )}
 
         {errorMessage && (
-          <div className="mb-6 rounded-md bg-red-50 p-4 text-sm text-red-800">
-            {errorMessage}
-          </div>
+          <DismissibleAlert
+            message={errorMessage}
+            type="error"
+            show={showErrorMessage}
+            onDismiss={() => setShowErrorMessage(false)}
+            className="mb-6"
+          />
         )}
 
         <PinList pins={pins} isLoading={isLoading} />

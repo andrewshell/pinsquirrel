@@ -1,17 +1,17 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Textarea } from '~/components/ui/textarea'
 import { Label } from '~/components/ui/label'
+import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import {
   pinCreationSchema,
   type PinCreationFormData,
 } from '~/lib/validation/pin-schema'
 
 interface PinCreationFormProps {
-  onSubmit: (data: PinCreationFormData) => void | Promise<void>
   onMetadataFetch?: (url: string) => void
   metadataTitle?: string
   metadataError?: string
@@ -21,10 +21,10 @@ interface PinCreationFormProps {
   errorMessage?: string
   editMode?: boolean
   initialData?: PinCreationFormData
+  actionUrl?: string
 }
 
 export function PinCreationForm({
-  onSubmit,
   onMetadataFetch,
   metadataTitle,
   metadataError,
@@ -34,10 +34,10 @@ export function PinCreationForm({
   errorMessage,
   editMode = false,
   initialData,
+  actionUrl,
 }: PinCreationFormProps) {
   const {
     register,
-    handleSubmit,
     formState: { errors, isSubmitting },
     setValue,
     watch,
@@ -50,9 +50,9 @@ export function PinCreationForm({
     },
   })
 
-  const onSubmitWrapper = (data: PinCreationFormData) => {
-    void onSubmit(data)
-  }
+  // Client-side state for dismissing flash messages
+  const [showSuccessMessage, setShowSuccessMessage] = useState(!!successMessage)
+  const [showErrorMessage, setShowErrorMessage] = useState(!!errorMessage)
 
   const urlValue = watch('url')
 
@@ -95,31 +95,28 @@ export function PinCreationForm({
 
   return (
     <form
-      onSubmit={e => void handleSubmit(onSubmitWrapper)(e)}
       method="post"
-      action="/pins/new"
+      action={actionUrl || '/pins/new'}
       className="space-y-4"
       noValidate
       aria-label={editMode ? 'Edit pin' : 'Create new pin'}
     >
       {successMessage && (
-        <div
-          className="rounded-md bg-green-50 p-4 text-sm text-green-800"
-          role="alert"
-          aria-live="polite"
-        >
-          {successMessage}
-        </div>
+        <DismissibleAlert
+          message={successMessage}
+          type="success"
+          show={showSuccessMessage}
+          onDismiss={() => setShowSuccessMessage(false)}
+        />
       )}
 
       {errorMessage && (
-        <div
-          className="rounded-md bg-red-50 p-4 text-sm text-red-800"
-          role="alert"
-          aria-live="assertive"
-        >
-          {errorMessage}
-        </div>
+        <DismissibleAlert
+          message={errorMessage}
+          type="error"
+          show={showErrorMessage}
+          onDismiss={() => setShowErrorMessage(false)}
+        />
       )}
 
       <div className="space-y-2">
