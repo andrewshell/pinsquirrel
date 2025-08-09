@@ -19,6 +19,8 @@ interface PinCreationFormProps {
   isLoading?: boolean
   successMessage?: string
   errorMessage?: string
+  editMode?: boolean
+  initialData?: PinCreationFormData
 }
 
 export function PinCreationForm({
@@ -30,6 +32,8 @@ export function PinCreationForm({
   isLoading,
   successMessage,
   errorMessage,
+  editMode = false,
+  initialData,
 }: PinCreationFormProps) {
   const {
     register,
@@ -39,6 +43,11 @@ export function PinCreationForm({
     watch,
   } = useForm<PinCreationFormData>({
     resolver: zodResolver(pinCreationSchema),
+    defaultValues: initialData || {
+      url: '',
+      title: '',
+      description: '',
+    },
   })
 
   const onSubmitWrapper = (data: PinCreationFormData) => {
@@ -69,6 +78,11 @@ export function PinCreationForm({
   }, [errors])
 
   const handleUrlBlur = () => {
+    // Don't fetch metadata in edit mode
+    if (editMode) {
+      return
+    }
+
     if (urlValue && onMetadataFetch) {
       try {
         new URL(urlValue) // Validate URL before fetching
@@ -86,7 +100,7 @@ export function PinCreationForm({
       action="/pins/new"
       className="space-y-4"
       noValidate
-      aria-label="Create new pin"
+      aria-label={editMode ? 'Edit pin' : 'Create new pin'}
     >
       {successMessage && (
         <div
@@ -194,7 +208,13 @@ export function PinCreationForm({
         className="w-full"
         aria-describedby={isLoading ? 'submit-status' : undefined}
       >
-        {isLoading ? 'Creating...' : 'Create Pin'}
+        {isLoading
+          ? editMode
+            ? 'Updating...'
+            : 'Creating...'
+          : editMode
+            ? 'Update Pin'
+            : 'Create Pin'}
         {isLoading && (
           <span id="submit-status" className="sr-only">
             Form is being submitted, please wait

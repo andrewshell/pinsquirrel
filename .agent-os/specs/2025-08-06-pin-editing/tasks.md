@@ -14,12 +14,12 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 1.4 Add error handling for non-existent pins
   - [x] 1.5 Verify all tests pass
 
-- [ ] 2. Extend PinCreationForm for Edit Mode
-  - [ ] 2.1 Write tests for PinCreationForm edit mode behavior
-  - [ ] 2.2 Add editMode and initialData props to PinCreationForm
-  - [ ] 2.3 Implement field pre-population logic
-  - [ ] 2.4 Update submit button text based on mode
-  - [ ] 2.5 Verify all tests pass
+- [x] 2. Extend PinCreationForm for Edit Mode
+  - [x] 2.1 Write tests for PinCreationForm edit mode behavior
+  - [x] 2.2 Add editMode and initialData props to PinCreationForm
+  - [x] 2.3 Implement field pre-population logic
+  - [x] 2.4 Update submit button text based on mode
+  - [x] 2.5 Verify all tests pass
 
 - [ ] 3. Implement Edit Action Handler
   - [ ] 3.1 Write tests for edit action validation and submission

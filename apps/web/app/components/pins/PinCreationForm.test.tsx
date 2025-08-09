@@ -346,4 +346,213 @@ describe('PinCreationForm', () => {
       expect(submitButton).toHaveAttribute('type', 'submit')
     })
   })
+
+  describe('Edit Mode', () => {
+    const initialData = {
+      url: 'https://example.com/article',
+      title: 'Original Title',
+      description: 'Original description',
+    }
+
+    it('renders with "Update Pin" button text in edit mode', () => {
+      render(
+        <PinCreationForm
+          onSubmit={mockOnSubmit}
+          editMode
+          initialData={initialData}
+        />
+      )
+
+      expect(
+        screen.getByRole('button', { name: /update pin/i })
+      ).toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: /create pin/i })
+      ).not.toBeInTheDocument()
+    })
+
+    it('pre-populates form fields with initial data in edit mode', () => {
+      render(
+        <PinCreationForm
+          onSubmit={mockOnSubmit}
+          editMode
+          initialData={initialData}
+        />
+      )
+
+      const urlInput = screen.getByLabelText(/url/i)
+      const titleInput = screen.getByLabelText(/title/i)
+      const descriptionInput = screen.getByLabelText(/description/i)
+
+      expect((urlInput as HTMLInputElement).value).toBe(
+        'https://example.com/article'
+      )
+      expect((titleInput as HTMLInputElement).value).toBe('Original Title')
+      expect((descriptionInput as HTMLTextAreaElement).value).toBe(
+        'Original description'
+      )
+    })
+
+    it('handles optional description in initial data', () => {
+      const dataWithoutDescription = {
+        url: 'https://example.com',
+        title: 'Title Only',
+      }
+
+      render(
+        <PinCreationForm
+          onSubmit={mockOnSubmit}
+          editMode
+          initialData={dataWithoutDescription}
+        />
+      )
+
+      const descriptionInput = screen.getByLabelText(/description/i)
+      expect((descriptionInput as HTMLTextAreaElement).value).toBe('')
+    })
+
+    it('allows editing pre-populated fields', async () => {
+      const user = userEvent.setup()
+      render(
+        <PinCreationForm
+          onSubmit={mockOnSubmit}
+          editMode
+          initialData={initialData}
+        />
+      )
+
+      const urlInput = screen.getByLabelText(/url/i)
+      const titleInput = screen.getByLabelText(/title/i)
+      const descriptionInput = screen.getByLabelText(/description/i)
+
+      // Clear and update each field
+      await user.clear(urlInput)
+      await user.type(urlInput, 'https://newsite.com')
+
+      await user.clear(titleInput)
+      await user.type(titleInput, 'Updated Title')
+
+      await user.clear(descriptionInput)
+      await user.type(descriptionInput, 'Updated description')
+
+      expect((urlInput as HTMLInputElement).value).toBe('https://newsite.com')
+      expect((titleInput as HTMLInputElement).value).toBe('Updated Title')
+      expect((descriptionInput as HTMLTextAreaElement).value).toBe(
+        'Updated description'
+      )
+    })
+
+    it('submits updated data in edit mode', async () => {
+      const user = userEvent.setup()
+      render(
+        <PinCreationForm
+          onSubmit={mockOnSubmit}
+          editMode
+          initialData={initialData}
+        />
+      )
+
+      const titleInput = screen.getByLabelText(/title/i)
+      const submitButton = screen.getByRole('button', { name: /update pin/i })
+
+      // Update the title
+      await user.clear(titleInput)
+      await user.type(titleInput, 'Modified Title')
+
+      // Submit the form
+      await user.click(submitButton)
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith({
+          url: 'https://example.com/article',
+          title: 'Modified Title',
+          description: 'Original description',
+        })
+      })
+    })
+
+    it('shows "Updating..." text during submission in edit mode', () => {
+      render(
+        <PinCreationForm
+          onSubmit={mockOnSubmit}
+          editMode
+          initialData={initialData}
+          isLoading
+        />
+      )
+
+      const submitButton = screen.getByRole('button', { name: /updating/i })
+      expect(submitButton).toBeDisabled()
+      expect(submitButton).toHaveTextContent('Updating...')
+    })
+
+    it('works in create mode when editMode is false or undefined', () => {
+      const { rerender } = render(
+        <PinCreationForm onSubmit={mockOnSubmit} editMode={false} />
+      )
+
+      expect(
+        screen.getByRole('button', { name: /create pin/i })
+      ).toBeInTheDocument()
+
+      // Also test when editMode is undefined
+      rerender(<PinCreationForm onSubmit={mockOnSubmit} />)
+      expect(
+        screen.getByRole('button', { name: /create pin/i })
+      ).toBeInTheDocument()
+    })
+
+    it('does not fetch metadata on URL blur in edit mode', async () => {
+      const user = userEvent.setup()
+      render(
+        <PinCreationForm
+          onSubmit={mockOnSubmit}
+          onMetadataFetch={mockOnMetadataFetch}
+          editMode
+          initialData={initialData}
+        />
+      )
+
+      const urlInput = screen.getByLabelText(/url/i)
+
+      // Clear and type new URL
+      await user.clear(urlInput)
+      await user.type(urlInput, 'https://different.com')
+      await user.tab() // Trigger blur
+
+      // Should not fetch metadata in edit mode
+      expect(mockOnMetadataFetch).not.toHaveBeenCalled()
+    })
+
+    it('maintains form validation in edit mode', async () => {
+      const user = userEvent.setup()
+      render(
+        <PinCreationForm
+          onSubmit={mockOnSubmit}
+          editMode
+          initialData={initialData}
+        />
+      )
+
+      const urlInput = screen.getByLabelText(/url/i)
+      const titleInput = screen.getByLabelText(/title/i)
+      const submitButton = screen.getByRole('button', { name: /update pin/i })
+
+      // Clear required fields
+      await user.clear(urlInput)
+      await user.clear(titleInput)
+      await user.click(submitButton)
+
+      // Form should not submit
+      await waitFor(() => {
+        expect(mockOnSubmit).not.toHaveBeenCalled()
+      })
+
+      // Should show validation errors
+      await waitFor(() => {
+        expect(urlInput).toHaveAttribute('aria-invalid', 'true')
+        expect(titleInput).toHaveAttribute('aria-invalid', 'true')
+      })
+    })
+  })
 })
