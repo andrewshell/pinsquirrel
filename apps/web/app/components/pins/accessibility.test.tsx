@@ -201,25 +201,29 @@ describe('Pin List Accessibility', () => {
       const user = userEvent.setup()
       render(<PinList pins={mockPins} isLoading={false} />)
 
-      // Tab through first pin's elements: title link, URL link, edit button, delete button
+      // Tab through first pin's elements
       await user.tab()
-      const titleLinks = screen.getAllByRole('link', { name: /Pin/ })
-      expect(titleLinks[0]).toHaveFocus() // First pin's title link
+      // First pin's title link
+      expect(screen.getByRole('link', { name: 'First Pin' })).toHaveFocus()
 
       await user.tab()
-      // Should focus URL link of first pin
+      // First pin's URL link
+      const urlLinks = screen.getAllByRole('link', { name: /example\.com/ })
+      expect(urlLinks[0]).toHaveFocus()
 
       await user.tab()
-      const editButtons = screen.getAllByLabelText(/Edit/)
-      expect(editButtons[0]).toHaveFocus()
+      // First pin's edit link
+      expect(screen.getByRole('link', { name: 'Edit First Pin' })).toHaveFocus()
 
       await user.tab()
-      const deleteButtons = screen.getAllByLabelText(/Delete/)
-      expect(deleteButtons[0]).toHaveFocus()
+      // First pin's delete button
+      expect(
+        screen.getByRole('button', { name: 'Delete First Pin' })
+      ).toHaveFocus()
 
       await user.tab()
       // Should move to second pin's title link
-      expect(titleLinks[1]).toHaveFocus()
+      expect(screen.getByRole('link', { name: 'Second Pin' })).toHaveFocus()
     })
 
     it('has proper heading hierarchy', () => {

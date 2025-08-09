@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import type { Pin } from '@pinsquirrel/core'
 
 interface PinCardProps {
@@ -96,12 +97,13 @@ export function PinCard({ pin }: PinCardProps) {
             role="group"
             aria-label={`Actions for ${pin.title}`}
           >
-            <button
+            <Link
+              to={`/pins/${pin.id}/edit`}
               className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer"
               aria-label={`Edit ${pin.title}`}
             >
               edit
-            </button>
+            </Link>
             <button
               className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer"
               aria-label={`Delete ${pin.title}`}

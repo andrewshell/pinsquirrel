@@ -28,12 +28,12 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 3.4 Add success redirect with flash message
   - [x] 3.5 Verify all tests pass
 
-- [ ] 4. Add Edit Navigation Links
-  - [ ] 4.1 Write tests for edit button rendering in PinCard
-  - [ ] 4.2 Add edit button/link to PinCard component
-  - [ ] 4.3 Implement proper navigation to edit route
-  - [ ] 4.4 Ensure accessibility with proper ARIA labels
-  - [ ] 4.5 Verify all tests pass
+- [x] 4. Add Edit Navigation Links
+  - [x] 4.1 Write tests for edit button rendering in PinCard
+  - [x] 4.2 Add edit button/link to PinCard component
+  - [x] 4.3 Implement proper navigation to edit route
+  - [x] 4.4 Ensure accessibility with proper ARIA labels
+  - [x] 4.5 Verify all tests pass
 
 - [ ] 5. End-to-End Testing and Polish
   - [ ] 5.1 Write integration tests for complete edit flow
