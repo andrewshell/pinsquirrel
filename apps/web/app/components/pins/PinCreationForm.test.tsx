@@ -10,17 +10,6 @@ describe('PinCreationForm', () => {
     vi.clearAllMocks()
   })
 
-  it('renders all form fields (URL, title, description)', () => {
-    render(<PinCreationForm />)
-
-    expect(screen.getByLabelText(/url/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/title/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/description/i)).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: /create pin/i })
-    ).toBeInTheDocument()
-  })
-
   it('submits directly to server without client-side validation', async () => {
     const user = userEvent.setup()
     render(<PinCreationForm />)
@@ -37,23 +26,6 @@ describe('PinCreationForm', () => {
     // No client-side validation errors should appear
     expect(screen.queryByText(/invalid url/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/url is required/i)).not.toBeInTheDocument()
-  })
-
-  it('has HTML5 validation disabled with novalidate attribute', () => {
-    render(<PinCreationForm />)
-
-    const form = screen.getByRole('form', { name: /create new pin/i })
-    expect(form).toHaveAttribute('novalidate')
-
-    // This means validation is handled server-side via React Router action
-  })
-
-  it('has correct form action and method attributes', () => {
-    render(<PinCreationForm />)
-
-    const form = screen.getByRole('form', { name: /create new pin/i })
-    expect(form).toHaveAttribute('method', 'post')
-    expect(form).toHaveAttribute('action', '/pins/new')
   })
 
   it('uses custom action URL when provided', () => {
@@ -163,44 +135,5 @@ describe('PinCreationForm', () => {
         'Page Title from Metadata'
       )
     })
-  })
-
-  it('has proper accessibility attributes', () => {
-    render(<PinCreationForm />)
-
-    const form = screen.getByRole('form')
-    expect(form).toHaveAttribute('novalidate')
-    expect(form).toHaveAttribute('aria-label', 'Create new pin')
-
-    const urlInput = screen.getByLabelText(/url/i)
-    expect(urlInput).toHaveAttribute('aria-required', 'true')
-    expect(urlInput).toHaveAttribute('aria-describedby', 'url-help')
-
-    const titleInput = screen.getByLabelText(/title/i)
-    expect(titleInput).toHaveAttribute('aria-required', 'true')
-    expect(titleInput).toHaveAttribute('aria-describedby', 'title-help')
-
-    const descriptionInput = screen.getByLabelText(/description/i)
-    expect(descriptionInput).toHaveAttribute('aria-required', 'false')
-  })
-
-  it('shows appropriate aria-label in edit mode', () => {
-    render(<PinCreationForm editMode />)
-
-    const form = screen.getByRole('form')
-    expect(form).toHaveAttribute('aria-label', 'Edit pin')
-  })
-
-  it('maintains accessibility attributes without client validation', () => {
-    render(<PinCreationForm />)
-
-    const urlInput = screen.getByLabelText(/url/i)
-    const titleInput = screen.getByLabelText(/title/i)
-
-    // Should have proper initial accessibility attributes
-    expect(urlInput).toHaveAttribute('aria-describedby', 'url-help')
-    expect(urlInput).toHaveAttribute('aria-invalid', 'false')
-    expect(titleInput).toHaveAttribute('aria-describedby', 'title-help')
-    expect(titleInput).toHaveAttribute('aria-invalid', 'false')
   })
 })

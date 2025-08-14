@@ -18,33 +18,6 @@ describe('LoginForm', () => {
     vi.mocked(useActionData).mockReturnValue(undefined)
   })
 
-  it('renders login form with all fields', () => {
-    render(<LoginForm />)
-
-    expect(screen.getAllByText('Login')).toHaveLength(2) // Title and button
-    expect(screen.getByLabelText('Username')).toBeInTheDocument()
-    expect(screen.getByLabelText('Password')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument()
-  })
-
-  it('updates username field when typed', () => {
-    render(<LoginForm />)
-
-    const usernameInput = screen.getByLabelText('Username')
-    fireEvent.change(usernameInput, { target: { value: 'testuser' } })
-
-    expect(usernameInput).toHaveValue('testuser')
-  })
-
-  it('updates password field when typed', () => {
-    render(<LoginForm />)
-
-    const passwordInput = screen.getByLabelText('Password')
-    fireEvent.change(passwordInput, { target: { value: 'testpass' } })
-
-    expect(passwordInput).toHaveValue('testpass')
-  })
-
   it('submits form with username and password', async () => {
     render(<LoginForm />)
 

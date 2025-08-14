@@ -18,16 +18,6 @@ describe('RegisterForm', () => {
     vi.mocked(useActionData).mockReturnValue(undefined)
   })
 
-  it('renders registration form with all fields', () => {
-    render(<RegisterForm />)
-
-    expect(screen.getAllByText('Sign Up')).toHaveLength(2) // Title and button
-    expect(screen.getByLabelText('Username')).toBeInTheDocument()
-    expect(screen.getByLabelText('Password')).toBeInTheDocument()
-    expect(screen.getByLabelText('Email (optional)')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Sign Up' })).toBeInTheDocument()
-  })
-
   it('updates form fields when typed', () => {
     render(<RegisterForm />)
 

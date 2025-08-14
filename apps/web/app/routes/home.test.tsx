@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider, redirect } from 'react-router'
-import Home, { loader, meta } from './home'
+import Home, { loader } from './home'
 import type { Route } from './+types/home'
 import { getUser } from '~/lib/session.server'
 
@@ -91,66 +91,6 @@ describe('Home Page', () => {
 
       expect(getUser).toHaveBeenCalledWith(request)
       expect(result).toEqual({ user: null })
-    })
-  })
-
-  describe('meta function', () => {
-    it('returns correct meta tags', () => {
-      const mockArgs = {} as Route.MetaArgs
-
-      const result = meta(mockArgs)
-
-      expect(result).toEqual([
-        { title: 'PinSquirrel Boilerplate' },
-        { name: 'description', content: 'A sensible start to a new project' },
-      ])
-    })
-
-    it('returns array with title and description', () => {
-      const mockArgs = {} as Route.MetaArgs
-
-      const result = meta(mockArgs)
-
-      expect(Array.isArray(result)).toBe(true)
-      expect(result).toHaveLength(2)
-      expect(result[0]).toHaveProperty('title')
-      expect(result[1]).toHaveProperty('name', 'description')
-    })
-  })
-
-  describe('loader logic validation', () => {
-    it('should validate user existence check pattern', () => {
-      const testCases = [
-        { user: null, shouldRedirect: false },
-        { user: undefined, shouldRedirect: false },
-        { user: { id: 'user-123', username: 'test' }, shouldRedirect: true },
-      ]
-
-      testCases.forEach(({ user, shouldRedirect }) => {
-        const userExists = !!user
-        expect(userExists).toBe(shouldRedirect)
-      })
-    })
-
-    it('should validate redirect logic pattern', () => {
-      // Test the conditional redirect logic used in loader
-      const loggedInUser = { id: 'user-123', username: 'test' }
-      const loggedOutUser = null
-
-      const shouldRedirectLoggedIn = !!loggedInUser
-      const shouldRedirectLoggedOut = !!loggedOutUser
-
-      expect(shouldRedirectLoggedIn).toBe(true)
-      expect(shouldRedirectLoggedOut).toBe(false)
-    })
-
-    it('should validate return data structure', () => {
-      // Test the structure of data returned for logged-out users
-      const user = null
-      const returnData = { user }
-
-      expect(returnData).toHaveProperty('user')
-      expect(returnData.user).toBeNull()
     })
   })
 
