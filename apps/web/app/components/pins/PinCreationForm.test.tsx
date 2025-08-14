@@ -1,7 +1,35 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createRoutesStub } from 'react-router'
 import { PinCreationForm } from './PinCreationForm'
+
+// Define props interface locally since it's not exported
+interface PinCreationFormProps {
+  onMetadataFetch?: (url: string) => void
+  metadataTitle?: string
+  metadataError?: string
+  isMetadataLoading?: boolean
+  isLoading?: boolean
+  successMessage?: string
+  errorMessage?: string
+  editMode?: boolean
+  initialData?: { url: string; title: string; description: string }
+  actionUrl?: string
+}
+
+// Helper to create route stub with component props
+const createPinCreationFormStub = (
+  props: Partial<PinCreationFormProps> = {}
+) => {
+  return createRoutesStub([
+    {
+      path: '/pins/new',
+      Component: () => <PinCreationForm {...props} />,
+      action: () => null, // Prevent form submission errors in tests
+    },
+  ])
+}
 
 describe('PinCreationForm', () => {
   const mockOnMetadataFetch = vi.fn()
@@ -12,7 +40,8 @@ describe('PinCreationForm', () => {
 
   it('submits directly to server without client-side validation', async () => {
     const user = userEvent.setup()
-    render(<PinCreationForm />)
+    const Stub = createPinCreationFormStub()
+    render(<Stub initialEntries={['/pins/new']} />)
 
     const urlInput = screen.getByLabelText(/url/i)
     const titleInput = screen.getByLabelText(/title/i)
@@ -29,14 +58,16 @@ describe('PinCreationForm', () => {
   })
 
   it('uses custom action URL when provided', () => {
-    render(<PinCreationForm actionUrl="/pins/123/edit" />)
+    const Stub = createPinCreationFormStub({ actionUrl: '/pins/123/edit' })
+    render(<Stub initialEntries={['/pins/new']} />)
 
     const form = screen.getByRole('form', { name: /create new pin/i })
     expect(form).toHaveAttribute('action', '/pins/123/edit')
   })
 
   it('shows "Update Pin" button text in edit mode', () => {
-    render(<PinCreationForm editMode />)
+    const Stub = createPinCreationFormStub({ editMode: true })
+    render(<Stub initialEntries={['/pins/new']} />)
 
     expect(
       screen.getByRole('button', { name: /update pin/i })
@@ -50,7 +81,8 @@ describe('PinCreationForm', () => {
       description: 'Test Description',
     }
 
-    render(<PinCreationForm initialData={initialData} />)
+    const Stub = createPinCreationFormStub({ initialData })
+    render(<Stub initialEntries={['/pins/new']} />)
 
     expect(screen.getByDisplayValue('https://example.com')).toBeInTheDocument()
     expect(screen.getByDisplayValue('Test Title')).toBeInTheDocument()
@@ -58,14 +90,20 @@ describe('PinCreationForm', () => {
   })
 
   it('displays success message when provided', () => {
-    render(<PinCreationForm successMessage="Pin created successfully!" />)
+    const Stub = createPinCreationFormStub({
+      successMessage: 'Pin created successfully!',
+    })
+    render(<Stub initialEntries={['/pins/new']} />)
 
     expect(screen.getByText('Pin created successfully!')).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveClass('bg-green-50')
   })
 
   it('displays error message when provided', () => {
-    render(<PinCreationForm errorMessage="Something went wrong" />)
+    const Stub = createPinCreationFormStub({
+      errorMessage: 'Something went wrong',
+    })
+    render(<Stub initialEntries={['/pins/new']} />)
 
     expect(screen.getByText('Something went wrong')).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveClass('bg-red-50')
@@ -73,7 +111,10 @@ describe('PinCreationForm', () => {
 
   it('calls onMetadataFetch when URL field loses focus with valid URL', async () => {
     const user = userEvent.setup()
-    render(<PinCreationForm onMetadataFetch={mockOnMetadataFetch} />)
+    const Stub = createPinCreationFormStub({
+      onMetadataFetch: mockOnMetadataFetch,
+    })
+    render(<Stub initialEntries={['/pins/new']} />)
 
     const urlInput = screen.getByLabelText(/url/i)
 
@@ -85,7 +126,10 @@ describe('PinCreationForm', () => {
 
   it('does not call onMetadataFetch with invalid URL', async () => {
     const user = userEvent.setup()
-    render(<PinCreationForm onMetadataFetch={mockOnMetadataFetch} />)
+    const Stub = createPinCreationFormStub({
+      onMetadataFetch: mockOnMetadataFetch,
+    })
+    render(<Stub initialEntries={['/pins/new']} />)
 
     const urlInput = screen.getByLabelText(/url/i)
 
@@ -97,7 +141,11 @@ describe('PinCreationForm', () => {
 
   it('does not call onMetadataFetch in edit mode', async () => {
     const user = userEvent.setup()
-    render(<PinCreationForm editMode onMetadataFetch={mockOnMetadataFetch} />)
+    const Stub = createPinCreationFormStub({
+      editMode: true,
+      onMetadataFetch: mockOnMetadataFetch,
+    })
+    render(<Stub initialEntries={['/pins/new']} />)
 
     const urlInput = screen.getByLabelText(/url/i)
 
@@ -108,13 +156,15 @@ describe('PinCreationForm', () => {
   })
 
   it('shows metadata loading state', () => {
-    render(<PinCreationForm isMetadataLoading />)
+    const Stub = createPinCreationFormStub({ isMetadataLoading: true })
+    render(<Stub initialEntries={['/pins/new']} />)
 
     expect(screen.getByText('Fetching page title...')).toBeInTheDocument()
   })
 
   it('shows metadata error message', () => {
-    render(<PinCreationForm metadataError="Failed to fetch" />)
+    const Stub = createPinCreationFormStub({ metadataError: 'Failed to fetch' })
+    render(<Stub initialEntries={['/pins/new']} />)
 
     expect(
       screen.getByText('Failed to fetch metadata. Please enter title manually.')
@@ -122,13 +172,17 @@ describe('PinCreationForm', () => {
   })
 
   it('populates title field when metadata title is provided', async () => {
-    const { rerender } = render(<PinCreationForm />)
+    const Stub1 = createPinCreationFormStub()
+    const { rerender } = render(<Stub1 initialEntries={['/pins/new']} />)
 
     // Initially no title
     expect(screen.getByLabelText(/title/i)).toHaveValue('')
 
     // Provide metadata title
-    rerender(<PinCreationForm metadataTitle="Page Title from Metadata" />)
+    const Stub2 = createPinCreationFormStub({
+      metadataTitle: 'Page Title from Metadata',
+    })
+    rerender(<Stub2 initialEntries={['/pins/new']} />)
 
     await waitFor(() => {
       expect(screen.getByLabelText(/title/i)).toHaveValue(

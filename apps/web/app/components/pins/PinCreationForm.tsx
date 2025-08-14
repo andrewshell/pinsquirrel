@@ -1,22 +1,19 @@
-import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { useEffect, useState, useRef, useMemo } from 'react'
+import { useFetcher } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Textarea } from '~/components/ui/textarea'
 import { Label } from '~/components/ui/label'
+import { FormText } from '~/components/ui/form-text'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
-import {
-  pinCreationSchema,
-  type PinCreationFormData,
-} from '~/lib/validation/pin-schema'
+import type { PinCreationFormData } from '~/lib/validation/pin-schema'
+import type { FieldErrors } from '~/lib/validation'
 
 interface PinCreationFormProps {
   onMetadataFetch?: (url: string) => void
   metadataTitle?: string
   metadataError?: string
   isMetadataLoading?: boolean
-  isLoading?: boolean
   successMessage?: string
   errorMessage?: string
   editMode?: boolean
@@ -29,50 +26,44 @@ export function PinCreationForm({
   metadataTitle,
   metadataError,
   isMetadataLoading,
-  isLoading,
   successMessage,
   errorMessage,
   editMode = false,
   initialData,
   actionUrl,
 }: PinCreationFormProps) {
-  const {
-    register,
-    formState: { errors, isSubmitting },
-    setValue,
-    watch,
-  } = useForm<PinCreationFormData>({
-    resolver: zodResolver(pinCreationSchema),
-    defaultValues: initialData || {
-      url: '',
-      title: '',
-      description: '',
-    },
-  })
+  const fetcher = useFetcher<{ errors?: FieldErrors }>()
+  const formRef = useRef<HTMLFormElement>(null)
+  const urlRef = useRef<HTMLInputElement>(null)
+  const titleRef = useRef<HTMLInputElement>(null)
 
-  // Client-side state for dismissing flash messages
+  // Client-side state for dismissing flash messages and URL tracking
   const [showSuccessMessage, setShowSuccessMessage] = useState(!!successMessage)
   const [showErrorMessage, setShowErrorMessage] = useState(!!errorMessage)
+  const [urlValue, setUrlValue] = useState(initialData?.url || '')
 
-  const urlValue = watch('url')
+  // Get validation errors from fetcher or props (memoized to prevent useEffect dependencies changing)
+  const errors = useMemo(
+    () => fetcher.data?.errors || {},
+    [fetcher.data?.errors]
+  )
+  const isSubmitting = fetcher.state === 'submitting'
 
   // Auto-populate title when metadata is fetched
   useEffect(() => {
-    if (metadataTitle) {
-      setValue('title', metadataTitle)
+    if (metadataTitle && titleRef.current) {
+      titleRef.current.value = metadataTitle
     }
-  }, [metadataTitle, setValue])
+  }, [metadataTitle])
 
   // Focus management for validation errors
   useEffect(() => {
     if (Object.keys(errors).length > 0) {
       // Focus the first field with an error
-      const firstErrorField = errors.url ? 'url' : errors.title ? 'title' : null
-      if (firstErrorField) {
-        const element = document.getElementById(firstErrorField)
-        if (element && element instanceof HTMLInputElement) {
-          element.focus()
-        }
+      if (errors.url && urlRef.current) {
+        urlRef.current.focus()
+      } else if (errors.title && titleRef.current) {
+        titleRef.current.focus()
       }
     }
   }, [errors])
@@ -93,8 +84,13 @@ export function PinCreationForm({
     }
   }
 
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUrlValue(e.target.value)
+  }
+
   return (
-    <form
+    <fetcher.Form
+      ref={formRef}
       method="post"
       action={actionUrl || '/pins/new'}
       className="space-y-4"
@@ -119,23 +115,38 @@ export function PinCreationForm({
         />
       )}
 
+      {/* Server validation errors */}
+      {errors._form && (
+        <DismissibleAlert
+          message={
+            Array.isArray(errors._form) ? errors._form.join(', ') : errors._form
+          }
+          type="error"
+        />
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="url">URL</Label>
         <Input
+          ref={urlRef}
           id="url"
+          name="url"
           type="url"
           placeholder="https://example.com"
-          {...register('url', { onBlur: handleUrlBlur })}
+          defaultValue={initialData?.url || ''}
+          onChange={handleUrlChange}
+          onBlur={handleUrlBlur}
           aria-invalid={!!errors.url}
           aria-describedby={errors.url ? 'url-error url-help' : 'url-help'}
           aria-required="true"
+          className={errors.url ? 'border-red-500' : ''}
         />
-        <p id="url-help" className="text-xs text-muted-foreground">
+        <FormText id="url-help" size="xs">
           Enter the web address you want to save as a pin
-        </p>
+        </FormText>
         {errors.url && (
           <p id="url-error" className="text-sm text-destructive" role="alert">
-            {errors.url.message}
+            {Array.isArray(errors.url) ? errors.url.join(', ') : errors.url}
           </p>
         )}
       </div>
@@ -144,10 +155,12 @@ export function PinCreationForm({
         <Label htmlFor="title">Title</Label>
         <div className="relative">
           <Input
+            ref={titleRef}
             id="title"
+            name="title"
             type="text"
             placeholder="Enter a title"
-            {...register('title')}
+            defaultValue={initialData?.title || ''}
             aria-invalid={!!errors.title}
             aria-describedby={
               errors.title
@@ -157,6 +170,7 @@ export function PinCreationForm({
                   : 'title-help'
             }
             aria-required="true"
+            className={errors.title ? 'border-red-500' : ''}
           />
           {isMetadataLoading && (
             <span
@@ -168,13 +182,15 @@ export function PinCreationForm({
             </span>
           )}
         </div>
-        <p id="title-help" className="text-xs text-muted-foreground">
+        <FormText id="title-help" size="xs">
           A descriptive title for your pin. We&apos;ll try to auto-fill this
           from the page.
-        </p>
+        </FormText>
         {errors.title && (
           <p id="title-error" className="text-sm text-destructive" role="alert">
-            {errors.title.message}
+            {Array.isArray(errors.title)
+              ? errors.title.join(', ')
+              : errors.title}
           </p>
         )}
         {metadataError && (
@@ -188,36 +204,37 @@ export function PinCreationForm({
         <Label htmlFor="description">Description (optional)</Label>
         <Textarea
           id="description"
+          name="description"
           placeholder="Add a description..."
-          {...register('description')}
+          defaultValue={initialData?.description || ''}
           rows={4}
           aria-describedby="description-help"
           aria-required="false"
         />
-        <p id="description-help" className="text-xs text-muted-foreground">
+        <FormText id="description-help" size="xs">
           Optional notes or context about this pin
-        </p>
+        </FormText>
       </div>
 
       <Button
         type="submit"
-        disabled={isLoading || isSubmitting}
+        disabled={isSubmitting}
         className="w-full"
-        aria-describedby={isLoading ? 'submit-status' : undefined}
+        aria-describedby={isSubmitting ? 'submit-status' : undefined}
       >
-        {isLoading
+        {isSubmitting
           ? editMode
             ? 'Updating...'
             : 'Creating...'
           : editMode
             ? 'Update Pin'
             : 'Create Pin'}
-        {isLoading && (
+        {isSubmitting && (
           <span id="submit-status" className="sr-only">
             Form is being submitted, please wait
           </span>
         )}
       </Button>
-    </form>
+    </fetcher.Form>
   )
 }

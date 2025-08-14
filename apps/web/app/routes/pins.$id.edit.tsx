@@ -7,6 +7,7 @@ import {
   pinCreationSchema,
   type PinCreationFormData,
 } from '~/lib/validation/pin-schema'
+import { parseFormData } from '~/lib/validation/helpers'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
 import { logger } from '~/lib/logger.server'
 
@@ -48,40 +49,27 @@ export async function action({ request, params }: Route.ActionArgs) {
     throw new Response('Pin ID is required', { status: 404 })
   }
 
-  const formData = await request.formData()
-  const url = formData.get('url') as string | null
-  const title = formData.get('title') as string | null
-  const description = formData.get('description') as string | null
+  // Parse and validate form data
+  const result = await parseFormData(request, pinCreationSchema)
 
-  // Validate form data
-  const validation = pinCreationSchema.safeParse({
-    url: url || '',
-    title: title || '',
-    description: description || undefined,
-  })
-
-  if (!validation.success) {
-    const errors: Record<string, string> = {}
-    validation.error.issues.forEach(error => {
-      const field = error.path[0] as string
-      errors[field] = error.message
-    })
-    return data({ errors }, { status: 400 })
+  if (!result.success) {
+    logger.debug('Pin edit validation failed', { errors: result.errors })
+    return data({ errors: result.errors }, { status: 400 })
   }
 
   try {
     // Update the pin using the service
     await pinService.updatePin(user.id, pinId, {
-      url: validation.data.url,
-      title: validation.data.title,
-      description: validation.data.description,
+      url: result.data.url,
+      title: result.data.title,
+      description: result.data.description,
       readLater: false, // Keep existing readLater value (not edited in this form)
     })
 
     logger.info('Pin updated successfully', {
       pinId,
       userId: user.id,
-      url: validation.data.url,
+      url: result.data.url,
     })
 
     // Redirect to pins list with success message
@@ -95,12 +83,14 @@ export async function action({ request, params }: Route.ActionArgs) {
     logger.exception(error, 'Failed to update pin', {
       pinId,
       userId: user.id,
-      url: validation.data.url,
+      url: result.data.url,
     })
 
     return data(
       {
-        error: 'Failed to update pin. Please try again.',
+        errors: {
+          _form: 'Failed to update pin. Please try again.',
+        },
       },
       { status: 400 }
     )
@@ -142,7 +132,11 @@ export default function PinEditPage() {
             metadataError={metadataError || undefined}
             isMetadataLoading={isMetadataLoading}
             errorMessage={
-              actionData && 'error' in actionData ? actionData.error : undefined
+              actionData?.errors?._form
+                ? Array.isArray(actionData.errors._form)
+                  ? actionData.errors._form.join(', ')
+                  : actionData.errors._form
+                : undefined
             }
           />
         </div>

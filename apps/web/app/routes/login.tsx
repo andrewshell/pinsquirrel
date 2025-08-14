@@ -1,4 +1,4 @@
-import { Link, redirect } from 'react-router'
+import { Link, redirect, data } from 'react-router'
 import type { Route } from './+types/login'
 import { AuthenticationServiceImpl } from '@pinsquirrel/core'
 import { DrizzleUserRepository, db } from '@pinsquirrel/database'
@@ -27,9 +27,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (!result.success) {
     logger.debug('Login validation failed', { errors: result.errors })
-    return {
-      errors: result.errors,
-    }
+    return data({ errors: result.errors }, { status: 400 })
   }
 
   try {
@@ -50,11 +48,14 @@ export async function action({ request }: Route.ActionArgs) {
       username: result.data.username,
     })
     const message = error instanceof Error ? error.message : 'Login failed'
-    return {
-      errors: {
-        _form: message,
+    return data(
+      {
+        errors: {
+          _form: message,
+        },
       },
-    }
+      { status: 400 }
+    )
   }
 }
 

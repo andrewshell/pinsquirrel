@@ -1,4 +1,4 @@
-import { useActionData } from 'react-router'
+import { useActionData, data } from 'react-router'
 import type { Route } from './+types/pins.new'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
 import {
@@ -8,6 +8,7 @@ import {
 } from '@pinsquirrel/database'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
 import { pinCreationSchema } from '~/lib/validation/pin-schema'
+import { parseFormData } from '~/lib/validation/helpers'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
 import { logger } from '~/lib/logger.server'
 
@@ -25,34 +26,21 @@ export async function action({ request }: Route.ActionArgs) {
   // Ensure user is authenticated
   const user = await requireUser(request)
 
-  const formData = await request.formData()
-  const url = formData.get('url') as string | null
-  const title = formData.get('title') as string | null
-  const description = formData.get('description') as string | null
+  // Parse and validate form data
+  const result = await parseFormData(request, pinCreationSchema)
 
-  // Validate form data
-  const validation = pinCreationSchema.safeParse({
-    url: url || '',
-    title: title || '',
-    description: description || undefined,
-  })
-
-  if (!validation.success) {
-    const errors: Record<string, string> = {}
-    validation.error.issues.forEach(error => {
-      const field = error.path[0] as string
-      errors[field] = error.message
-    })
-    return { errors }
+  if (!result.success) {
+    logger.debug('Pin creation validation failed', { errors: result.errors })
+    return data({ errors: result.errors }, { status: 400 })
   }
 
   try {
     // Create the pin
     const pin = await pinRepository.create({
       userId: user.id,
-      url: validation.data.url,
-      title: validation.data.title,
-      description: validation.data.description || '',
+      url: result.data.url,
+      title: result.data.title,
+      description: result.data.description || '',
       readLater: false,
     })
 
@@ -72,12 +60,17 @@ export async function action({ request }: Route.ActionArgs) {
   } catch (error) {
     logger.exception(error, 'Failed to create pin', {
       userId: user.id,
-      url: validation.data.url,
+      url: result.data.url,
     })
 
-    return {
-      error: 'Failed to create pin. Please try again.',
-    }
+    return data(
+      {
+        errors: {
+          _form: 'Failed to create pin. Please try again.',
+        },
+      },
+      { status: 400 }
+    )
   }
 }
 
@@ -106,7 +99,13 @@ export default function PinsNewPage() {
             metadataTitle={metadata?.title}
             metadataError={metadataError || undefined}
             isMetadataLoading={isMetadataLoading}
-            errorMessage={actionData?.error}
+            errorMessage={
+              actionData?.errors?._form
+                ? Array.isArray(actionData.errors._form)
+                  ? actionData.errors._form.join(', ')
+                  : actionData.errors._form
+                : undefined
+            }
           />
         </div>
       </div>

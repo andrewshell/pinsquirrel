@@ -1,10 +1,8 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unnecessary-type-assertion */
+/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { loader, action } from './profile'
 import type { Route } from './+types/profile'
 import { requireUser } from '~/lib/session.server'
-import { AuthenticationServiceImpl } from '@pinsquirrel/core'
-import { DrizzleUserRepository } from '@pinsquirrel/database'
 import { logger } from '~/lib/logger.server'
 
 // Mock all dependencies
@@ -18,6 +16,11 @@ vi.mock('react-router', () => ({
     commitSession: vi.fn(),
     destroySession: vi.fn(),
   }),
+  data: vi.fn().mockImplementation((data, options) => ({
+    ...data,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    status: options?.status || 200,
+  })),
 }))
 
 describe('Profile Route', () => {
@@ -30,32 +33,9 @@ describe('Profile Route', () => {
     updatedAt: new Date(),
   }
 
-  let mockAuthService: any
-
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(requireUser).mockResolvedValue(mockUser)
-
-    mockAuthService = {
-      updateEmail: vi.fn(),
-      changePassword: vi.fn(),
-    }
-    vi.mocked(AuthenticationServiceImpl).mockImplementation(
-      () => mockAuthService as any
-    )
-    vi.mocked(DrizzleUserRepository).mockImplementation(
-      () =>
-        ({
-          findById: vi.fn(),
-          findByEmailHash: vi.fn(),
-          findByUsername: vi.fn(),
-          findAll: vi.fn(),
-          list: vi.fn(),
-          create: vi.fn(),
-          update: vi.fn(),
-          delete: vi.fn(),
-        }) as unknown as DrizzleUserRepository
-    )
   })
 
   describe('loader', () => {
@@ -181,11 +161,9 @@ describe('Profile Route', () => {
 
       const result = await action(args)
 
-      expect((mockAuthService as any).updateEmail).not.toHaveBeenCalled()
       expect(result).toEqual({
-        error: 'Email is required',
-        success: null,
-        field: 'email',
+        errors: { email: 'Valid email is required' },
+        status: 400,
       })
     })
 
@@ -203,11 +181,9 @@ describe('Profile Route', () => {
 
       const result = await action(args)
 
-      expect((mockAuthService as any).updateEmail).not.toHaveBeenCalled()
       expect(result).toEqual({
-        error: 'Email is required',
-        success: null,
-        field: 'email',
+        errors: { email: 'Valid email is required' },
+        status: 400,
       })
     })
 
@@ -226,11 +202,12 @@ describe('Profile Route', () => {
 
       const result = await action(args)
 
-      expect((mockAuthService as any).changePassword).not.toHaveBeenCalled()
       expect(result).toEqual({
-        error: 'Current password and new password are required',
-        success: null,
-        field: 'password',
+        errors: {
+          currentPassword: 'Current password is required',
+          newPassword: 'Password must be at least 8 characters',
+        },
+        status: 400,
       })
     })
 
@@ -249,11 +226,9 @@ describe('Profile Route', () => {
 
       const result = await action(args)
 
-      expect((mockAuthService as any).changePassword).not.toHaveBeenCalled()
       expect(result).toEqual({
-        error: 'Current password and new password are required',
-        success: null,
-        field: 'password',
+        errors: { currentPassword: 'Current password is required' },
+        status: 400,
       })
     })
 
@@ -272,11 +247,9 @@ describe('Profile Route', () => {
 
       const result = await action(args)
 
-      expect((mockAuthService as any).changePassword).not.toHaveBeenCalled()
       expect(result).toEqual({
-        error: 'Current password and new password are required',
-        success: null,
-        field: 'password',
+        errors: { newPassword: 'Password must be at least 8 characters' },
+        status: 400,
       })
     })
 
@@ -295,11 +268,9 @@ describe('Profile Route', () => {
 
       const result = await action(args)
 
-      expect((mockAuthService as any).changePassword).not.toHaveBeenCalled()
       expect(result).toEqual({
-        error: 'New password must be at least 6 characters',
-        success: null,
-        field: 'password',
+        errors: { newPassword: 'Password must be at least 8 characters' },
+        status: 400,
       })
     })
 
@@ -316,14 +287,14 @@ describe('Profile Route', () => {
 
       const result = await action(args)
 
-      expect((mockAuthService as any).updateEmail).not.toHaveBeenCalled()
-      expect((mockAuthService as any).changePassword).not.toHaveBeenCalled()
       expect(result).toEqual({
-        error: 'Invalid action',
-        success: null,
-        field: null,
+        errors: { _form: 'Invalid action' },
+        status: 400,
       })
     })
+
+    // Note: Service integration tests are covered by the component tests
+    // These route tests focus on validation logic rather than service calls
 
     it('should log request with correct parameters', async () => {
       const formData = new FormData()

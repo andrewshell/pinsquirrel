@@ -19,8 +19,12 @@ export type FieldErrors = {
 }
 
 // Convert Zod errors to field errors
-function formatZodErrors(error: z.ZodError): FieldErrors {
+export function formatZodErrors(error: z.ZodError): FieldErrors {
   const fieldErrors: FieldErrors = {}
+
+  if (!error || !error.issues) {
+    return { _form: 'Invalid form data' }
+  }
 
   for (const issue of error.issues) {
     const path = issue.path.join('.')
@@ -62,12 +66,21 @@ export async function parseFormData<T>(
 ): Promise<ValidationResult<T>> {
   try {
     const formData = await request.formData()
-    const data: Record<string, unknown> = {}
+
+    // Convert FormData to a plain object, treating missing fields as empty strings
+    const rawData: Record<string, unknown> = {}
     for (const [key, value] of formData.entries()) {
-      data[key] = value
+      if (value instanceof File) {
+        rawData[key] = '' // Files are not supported yet
+      } else {
+        rawData[key] = String(value)
+      }
     }
 
-    const result = schema.safeParse(data)
+    // For missing optional fields, we don't need to set them since Zod handles undefined for optional fields
+    // For required string fields that are missing, Zod will give appropriate error messages
+
+    const result = schema.safeParse(rawData)
 
     if (result.success) {
       return {

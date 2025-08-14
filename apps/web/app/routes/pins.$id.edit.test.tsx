@@ -302,10 +302,13 @@ describe('pins.$id.edit route', () => {
 
       const result = await action({ request, params, context: {} })
 
-      expect(result).toHaveProperty(
-        'error',
-        'Failed to update pin. Please try again.'
-      )
+      expect(result).toHaveProperty('errors')
+      if ('errors' in result) {
+        expect(result.errors).toHaveProperty(
+          '_form',
+          'Failed to update pin. Please try again.'
+        )
+      }
     })
   })
 })

@@ -1,24 +1,14 @@
-import React, { useState } from 'react'
-import { useSubmit, useActionData } from 'react-router'
+import { useFetcher } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import type { FieldErrors } from '~/lib/validation'
 
 export function LoginForm() {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const submit = useSubmit()
-  const actionData = useActionData<{ errors?: FieldErrors }>()
+  const fetcher = useFetcher<{ errors?: FieldErrors }>()
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    const formData = new FormData()
-    formData.append('username', username)
-    formData.append('password', password)
-
-    void submit(formData, { method: 'post' })
-  }
+  // Get validation errors and loading state from fetcher
+  const actionData = fetcher.data
+  const isSubmitting = fetcher.state === 'submitting'
 
   // Note: Successful login will redirect automatically via createUserSession
 
@@ -28,7 +18,7 @@ export function LoginForm() {
         <CardTitle>Login</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <fetcher.Form method="post" className="space-y-4">
           {actionData?.errors?._form && (
             <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
               {actionData.errors._form}
@@ -44,9 +34,8 @@ export function LoginForm() {
             </label>
             <input
               id="username"
+              name="username"
               type="text"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
               required
               className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 actionData?.errors?.username
@@ -70,9 +59,8 @@ export function LoginForm() {
             </label>
             <input
               id="password"
+              name="password"
               type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
               required
               className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 actionData?.errors?.password
@@ -87,10 +75,10 @@ export function LoginForm() {
             )}
           </div>
 
-          <Button type="submit" className="w-full">
-            Login
+          <Button type="submit" disabled={isSubmitting} className="w-full">
+            {isSubmitting ? 'Signing in...' : 'Login'}
           </Button>
-        </form>
+        </fetcher.Form>
       </CardContent>
     </Card>
   )

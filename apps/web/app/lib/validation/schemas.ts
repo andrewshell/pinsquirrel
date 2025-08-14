@@ -23,6 +23,17 @@ export const registerSchema = z.object({
 })
 
 // Profile schemas (HTTP-specific, extends core validation)
+export const updateEmailSchema = z.object({
+  intent: z.literal('update-email'),
+  email: emailSchema,
+})
+
+export const changePasswordSchema = z.object({
+  intent: z.literal('change-password'),
+  currentPassword: passwordSchema,
+  newPassword: passwordSchema,
+})
+
 export const updateProfileSchema = z
   .object({
     email: optionalEmailSchema,
@@ -74,6 +85,8 @@ export const userUpdateSchema = z.object({
 // Type exports
 export type LoginInput = z.infer<typeof loginSchema>
 export type RegisterInput = z.infer<typeof registerSchema>
+export type UpdateEmailInput = z.infer<typeof updateEmailSchema>
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>
 export type UserCreateInput = z.infer<typeof userCreateSchema>
 export type UserUpdateInput = z.infer<typeof userUpdateSchema>

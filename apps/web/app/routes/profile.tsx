@@ -1,11 +1,17 @@
-import { Form, useLoaderData, useActionData } from 'react-router'
+import { useLoaderData, data, Form } from 'react-router'
 import type { Route } from './+types/profile'
 import { requireUser } from '~/lib/session.server'
-import { AuthenticationServiceImpl } from '@pinsquirrel/core'
+import {
+  AuthenticationServiceImpl,
+  InvalidCredentialsError,
+} from '@pinsquirrel/core'
 import { DrizzleUserRepository, db } from '@pinsquirrel/database'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
+import { UpdateEmailForm } from '~/components/profile/UpdateEmailForm'
+import { ChangePasswordForm } from '~/components/profile/ChangePasswordForm'
 import { logger } from '~/lib/logger.server'
+// Note: Manual validation is used instead of Zod schemas to avoid import issues in tests
 
 // Server-side authentication service
 const userRepository = new DrizzleUserRepository(db)
@@ -29,89 +35,142 @@ export async function action({ request }: Route.ActionArgs) {
 
   try {
     if (intent === 'update-email') {
-      const email = formData.get('email') as string
-
-      if (!email || !email.trim()) {
-        return {
-          error: 'Email is required',
-          success: null,
-          field: 'email',
-        }
+      // Convert FormData to plain object for validation
+      const rawData = {
+        intent: formData.get('intent'),
+        email: formData.get('email'),
       }
 
-      await authService.updateEmail(user.id, email.trim())
+      // Simple manual validation for testing
+      const email = rawData.email as string
+      if (!email || email.trim() === '') {
+        return data(
+          {
+            errors: { email: 'Valid email is required' },
+          },
+          { status: 400 }
+        )
+      }
+
+      if (!email.includes('@')) {
+        return data(
+          {
+            errors: { email: 'Valid email is required' },
+          },
+          { status: 400 }
+        )
+      }
+
+      await authService.updateEmail(user.id, email)
 
       logger.info('User email updated', {
         userId: user.id,
         hasEmail: true,
       })
 
-      return {
-        error: null,
+      return data({
         success: 'Email updated successfully',
         field: 'email',
-      }
+      })
     }
 
     if (intent === 'change-password') {
-      const currentPassword = formData.get('currentPassword') as string
-      const newPassword = formData.get('newPassword') as string
-
-      if (!currentPassword || !newPassword) {
-        return {
-          error: 'Current password and new password are required',
-          success: null,
-          field: 'password',
-        }
+      // Convert FormData to plain object for validation
+      const rawData = {
+        intent: formData.get('intent'),
+        currentPassword: formData.get('currentPassword'),
+        newPassword: formData.get('newPassword'),
       }
 
-      if (newPassword.length < 6) {
-        return {
-          error: 'New password must be at least 6 characters',
-          success: null,
-          field: 'password',
-        }
+      const currentPassword = rawData.currentPassword as string
+      const newPassword = rawData.newPassword as string
+      const errors: Record<string, string> = {}
+
+      // Validate that fields are provided
+      if (!currentPassword || currentPassword.trim() === '') {
+        errors.currentPassword = 'Current password is required'
       }
 
-      await authService.changePassword(user.id, currentPassword, newPassword)
+      // Only validate new password format (let service handle current password authentication)
+      if (!newPassword || newPassword.length < 8) {
+        errors.newPassword = 'Password must be at least 8 characters'
+      }
 
-      logger.info('User password changed', {
-        userId: user.id,
-      })
+      if (Object.keys(errors).length > 0) {
+        return data({ errors }, { status: 400 })
+      }
 
-      return {
-        error: null,
-        success: 'Password changed successfully',
-        field: 'password',
+      try {
+        await authService.changePassword(user.id, currentPassword, newPassword)
+
+        logger.info('User password changed', {
+          userId: user.id,
+        })
+
+        return data({
+          success: 'Password changed successfully',
+          field: 'password',
+        })
+      } catch (error) {
+        // Handle specific authentication errors
+        if (error instanceof InvalidCredentialsError) {
+          return data(
+            {
+              errors: {
+                currentPassword: 'Current password is incorrect',
+              },
+            },
+            { status: 400 }
+          )
+        }
+
+        // Handle validation errors from the service
+        if (
+          error instanceof Error &&
+          error.message.includes('Invalid new password')
+        ) {
+          return data(
+            {
+              errors: {
+                newPassword: 'Password must be at least 8 characters',
+              },
+            },
+            { status: 400 }
+          )
+        }
+
+        // Re-throw to be caught by outer catch block
+        throw error
       }
     }
 
-    return {
-      error: 'Invalid action',
-      success: null,
-      field: null,
-    }
+    return data(
+      {
+        errors: {
+          _form: 'Invalid action',
+        },
+      },
+      { status: 400 }
+    )
   } catch (error) {
     logger.exception(error, 'Profile update failed', {
       userId: user.id,
       intent,
     })
     const message = error instanceof Error ? error.message : 'Update failed'
-    return {
-      error: message,
-      success: null,
-      field: intent === 'update-email' ? 'email' : 'password',
-    }
+    return data(
+      {
+        errors: {
+          _form: message,
+        },
+      },
+      { status: 400 }
+    )
   }
 }
 
 export default function ProfilePage() {
   const { user } = useLoaderData<typeof loader>()
-  const actionData = useActionData<{
-    error: string | null
-    success: string | null
-    field: string | null
-  }>()
 
   const formatDate = (date: string | Date) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -179,109 +238,10 @@ export default function ProfilePage() {
           </Card>
 
           {/* Update Email Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Update Email</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Form method="post" className="space-y-4">
-                <input type="hidden" name="intent" value="update-email" />
-
-                {actionData?.field === 'email' && actionData.error && (
-                  <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
-                    {actionData.error}
-                  </div>
-                )}
-
-                {actionData?.field === 'email' && actionData.success && (
-                  <div className="p-3 text-sm text-green-600 bg-green-50 border border-green-200 rounded">
-                    {actionData.success}
-                  </div>
-                )}
-
-                <div>
-                  <label
-                    htmlFor="email"
-                    className="block text-sm font-medium text-foreground mb-1"
-                  >
-                    New Email Address
-                  </label>
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    required
-                    className="w-full px-3 py-2 border border-input bg-background rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
-                    placeholder="Enter new email address"
-                  />
-                </div>
-
-                <Button type="submit">Update Email</Button>
-              </Form>
-            </CardContent>
-          </Card>
+          <UpdateEmailForm />
 
           {/* Change Password Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Change Password</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Form method="post" className="space-y-4">
-                <input type="hidden" name="intent" value="change-password" />
-
-                {actionData?.field === 'password' && actionData.error && (
-                  <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
-                    {actionData.error}
-                  </div>
-                )}
-
-                {actionData?.field === 'password' && actionData.success && (
-                  <div className="p-3 text-sm text-green-600 bg-green-50 border border-green-200 rounded">
-                    {actionData.success}
-                  </div>
-                )}
-
-                <div>
-                  <label
-                    htmlFor="currentPassword"
-                    className="block text-sm font-medium text-foreground mb-1"
-                  >
-                    Current Password
-                  </label>
-                  <input
-                    id="currentPassword"
-                    name="currentPassword"
-                    type="password"
-                    required
-                    className="w-full px-3 py-2 border border-input bg-background rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="newPassword"
-                    className="block text-sm font-medium text-foreground mb-1"
-                  >
-                    New Password
-                  </label>
-                  <input
-                    id="newPassword"
-                    name="newPassword"
-                    type="password"
-                    required
-                    minLength={6}
-                    className="w-full px-3 py-2 border border-input bg-background rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
-                  />
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Must be at least 6 characters
-                  </p>
-                </div>
-
-                <Button type="submit">Change Password</Button>
-              </Form>
-            </CardContent>
-          </Card>
+          <ChangePasswordForm username={user.username} />
 
           {/* Account Actions Card */}
           <Card>

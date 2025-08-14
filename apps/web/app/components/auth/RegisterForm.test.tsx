@@ -1,181 +1,126 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { useSubmit, useActionData } from 'react-router'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { createRoutesStub } from 'react-router'
 import { RegisterForm } from './RegisterForm'
+import type { FieldErrors } from '~/lib/validation'
 
-// Mock React Router hooks
-vi.mock('react-router', () => ({
-  useSubmit: vi.fn(),
-  useActionData: vi.fn(),
-}))
+// Mock useFetcher for test data control
+const mockUseFetcher = vi.fn()
+
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router')
+  return {
+    ...actual,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    useFetcher: () => mockUseFetcher(),
+  }
+})
 
 describe('RegisterForm', () => {
-  const mockSubmit = vi.fn()
-
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(useSubmit).mockReturnValue(mockSubmit)
-    vi.mocked(useActionData).mockReturnValue(undefined)
+    mockUseFetcher.mockReturnValue({
+      data: undefined,
+      state: 'idle',
+      Form: 'form',
+    })
   })
 
-  it('updates form fields when typed', () => {
-    render(<RegisterForm />)
-
-    const usernameInput = screen.getByLabelText('Username')
-    const passwordInput = screen.getByLabelText('Password')
-    const emailInput = screen.getByLabelText('Email (optional)')
-
-    fireEvent.change(usernameInput, { target: { value: 'testuser' } })
-    fireEvent.change(passwordInput, { target: { value: 'testpass' } })
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } })
-
-    expect(usernameInput).toHaveValue('testuser')
-    expect(passwordInput).toHaveValue('testpass')
-    expect(emailInput).toHaveValue('test@example.com')
-  })
-
-  it('submits form with all fields including email', async () => {
-    render(<RegisterForm />)
-
-    const usernameInput = screen.getByLabelText('Username')
-    const passwordInput = screen.getByLabelText('Password')
-    const emailInput = screen.getByLabelText('Email (optional)')
-    const submitButton = screen.getByRole('button', { name: 'Sign Up' })
-
-    fireEvent.change(usernameInput, { target: { value: 'testuser' } })
-    fireEvent.change(passwordInput, { target: { value: 'testpass' } })
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } })
-    fireEvent.click(submitButton)
-
-    await waitFor(() => {
-      expect(mockSubmit).toHaveBeenCalledWith(expect.any(FormData), {
-        method: 'post',
-      })
+  const renderWithRouter = (
+    actionData?: { errors?: FieldErrors },
+    isSubmitting = false
+  ) => {
+    mockUseFetcher.mockReturnValue({
+      data: actionData,
+      state: isSubmitting ? 'submitting' : 'idle',
+      Form: 'form',
     })
 
-    // Verify FormData contents
-    const [[formData]] = mockSubmit.mock.calls
-    expect((formData as FormData).get('username')).toBe('testuser')
-    expect((formData as FormData).get('password')).toBe('testpass')
-    expect((formData as FormData).get('email')).toBe('test@example.com')
-  })
+    const Stub = createRoutesStub([
+      {
+        path: '/register',
+        Component: RegisterForm,
+      },
+    ])
 
-  it('submits form without email when email is empty', async () => {
-    render(<RegisterForm />)
+    return render(<Stub initialEntries={['/register']} />)
+  }
 
-    const usernameInput = screen.getByLabelText('Username')
-    const passwordInput = screen.getByLabelText('Password')
-    const submitButton = screen.getByRole('button', { name: 'Sign Up' })
+  it('renders form with correct attributes and structure', () => {
+    const { container } = renderWithRouter()
 
-    fireEvent.change(usernameInput, { target: { value: 'testuser' } })
-    fireEvent.change(passwordInput, { target: { value: 'testpass' } })
-    fireEvent.click(submitButton)
-
-    await waitFor(() => {
-      expect(mockSubmit).toHaveBeenCalled()
-    })
-
-    const [[formData]] = mockSubmit.mock.calls
-    expect((formData as FormData).get('username')).toBe('testuser')
-    expect((formData as FormData).get('password')).toBe('testpass')
-    expect((formData as FormData).get('email')).toBe(null)
-  })
-
-  it('trims whitespace from email before submitting', async () => {
-    render(<RegisterForm />)
+    const form = container.querySelector('form')
+    expect(form).toHaveAttribute('method', 'post')
 
     const usernameInput = screen.getByLabelText('Username')
     const passwordInput = screen.getByLabelText('Password')
     const emailInput = screen.getByLabelText('Email (optional)')
     const submitButton = screen.getByRole('button', { name: 'Sign Up' })
 
-    fireEvent.change(usernameInput, { target: { value: 'testuser' } })
-    fireEvent.change(passwordInput, { target: { value: 'testpass' } })
-    fireEvent.change(emailInput, { target: { value: '  test@example.com  ' } })
-    fireEvent.click(submitButton)
-
-    await waitFor(() => {
-      expect(mockSubmit).toHaveBeenCalled()
-    })
-
-    const [[formData]] = mockSubmit.mock.calls
-    expect((formData as FormData).get('email')).toBe('test@example.com')
-  })
-
-  it('does not submit email when only whitespace', async () => {
-    render(<RegisterForm />)
-
-    const usernameInput = screen.getByLabelText('Username')
-    const passwordInput = screen.getByLabelText('Password')
-    const emailInput = screen.getByLabelText('Email (optional)')
-    const submitButton = screen.getByRole('button', { name: 'Sign Up' })
-
-    fireEvent.change(usernameInput, { target: { value: 'testuser' } })
-    fireEvent.change(passwordInput, { target: { value: 'testpass' } })
-    fireEvent.change(emailInput, { target: { value: '   ' } })
-    fireEvent.click(submitButton)
-
-    await waitFor(() => {
-      expect(mockSubmit).toHaveBeenCalled()
-    })
-
-    const [[formData]] = mockSubmit.mock.calls
-    expect((formData as FormData).get('email')).toBe(null)
+    expect(usernameInput).toHaveAttribute('name', 'username')
+    expect(usernameInput).toHaveAttribute('required')
+    expect(passwordInput).toHaveAttribute('name', 'password')
+    expect(passwordInput).toHaveAttribute('required')
+    expect(emailInput).toHaveAttribute('name', 'email')
+    expect(emailInput).not.toHaveAttribute('required')
+    expect(submitButton).toHaveAttribute('type', 'submit')
   })
 
   it('displays form-level error message', () => {
-    vi.mocked(useActionData).mockReturnValue({
-      errors: { _form: 'Username already exists' },
+    renderWithRouter({
+      errors: { _form: 'Registration failed' },
     })
 
-    render(<RegisterForm />)
-
-    expect(screen.getByText('Username already exists')).toBeInTheDocument()
+    expect(screen.getByText('Registration failed')).toBeInTheDocument()
   })
 
-  it('displays field-specific error messages', () => {
-    vi.mocked(useActionData).mockReturnValue({
-      errors: {
-        username: 'Username is required',
-        password: 'Password must be at least 8 characters',
-        email: 'Invalid email format',
-      },
+  it('displays username field error', () => {
+    renderWithRouter({
+      errors: { username: 'Username is required' },
     })
-
-    render(<RegisterForm />)
 
     expect(screen.getByText('Username is required')).toBeInTheDocument()
-    expect(
-      screen.getByText('Password must be at least 8 characters')
-    ).toBeInTheDocument()
-    expect(screen.getByText('Invalid email format')).toBeInTheDocument()
+    expect(screen.getByLabelText('Username')).toHaveClass('border-red-500')
   })
 
-  it('applies error styling to fields with errors', () => {
-    vi.mocked(useActionData).mockReturnValue({
-      errors: {
-        username: 'Username error',
-        password: 'Password error',
-        email: 'Email error',
-      },
+  it('displays password field error', () => {
+    renderWithRouter({
+      errors: { password: 'Password is required' },
     })
 
-    render(<RegisterForm />)
-
-    expect(screen.getByLabelText('Username')).toHaveClass('border-red-500')
+    expect(screen.getByText('Password is required')).toBeInTheDocument()
     expect(screen.getByLabelText('Password')).toHaveClass('border-red-500')
+  })
+
+  it('displays email field error', () => {
+    renderWithRouter({
+      errors: { email: 'Invalid email format' },
+    })
+
+    expect(screen.getByText('Invalid email format')).toBeInTheDocument()
     expect(screen.getByLabelText('Email (optional)')).toHaveClass(
       'border-red-500'
     )
   })
 
-  it('applies normal styling to fields without errors', () => {
-    render(<RegisterForm />)
+  it('applies correct CSS classes for valid fields', () => {
+    renderWithRouter()
 
-    expect(screen.getByLabelText('Username')).toHaveClass('border-gray-300')
-    expect(screen.getByLabelText('Password')).toHaveClass('border-gray-300')
-    expect(screen.getByLabelText('Email (optional)')).toHaveClass(
-      'border-gray-300'
-    )
+    const usernameInput = screen.getByLabelText('Username')
+    const passwordInput = screen.getByLabelText('Password')
+    const emailInput = screen.getByLabelText('Email (optional)')
+
+    expect(usernameInput).toHaveClass('border-gray-300')
+    expect(passwordInput).toHaveClass('border-gray-300')
+    expect(emailInput).toHaveClass('border-gray-300')
+  })
+
+  it('shows loading state when submitting', () => {
+    renderWithRouter(undefined, true)
+
+    const submitButton = screen.getByRole('button')
+
+    expect(submitButton).toHaveTextContent('Creating account...')
+    expect(submitButton).toBeDisabled()
   })
 })

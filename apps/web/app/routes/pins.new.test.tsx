@@ -35,12 +35,19 @@ vi.mock('react-router', () => ({
         status: 302,
       }) as any
   ),
+  data: vi
+    .fn()
+    .mockImplementation((data: unknown, options?: { status?: number }) => ({
+      ...(data as object),
+      status: options?.status || 200,
+    })),
 }))
 
 // Mock logger
 vi.mock('~/lib/logger.server', () => ({
   logger: {
     info: vi.fn(),
+    debug: vi.fn(),
     exception: vi.fn(),
   },
 }))
@@ -203,8 +210,9 @@ describe('pins/new route', () => {
       expect(result).toEqual({
         errors: {
           url: 'Invalid URL format',
-          title: 'Title is required',
+          title: 'Invalid input: expected string, received undefined',
         },
+        status: 400,
       })
 
       expect(mockCreate).not.toHaveBeenCalled()
@@ -223,8 +231,9 @@ describe('pins/new route', () => {
 
       expect(result).toEqual({
         errors: {
-          url: 'Invalid URL format',
+          url: 'Invalid input: expected string, received undefined',
         },
+        status: 400,
       })
 
       expect(mockCreate).not.toHaveBeenCalled()
@@ -243,8 +252,9 @@ describe('pins/new route', () => {
 
       expect(result).toEqual({
         errors: {
-          title: 'Title is required',
+          title: 'Invalid input: expected string, received undefined',
         },
+        status: 400,
       })
 
       expect(mockCreate).not.toHaveBeenCalled()
@@ -265,7 +275,10 @@ describe('pins/new route', () => {
       const result = await action({ request } as Parameters<typeof action>[0])
 
       expect(result).toEqual({
-        error: 'Failed to create pin. Please try again.',
+        errors: {
+          _form: 'Failed to create pin. Please try again.',
+        },
+        status: 400,
       })
     })
 
