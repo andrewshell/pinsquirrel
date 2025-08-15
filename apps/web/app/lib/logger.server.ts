@@ -16,6 +16,8 @@ interface LogEntry {
 
 class Logger {
   private readonly isDevelopment = process.env.NODE_ENV !== 'production'
+  private readonly isTest =
+    process.env.VITEST === 'true' || process.env.NODE_ENV === 'test'
   private readonly logLevel: LogLevel
 
   constructor() {
@@ -45,6 +47,11 @@ class Logger {
   }
 
   private output(entry: LogEntry): void {
+    // Skip all output during tests to keep test output clean
+    if (this.isTest) {
+      return
+    }
+
     if (this.isDevelopment) {
       // Pretty print for development
       const color = {

@@ -1,14 +1,26 @@
 import { renderHook, waitFor, act } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useMetadataFetch } from './useMetadataFetch'
 
 // Mock fetch
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 
+// Mock console.error to prevent error logs in test output
+const mockConsoleError = vi.fn()
+const originalConsoleError = console.error
+
 describe('useMetadataFetch', () => {
   beforeEach(() => {
     mockFetch.mockClear()
+    // Replace console.error with mock to keep test output clean
+    console.error = mockConsoleError
+    mockConsoleError.mockClear()
+  })
+
+  afterEach(() => {
+    // Restore original console.error
+    console.error = originalConsoleError
   })
 
   it('should return initial state', () => {

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { createMemoryRouter, RouterProvider, redirect } from 'react-router'
+import { createRoutesStub } from 'react-router'
 import Home, { loader } from './home'
 import type { Route } from './+types/home'
 import { getUser } from '~/lib/session.server'
@@ -22,35 +22,15 @@ vi.mock('react-router', async () => {
   }
 })
 
-// Helper function to render with React Router context
-function renderWithRouter(
-  user: { id: string; username: string } | null = null
-) {
-  const routes = [
+// Helper function for component testing (avoids hydration warnings)
+function renderComponentWithRouter() {
+  const Stub = createRoutesStub([
     {
       path: '/',
-      element: <Home />,
-      loader: () => {
-        // Simulate the redirect behavior for logged-in users
-        if (user) {
-          // eslint-disable-next-line @typescript-eslint/only-throw-error
-          throw redirect('/pins')
-        }
-        return { user }
-      },
+      Component: () => <Home />,
     },
-    {
-      // Add pins route to handle redirects
-      path: '/pins',
-      element: <div data-testid="pins-page">Pins Page</div>,
-    },
-  ]
-
-  const router = createMemoryRouter(routes, {
-    initialEntries: ['/'],
-  })
-
-  return render(<RouterProvider router={router} />)
+  ])
+  return render(<Stub initialEntries={['/']} />)
 }
 
 describe('Home Page', () => {
@@ -96,13 +76,13 @@ describe('Home Page', () => {
 
   describe('component rendering tests', () => {
     it('should render the main heading', async () => {
-      renderWithRouter()
+      renderComponentWithRouter()
 
       expect(await screen.findByText('PinSquirrel')).toBeInTheDocument()
     })
 
     it('should render the description', async () => {
-      renderWithRouter()
+      renderComponentWithRouter()
 
       expect(
         await screen.findByText(
@@ -112,13 +92,13 @@ describe('Home Page', () => {
     })
 
     it('should render the logo', async () => {
-      renderWithRouter()
+      renderComponentWithRouter()
 
       expect(await screen.findByAltText('PinSquirrel logo')).toBeInTheDocument()
     })
 
     it('should render login and register buttons', async () => {
-      renderWithRouter(null)
+      renderComponentWithRouter()
 
       expect(
         await screen.findByRole('link', { name: 'Get Started' })
@@ -127,7 +107,7 @@ describe('Home Page', () => {
     })
 
     it('should render all three feature cards', async () => {
-      renderWithRouter()
+      renderComponentWithRouter()
 
       // Feature card titles
       expect(await screen.findByText('Hoard Everything')).toBeInTheDocument()
@@ -147,7 +127,7 @@ describe('Home Page', () => {
     })
 
     it('should render feature descriptions', async () => {
-      renderWithRouter()
+      renderComponentWithRouter()
 
       expect(
         await screen.findByText(/Links, images, articles, markdown/)
