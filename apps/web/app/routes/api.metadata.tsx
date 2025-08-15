@@ -1,16 +1,8 @@
 import type { Route } from './+types/api.metadata'
 import { requireUser } from '~/lib/session.server'
-import {
-  HttpMetadataService,
-  CheerioHtmlParser,
-  NodeHttpFetcher,
-} from '@pinsquirrel/core'
+import { metadataService } from '~/lib/services/container.server'
+import { HttpMetadataService } from '@pinsquirrel/core'
 import { logger } from '~/lib/logger.server'
-
-// Create service instances
-const htmlParser = new CheerioHtmlParser()
-const httpFetcher = new NodeHttpFetcher()
-const metadataService = new HttpMetadataService(httpFetcher, htmlParser)
 
 export async function loader({ request }: Route.LoaderArgs) {
   // Ensure user is authenticated
@@ -38,34 +30,10 @@ export async function loader({ request }: Route.LoaderArgs) {
       url: targetUrl,
     })
 
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error'
+    // Use the service's error mapping methods
+    const statusCode = HttpMetadataService.getHttpStatusForError(error as Error)
+    const message = HttpMetadataService.getUserFriendlyMessage(error as Error)
 
-    // Map different error types to appropriate HTTP status codes
-    if (
-      errorMessage.includes('Invalid URL protocol') ||
-      errorMessage.includes('Invalid URL format')
-    ) {
-      return Response.json({ error: 'Invalid URL format' }, { status: 400 })
-    }
-
-    if (
-      errorMessage.includes('TimeoutError') ||
-      errorMessage.includes('timeout')
-    ) {
-      return Response.json({ error: 'Request timeout' }, { status: 408 })
-    }
-
-    if (
-      errorMessage.includes('HTTP 404') ||
-      errorMessage.includes('Not Found')
-    ) {
-      return Response.json(
-        { error: 'Failed to fetch URL content' },
-        { status: 404 }
-      )
-    }
-
-    return Response.json({ error: 'Failed to fetch metadata' }, { status: 500 })
+    return Response.json({ error: message }, { status: statusCode })
   }
 }

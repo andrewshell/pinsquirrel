@@ -1,8 +1,6 @@
 import { createCookieSessionStorage, redirect } from 'react-router'
-import { DrizzleUserRepository, db } from '@pinsquirrel/database'
+import { repositories } from './services/container.server'
 import { logger } from './logger.server'
-
-const userRepository = new DrizzleUserRepository(db)
 
 // Session storage configuration
 const sessionStorage = createCookieSessionStorage({
@@ -31,7 +29,7 @@ export async function getUser(request: Request) {
   if (!userId) return null
 
   try {
-    const user = await userRepository.findById(userId)
+    const user = await repositories.user.findById(userId)
     if (!user) {
       logger.warn('User not found for valid session', { userId })
     }

@@ -1,7 +1,7 @@
 import { useLoaderData, useActionData, data } from 'react-router'
 import type { Route } from './+types/pins.$id.edit'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
-import { pinService } from '~/lib/services/pinService.server'
+import { pinService } from '~/lib/services/container.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { validatePinCreation, validateIdParam } from '@pinsquirrel/core'

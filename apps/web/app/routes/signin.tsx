@@ -1,15 +1,11 @@
 import { Link, redirect, data } from 'react-router'
 import type { Route } from './+types/signin'
-import { AuthenticationServiceImpl, validateLogin } from '@pinsquirrel/core'
-import { DrizzleUserRepository, db } from '@pinsquirrel/database'
+import { validateLogin } from '@pinsquirrel/core'
+import { authService } from '~/lib/services/container.server'
 import { createUserSession, getUserId } from '~/lib/session.server'
 import { LoginForm } from '~/components/auth/LoginForm'
 import { parseFormData } from '~/lib/http-utils'
 import { logger } from '~/lib/logger.server'
-
-// Server-side authentication service
-const userRepository = new DrizzleUserRepository(db)
-const authService = new AuthenticationServiceImpl(userRepository)
 
 export function meta(_: Route.MetaArgs) {
   return [

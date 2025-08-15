@@ -2,6 +2,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { loader } from './api.metadata'
 import type { Route } from './+types/api.metadata'
+import {
+  InvalidUrlError,
+  FetchTimeoutError,
+  HttpError,
+} from '@pinsquirrel/core'
 
 // Mock dependencies
 vi.mock('~/lib/session.server', () => ({
@@ -17,11 +22,30 @@ const { mockFetchMetadata, mockHttpMetadataService } = vi.hoisted(() => {
   return { mockFetchMetadata, mockHttpMetadataService }
 })
 
-vi.mock('@pinsquirrel/core', () => ({
-  HttpMetadataService: mockHttpMetadataService,
-  CheerioHtmlParser: vi.fn(),
-  NodeHttpFetcher: vi.fn(),
-}))
+vi.mock('@pinsquirrel/core', async () => {
+  const actual = await vi.importActual('@pinsquirrel/core')
+  return {
+    ...actual,
+    HttpMetadataService: Object.assign(mockHttpMetadataService, {
+      getHttpStatusForError: vi.fn((error: Error) => {
+        if (error.name === 'InvalidUrlError') return 400
+        if (error.name === 'FetchTimeoutError') return 408
+        if (error.name === 'HttpError') return 404
+        return 500
+      }),
+      getUserFriendlyMessage: vi.fn((error: Error) => {
+        if (error.name === 'InvalidUrlError') return 'Invalid URL format'
+        if (error.name === 'FetchTimeoutError') return 'Request timeout'
+        if (error.name === 'HttpError') return 'Failed to fetch URL content'
+        return 'Failed to fetch metadata'
+      }),
+    }),
+    CheerioHtmlParser: vi.fn(),
+    NodeHttpFetcher: vi.fn(),
+    AuthenticationService: vi.fn(),
+    PinService: vi.fn(),
+  }
+})
 
 vi.mock('~/lib/logger.server', () => ({
   logger: {
@@ -47,7 +71,7 @@ describe('api.metadata loader', () => {
   })
 
   it('should return 400 for invalid URL format', async () => {
-    mockFetchMetadata.mockRejectedValue(new Error('Invalid URL format'))
+    mockFetchMetadata.mockRejectedValue(new InvalidUrlError('not-a-url'))
 
     const request = new Request(
       'http://localhost:3000/api/metadata?url=not-a-url'
@@ -86,7 +110,7 @@ describe('api.metadata loader', () => {
 
   it('should handle timeout errors', async () => {
     mockFetchMetadata.mockRejectedValue(
-      new Error('TimeoutError: Request timeout')
+      new FetchTimeoutError('https://example.com')
     )
 
     const request = new Request(
@@ -102,7 +126,9 @@ describe('api.metadata loader', () => {
   })
 
   it('should handle not found errors', async () => {
-    mockFetchMetadata.mockRejectedValue(new Error('HTTP 404: Not Found'))
+    mockFetchMetadata.mockRejectedValue(
+      new HttpError(404, 'https://example.com/notfound')
+    )
 
     const request = new Request(
       'http://localhost:3000/api/metadata?url=https://example.com/notfound'
@@ -119,6 +145,7 @@ describe('api.metadata loader', () => {
   })
 
   it('should return 500 for other fetch errors', async () => {
+    // Generic error without a specific name should default to 500
     mockFetchMetadata.mockRejectedValue(new Error('Some other error'))
 
     const request = new Request(

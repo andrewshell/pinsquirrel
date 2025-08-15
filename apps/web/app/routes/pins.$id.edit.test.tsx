@@ -30,7 +30,7 @@ vi.mock('@pinsquirrel/database', () => ({
 }))
 
 // Mock the PinService
-vi.mock('~/lib/services/pinService.server', () => ({
+vi.mock('~/lib/services/container.server', () => ({
   pinService: {
     getPin: vi.fn(),
     updatePin: vi.fn(),
@@ -79,7 +79,7 @@ vi.mock('@pinsquirrel/core', async () => {
 })
 
 import { requireUser } from '~/lib/session.server'
-import { pinService } from '~/lib/services/pinService.server'
+import { pinService } from '~/lib/services/container.server'
 import { validatePinCreation, validateIdParam } from '@pinsquirrel/core'
 import { loader, action } from './pins.$id.edit'
 

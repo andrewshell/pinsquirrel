@@ -7,6 +7,7 @@ import { Label } from '~/components/ui/label'
 import { FormText } from '~/components/ui/form-text'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import type { FieldErrors } from '@pinsquirrel/core'
+import { isValidUrl } from '@pinsquirrel/core'
 
 // Pin creation form data type
 type PinCreationFormData = {
@@ -81,12 +82,11 @@ export function PinCreationForm({
     }
 
     if (urlValue && onMetadataFetch) {
-      try {
-        new URL(urlValue) // Validate URL before fetching
+      // Use centralized URL validation
+      if (isValidUrl(urlValue)) {
         onMetadataFetch(urlValue)
-      } catch {
-        // Invalid URL, don't fetch metadata
       }
+      // Invalid URL, don't fetch metadata
     }
   }
 

@@ -17,6 +17,7 @@ vi.mock('@pinsquirrel/database', () => ({
     countByUserId: mockCountByUserId,
   })),
   DrizzleTagRepository: vi.fn().mockImplementation(() => ({})),
+  DrizzleUserRepository: vi.fn().mockImplementation(() => ({})),
   db: {},
 }))
 

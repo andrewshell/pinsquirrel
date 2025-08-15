@@ -2,12 +2,10 @@ import { useLoaderData, data, Form } from 'react-router'
 import type { Route } from './+types/profile'
 import { requireUser } from '~/lib/session.server'
 import {
-  AuthenticationServiceImpl,
   InvalidCredentialsError,
   validateEmailUpdate,
   validatePasswordChange,
 } from '@pinsquirrel/core'
-import { DrizzleUserRepository, db } from '@pinsquirrel/database'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { UpdateEmailForm } from '~/components/profile/UpdateEmailForm'
@@ -15,9 +13,7 @@ import { ChangePasswordForm } from '~/components/profile/ChangePasswordForm'
 import { parseFormData } from '~/lib/http-utils'
 import { logger } from '~/lib/logger.server'
 
-// Server-side authentication service
-const userRepository = new DrizzleUserRepository(db)
-const authService = new AuthenticationServiceImpl(userRepository)
+import { authService } from '~/lib/services/container.server'
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request)

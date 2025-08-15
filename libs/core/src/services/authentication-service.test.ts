@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { AuthenticationServiceImpl } from './authentication-service.js'
+import { AuthenticationService } from './authentication-service.js'
 import type { UserRepository } from '../interfaces/user-repository.js'
 import type { User } from '../entities/user.js'
 import {
@@ -21,7 +21,7 @@ vi.mock('../utils/crypto.js', () => ({
 import { verifyPassword } from '../utils/crypto.js'
 
 describe('AuthenticationService', () => {
-  let authService: AuthenticationServiceImpl
+  let authService: AuthenticationService
   let mockUserRepository: UserRepository
 
   const mockUser: User = {
@@ -43,7 +43,7 @@ describe('AuthenticationService', () => {
       delete: vi.fn(),
       list: vi.fn(),
     }
-    authService = new AuthenticationServiceImpl(mockUserRepository)
+    authService = new AuthenticationService(mockUserRepository)
   })
 
   describe('register', () => {

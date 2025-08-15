@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest'
-import { PinServiceImpl } from './pin-service.js'
+import { PinService } from './pin-service.js'
 import type { PinRepository } from '../interfaces/pin-repository.js'
 import type { TagRepository } from '../interfaces/tag-repository.js'
 import type { Pin } from '../entities/pin.js'
@@ -13,8 +13,8 @@ import {
   DuplicateTagError,
 } from '../errors/pin-errors.js'
 
-describe('PinServiceImpl', () => {
-  let pinService: PinServiceImpl
+describe('PinService', () => {
+  let pinService: PinService
   let mockPinRepository: {
     findById: Mock
     findAll: Mock
@@ -82,7 +82,7 @@ describe('PinServiceImpl', () => {
       fetchOrCreateByNames: vi.fn(),
     }
 
-    pinService = new PinServiceImpl(
+    pinService = new PinService(
       mockPinRepository as unknown as PinRepository,
       mockTagRepository as unknown as TagRepository
     )

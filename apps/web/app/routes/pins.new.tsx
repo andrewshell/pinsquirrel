@@ -1,21 +1,13 @@
 import { useActionData, data } from 'react-router'
 import type { Route } from './+types/pins.new'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
-import {
-  DrizzlePinRepository,
-  DrizzleTagRepository,
-  db,
-} from '@pinsquirrel/database'
+import { repositories } from '~/lib/services/container.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { validatePinCreation } from '@pinsquirrel/core'
 import { parseFormData } from '~/lib/http-utils'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
 import { logger } from '~/lib/logger.server'
-
-// Server-side repositories
-const tagRepository = new DrizzleTagRepository(db)
-const pinRepository = new DrizzlePinRepository(db, tagRepository)
 
 export async function loader({ request }: Route.LoaderArgs) {
   // Ensure user is authenticated
@@ -38,7 +30,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   try {
     // Create the pin
-    const pin = await pinRepository.create({
+    const pin = await repositories.pin.create({
       userId: user.id,
       url: result.data.url,
       title: result.data.title,

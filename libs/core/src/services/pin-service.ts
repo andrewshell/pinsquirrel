@@ -1,4 +1,3 @@
-import type { PinService } from '../interfaces/pin-service.js'
 import type { PinRepository } from '../interfaces/pin-repository.js'
 import type { TagRepository } from '../interfaces/tag-repository.js'
 import type { Pin } from '../entities/pin.js'
@@ -24,7 +23,7 @@ import {
   DuplicateTagError,
 } from '../errors/pin-errors.js'
 
-export class PinServiceImpl implements PinService {
+export class PinService {
   constructor(
     private readonly pinRepository: PinRepository,
     private readonly tagRepository: TagRepository

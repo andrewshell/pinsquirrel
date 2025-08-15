@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from 'vitest'
-import { HttpMetadataService } from './metadata-service'
-import type { HttpFetcher } from '../utils/http-fetcher'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HtmlParser } from '../utils/html-parser'
+import type { HttpFetcher } from '../utils/http-fetcher'
+import { HttpMetadataService } from './metadata-service'
 
 describe('HttpMetadataService', () => {
   const mockHttpFetcher: HttpFetcher = {
@@ -35,7 +35,7 @@ describe('HttpMetadataService', () => {
 
   it('should reject invalid URL protocols', async () => {
     await expect(service.fetchMetadata('ftp://example.com')).rejects.toThrow(
-      'Failed to fetch metadata: Invalid URL protocol'
+      'Unsupported URL protocol: ftp:'
     )
 
     expect(mockHttpFetcher.fetch).not.toHaveBeenCalled()
@@ -44,7 +44,7 @@ describe('HttpMetadataService', () => {
 
   it('should reject malformed URLs', async () => {
     await expect(service.fetchMetadata('not-a-url')).rejects.toThrow(
-      'Failed to fetch metadata'
+      'Invalid URL format: not-a-url'
     )
 
     expect(mockHttpFetcher.fetch).not.toHaveBeenCalled()
@@ -57,7 +57,7 @@ describe('HttpMetadataService', () => {
     )
 
     await expect(service.fetchMetadata('https://example.com')).rejects.toThrow(
-      'Failed to fetch metadata: Network error'
+      'HTTP 500 error while fetching: https://example.com'
     )
 
     expect(mockHttpFetcher.fetch).toHaveBeenCalledWith('https://example.com')
@@ -73,7 +73,7 @@ describe('HttpMetadataService', () => {
     })
 
     await expect(service.fetchMetadata('https://example.com')).rejects.toThrow(
-      'Failed to fetch metadata: Parser error'
+      'Failed to parse metadata from: https://example.com'
     )
 
     expect(mockHttpFetcher.fetch).toHaveBeenCalledWith('https://example.com')
@@ -84,7 +84,7 @@ describe('HttpMetadataService', () => {
     vi.mocked(mockHttpFetcher.fetch).mockRejectedValue('string error')
 
     await expect(service.fetchMetadata('https://example.com')).rejects.toThrow(
-      'Failed to fetch metadata: Unknown error'
+      'HTTP 500 error while fetching: https://example.com'
     )
   })
 

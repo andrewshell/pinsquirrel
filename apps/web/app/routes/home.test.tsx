@@ -111,7 +111,7 @@ describe('Home Page', () => {
 
       // Feature card titles
       expect(await screen.findByText('Hoard Everything')).toBeInTheDocument()
-      expect(screen.getByText('Actually Find Your Shit')).toBeInTheDocument()
+      expect(screen.getByText('Find Your Shit')).toBeInTheDocument()
       expect(screen.getByText('Your Secret Stash')).toBeInTheDocument()
 
       // Feature card illustrations

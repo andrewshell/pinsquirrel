@@ -2,25 +2,22 @@ import { useLoaderData, useNavigation, Link, data } from 'react-router'
 import { useState } from 'react'
 import type { Route } from './+types/pins'
 import { requireUser, getSession, commitSession } from '~/lib/session.server'
-import {
-  DrizzlePinRepository,
-  DrizzleTagRepository,
-  db,
-} from '@pinsquirrel/database'
+import { repositories } from '~/lib/services/container.server'
+import { parsePaginationParams, calculatePagination } from '@pinsquirrel/core'
 import { PinList } from '~/components/pins/PinList'
 import { PinsPagination } from '~/components/ui/pins-pagination'
 import { Button } from '~/components/ui/button'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import { Plus } from 'lucide-react'
 
-// Server-side repositories
-const tagRepository = new DrizzleTagRepository(db)
-const pinRepository = new DrizzlePinRepository(db, tagRepository)
-
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url)
-  const page = Math.max(1, Number(url.searchParams.get('page')) || 1)
-  const pageSize = 25
+
+  // Parse pagination parameters from URL
+  const paginationParams = parsePaginationParams({
+    page: url.searchParams.get('page') || undefined,
+    pageSize: url.searchParams.get('pageSize') || undefined,
+  })
 
   // Get authenticated user
   const user = await requireUser(request)
@@ -32,23 +29,28 @@ export async function loader({ request }: Route.LoaderArgs) {
   const successMessage = session.get('flash-success') as string | null
   const errorMessage = session.get('flash-error') as string | null
 
-  // Fetch pins with pagination
-  const offset = (page - 1) * pageSize
-  const pins = await pinRepository.findByUserId(user.id, {
-    limit: pageSize,
-    offset: offset,
+  // Get total count for pagination calculation
+  const totalCount = await repositories.pin.countByUserId(user.id)
+
+  // Calculate pagination details
+  const pagination = calculatePagination(totalCount, {
+    ...paginationParams,
+    defaultPageSize: 25,
+    maxPageSize: 100,
   })
 
-  // Get total count for pagination
-  const totalCount = await pinRepository.countByUserId(user.id)
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+  // Fetch pins with pagination
+  const pins = await repositories.pin.findByUserId(user.id, {
+    limit: pagination.pageSize,
+    offset: pagination.offset,
+  })
 
   // Return with updated session to clear flash messages
   return data(
     {
       pins,
-      totalPages,
-      currentPage: page,
+      totalPages: pagination.totalPages,
+      currentPage: pagination.page,
       totalCount,
       successMessage,
       errorMessage,

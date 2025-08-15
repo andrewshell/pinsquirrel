@@ -1,20 +1,12 @@
 import { useState, useCallback, useRef } from 'react'
 import type { MetadataResult } from '@pinsquirrel/core'
+import { isValidUrl } from '@pinsquirrel/core'
 
 interface UseMetadataFetchResult {
   loading: boolean
   error: string | null
   metadata: MetadataResult | null
   fetchMetadata: (url: string) => void
-}
-
-const isValidUrl = (string: string): boolean => {
-  try {
-    const url = new URL(string)
-    return url.protocol === 'http:' || url.protocol === 'https:'
-  } catch {
-    return false
-  }
 }
 
 export const useMetadataFetch = (): UseMetadataFetchResult => {

@@ -1,4 +1,3 @@
-import type { AuthenticationService } from '../interfaces/authentication-service.js'
 import type { UserRepository } from '../interfaces/user-repository.js'
 import type { User } from '../entities/user.js'
 import {
@@ -12,7 +11,7 @@ import {
   emailSchema,
 } from '../validation/domain-schemas.js'
 
-export class AuthenticationServiceImpl implements AuthenticationService {
+export class AuthenticationService {
   constructor(private readonly userRepository: UserRepository) {}
 
   async register(
