@@ -98,23 +98,23 @@ describe('Home Page', () => {
     it('should render the main heading', async () => {
       renderWithRouter()
 
-      expect(
-        await screen.findByText('PinSquirrel Boilerplate')
-      ).toBeInTheDocument()
+      expect(await screen.findByText('PinSquirrel')).toBeInTheDocument()
     })
 
     it('should render the description', async () => {
       renderWithRouter()
 
       expect(
-        await screen.findByText('A sensible start to a new project')
+        await screen.findByText(
+          /Stop pretending you.*ll ever organize your bookmarks/
+        )
       ).toBeInTheDocument()
     })
 
-    it('should render the squirrel emoji', async () => {
+    it('should render the logo', async () => {
       renderWithRouter()
 
-      expect(await screen.findByText('🐿️')).toBeInTheDocument()
+      expect(await screen.findByAltText('PinSquirrel logo')).toBeInTheDocument()
     })
 
     it('should render login and register buttons', async () => {
@@ -130,24 +130,34 @@ describe('Home Page', () => {
       renderWithRouter()
 
       // Feature card titles
-      expect(await screen.findByText('Ready to Go')).toBeInTheDocument()
-      expect(screen.getByText('Secure')).toBeInTheDocument()
-      expect(screen.getByText('Modern Stack')).toBeInTheDocument()
+      expect(await screen.findByText('Hoard Everything')).toBeInTheDocument()
+      expect(screen.getByText('Actually Find Your Shit')).toBeInTheDocument()
+      expect(screen.getByText('Your Secret Stash')).toBeInTheDocument()
 
-      // Feature card emojis
-      expect(screen.getByText('🚀')).toBeInTheDocument()
-      expect(screen.getByText('🔒')).toBeInTheDocument()
-      expect(screen.getByText('⚡')).toBeInTheDocument()
+      // Feature card illustrations
+      expect(
+        screen.getByAltText('Person holding boxes illustration')
+      ).toBeInTheDocument()
+      expect(
+        screen.getByAltText('Dung beetle illustration')
+      ).toBeInTheDocument()
+      expect(
+        screen.getByAltText('Incognito figure illustration')
+      ).toBeInTheDocument()
     })
 
     it('should render feature descriptions', async () => {
       renderWithRouter()
 
       expect(
-        await screen.findByText(/Complete authentication system/)
+        await screen.findByText(/Links, images, articles, markdown/)
       ).toBeInTheDocument()
-      expect(screen.getByText(/HTTP-only cookies/)).toBeInTheDocument()
-      expect(screen.getByText(/React Router 7/)).toBeInTheDocument()
+      expect(
+        screen.getByText(/Our search doesn.*t judge your 3am research spirals/)
+      ).toBeInTheDocument()
+      expect(
+        screen.getByText(/We don.*t care what you.*re hoarding/)
+      ).toBeInTheDocument()
     })
   })
 })

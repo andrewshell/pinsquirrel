@@ -1,7 +1,7 @@
 import { Link, redirect } from 'react-router'
-import type { Route } from './+types/home'
-import { getUser } from '~/lib/session.server'
 import { Button } from '~/components/ui/button'
+import { getUser } from '~/lib/session.server'
+import type { Route } from './+types/home'
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await getUser(request)
@@ -17,8 +17,14 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export function meta(_: Route.MetaArgs) {
   return [
-    { title: 'PinSquirrel Boilerplate' },
-    { name: 'description', content: 'A sensible start to a new project' },
+    {
+      title: 'PinSquirrel - Hoard your links like winter is coming',
+    },
+    {
+      name: 'description',
+      content:
+        "The bookmark manager for digital hoarders. Stash links, images, and articles in your tree. Because you never know when you'll need that random blog post from 2019.",
+    },
   ]
 }
 
@@ -26,24 +32,28 @@ export default function Home() {
   // No need to access user data since logged-in users are redirected
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <div className="container mx-auto px-4 py-16">
         {/* Hero Section */}
         <div className="text-center max-w-4xl mx-auto">
           {/* Hero Icon/Logo */}
           <div className="mb-8">
-            <div className="w-16 h-16 mx-auto bg-muted rounded-lg flex items-center justify-center">
-              <span className="text-2xl">🐿️</span>
-            </div>
+            <img
+              src="/pinsquirrel.svg"
+              alt="PinSquirrel logo"
+              className="w-16 h-16 mx-auto"
+            />
           </div>
 
           {/* Hero Text */}
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
-            PinSquirrel Boilerplate
+            PinSquirrel
           </h1>
 
           <p className="text-lg md:text-xl text-muted-foreground mb-12 max-w-2xl mx-auto">
-            A sensible start to a new project
+            Stop pretending you&apos;ll ever organize your bookmarks. Just hoard
+            them like nature intended. We&apos;re the digital tree where you can
+            stash everything and actually find it again.
           </p>
 
           {/* Call to Action */}
@@ -60,43 +70,55 @@ export default function Home() {
           {/* Features */}
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
             <div className="text-center space-y-4">
-              <div className="w-12 h-12 mx-auto bg-muted rounded-md flex items-center justify-center">
-                <span className="text-xl">🚀</span>
-              </div>
+              <img
+                src="/man_holding_boxes.svg"
+                alt="Person holding boxes illustration"
+                className="w-12 h-12 mx-auto"
+              />
               <div>
                 <h3 className="font-medium text-foreground mb-2">
-                  Ready to Go
+                  Hoard Everything
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Complete authentication system with secure sessions and user
-                  management
+                  Links, images, articles, markdown - if it exists on the
+                  internet, you can stash it. Because that random blog post WILL
+                  disappear right when you need it.
                 </p>
               </div>
             </div>
 
             <div className="text-center space-y-4">
-              <div className="w-12 h-12 mx-auto bg-muted rounded-md flex items-center justify-center">
-                <span className="text-xl">🔒</span>
-              </div>
+              <img
+                src="/dung_beetle.svg"
+                alt="Dung beetle illustration"
+                className="w-12 h-12 mx-auto"
+              />
               <div>
-                <h3 className="font-medium text-foreground mb-2">Secure</h3>
+                <h3 className="font-medium text-foreground mb-2">
+                  Actually Find Your Shit
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  HTTP-only cookies, server-side sessions, and proper security
-                  practices
+                  Our search doesn&apos;t judge your 3am research spirals. Tag
+                  it, forget it, then magically find it six months later when
+                  you suddenly remember it exists.
                 </p>
               </div>
             </div>
 
             <div className="text-center space-y-4">
-              <div className="w-12 h-12 mx-auto bg-muted rounded-md flex items-center justify-center">
-                <span className="text-xl">⚡</span>
-              </div>
+              <img
+                src="/incognito.svg"
+                alt="Incognito figure illustration"
+                className="w-12 h-12 mx-auto"
+              />
               <div>
                 <h3 className="font-medium text-foreground mb-2">
-                  Modern Stack
+                  Your Secret Stash
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  React Router 7, TypeScript, Tailwind CSS, and PostgreSQL
+                  We don&apos;t care what you&apos;re hoarding and neither does
+                  anyone else. No tracking, no judging, just pure unadulterated
+                  link chaos that&apos;s yours alone.
                 </p>
               </div>
             </div>

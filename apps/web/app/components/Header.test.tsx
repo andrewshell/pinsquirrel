@@ -43,7 +43,8 @@ describe('Header', () => {
     render(<Header user={null} />)
 
     expect(screen.getByText('PinSquirrel')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'PinSquirrel' })).toHaveAttribute(
+    expect(screen.getByAltText('PinSquirrel logo')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /PinSquirrel/i })).toHaveAttribute(
       'href',
       '/'
     )

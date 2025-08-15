@@ -11,6 +11,7 @@ import {
 import type { Route } from './+types/root'
 import { getUser } from '~/lib/session.server'
 import { Header } from '~/components/Header'
+import { Footer } from '~/components/Footer'
 import './app.css'
 
 export const links: Route.LinksFunction = () => [
@@ -24,6 +25,21 @@ export const links: Route.LinksFunction = () => [
     rel: 'stylesheet',
     href: 'https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap',
   },
+  // Favicon references
+  { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
+  {
+    rel: 'icon',
+    type: 'image/png',
+    sizes: '32x32',
+    href: '/favicon-32x32.png',
+  },
+  {
+    rel: 'icon',
+    type: 'image/png',
+    sizes: '16x16',
+    href: '/favicon-16x16.png',
+  },
+  { rel: 'manifest', href: '/site.webmanifest' },
 ]
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -37,6 +53,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#ffffff" />
         <Meta />
         <Links />
       </head>
@@ -53,10 +70,13 @@ export default function App() {
   const { user } = useLoaderData<typeof loader>()
 
   return (
-    <>
+    <div className="min-h-screen flex flex-col">
       <Header user={user} />
-      <Outlet />
-    </>
+      <main className="flex-1">
+        <Outlet />
+      </main>
+      <Footer />
+    </div>
   )
 }
 

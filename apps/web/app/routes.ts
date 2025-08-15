@@ -10,6 +10,8 @@ export default [
   route('pins/:id/edit', 'routes/pins.$id.edit.tsx'),
   route('logout', 'routes/logout.tsx'),
   route('api/metadata', 'routes/api.metadata.tsx'),
+  route('privacy', 'routes/privacy.tsx'),
+  route('terms', 'routes/terms.tsx'),
 
   // Catch-all route for 404s and well-known requests (must be last)
   route('*', 'routes/$.tsx'),

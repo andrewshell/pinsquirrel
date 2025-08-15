@@ -13,8 +13,15 @@ export function Header({ user }: HeaderProps) {
         <div className="flex justify-between items-center h-16">
           {/* Logo/Brand */}
           <div className="flex-shrink-0">
-            <Link to="/" className="text-xl font-bold text-gray-900">
-              PinSquirrel
+            <Link to="/" className="flex items-center space-x-2">
+              <img
+                src="/pinsquirrel.svg"
+                alt="PinSquirrel logo"
+                className="w-8 h-8"
+              />
+              <span className="text-xl font-bold text-gray-900">
+                PinSquirrel
+              </span>
             </Link>
           </div>
 
