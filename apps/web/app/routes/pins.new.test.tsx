@@ -27,22 +27,7 @@ vi.mock('@pinsquirrel/database', () => ({
   db: {},
 }))
 
-// Mock react-router
-vi.mock('react-router', () => ({
-  redirect: vi.fn().mockImplementation(
-    (to: string) =>
-      ({
-        url: to,
-        status: 302,
-      }) as any
-  ),
-  data: vi
-    .fn()
-    .mockImplementation((data: unknown, options?: { status?: number }) => ({
-      ...(data as object),
-      status: options?.status || 200,
-    })),
-}))
+// No need to mock react-router for server-side loader/action functions
 
 // Mock logger
 vi.mock('~/lib/logger.server', () => ({
@@ -209,8 +194,8 @@ describe('pins/new route', () => {
       const result = await action({ request } as Parameters<typeof action>[0])
 
       // Should return validation errors (actual validation is tested in core)
-      expect(result).toHaveProperty('errors')
-      expect(result).toHaveProperty('status', 400)
+      expect(result).toHaveProperty('data.errors')
+      expect(result).toHaveProperty('init.status', 400)
       expect(mockCreate).not.toHaveBeenCalled()
     })
 
@@ -228,11 +213,15 @@ describe('pins/new route', () => {
 
       const result = await action({ request } as Parameters<typeof action>[0])
 
-      expect(result).toEqual({
-        errors: {
-          _form: 'Failed to create pin. Please try again.',
+      expect(result).toMatchObject({
+        data: {
+          errors: {
+            _form: 'Failed to create pin. Please try again.',
+          },
         },
-        status: 400,
+        init: {
+          status: 400,
+        },
       })
     })
 
