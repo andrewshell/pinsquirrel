@@ -7,6 +7,7 @@ import {
   db,
 } from '@pinsquirrel/database'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
+import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { validatePinCreation } from '@pinsquirrel/core'
 import { parseFormData } from '~/lib/http-utils'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
@@ -94,21 +95,26 @@ export default function PinsNewPage() {
           </p>
         </div>
 
-        <div className="bg-card rounded-lg shadow-sm p-6">
-          <PinCreationForm
-            onMetadataFetch={fetchMetadata}
-            metadataTitle={metadata?.title}
-            metadataError={metadataError || undefined}
-            isMetadataLoading={isMetadataLoading}
-            errorMessage={
-              actionData?.errors?._form
-                ? Array.isArray(actionData.errors._form)
-                  ? actionData.errors._form.join(', ')
-                  : actionData.errors._form
-                : undefined
-            }
-          />
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Pin Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PinCreationForm
+              onMetadataFetch={fetchMetadata}
+              metadataTitle={metadata?.title}
+              metadataError={metadataError || undefined}
+              isMetadataLoading={isMetadataLoading}
+              errorMessage={
+                actionData?.errors?._form
+                  ? Array.isArray(actionData.errors._form)
+                    ? actionData.errors._form.join(', ')
+                    : actionData.errors._form
+                  : undefined
+              }
+            />
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

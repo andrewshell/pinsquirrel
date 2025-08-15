@@ -3,6 +3,7 @@ import type { Route } from './+types/pins.$id.edit'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
 import { pinService } from '~/lib/services/pinService.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
+import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { validatePinCreation, validateIdParam } from '@pinsquirrel/core'
 import { parseFormData, parseParams } from '~/lib/http-utils'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
@@ -131,24 +132,29 @@ export default function PinEditPage() {
           <p className="mt-2 text-muted-foreground">Update your pin details</p>
         </div>
 
-        <div className="bg-card rounded-lg shadow-sm p-6">
-          <PinCreationForm
-            editMode
-            initialData={initialData}
-            actionUrl={`/pins/${pin.id}/edit`}
-            onMetadataFetch={fetchMetadata}
-            metadataTitle={metadata?.title}
-            metadataError={metadataError || undefined}
-            isMetadataLoading={isMetadataLoading}
-            errorMessage={
-              actionData?.errors?._form
-                ? Array.isArray(actionData.errors._form)
-                  ? actionData.errors._form.join(', ')
-                  : actionData.errors._form
-                : undefined
-            }
-          />
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Pin Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PinCreationForm
+              editMode
+              initialData={initialData}
+              actionUrl={`/pins/${pin.id}/edit`}
+              onMetadataFetch={fetchMetadata}
+              metadataTitle={metadata?.title}
+              metadataError={metadataError || undefined}
+              isMetadataLoading={isMetadataLoading}
+              errorMessage={
+                actionData?.errors?._form
+                  ? Array.isArray(actionData.errors._form)
+                    ? actionData.errors._form.join(', ')
+                    : actionData.errors._form
+                  : undefined
+              }
+            />
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
