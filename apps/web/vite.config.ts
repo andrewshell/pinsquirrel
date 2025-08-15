@@ -13,6 +13,11 @@ export default defineConfig({
     !process.env.VITEST && reactRouter(),
     tsconfigPaths(),
   ],
+  build: {
+    rollupOptions: {
+      external: ['node:crypto', 'node:util'],
+    },
+  },
   test: {
     globals: true,
     environment: 'happy-dom',

@@ -7,8 +7,8 @@ import {
   UserAlreadyExistsError,
 } from '../errors/auth-errors.js'
 
-// Mock the crypto module
-vi.mock('../utils/crypto.js', () => ({
+// Mock the server module (which contains crypto functions)
+vi.mock('../server.js', () => ({
   hashPassword: vi
     .fn()
     .mockImplementation((password: string) =>
@@ -18,7 +18,7 @@ vi.mock('../utils/crypto.js', () => ({
   hashEmail: vi.fn().mockImplementation((email: string) => `hashed_${email}`),
 }))
 
-import { verifyPassword } from '../utils/crypto.js'
+import { verifyPassword } from '../server.js'
 
 describe('AuthenticationService', () => {
   let authService: AuthenticationService

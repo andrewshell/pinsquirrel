@@ -69,25 +69,27 @@ export function PinCard({ pin }: PinCardProps) {
         {/* Tags */}
         {pin.tags.length > 0 && (
           <div
-            className="flex flex-wrap gap-1 mb-2"
+            className="text-sm text-muted-foreground mb-2"
             data-testid="pin-tags"
             role="list"
             aria-label={`Tags: ${pin.tags.map(t => t.name).join(', ')}`}
           >
-            {pin.tags.map(tag => (
-              <span
-                key={tag.id}
-                className="text-xs text-secondary-foreground bg-secondary hover:bg-secondary/80 cursor-pointer px-2 py-0.5 font-bold"
-                role="listitem"
-              >
-                {tag.name}
+            {pin.tags.map((tag, index) => (
+              <span key={tag.id} role="listitem">
+                <button
+                  className="text-accent hover:text-accent/80 hover:underline cursor-pointer"
+                  aria-label={`Filter by tag: ${tag.name}`}
+                >
+                  {tag.name}
+                </button>
+                {index < pin.tags.length - 1 && <span>, </span>}
               </span>
             ))}
           </div>
         )}
 
         {/* Bottom row: Timestamp and Actions */}
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {/* Timestamp */}
           <span className="font-bold">{getRelativeTime(pin.createdAt)}</span>
 

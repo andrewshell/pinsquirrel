@@ -22,7 +22,6 @@ export type { PinRepository } from './interfaces/pin-repository.js'
 export type { TagRepository } from './interfaces/tag-repository.js'
 
 // Services
-export { AuthenticationService } from './services/authentication-service.js'
 export { PinService } from './services/pin-service.js'
 export { HttpMetadataService, type MetadataService, type MetadataResult } from './services/metadata-service.js'
 
@@ -48,7 +47,6 @@ export {
 } from './errors/metadata-errors.js'
 
 // Utils
-export { hashPassword, verifyPassword, hashEmail } from './utils/crypto.js'
 export { CheerioHtmlParser, type HtmlParser } from './utils/html-parser.js'
 export { NodeHttpFetcher, type HttpFetcher } from './utils/http-fetcher.js'
 export {

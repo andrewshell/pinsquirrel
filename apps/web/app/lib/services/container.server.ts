@@ -1,10 +1,10 @@
 import {
   PinService,
-  AuthenticationService,
   HttpMetadataService,
   CheerioHtmlParser,
   NodeHttpFetcher,
 } from '@pinsquirrel/core'
+import { AuthenticationService } from '@pinsquirrel/core/server'
 import {
   DrizzlePinRepository,
   DrizzleTagRepository,

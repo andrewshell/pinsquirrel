@@ -4,7 +4,7 @@ import {
   InvalidCredentialsError,
   UserAlreadyExistsError,
 } from '../errors/auth-errors.js'
-import { hashPassword, verifyPassword, hashEmail } from '../utils/crypto.js'
+import { hashPassword, verifyPassword, hashEmail } from '../server.js'
 import {
   usernameSchema,
   passwordSchema,
