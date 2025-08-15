@@ -54,7 +54,7 @@ describe('LoginForm', () => {
 
     const usernameInput = screen.getByLabelText('Username')
     const passwordInput = screen.getByLabelText('Password')
-    const submitButton = screen.getByRole('button', { name: 'Login' })
+    const submitButton = screen.getByRole('button', { name: 'Sign In' })
 
     expect(usernameInput).toHaveAttribute('name', 'username')
     expect(usernameInput).toHaveAttribute('required')

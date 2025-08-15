@@ -39,7 +39,9 @@ describe('Terms Page', () => {
   it('should have contact email link', () => {
     render(<Terms />)
 
-    const emailLink = screen.getByRole('link', { name: 'andrew@pinsquirrel.com' })
+    const emailLink = screen.getByRole('link', {
+      name: 'andrew@pinsquirrel.com',
+    })
     expect(emailLink).toBeInTheDocument()
     expect(emailLink).toHaveAttribute('href', 'mailto:andrew@pinsquirrel.com')
   })

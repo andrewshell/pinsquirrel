@@ -46,7 +46,7 @@ export function Header({ user }: HeaderProps) {
               // Logged out state
               <div className="flex items-center space-x-2">
                 <Button variant="ghost" size="sm" asChild>
-                  <Link to="/login">Login</Link>
+                  <Link to="/login">Sign In</Link>
                 </Button>
                 <Button size="sm" asChild>
                   <Link to="/register">Sign Up</Link>

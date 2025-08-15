@@ -15,7 +15,7 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>Login</CardTitle>
+        <CardTitle>Sign In</CardTitle>
       </CardHeader>
       <CardContent>
         <fetcher.Form method="post" className="space-y-4">
@@ -76,7 +76,7 @@ export function LoginForm() {
           </div>
 
           <Button type="submit" disabled={isSubmitting} className="w-full">
-            {isSubmitting ? 'Signing in...' : 'Login'}
+            {isSubmitting ? 'Signing in...' : 'Sign In'}
           </Button>
         </fetcher.Form>
       </CardContent>

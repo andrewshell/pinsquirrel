@@ -54,14 +54,14 @@ describe('Header', () => {
     it('shows login and sign up buttons', () => {
       render(<Header user={null} />)
 
-      expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Sign In' })).toBeInTheDocument()
       expect(screen.getByRole('link', { name: 'Sign Up' })).toBeInTheDocument()
     })
 
     it('login link points to /login', () => {
       render(<Header user={null} />)
 
-      expect(screen.getByRole('link', { name: 'Login' })).toHaveAttribute(
+      expect(screen.getByRole('link', { name: 'Sign In' })).toHaveAttribute(
         'href',
         '/login'
       )
@@ -115,7 +115,7 @@ describe('Header', () => {
       render(<Header user={mockUser} />)
 
       expect(
-        screen.queryByRole('link', { name: 'Login' })
+        screen.queryByRole('link', { name: 'Sign In' })
       ).not.toBeInTheDocument()
       expect(
         screen.queryByRole('link', { name: 'Sign Up' })
