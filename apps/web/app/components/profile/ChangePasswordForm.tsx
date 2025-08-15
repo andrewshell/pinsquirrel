@@ -2,7 +2,7 @@ import { useFetcher } from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { FormText } from '~/components/ui/form-text'
-import type { FieldErrors } from '~/lib/validation'
+import type { FieldErrors } from '@pinsquirrel/core'
 
 interface ChangePasswordFormProps {
   // Username is needed for the hidden field for password managers

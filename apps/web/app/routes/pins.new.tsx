@@ -7,8 +7,8 @@ import {
   db,
 } from '@pinsquirrel/database'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
-import { pinCreationSchema } from '~/lib/validation/pin-schema'
-import { parseFormData } from '~/lib/validation/helpers'
+import { validatePinCreation } from '@pinsquirrel/core'
+import { parseFormData } from '~/lib/http-utils'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
 import { logger } from '~/lib/logger.server'
 
@@ -27,7 +27,8 @@ export async function action({ request }: Route.ActionArgs) {
   const user = await requireUser(request)
 
   // Parse and validate form data
-  const result = await parseFormData(request, pinCreationSchema)
+  const formData = await parseFormData(request)
+  const result = validatePinCreation(formData)
 
   if (!result.success) {
     logger.debug('Pin creation validation failed', { errors: result.errors })

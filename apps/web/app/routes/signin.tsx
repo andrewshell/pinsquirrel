@@ -1,10 +1,10 @@
 import { Link, redirect, data } from 'react-router'
 import type { Route } from './+types/signin'
-import { AuthenticationServiceImpl } from '@pinsquirrel/core'
+import { AuthenticationServiceImpl, validateLogin } from '@pinsquirrel/core'
 import { DrizzleUserRepository, db } from '@pinsquirrel/database'
 import { createUserSession, getUserId } from '~/lib/session.server'
 import { LoginForm } from '~/components/auth/LoginForm'
-import { loginSchema, parseFormData } from '~/lib/validation'
+import { parseFormData } from '~/lib/http-utils'
 import { logger } from '~/lib/logger.server'
 
 // Server-side authentication service
@@ -23,7 +23,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 export async function action({ request }: Route.ActionArgs) {
   logger.request(request, { action: 'login' })
 
-  const result = await parseFormData(request, loginSchema)
+  const formData = await parseFormData(request)
+  const result = validateLogin(formData)
 
   if (!result.success) {
     logger.debug('Login validation failed', { errors: result.errors })

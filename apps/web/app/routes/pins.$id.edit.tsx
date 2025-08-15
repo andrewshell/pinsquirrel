@@ -3,32 +3,38 @@ import type { Route } from './+types/pins.$id.edit'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
 import { pinService } from '~/lib/services/pinService.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
-import {
-  pinCreationSchema,
-  type PinCreationFormData,
-} from '~/lib/validation/pin-schema'
-import { parseFormData } from '~/lib/validation/helpers'
+import { validatePinCreation, validateIdParam } from '@pinsquirrel/core'
+import { parseFormData, parseParams } from '~/lib/http-utils'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
 import { logger } from '~/lib/logger.server'
+
+// Pin creation form data type
+export type PinCreationFormData = {
+  url: string
+  title: string
+  description?: string
+}
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   // Ensure user is authenticated
   const user = await requireUser(request)
 
-  // Get pin ID from params
-  const pinId = params.id
-  if (!pinId) {
+  // Validate pin ID from params
+  const paramData = parseParams(params)
+  const pinIdResult = validateIdParam(paramData.id)
+
+  if (!pinIdResult.success) {
     // eslint-disable-next-line @typescript-eslint/only-throw-error
-    throw new Response('Pin ID is required', { status: 404 })
+    throw new Response('Invalid pin ID', { status: 404 })
   }
 
   // Fetch the pin using the service
   try {
-    const pin = await pinService.getPin(user.id, pinId)
+    const pin = await pinService.getPin(user.id, pinIdResult.data)
     return data({ pin })
   } catch (error) {
     logger.exception(error, 'Failed to load pin for editing', {
-      pinId,
+      pinId: pinIdResult.data,
       userId: user.id,
     })
 
@@ -42,15 +48,18 @@ export async function action({ request, params }: Route.ActionArgs) {
   // Ensure user is authenticated
   const user = await requireUser(request)
 
-  // Get pin ID from params
-  const pinId = params.id
-  if (!pinId) {
+  // Validate pin ID from params
+  const paramData = parseParams(params)
+  const pinIdResult = validateIdParam(paramData.id)
+
+  if (!pinIdResult.success) {
     // eslint-disable-next-line @typescript-eslint/only-throw-error
-    throw new Response('Pin ID is required', { status: 404 })
+    throw new Response('Invalid pin ID', { status: 404 })
   }
 
   // Parse and validate form data
-  const result = await parseFormData(request, pinCreationSchema)
+  const formData = await parseFormData(request)
+  const result = validatePinCreation(formData)
 
   if (!result.success) {
     logger.debug('Pin edit validation failed', { errors: result.errors })
@@ -59,7 +68,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   try {
     // Update the pin using the service
-    await pinService.updatePin(user.id, pinId, {
+    await pinService.updatePin(user.id, pinIdResult.data, {
       url: result.data.url,
       title: result.data.title,
       description: result.data.description,
@@ -67,7 +76,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     })
 
     logger.info('Pin updated successfully', {
-      pinId,
+      pinId: pinIdResult.data,
       userId: user.id,
       url: result.data.url,
     })
@@ -81,7 +90,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     )
   } catch (error) {
     logger.exception(error, 'Failed to update pin', {
-      pinId,
+      pinId: pinIdResult.data,
       userId: user.id,
       url: result.data.url,
     })

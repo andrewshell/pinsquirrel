@@ -68,8 +68,19 @@ vi.mock('~/lib/useMetadataFetch', () => ({
   })),
 }))
 
+// Mock core validation functions
+vi.mock('@pinsquirrel/core', async () => {
+  const actual = await vi.importActual('@pinsquirrel/core')
+  return {
+    ...actual,
+    validatePinCreation: vi.fn(),
+    validateIdParam: vi.fn(),
+  }
+})
+
 import { requireUser } from '~/lib/session.server'
 import { pinService } from '~/lib/services/pinService.server'
+import { validatePinCreation, validateIdParam } from '@pinsquirrel/core'
 import { loader, action } from './pins.$id.edit'
 
 const mockRequireUser = vi.mocked(requireUser)
@@ -77,6 +88,8 @@ const mockRequireUser = vi.mocked(requireUser)
 const mockGetPin = vi.mocked(pinService.getPin)
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const mockUpdatePinService = vi.mocked(pinService.updatePin)
+const mockValidatePinCreation = vi.mocked(validatePinCreation)
+const mockValidateIdParam = vi.mocked(validateIdParam)
 
 describe('pins.$id.edit route', () => {
   const mockUser = {
@@ -126,6 +139,10 @@ describe('pins.$id.edit route', () => {
     it('should require user authentication', async () => {
       mockRequireUser.mockResolvedValue(mockUser)
       mockGetPin.mockResolvedValue(mockPin)
+      mockValidateIdParam.mockReturnValue({
+        success: true,
+        data: 'pin-1',
+      })
 
       const request = new Request('http://localhost:3000/pins/pin-1/edit')
       const params = { id: 'pin-1' }
@@ -138,6 +155,10 @@ describe('pins.$id.edit route', () => {
     it('should fetch pin by id for authenticated user', async () => {
       mockRequireUser.mockResolvedValue(mockUser)
       mockGetPin.mockResolvedValue(mockPin)
+      mockValidateIdParam.mockReturnValue({
+        success: true,
+        data: 'pin-1',
+      })
 
       const request = new Request('http://localhost:3000/pins/pin-1/edit')
       const params = { id: 'pin-1' }
@@ -153,6 +174,10 @@ describe('pins.$id.edit route', () => {
     it('should return 404 response when pin is not found', async () => {
       mockRequireUser.mockResolvedValue(mockUser)
       mockGetPin.mockRejectedValue(new Error('Pin not found'))
+      mockValidateIdParam.mockReturnValue({
+        success: true,
+        data: 'pin-1',
+      })
 
       const request = new Request('http://localhost:3000/pins/pin-1/edit')
       const params = { id: 'pin-1' }
@@ -170,6 +195,10 @@ describe('pins.$id.edit route', () => {
 
     it('should return 404 response when pin id is missing', async () => {
       mockRequireUser.mockResolvedValue(mockUser)
+      mockValidateIdParam.mockReturnValue({
+        success: false,
+        errors: { id: 'Invalid ID format' },
+      })
 
       const request = new Request('http://localhost:3000/pins/undefined/edit')
       const params = { id: undefined as unknown as string }
@@ -181,7 +210,7 @@ describe('pins.$id.edit route', () => {
         expect(error).toBeInstanceOf(Response)
         const response = error as Response
         expect(response.status).toBe(404)
-        expect(await response.text()).toBe('Pin ID is required')
+        expect(await response.text()).toBe('Invalid pin ID')
       }
     })
   })
@@ -189,6 +218,19 @@ describe('pins.$id.edit route', () => {
   describe('action', () => {
     it('should require user authentication', async () => {
       mockRequireUser.mockResolvedValue(mockUser)
+      mockValidateIdParam.mockReturnValue({
+        success: true,
+        data: 'pin-1',
+      })
+      mockValidatePinCreation.mockReturnValue({
+        success: true,
+        data: {
+          url: 'https://updated.com',
+          title: 'Updated Pin',
+          description: 'Updated description',
+        },
+      })
+      mockUpdatePinService.mockResolvedValue(mockPin)
 
       const formData = new FormData()
       formData.append('url', 'https://updated.com')
@@ -208,6 +250,18 @@ describe('pins.$id.edit route', () => {
 
     it('should update pin with valid data', async () => {
       mockRequireUser.mockResolvedValue(mockUser)
+      mockValidateIdParam.mockReturnValue({
+        success: true,
+        data: 'pin-1',
+      })
+      mockValidatePinCreation.mockReturnValue({
+        success: true,
+        data: {
+          url: 'https://updated.com',
+          title: 'Updated Pin',
+          description: 'Updated description',
+        },
+      })
       mockUpdatePinService.mockResolvedValue({
         ...mockPin,
         url: 'https://updated.com',
@@ -240,8 +294,16 @@ describe('pins.$id.edit route', () => {
       expect((response as Response).headers.get('Location')).toBe('/pins')
     })
 
-    it('should return validation errors for invalid data', async () => {
+    it('should return validation errors when core validation fails', async () => {
       mockRequireUser.mockResolvedValue(mockUser)
+      mockValidateIdParam.mockReturnValue({
+        success: true,
+        data: 'pin-1',
+      })
+      mockValidatePinCreation.mockReturnValue({
+        success: false,
+        errors: { url: 'Invalid URL', title: 'Title required' },
+      })
 
       const formData = new FormData()
       formData.append('url', 'not-a-url')
@@ -256,13 +318,17 @@ describe('pins.$id.edit route', () => {
 
       const result = await action({ request, params, context: {} })
 
-      // In our mock, data() just returns the object directly
+      // Should return validation errors (actual validation logic tested in core)
       expect(result).toHaveProperty('errors')
       expect(mockUpdatePinService).not.toHaveBeenCalled()
     })
 
     it('should return 404 response when pin id is missing', async () => {
       mockRequireUser.mockResolvedValue(mockUser)
+      mockValidateIdParam.mockReturnValue({
+        success: false,
+        errors: { id: 'Invalid ID format' },
+      })
 
       const formData = new FormData()
       formData.append('url', 'https://updated.com')
@@ -281,12 +347,24 @@ describe('pins.$id.edit route', () => {
         expect(error).toBeInstanceOf(Response)
         const response = error as Response
         expect(response.status).toBe(404)
-        expect(await response.text()).toBe('Pin ID is required')
+        expect(await response.text()).toBe('Invalid pin ID')
       }
     })
 
     it('should handle service errors during update', async () => {
       mockRequireUser.mockResolvedValue(mockUser)
+      mockValidateIdParam.mockReturnValue({
+        success: true,
+        data: 'pin-1',
+      })
+      mockValidatePinCreation.mockReturnValue({
+        success: true,
+        data: {
+          url: 'https://updated.com',
+          title: 'Updated Pin',
+          description: 'Updated description',
+        },
+      })
       mockUpdatePinService.mockRejectedValue(new Error('Database error'))
 
       const formData = new FormData()

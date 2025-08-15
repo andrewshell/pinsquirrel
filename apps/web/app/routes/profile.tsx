@@ -4,14 +4,16 @@ import { requireUser } from '~/lib/session.server'
 import {
   AuthenticationServiceImpl,
   InvalidCredentialsError,
+  validateEmailUpdate,
+  validatePasswordChange,
 } from '@pinsquirrel/core'
 import { DrizzleUserRepository, db } from '@pinsquirrel/database'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { UpdateEmailForm } from '~/components/profile/UpdateEmailForm'
 import { ChangePasswordForm } from '~/components/profile/ChangePasswordForm'
+import { parseFormData } from '~/lib/http-utils'
 import { logger } from '~/lib/logger.server'
-// Note: Manual validation is used instead of Zod schemas to avoid import issues in tests
 
 // Server-side authentication service
 const userRepository = new DrizzleUserRepository(db)
@@ -24,8 +26,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   const user = await requireUser(request)
-  const formData = await request.formData()
-  const intent = formData.get('intent') as string
+  const formData = await parseFormData(request)
+  const intent = formData.intent
 
   logger.request(request, {
     action: 'profile-update',
@@ -35,33 +37,13 @@ export async function action({ request }: Route.ActionArgs) {
 
   try {
     if (intent === 'update-email') {
-      // Convert FormData to plain object for validation
-      const rawData = {
-        intent: formData.get('intent'),
-        email: formData.get('email'),
+      const result = validateEmailUpdate(formData)
+
+      if (!result.success) {
+        return data({ errors: result.errors }, { status: 400 })
       }
 
-      // Simple manual validation for testing
-      const email = rawData.email as string
-      if (!email || email.trim() === '') {
-        return data(
-          {
-            errors: { email: 'Valid email is required' },
-          },
-          { status: 400 }
-        )
-      }
-
-      if (!email.includes('@')) {
-        return data(
-          {
-            errors: { email: 'Valid email is required' },
-          },
-          { status: 400 }
-        )
-      }
-
-      await authService.updateEmail(user.id, email)
+      await authService.updateEmail(user.id, result.data.email)
 
       logger.info('User email updated', {
         userId: user.id,
@@ -75,33 +57,18 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     if (intent === 'change-password') {
-      // Convert FormData to plain object for validation
-      const rawData = {
-        intent: formData.get('intent'),
-        currentPassword: formData.get('currentPassword'),
-        newPassword: formData.get('newPassword'),
-      }
+      const result = validatePasswordChange(formData)
 
-      const currentPassword = rawData.currentPassword as string
-      const newPassword = rawData.newPassword as string
-      const errors: Record<string, string> = {}
-
-      // Validate that fields are provided
-      if (!currentPassword || currentPassword.trim() === '') {
-        errors.currentPassword = 'Current password is required'
-      }
-
-      // Only validate new password format (let service handle current password authentication)
-      if (!newPassword || newPassword.length < 8) {
-        errors.newPassword = 'Password must be at least 8 characters'
-      }
-
-      if (Object.keys(errors).length > 0) {
-        return data({ errors }, { status: 400 })
+      if (!result.success) {
+        return data({ errors: result.errors }, { status: 400 })
       }
 
       try {
-        await authService.changePassword(user.id, currentPassword, newPassword)
+        await authService.changePassword(
+          user.id,
+          result.data.currentPassword,
+          result.data.newPassword
+        )
 
         logger.info('User password changed', {
           userId: user.id,

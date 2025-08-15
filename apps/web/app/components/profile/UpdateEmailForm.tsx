@@ -1,7 +1,7 @@
 import { useFetcher } from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
-import type { FieldErrors } from '~/lib/validation'
+import type { FieldErrors } from '@pinsquirrel/core'
 
 interface UpdateEmailFormProps {
   // Optional success callback for parent component to handle success

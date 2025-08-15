@@ -6,8 +6,14 @@ import { Textarea } from '~/components/ui/textarea'
 import { Label } from '~/components/ui/label'
 import { FormText } from '~/components/ui/form-text'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
-import type { PinCreationFormData } from '~/lib/validation/pin-schema'
-import type { FieldErrors } from '~/lib/validation'
+import type { FieldErrors } from '@pinsquirrel/core'
+
+// Pin creation form data type
+type PinCreationFormData = {
+  url: string
+  title: string
+  description?: string
+}
 
 interface PinCreationFormProps {
   onMetadataFetch?: (url: string) => void

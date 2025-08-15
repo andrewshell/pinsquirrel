@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { createRoutesStub } from 'react-router'
 import { LoginForm } from './LoginForm'
-import type { FieldErrors } from '~/lib/validation'
+import type { FieldErrors } from '@pinsquirrel/core'
 
 // Mock useFetcher for test data control
 const mockUseFetcher = vi.fn()

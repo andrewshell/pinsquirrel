@@ -1,10 +1,13 @@
 import { Link, redirect, data } from 'react-router'
 import type { Route } from './+types/signup'
-import { AuthenticationServiceImpl } from '@pinsquirrel/core'
+import {
+  AuthenticationServiceImpl,
+  validateRegistration,
+} from '@pinsquirrel/core'
 import { DrizzleUserRepository, db } from '@pinsquirrel/database'
 import { createUserSession, getUserId } from '~/lib/session.server'
 import { RegisterForm } from '~/components/auth/RegisterForm'
-import { registerSchema, parseFormData } from '~/lib/validation'
+import { parseFormData } from '~/lib/http-utils'
 import { logger } from '~/lib/logger.server'
 
 // Server-side authentication service
@@ -23,7 +26,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 export async function action({ request }: Route.ActionArgs) {
   logger.request(request, { action: 'register' })
 
-  const result = await parseFormData(request, registerSchema)
+  const formData = await parseFormData(request)
+  const result = validateRegistration(formData)
 
   if (!result.success) {
     logger.debug('Registration validation failed', { errors: result.errors })

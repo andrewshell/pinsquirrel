@@ -1,7 +1,7 @@
 import { useFetcher } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
-import type { FieldErrors } from '~/lib/validation'
+import type { FieldErrors } from '@pinsquirrel/core'
 
 export function RegisterForm() {
   const fetcher = useFetcher<{ errors?: FieldErrors }>()
