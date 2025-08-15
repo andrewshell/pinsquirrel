@@ -96,7 +96,7 @@ describe('PinCreationForm', () => {
     render(<Stub initialEntries={['/pins/new']} />)
 
     expect(screen.getByText('Pin created successfully!')).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveClass('bg-green-50')
+    expect(screen.getByRole('alert')).toHaveClass('bg-lime-300')
   })
 
   it('displays error message when provided', () => {
@@ -106,7 +106,7 @@ describe('PinCreationForm', () => {
     render(<Stub initialEntries={['/pins/new']} />)
 
     expect(screen.getByText('Something went wrong')).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveClass('bg-red-50')
+    expect(screen.getByRole('alert')).toHaveClass('bg-red-400')
   })
 
   it('calls onMetadataFetch when URL field loses focus with valid URL', async () => {

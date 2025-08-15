@@ -104,8 +104,8 @@ describe('PinCard', () => {
 
     expect(editButton).toHaveTextContent('edit')
     expect(deleteButton).toHaveTextContent('delete')
-    expect(editButton).toHaveClass('text-xs', 'text-blue-600')
-    expect(deleteButton).toHaveClass('text-xs', 'text-blue-600')
+    expect(editButton).toHaveClass('text-accent', 'font-bold')
+    expect(deleteButton).toHaveClass('text-destructive', 'font-bold')
   })
 
   it('displays relative time correctly', () => {
@@ -135,7 +135,7 @@ describe('PinCard', () => {
     it('maintains edit button styling as a link', () => {
       renderWithRouter(<PinCard pin={mockPin} />)
       const editLink = screen.getByRole('link', { name: /edit example pin/i })
-      expect(editLink).toHaveClass('text-xs', 'text-blue-600')
+      expect(editLink).toHaveClass('text-accent', 'font-bold')
       expect(editLink).toHaveTextContent('edit')
     })
 

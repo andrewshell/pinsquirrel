@@ -1,6 +1,7 @@
 import { useFetcher } from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
+import { Input } from '~/components/ui/input'
 import { FormText } from '~/components/ui/form-text'
 import type { FieldErrors } from '@pinsquirrel/core'
 
@@ -49,14 +50,14 @@ export function ChangePasswordForm({
           />
 
           {passwordFetcher.data?.errors?._form && (
-            <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
+            <div className="p-3 text-sm text-black bg-red-400 border-4 border-foreground neobrutalism-shadow font-bold uppercase">
               {passwordFetcher.data.errors._form}
             </div>
           )}
 
           {passwordFetcher.data?.success &&
             passwordFetcher.data?.field === 'password' && (
-              <div className="p-3 text-sm text-green-600 bg-green-50 border border-green-200 rounded">
+              <div className="p-3 text-sm text-black bg-lime-300 border-4 border-foreground neobrutalism-shadow font-bold uppercase">
                 {passwordFetcher.data.success}
               </div>
             )}
@@ -68,16 +69,16 @@ export function ChangePasswordForm({
             >
               Current Password
             </label>
-            <input
+            <Input
               id="currentPassword"
               name="currentPassword"
               type="password"
               autoComplete="current-password"
-              className={`w-full px-3 py-2 border bg-background rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring ${
+              className={
                 passwordFetcher.data?.errors?.currentPassword
-                  ? 'border-red-500 focus:border-red-500'
-                  : 'border-input focus:border-ring'
-              }`}
+                  ? 'border-red-500'
+                  : ''
+              }
             />
             {passwordFetcher.data?.errors?.currentPassword && (
               <p className="mt-1 text-sm text-red-600">
@@ -93,16 +94,16 @@ export function ChangePasswordForm({
             >
               New Password
             </label>
-            <input
+            <Input
               id="newPassword"
               name="newPassword"
               type="password"
               autoComplete="new-password"
-              className={`w-full px-3 py-2 border bg-background rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring ${
+              className={
                 passwordFetcher.data?.errors?.newPassword
-                  ? 'border-red-500 focus:border-red-500'
-                  : 'border-input focus:border-ring'
-              }`}
+                  ? 'border-red-500'
+                  : ''
+              }
             />
             {passwordFetcher.data?.errors?.newPassword ? (
               <FormText variant="error" className="mt-1">

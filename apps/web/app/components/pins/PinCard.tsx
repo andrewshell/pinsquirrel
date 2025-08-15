@@ -26,19 +26,19 @@ export function PinCard({ pin }: PinCardProps) {
 
   return (
     <div
-      className="py-1"
+      className="py-2 hover:bg-accent/5 transition-all"
       role="article"
       aria-labelledby={`pin-title-${pin.id}`}
     >
       {/* Main content */}
       <div className="flex-1 min-w-0">
         {/* Title as link */}
-        <h3 id={`pin-title-${pin.id}`} className="mb-0.5">
+        <h3 id={`pin-title-${pin.id}`} className="mb-1">
           <a
             href={pin.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-600 hover:text-blue-800 font-normal"
+            className="text-accent hover:text-accent/80 font-bold text-base"
           >
             {pin.title}
           </a>
@@ -50,7 +50,7 @@ export function PinCard({ pin }: PinCardProps) {
             href={pin.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-blue-600"
+            className="text-muted-foreground hover:text-foreground break-all"
           >
             {pin.url}
           </a>
@@ -60,7 +60,7 @@ export function PinCard({ pin }: PinCardProps) {
         {pin.description && (
           <div
             data-testid="pin-description"
-            className="text-xs text-muted-foreground mb-1"
+            className="text-sm text-muted-foreground mb-2"
           >
             {pin.description}
           </div>
@@ -69,7 +69,7 @@ export function PinCard({ pin }: PinCardProps) {
         {/* Tags */}
         {pin.tags.length > 0 && (
           <div
-            className="flex flex-wrap gap-1 mb-1"
+            className="flex flex-wrap gap-1 mb-2"
             data-testid="pin-tags"
             role="list"
             aria-label={`Tags: ${pin.tags.map(t => t.name).join(', ')}`}
@@ -77,7 +77,7 @@ export function PinCard({ pin }: PinCardProps) {
             {pin.tags.map(tag => (
               <span
                 key={tag.id}
-                className="text-xs text-orange-600 hover:text-orange-800 cursor-pointer"
+                className="text-xs text-secondary-foreground bg-secondary hover:bg-secondary/80 cursor-pointer px-2 py-0.5 font-bold"
                 role="listitem"
               >
                 {tag.name}
@@ -87,9 +87,9 @@ export function PinCard({ pin }: PinCardProps) {
         )}
 
         {/* Bottom row: Timestamp and Actions */}
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
           {/* Timestamp */}
-          <span>{getRelativeTime(pin.createdAt)}</span>
+          <span className="font-bold">{getRelativeTime(pin.createdAt)}</span>
 
           {/* Actions */}
           <div
@@ -99,13 +99,13 @@ export function PinCard({ pin }: PinCardProps) {
           >
             <Link
               to={`/pins/${pin.id}/edit`}
-              className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer"
+              className="text-accent hover:text-accent/80 font-bold hover:underline"
               aria-label={`Edit ${pin.title}`}
             >
               edit
             </Link>
             <button
-              className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer"
+              className="text-destructive hover:text-destructive/80 font-bold hover:underline"
               aria-label={`Delete ${pin.title}`}
             >
               delete

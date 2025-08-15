@@ -1,6 +1,7 @@
 import { useFetcher } from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
+import { Input } from '~/components/ui/input'
 import type { FieldErrors } from '@pinsquirrel/core'
 
 interface UpdateEmailFormProps {
@@ -34,14 +35,14 @@ export function UpdateEmailForm({ onSuccess }: UpdateEmailFormProps) {
           <input type="hidden" name="intent" value="update-email" />
 
           {emailFetcher.data?.errors?._form && (
-            <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
+            <div className="p-3 text-sm text-black bg-red-400 border-4 border-foreground neobrutalism-shadow font-bold uppercase">
               {emailFetcher.data.errors._form}
             </div>
           )}
 
           {emailFetcher.data?.success &&
             emailFetcher.data?.field === 'email' && (
-              <div className="p-3 text-sm text-green-600 bg-green-50 border border-green-200 rounded">
+              <div className="p-3 text-sm text-black bg-lime-300 border-4 border-foreground neobrutalism-shadow font-bold uppercase">
                 {emailFetcher.data.success}
               </div>
             )}
@@ -53,16 +54,14 @@ export function UpdateEmailForm({ onSuccess }: UpdateEmailFormProps) {
             >
               New Email Address
             </label>
-            <input
+            <Input
               id="email"
               name="email"
               type="email"
               autoComplete="email"
-              className={`w-full px-3 py-2 border bg-background rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring ${
-                emailFetcher.data?.errors?.email
-                  ? 'border-red-500 focus:border-red-500'
-                  : 'border-input focus:border-ring'
-              }`}
+              className={
+                emailFetcher.data?.errors?.email ? 'border-red-500' : ''
+              }
               placeholder="Enter new email address"
             />
             {emailFetcher.data?.errors?.email && (

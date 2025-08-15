@@ -8,7 +8,7 @@ import {
   db,
 } from '@pinsquirrel/database'
 import { PinList } from '~/components/pins/PinList'
-import { Pagination } from '~/components/pins/Pagination'
+import { PinsPagination } from '~/components/ui/pins-pagination'
 import { Button } from '~/components/ui/button'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import { Plus } from 'lucide-react'
@@ -119,7 +119,7 @@ export default function PinsPage() {
 
         <PinList pins={pins} isLoading={isLoading} />
 
-        <Pagination
+        <PinsPagination
           currentPage={currentPage}
           totalPages={totalPages}
           totalCount={totalCount}

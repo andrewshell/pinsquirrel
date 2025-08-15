@@ -8,18 +8,18 @@ interface HeaderProps {
 
 export function Header({ user }: HeaderProps) {
   return (
-    <header className="bg-white border-b border-gray-200">
+    <header className="bg-background border-b-8 border-foreground neobrutalism-shadow">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center h-20">
           {/* Logo/Brand */}
           <div className="flex-shrink-0">
             <Link to="/" className="flex items-center space-x-2">
               <img
                 src="/pinsquirrel.svg"
                 alt="PinSquirrel logo"
-                className="w-8 h-8"
+                className="w-10 h-10"
               />
-              <span className="text-xl font-bold text-gray-900">
+              <span className="text-2xl font-black text-foreground uppercase tracking-tight">
                 PinSquirrel
               </span>
             </Link>
@@ -32,7 +32,7 @@ export function Header({ user }: HeaderProps) {
               <div className="flex items-center space-x-4">
                 <Link
                   to="/profile"
-                  className="text-sm text-gray-700 hover:text-gray-900"
+                  className="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
                 >
                   {user.username}
                 </Link>

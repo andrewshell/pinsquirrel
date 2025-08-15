@@ -130,7 +130,11 @@ describe('Header', () => {
       const { container } = render(<Header user={null} />)
 
       const header = container.querySelector('header')
-      expect(header).toHaveClass('bg-white', 'border-b', 'border-gray-200')
+      expect(header).toHaveClass(
+        'bg-background',
+        'border-b-8',
+        'border-foreground'
+      )
     })
 
     it('applies correct navigation spacing for logged out state', () => {
@@ -174,9 +178,9 @@ describe('Header', () => {
 
       const profileLink = screen.getByRole('link', { name: 'testuser' })
       expect(profileLink).toHaveClass(
-        'text-sm',
-        'text-gray-700',
-        'hover:text-gray-900'
+        'text-base',
+        'font-bold',
+        'text-foreground'
       )
     })
   })

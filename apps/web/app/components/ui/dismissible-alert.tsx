@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Alert, AlertDescription } from './alert'
-import { CheckCircle, XCircle, X } from 'lucide-react'
+import { CheckCircle, XCircle } from 'lucide-react'
 import { cn } from '~/lib/utils'
 
 interface DismissibleAlertProps {
@@ -40,33 +40,25 @@ export function DismissibleAlert({
 
   return (
     <Alert
-      variant={isSuccess ? 'default' : 'destructive'}
+      variant="default"
       className={cn(
-        isSuccess
-          ? 'bg-green-50 border-green-200 text-green-800'
-          : 'bg-red-50 border-red-200',
+        'cursor-pointer transition-all hover:opacity-80 active:transform active:scale-[0.98]',
+        isSuccess ? 'bg-lime-300 text-black' : 'bg-red-400 text-black',
         className
       )}
+      onClick={handleDismiss}
+      tabIndex={0}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          handleDismiss()
+        }
+      }}
+      aria-label={`Dismiss ${type} message: ${message}`}
+      title="Click to dismiss"
     >
-      <Icon className={isSuccess ? 'text-green-600' : 'text-red-600'} />
-      <AlertDescription
-        className={isSuccess ? 'text-green-800' : 'text-red-800'}
-      >
-        {message}
-      </AlertDescription>
-      <button
-        type="button"
-        onClick={handleDismiss}
-        className={cn(
-          'absolute right-3 top-3 focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-sm',
-          isSuccess
-            ? 'text-green-600 hover:text-green-800 focus:ring-green-500'
-            : 'text-red-600 hover:text-red-800 focus:ring-red-500'
-        )}
-        aria-label={`Dismiss ${type} message`}
-      >
-        <X className="h-4 w-4" />
-      </button>
+      <Icon className="text-black" />
+      <AlertDescription className="text-black">{message}</AlertDescription>
     </Alert>
   )
 }
