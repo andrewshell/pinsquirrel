@@ -1,5 +1,5 @@
 import { Link, redirect, data } from 'react-router'
-import type { Route } from './+types/register'
+import type { Route } from './+types/signup'
 import { AuthenticationServiceImpl } from '@pinsquirrel/core'
 import { DrizzleUserRepository, db } from '@pinsquirrel/database'
 import { createUserSession, getUserId } from '~/lib/session.server'
@@ -73,7 +73,7 @@ export default function RegisterPage() {
         <p className="mt-2 text-center text-sm text-gray-600">
           Or{' '}
           <Link
-            to="/login"
+            to="/signin"
             className="font-medium text-blue-600 hover:text-blue-500"
           >
             sign in to your existing account

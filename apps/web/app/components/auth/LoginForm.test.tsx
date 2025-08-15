@@ -38,12 +38,12 @@ describe('LoginForm', () => {
 
     const Stub = createRoutesStub([
       {
-        path: '/login',
+        path: '/signin',
         Component: LoginForm,
       },
     ])
 
-    return render(<Stub initialEntries={['/login']} />)
+    return render(<Stub initialEntries={['/signin']} />)
   }
 
   it('renders form with correct attributes and structure', () => {

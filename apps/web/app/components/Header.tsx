@@ -38,7 +38,7 @@ export function Header({ user }: HeaderProps) {
                 </Link>
                 <Form method="post" action="/logout">
                   <Button variant="outline" size="sm" type="submit">
-                    Logout
+                    Sign Out
                   </Button>
                 </Form>
               </div>
@@ -46,10 +46,10 @@ export function Header({ user }: HeaderProps) {
               // Logged out state
               <div className="flex items-center space-x-2">
                 <Button variant="ghost" size="sm" asChild>
-                  <Link to="/login">Sign In</Link>
+                  <Link to="/signin">Sign In</Link>
                 </Button>
                 <Button size="sm" asChild>
-                  <Link to="/register">Sign Up</Link>
+                  <Link to="/signup">Sign Up</Link>
                 </Button>
               </div>
             )}

@@ -40,7 +40,7 @@ export async function getUser(request: Request) {
     logger.exception(error, 'Failed to fetch user from session', { userId })
     // If user lookup fails, clear the session
     // eslint-disable-next-line @typescript-eslint/only-throw-error
-    throw redirect('/login', {
+    throw redirect('/signin', {
       headers: {
         'Set-Cookie': await sessionStorage.destroySession(
           await getSession(request)
@@ -54,7 +54,7 @@ export async function requireUser(request: Request) {
   const user = await getUser(request)
   if (!user) {
     // eslint-disable-next-line @typescript-eslint/only-throw-error
-    throw redirect('/login')
+    throw redirect('/signin')
   }
   return user
 }
@@ -83,7 +83,7 @@ export async function logout(request: Request) {
     logger.info('User logout', { userId })
   }
 
-  return redirect('/login', {
+  return redirect('/signin', {
     headers: {
       'Set-Cookie': await sessionStorage.destroySession(session),
     },

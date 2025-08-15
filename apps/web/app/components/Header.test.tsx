@@ -58,21 +58,21 @@ describe('Header', () => {
       expect(screen.getByRole('link', { name: 'Sign Up' })).toBeInTheDocument()
     })
 
-    it('login link points to /login', () => {
+    it('login link points to /signin', () => {
       render(<Header user={null} />)
 
       expect(screen.getByRole('link', { name: 'Sign In' })).toHaveAttribute(
         'href',
-        '/login'
+        '/signin'
       )
     })
 
-    it('sign up link points to /register', () => {
+    it('sign up link points to /signup', () => {
       render(<Header user={null} />)
 
       expect(screen.getByRole('link', { name: 'Sign Up' })).toHaveAttribute(
         'href',
-        '/register'
+        '/signup'
       )
     })
 
@@ -81,7 +81,7 @@ describe('Header', () => {
 
       expect(screen.queryByText('testuser')).not.toBeInTheDocument()
       expect(
-        screen.queryByRole('button', { name: 'Logout' })
+        screen.queryByRole('button', { name: 'Sign Out' })
       ).not.toBeInTheDocument()
     })
   })
@@ -98,14 +98,16 @@ describe('Header', () => {
     it('shows logout button', () => {
       render(<Header user={mockUser} />)
 
-      expect(screen.getByRole('button', { name: 'Logout' })).toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: 'Sign Out' })
+      ).toBeInTheDocument()
     })
 
     it('logout form posts to /logout', () => {
       render(<Header user={mockUser} />)
 
       const logoutForm = screen
-        .getByRole('button', { name: 'Logout' })
+        .getByRole('button', { name: 'Sign Out' })
         .closest('form')
       expect(logoutForm).toHaveAttribute('method', 'post')
       expect(logoutForm).toHaveAttribute('action', '/logout')

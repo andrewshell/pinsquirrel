@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { loader } from './register'
-import type { Route } from './+types/register'
+import { loader } from './signup'
+import type { Route } from './+types/signup'
 import { getUserId } from '~/lib/session.server'
 
 // Mock all dependencies
@@ -29,7 +29,7 @@ describe('Register Route', () => {
 
   describe('loader', () => {
     it('redirects to home when user is already logged in', async () => {
-      const request = new Request('http://localhost/register')
+      const request = new Request('http://localhost/signup')
       const args: Route.LoaderArgs = { request, params: {}, context: {} }
 
       vi.mocked(getUserId).mockResolvedValue('user-123')
@@ -43,7 +43,7 @@ describe('Register Route', () => {
     })
 
     it('returns null when user is not logged in', async () => {
-      const request = new Request('http://localhost/register')
+      const request = new Request('http://localhost/signup')
       const args: Route.LoaderArgs = { request, params: {}, context: {} }
 
       vi.mocked(getUserId).mockResolvedValue(null)

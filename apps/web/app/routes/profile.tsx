@@ -255,7 +255,7 @@ export default function ProfilePage() {
                 </Button>
                 <Form method="post" action="/logout">
                   <Button variant="destructive" type="submit">
-                    Logout
+                    Sign Out
                   </Button>
                 </Form>
               </div>

@@ -60,10 +60,10 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-20">
             {/* Since logged-in users are redirected, we only show logged out state */}
             <Button asChild>
-              <Link to="/register">Get Started</Link>
+              <Link to="/signup">Get Started</Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link to="/login">Sign In</Link>
+              <Link to="/signin">Sign In</Link>
             </Button>
           </div>
 

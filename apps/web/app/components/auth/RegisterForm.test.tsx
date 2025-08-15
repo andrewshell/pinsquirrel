@@ -38,12 +38,12 @@ describe('RegisterForm', () => {
 
     const Stub = createRoutesStub([
       {
-        path: '/register',
+        path: '/signup',
         Component: RegisterForm,
       },
     ])
 
-    return render(<Stub initialEntries={['/register']} />)
+    return render(<Stub initialEntries={['/signup']} />)
   }
 
   it('renders form with correct attributes and structure', () => {
