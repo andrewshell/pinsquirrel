@@ -69,17 +69,19 @@ export default function Home() {
 
           {/* Features */}
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            <div className="text-center space-y-4">
-              <img
-                src="/man_holding_boxes.svg"
-                alt="Person holding boxes illustration"
-                className="w-12 h-12 mx-auto"
-              />
+            <div className="text-center space-y-4 p-6">
+              <div className="bg-background p-3 rounded-full w-fit mx-auto border-4 border-foreground neobrutalism-shadow">
+                <img
+                  src="/man_holding_boxes.svg"
+                  alt="Person holding boxes illustration"
+                  className="w-12 h-12"
+                />
+              </div>
               <div>
-                <h3 className="font-medium text-foreground mb-2">
+                <h3 className="font-bold text-foreground mb-3 text-lg uppercase tracking-tight">
                   Hoard Everything
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-foreground font-medium leading-relaxed">
                   Links, images, articles, markdown - if it exists on the
                   internet, you can stash it. Because that random blog post WILL
                   disappear right when you need it.
@@ -87,17 +89,19 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="text-center space-y-4">
-              <img
-                src="/dung_beetle.svg"
-                alt="Dung beetle illustration"
-                className="w-12 h-12 mx-auto"
-              />
+            <div className="text-center space-y-4 p-6">
+              <div className="bg-background p-3 rounded-full w-fit mx-auto border-4 border-foreground neobrutalism-shadow">
+                <img
+                  src="/dung_beetle.svg"
+                  alt="Dung beetle illustration"
+                  className="w-12 h-12"
+                />
+              </div>
               <div>
-                <h3 className="font-medium text-foreground mb-2">
-                  Actually Find Your Shit
+                <h3 className="font-bold text-foreground mb-3 text-lg uppercase tracking-tight">
+                  Find Your Shit
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-foreground font-medium leading-relaxed">
                   Our search doesn&apos;t judge your 3am research spirals. Tag
                   it, forget it, then magically find it six months later when
                   you suddenly remember it exists.
@@ -105,17 +109,19 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="text-center space-y-4">
-              <img
-                src="/incognito.svg"
-                alt="Incognito figure illustration"
-                className="w-12 h-12 mx-auto"
-              />
+            <div className="text-center space-y-4 p-6">
+              <div className="bg-background p-3 rounded-full w-fit mx-auto border-4 border-foreground neobrutalism-shadow">
+                <img
+                  src="/incognito.svg"
+                  alt="Incognito figure illustration"
+                  className="w-12 h-12"
+                />
+              </div>
               <div>
-                <h3 className="font-medium text-foreground mb-2">
+                <h3 className="font-bold text-foreground mb-3 text-lg uppercase tracking-tight">
                   Your Secret Stash
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-foreground font-medium leading-relaxed">
                   We don&apos;t care what you&apos;re hoarding and neither does
                   anyone else. No tracking, no judging, just pure unadulterated
                   link chaos that&apos;s yours alone.

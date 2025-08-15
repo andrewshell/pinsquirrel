@@ -132,7 +132,7 @@ describe('Header', () => {
       const header = container.querySelector('header')
       expect(header).toHaveClass(
         'bg-background',
-        'border-b-8',
+        'border-b-4',
         'border-foreground'
       )
     })

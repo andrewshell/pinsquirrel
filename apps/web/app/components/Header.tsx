@@ -1,6 +1,6 @@
+import type { User } from '@pinsquirrel/core'
 import { Form, Link } from 'react-router'
 import { Button } from '~/components/ui/button'
-import type { User } from '@pinsquirrel/core'
 
 interface HeaderProps {
   user: User | null
@@ -8,7 +8,7 @@ interface HeaderProps {
 
 export function Header({ user }: HeaderProps) {
   return (
-    <header className="bg-background border-b-8 border-foreground neobrutalism-shadow">
+    <header className="bg-background border-b-4 border-foreground neobrutalism-shadow">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
           {/* Logo/Brand */}
@@ -45,7 +45,7 @@ export function Header({ user }: HeaderProps) {
             ) : (
               // Logged out state
               <div className="flex items-center space-x-2">
-                <Button variant="ghost" size="sm" asChild>
+                <Button variant="outline" size="sm" asChild>
                   <Link to="/signin">Sign In</Link>
                 </Button>
                 <Button size="sm" asChild>

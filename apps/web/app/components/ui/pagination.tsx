@@ -6,7 +6,7 @@ import {
 import * as React from 'react'
 import { Link } from 'react-router'
 
-import { Button, buttonVariants } from '~/components/ui/button'
+import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/utils'
 
 function Pagination({ className, ...props }: React.ComponentProps<'nav'>) {
@@ -55,10 +55,19 @@ function PaginationLink({
       data-slot="pagination-link"
       data-active={isActive}
       className={cn(
-        buttonVariants({
-          variant: isActive ? 'outline' : 'ghost',
-          size,
-        }),
+        // Override button styles for a more subtle pagination
+        'inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors',
+        'disabled:pointer-events-none disabled:opacity-50',
+        'border border-transparent rounded-md',
+        'hover:bg-accent hover:text-accent-foreground',
+        // Active page styling
+        isActive &&
+          'bg-primary text-primary-foreground border-primary hover:bg-primary/90',
+        // Size variants without neobrutalism
+        size === 'default' && 'h-10 px-4 py-2',
+        size === 'sm' && 'h-9 px-3',
+        size === 'lg' && 'h-11 px-8',
+        size === 'icon' && 'h-10 w-10',
         className
       )}
       {...props}
@@ -77,7 +86,7 @@ function PaginationPrevious({
       className={cn('gap-1 px-2.5 sm:pl-2.5', className)}
       {...props}
     >
-      <ChevronLeftIcon />
+      <ChevronLeftIcon className="h-4 w-4" />
       <span className="hidden sm:block">Previous</span>
     </PaginationLink>
   )
@@ -95,7 +104,7 @@ function PaginationNext({
       {...props}
     >
       <span className="hidden sm:block">Next</span>
-      <ChevronRightIcon />
+      <ChevronRightIcon className="h-4 w-4" />
     </PaginationLink>
   )
 }

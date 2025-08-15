@@ -11,6 +11,17 @@ import { logger } from '~/lib/logger.server'
 const userRepository = new DrizzleUserRepository(db)
 const authService = new AuthenticationServiceImpl(userRepository)
 
+export function meta(_: Route.MetaArgs) {
+  return [
+    { title: 'Welcome Back, Digital Hoarder - PinSquirrel' },
+    {
+      name: 'description',
+      content:
+        'Time to dive back into your magnificent collection of internet treasures. Your digital stash awaits.',
+    },
+  ]
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   const userId = await getUserId(request)
   if (userId) {
@@ -65,7 +76,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Sign in to your account
+          Welcome Back, Digital Hoarder
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
           Or{' '}
@@ -73,7 +84,7 @@ export default function LoginPage() {
             to="/signup"
             className="font-medium text-blue-600 hover:text-blue-500"
           >
-            create a new account
+            join the gang
           </Link>
         </p>
       </div>

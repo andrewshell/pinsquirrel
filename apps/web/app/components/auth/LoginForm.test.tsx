@@ -77,7 +77,10 @@ describe('LoginForm', () => {
     })
 
     expect(screen.getByText('Username is required')).toBeInTheDocument()
-    expect(screen.getByLabelText('Username')).toHaveClass('border-red-500')
+    expect(screen.getByLabelText('Username')).toHaveAttribute(
+      'aria-invalid',
+      'true'
+    )
   })
 
   it('displays password field error', () => {
@@ -86,17 +89,20 @@ describe('LoginForm', () => {
     })
 
     expect(screen.getByText('Password is required')).toBeInTheDocument()
-    expect(screen.getByLabelText('Password')).toHaveClass('border-red-500')
+    expect(screen.getByLabelText('Password')).toHaveAttribute(
+      'aria-invalid',
+      'true'
+    )
   })
 
-  it('applies correct CSS classes for valid fields', () => {
+  it('applies correct attributes for valid fields', () => {
     renderWithRouter()
 
     const usernameInput = screen.getByLabelText('Username')
     const passwordInput = screen.getByLabelText('Password')
 
-    expect(usernameInput).toHaveClass('border-gray-300')
-    expect(passwordInput).toHaveClass('border-gray-300')
+    expect(usernameInput).not.toHaveAttribute('aria-invalid')
+    expect(passwordInput).not.toHaveAttribute('aria-invalid')
   })
 
   it('shows loading state when submitting', () => {

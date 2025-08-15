@@ -80,7 +80,10 @@ describe('RegisterForm', () => {
     })
 
     expect(screen.getByText('Username is required')).toBeInTheDocument()
-    expect(screen.getByLabelText('Username')).toHaveClass('border-red-500')
+    expect(screen.getByLabelText('Username')).toHaveAttribute(
+      'aria-invalid',
+      'true'
+    )
   })
 
   it('displays password field error', () => {
@@ -89,7 +92,10 @@ describe('RegisterForm', () => {
     })
 
     expect(screen.getByText('Password is required')).toBeInTheDocument()
-    expect(screen.getByLabelText('Password')).toHaveClass('border-red-500')
+    expect(screen.getByLabelText('Password')).toHaveAttribute(
+      'aria-invalid',
+      'true'
+    )
   })
 
   it('displays email field error', () => {
@@ -98,21 +104,22 @@ describe('RegisterForm', () => {
     })
 
     expect(screen.getByText('Invalid email format')).toBeInTheDocument()
-    expect(screen.getByLabelText('Email (optional)')).toHaveClass(
-      'border-red-500'
+    expect(screen.getByLabelText('Email (optional)')).toHaveAttribute(
+      'aria-invalid',
+      'true'
     )
   })
 
-  it('applies correct CSS classes for valid fields', () => {
+  it('applies correct attributes for valid fields', () => {
     renderWithRouter()
 
     const usernameInput = screen.getByLabelText('Username')
     const passwordInput = screen.getByLabelText('Password')
     const emailInput = screen.getByLabelText('Email (optional)')
 
-    expect(usernameInput).toHaveClass('border-gray-300')
-    expect(passwordInput).toHaveClass('border-gray-300')
-    expect(emailInput).toHaveClass('border-gray-300')
+    expect(usernameInput).not.toHaveAttribute('aria-invalid')
+    expect(passwordInput).not.toHaveAttribute('aria-invalid')
+    expect(emailInput).not.toHaveAttribute('aria-invalid')
   })
 
   it('shows loading state when submitting', () => {
