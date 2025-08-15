@@ -3,17 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Route } from './+types/signup'
 
 // Mock only external dependencies
-vi.mock('~/lib/session.server', () => ({
-  getUserId: vi.fn(),
-  createUserSession: vi.fn(),
-}))
-
-vi.mock('@pinsquirrel/database', () => ({
-  DrizzleUserRepository: vi.fn(),
-  DrizzleTagRepository: vi.fn(),
-  DrizzlePinRepository: vi.fn(),
-  db: {},
-}))
+vi.mock('~/lib/session.server')
 
 import { getUserId } from '~/lib/session.server'
 import { loader, action } from './signup'

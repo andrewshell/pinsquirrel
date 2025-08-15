@@ -47,13 +47,6 @@ vi.mock('@pinsquirrel/core', async () => {
   }
 })
 
-vi.mock('~/lib/logger.server', () => ({
-  logger: {
-    info: vi.fn(),
-    exception: vi.fn(),
-  },
-}))
-
 describe('api.metadata loader', () => {
   beforeEach(() => {
     vi.clearAllMocks()

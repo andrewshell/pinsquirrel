@@ -1,30 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { User } from '@pinsquirrel/core'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Route } from './+types/profile'
 
 // Mock only external dependencies - not internal validation
-vi.mock('~/lib/session.server', () => ({
-  requireUser: vi.fn(),
-}))
-
-vi.mock('@pinsquirrel/database', () => ({
-  DrizzleUserRepository: vi.fn(),
-  DrizzleTagRepository: vi.fn(),
-  DrizzlePinRepository: vi.fn(),
-  db: {},
-}))
-
-vi.mock('~/lib/logger.server', () => ({
-  logger: {
-    request: vi.fn(),
-    info: vi.fn(),
-    exception: vi.fn(),
-  },
-}))
+vi.mock('~/lib/session.server')
 
 import { requireUser } from '~/lib/session.server'
-import { loader, action } from './profile'
+import { action, loader } from './profile'
 
 const mockRequireUser = vi.mocked(requireUser)
 
