@@ -15,21 +15,21 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 1.5 Add proper error handling and response codes
   - [x] 1.6 Verify all tests pass
 
-- [ ] 2. Create Confirmation Dialog Component
-  - [ ] 2.1 Write tests for DeleteConfirmationDialog component
-  - [ ] 2.2 Implement dialog component using shadcn/ui Dialog
-  - [ ] 2.3 Add proper accessibility attributes and focus management
-  - [ ] 2.4 Integrate form submission with React Router Form component
-  - [ ] 2.5 Add loading states and proper button styling
-  - [ ] 2.6 Verify all tests pass
+- [x] 2. Create Confirmation Dialog Component
+  - [x] 2.1 Write tests for DeleteConfirmationDialog component
+  - [x] 2.2 Implement dialog component using shadcn/ui Dialog
+  - [x] 2.3 Add proper accessibility attributes and focus management
+  - [x] 2.4 Integrate form submission with React Router Form component
+  - [x] 2.5 Add loading states and proper button styling
+  - [x] 2.6 Verify all tests pass
 
-- [ ] 3. Enhance PinCard with Delete Button
-  - [ ] 3.1 Write tests for PinCard delete button functionality
-  - [ ] 3.2 Add delete button to PinCard component with proper styling
-  - [ ] 3.3 Integrate confirmation dialog into PinCard
-  - [ ] 3.4 Add optimistic UI updates for better user experience
-  - [ ] 3.5 Handle success and error notifications
-  - [ ] 3.6 Verify all tests pass
+- [x] 3. Enhance PinCard with Delete Button
+  - [x] 3.1 Write tests for PinCard delete button functionality
+  - [x] 3.2 Add delete button to PinCard component with proper styling
+  - [x] 3.3 Integrate confirmation dialog into PinCard
+  - [x] 3.4 Add optimistic UI updates for better user experience
+  - [x] 3.5 Handle success and error notifications
+  - [x] 3.6 Verify all tests pass
 
 - [ ] 4. Integration Testing and Error Handling
   - [ ] 4.1 Write integration tests for complete deletion workflow

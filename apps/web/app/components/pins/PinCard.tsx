@@ -1,11 +1,15 @@
+import { useState } from 'react'
 import { Link } from 'react-router'
 import type { Pin } from '@pinsquirrel/core'
+import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
 
 interface PinCardProps {
   pin: Pin
 }
 
 export function PinCard({ pin }: PinCardProps) {
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+
   // Format relative time (simplified for now)
   const getRelativeTime = (date: Date) => {
     const now = new Date()
@@ -107,14 +111,23 @@ export function PinCard({ pin }: PinCardProps) {
               edit
             </Link>
             <button
+              type="button"
               className="text-destructive hover:text-destructive/80 font-bold hover:underline"
               aria-label={`Delete ${pin.title}`}
+              onClick={() => setIsDeleteDialogOpen(true)}
             >
               delete
             </button>
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        pin={pin}
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      />
     </div>
   )
 }

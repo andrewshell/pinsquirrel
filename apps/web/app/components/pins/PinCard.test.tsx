@@ -1,12 +1,28 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import userEvent from '@testing-library/user-event'
+import { createMemoryRouter, RouterProvider } from 'react-router'
 import { PinCard } from './PinCard'
 import type { Pin } from '@pinsquirrel/core'
 
 // Helper function to render with router context
 const renderWithRouter = (component: React.ReactNode) => {
-  return render(<MemoryRouter>{component}</MemoryRouter>)
+  const router = createMemoryRouter(
+    [
+      {
+        path: '/',
+        element: component,
+      },
+      {
+        path: '/pins/:id/edit',
+        element: <div>Edit Route</div>,
+      },
+    ],
+    {
+      initialEntries: ['/'],
+    }
+  )
+  return render(<RouterProvider router={router} />)
 }
 
 describe('PinCard', () => {
@@ -146,6 +162,150 @@ describe('PinCard', () => {
       renderWithRouter(<PinCard pin={customPin} />)
       const editLink = screen.getByRole('link', { name: /edit custom pin/i })
       expect(editLink).toHaveAttribute('href', '/pins/custom-pin-123/edit')
+    })
+  })
+
+  describe('Delete functionality', () => {
+    it('should render delete button', () => {
+      renderWithRouter(<PinCard pin={mockPin} />)
+      const deleteButton = screen.getByRole('button', {
+        name: /delete example pin/i,
+      })
+      expect(deleteButton).toBeInTheDocument()
+      expect(deleteButton).toHaveTextContent('delete')
+    })
+
+    it('should open confirmation dialog when delete button is clicked', async () => {
+      const user = userEvent.setup()
+      renderWithRouter(<PinCard pin={mockPin} />)
+
+      const deleteButton = screen.getByRole('button', {
+        name: /delete example pin/i,
+      })
+      await user.click(deleteButton)
+
+      // Dialog should be open and visible
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      expect(
+        screen.getByRole('heading', { name: 'Delete Pin' })
+      ).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          'Are you sure you want to delete this pin? This action cannot be undone.'
+        )
+      ).toBeInTheDocument()
+    })
+
+    it('should display pin details in confirmation dialog', async () => {
+      const user = userEvent.setup()
+      renderWithRouter(<PinCard pin={mockPin} />)
+
+      const deleteButton = screen.getByRole('button', {
+        name: /delete example pin/i,
+      })
+      await user.click(deleteButton)
+
+      // Pin details should be visible in dialog - check within dialog context
+      const dialog = screen.getByRole('dialog')
+      expect(dialog).toHaveTextContent('Example Pin')
+      expect(dialog).toHaveTextContent('https://example.com')
+    })
+
+    it('should close dialog when cancel is clicked', async () => {
+      const user = userEvent.setup()
+      renderWithRouter(<PinCard pin={mockPin} />)
+
+      // Open dialog
+      const deleteButton = screen.getByRole('button', {
+        name: /delete example pin/i,
+      })
+      await user.click(deleteButton)
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+      // Close dialog
+      const cancelButton = screen.getByRole('button', { name: /cancel/i })
+      await user.click(cancelButton)
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('should close dialog when X button is clicked', async () => {
+      const user = userEvent.setup()
+      renderWithRouter(<PinCard pin={mockPin} />)
+
+      // Open dialog
+      const deleteButton = screen.getByRole('button', {
+        name: /delete example pin/i,
+      })
+      await user.click(deleteButton)
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+      // Close dialog with X button
+      const closeButton = screen.getByRole('button', { name: /close/i })
+      await user.click(closeButton)
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('should close dialog when escape key is pressed', async () => {
+      const user = userEvent.setup()
+      renderWithRouter(<PinCard pin={mockPin} />)
+
+      // Open dialog
+      const deleteButton = screen.getByRole('button', {
+        name: /delete example pin/i,
+      })
+      await user.click(deleteButton)
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+      // Close with escape key
+      await user.keyboard('{Escape}')
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('should handle dialog state properly for different pins', async () => {
+      const user = userEvent.setup()
+      const secondPin = {
+        ...mockPin,
+        id: 'pin-2',
+        title: 'Second Pin',
+        url: 'https://second.com',
+      }
+
+      renderWithRouter(
+        <div>
+          <PinCard pin={mockPin} />
+          <PinCard pin={secondPin} />
+        </div>
+      )
+
+      // Click delete on first pin
+      const firstDeleteButton = screen.getByRole('button', {
+        name: /delete example pin/i,
+      })
+      await user.click(firstDeleteButton)
+
+      // Verify dialog is open and shows correct pin details
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+      // Within the dialog specifically, check for the pin details
+      const dialog = screen.getByRole('dialog')
+      expect(dialog).toHaveTextContent('Example Pin')
+      expect(dialog).toHaveTextContent('https://example.com')
+
+      // The second pin's details should still be visible in the page, but not in the dialog
+      // This test confirms the correct pin is shown in the delete dialog
+      const pinElements = screen.getAllByText('Example Pin')
+      expect(pinElements.length).toBeGreaterThanOrEqual(2) // One in page, one in dialog
+    })
+
+    it('should have proper accessibility attributes for delete button', () => {
+      renderWithRouter(<PinCard pin={mockPin} />)
+      const deleteButton = screen.getByRole('button', {
+        name: /delete example pin/i,
+      })
+
+      expect(deleteButton).toHaveAttribute('aria-label', 'Delete Example Pin')
+      expect(deleteButton).toHaveClass('text-destructive', 'font-bold')
+      expect(deleteButton).toHaveAttribute('type', 'button')
     })
   })
 })
