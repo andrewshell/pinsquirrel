@@ -7,13 +7,13 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
 
 ## Tasks
 
-- [ ] 1. Implement Pin Route DELETE Action Handler
-  - [ ] 1.1 Write tests for DELETE action handler with authentication validation
-  - [ ] 1.2 Create DELETE action handler in pins route
-  - [ ] 1.3 Add pin ownership verification logic
-  - [ ] 1.4 Implement database deletion with transaction handling
-  - [ ] 1.5 Add proper error handling and response codes
-  - [ ] 1.6 Verify all tests pass
+- [x] 1. Implement Pin Route DELETE Action Handler
+  - [x] 1.1 Write tests for DELETE action handler with authentication validation
+  - [x] 1.2 Create DELETE action handler in pins route
+  - [x] 1.3 Add pin ownership verification logic
+  - [x] 1.4 Implement database deletion with transaction handling
+  - [x] 1.5 Add proper error handling and response codes
+  - [x] 1.6 Verify all tests pass
 
 - [ ] 2. Create Confirmation Dialog Component
   - [ ] 2.1 Write tests for DeleteConfirmationDialog component

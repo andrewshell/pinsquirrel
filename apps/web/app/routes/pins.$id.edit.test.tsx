@@ -34,6 +34,7 @@ vi.mock('~/lib/services/container.server', () => ({
   pinService: {
     getPin: vi.fn(),
     updatePin: vi.fn(),
+    deletePin: vi.fn(),
   },
 }))
 
@@ -88,6 +89,8 @@ const mockRequireUser = vi.mocked(requireUser)
 const mockGetPin = vi.mocked(pinService.getPin)
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const mockUpdatePinService = vi.mocked(pinService.updatePin)
+// eslint-disable-next-line @typescript-eslint/unbound-method
+const mockDeletePinService = vi.mocked(pinService.deletePin)
 const mockValidatePinCreation = vi.mocked(validatePinCreation)
 const mockValidateIdParam = vi.mocked(validateIdParam)
 
@@ -109,8 +112,6 @@ describe('pins.$id.edit route', () => {
     title: 'Example Pin',
     description: 'A test pin',
     readLater: false,
-    contentPath: null,
-    imagePath: null,
     createdAt: mockDate,
     updatedAt: mockDate,
     tags: [
@@ -387,6 +388,142 @@ describe('pins.$id.edit route', () => {
           'Failed to update pin. Please try again.'
         )
       }
+    })
+
+    // DELETE method tests
+    describe('DELETE method', () => {
+      it('should delete pin with valid ID and user ownership', async () => {
+        mockRequireUser.mockResolvedValue(mockUser)
+        mockValidateIdParam.mockReturnValue({
+          success: true,
+          data: 'pin-1',
+        })
+        mockDeletePinService.mockResolvedValue()
+
+        const request = new Request('http://localhost:3000/pins/pin-1/edit', {
+          method: 'DELETE',
+        })
+        const params = { id: 'pin-1' }
+
+        const response = await action({ request, params, context: {} })
+
+        expect(mockDeletePinService).toHaveBeenCalledWith('user-1', 'pin-1')
+        expect(response).toBeInstanceOf(Response)
+        expect((response as Response).status).toBe(302)
+        expect((response as Response).headers.get('Location')).toBe('/pins')
+      })
+
+      it('should return 404 response when pin id is invalid for DELETE', async () => {
+        mockRequireUser.mockResolvedValue(mockUser)
+        mockValidateIdParam.mockReturnValue({
+          success: false,
+          errors: { id: 'Invalid ID format' },
+        })
+
+        const request = new Request(
+          'http://localhost:3000/pins/invalid-id/edit',
+          {
+            method: 'DELETE',
+          }
+        )
+        const params = { id: 'invalid-id' }
+
+        try {
+          await action({ request, params, context: {} })
+          throw new Error('Should have thrown')
+        } catch (error: unknown) {
+          expect(error).toBeInstanceOf(Response)
+          const response = error as Response
+          expect(response.status).toBe(404)
+          expect(await response.text()).toBe('Invalid pin ID')
+        }
+
+        expect(mockDeletePinService).not.toHaveBeenCalled()
+      })
+
+      it('should handle unauthorized pin access errors for DELETE', async () => {
+        mockRequireUser.mockResolvedValue(mockUser)
+        mockValidateIdParam.mockReturnValue({
+          success: true,
+          data: 'pin-1',
+        })
+        mockDeletePinService.mockRejectedValue(
+          new Error('Unauthorized access to pin')
+        )
+
+        const request = new Request('http://localhost:3000/pins/pin-1/edit', {
+          method: 'DELETE',
+        })
+        const params = { id: 'pin-1' }
+
+        try {
+          await action({ request, params, context: {} })
+          throw new Error('Should have thrown')
+        } catch (error: unknown) {
+          expect(error).toBeInstanceOf(Response)
+          const response = error as Response
+          expect(response.status).toBe(404)
+          expect(await response.text()).toBe('Pin not found')
+        }
+
+        expect(mockDeletePinService).toHaveBeenCalledWith('user-1', 'pin-1')
+      })
+
+      it('should handle pin not found errors for DELETE', async () => {
+        mockRequireUser.mockResolvedValue(mockUser)
+        mockValidateIdParam.mockReturnValue({
+          success: true,
+          data: 'pin-1',
+        })
+        mockDeletePinService.mockRejectedValue(new Error('Pin not found'))
+
+        const request = new Request('http://localhost:3000/pins/pin-1/edit', {
+          method: 'DELETE',
+        })
+        const params = { id: 'pin-1' }
+
+        try {
+          await action({ request, params, context: {} })
+          throw new Error('Should have thrown')
+        } catch (error: unknown) {
+          expect(error).toBeInstanceOf(Response)
+          const response = error as Response
+          expect(response.status).toBe(404)
+          expect(await response.text()).toBe('Pin not found')
+        }
+
+        expect(mockDeletePinService).toHaveBeenCalledWith('user-1', 'pin-1')
+      })
+
+      it('should handle database errors during DELETE', async () => {
+        mockRequireUser.mockResolvedValue(mockUser)
+        mockValidateIdParam.mockReturnValue({
+          success: true,
+          data: 'pin-1',
+        })
+        mockDeletePinService.mockRejectedValue(
+          new Error('Database connection failed')
+        )
+
+        const request = new Request('http://localhost:3000/pins/pin-1/edit', {
+          method: 'DELETE',
+        })
+        const params = { id: 'pin-1' }
+
+        try {
+          await action({ request, params, context: {} })
+          throw new Error('Should have thrown')
+        } catch (error: unknown) {
+          expect(error).toBeInstanceOf(Response)
+          const response = error as Response
+          expect(response.status).toBe(500)
+          expect(await response.text()).toBe(
+            'Failed to delete pin. Please try again.'
+          )
+        }
+
+        expect(mockDeletePinService).toHaveBeenCalledWith('user-1', 'pin-1')
+      })
     })
   })
 })

@@ -68,8 +68,6 @@ describe('PinsPage Integration', () => {
       title: 'Example Pin',
       description: 'A test pin',
       readLater: false,
-      contentPath: null,
-      imagePath: null,
       tags: [
         {
           id: 'tag-1',
@@ -89,8 +87,6 @@ describe('PinsPage Integration', () => {
       title: 'Another Pin',
       description: null,
       readLater: true,
-      contentPath: null,
-      imagePath: null,
       tags: [],
       createdAt: new Date('2025-01-02'),
       updatedAt: new Date('2025-01-02'),

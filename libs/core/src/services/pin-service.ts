@@ -200,5 +200,4 @@ export class PinService {
     // Delete tag
     await this.tagRepository.delete(tagId)
   }
-
 }

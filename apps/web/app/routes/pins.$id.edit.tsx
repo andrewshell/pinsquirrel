@@ -58,6 +58,52 @@ export async function action({ request, params }: Route.ActionArgs) {
     throw new Response('Invalid pin ID', { status: 404 })
   }
 
+  // Handle DELETE requests for pin deletion
+  if (request.method === 'DELETE') {
+    try {
+      // Delete the pin using the service
+      await pinService.deletePin(user.id, pinIdResult.data)
+
+      logger.info('Pin deleted successfully', {
+        pinId: pinIdResult.data,
+        userId: user.id,
+      })
+
+      // Redirect to pins list with success message
+      return setFlashMessage(
+        request,
+        'success',
+        'Pin deleted successfully!',
+        '/pins'
+      )
+    } catch (error) {
+      logger.exception(error, 'Failed to delete pin', {
+        pinId: pinIdResult.data,
+        userId: user.id,
+      })
+
+      // Check for specific error types
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error'
+
+      if (
+        errorMessage.includes('not found') ||
+        errorMessage.includes('Unauthorized')
+      ) {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
+        throw new Response('Pin not found', { status: 404 })
+      }
+
+      // Generic server error for other cases
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
+      throw new Response('Failed to delete pin. Please try again.', {
+        status: 500,
+      })
+    }
+  }
+
+  // Handle POST/PUT requests for pin updates (existing logic)
+
   // Parse and validate form data
   const formData = await parseFormData(request)
   const result = validatePinCreation(formData)

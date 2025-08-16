@@ -452,7 +452,6 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       expect(result!.tags).toEqual([])
     })
 
-
     it('should return null when pin not found', async () => {
       const result = await pinRepository.update('nonexistent-id', {
         title: 'New Title',
