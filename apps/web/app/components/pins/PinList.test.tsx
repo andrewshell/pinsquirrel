@@ -24,8 +24,6 @@ describe('PinList', () => {
       title: 'First Pin',
       description: 'First description',
       readLater: false,
-      contentPath: null,
-      imagePath: null,
       tags: [
         {
           id: 'tag-1',
@@ -45,8 +43,6 @@ describe('PinList', () => {
       title: 'Second Pin',
       description: null,
       readLater: true,
-      contentPath: null,
-      imagePath: null,
       tags: [],
       createdAt: new Date('2025-01-02'),
       updatedAt: new Date('2025-01-02'),
@@ -58,8 +54,6 @@ describe('PinList', () => {
       title: 'Third Pin',
       description: 'Third description',
       readLater: false,
-      contentPath: null,
-      imagePath: null,
       tags: [
         {
           id: 'tag-2',

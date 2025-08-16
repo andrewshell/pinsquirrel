@@ -17,8 +17,6 @@ describe('PinCard', () => {
     title: 'Example Pin',
     description: 'This is a test pin description',
     readLater: false,
-    contentPath: null,
-    imagePath: null,
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
     tags: [

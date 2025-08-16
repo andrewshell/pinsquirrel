@@ -20,18 +20,6 @@ export const pinDescriptionSchema = z
 
 export const readLaterSchema = z.boolean().optional().default(false)
 
-export const contentPathSchema = z
-  .string()
-  .max(500, 'Content path must be at most 500 characters')
-  .nullable()
-  .optional()
-
-export const imagePathSchema = z
-  .string()
-  .max(500, 'Image path must be at most 500 characters')
-  .nullable()
-  .optional()
-
 // Tag validations
 export const tagNameSchema = z
   .string()
@@ -50,8 +38,6 @@ export const createPinDataSchema = z.object({
   title: pinTitleSchema,
   description: pinDescriptionSchema,
   readLater: readLaterSchema,
-  contentPath: contentPathSchema,
-  imagePath: imagePathSchema,
   tagNames: tagNamesSchema,
 })
 
@@ -60,8 +46,6 @@ export const updatePinDataSchema = z.object({
   title: pinTitleSchema.optional(),
   description: pinDescriptionSchema,
   readLater: readLaterSchema,
-  contentPath: contentPathSchema,
-  imagePath: imagePathSchema,
   tagNames: tagNamesSchema,
 })
 

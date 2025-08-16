@@ -29,6 +29,7 @@ The following features have been implemented:
 ### Must-Have Features
 
 - [ ] Pin deletion with confirmation - Safe deletion workflow `XS`
+- [ ] Read later flag and user interface
 - [ ] Tag management UI - Add/remove tags from pins `M`
 - [ ] Basic search - Search pins by title and description `M`
 

@@ -7,8 +7,6 @@ export interface Pin {
   title: string
   description: string | null
   readLater: boolean
-  contentPath: string | null
-  imagePath: string | null
   tags: Tag[]
   createdAt: Date
   updatedAt: Date
@@ -20,8 +18,6 @@ export interface CreatePinData {
   title: string
   description?: string | null
   readLater?: boolean
-  contentPath?: string | null
-  imagePath?: string | null
   tagNames?: string[]
 }
 
@@ -30,7 +26,5 @@ export interface UpdatePinData {
   title?: string
   description?: string | null
   readLater?: boolean
-  contentPath?: string | null
-  imagePath?: string | null
   tagNames?: string[]
 }

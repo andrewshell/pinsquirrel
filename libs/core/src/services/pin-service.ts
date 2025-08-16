@@ -11,8 +11,6 @@ import {
   createPinDataSchema,
   updatePinDataSchema,
   createTagDataSchema,
-  contentPathSchema,
-  imagePathSchema,
 } from '../validation/pin-schemas.js'
 import {
   PinNotFoundError,
@@ -59,8 +57,6 @@ export class PinService {
       title: data.title,
       description: data.description,
       readLater: data.readLater ?? false,
-      contentPath: data.contentPath,
-      imagePath: data.imagePath,
       tagNames: data.tagNames,
     })
 
@@ -205,55 +201,4 @@ export class PinService {
     await this.tagRepository.delete(tagId)
   }
 
-  async updatePinContent(
-    userId: string,
-    pinId: string,
-    contentPath: string | null
-  ): Promise<void> {
-    // Validate content path
-    const validationResult = contentPathSchema.safeParse(contentPath)
-    if (!validationResult.success) {
-      throw new Error(
-        `Invalid content path: ${validationResult.error.issues[0]?.message}`
-      )
-    }
-
-    // Get pin and check ownership
-    const pin = await this.pinRepository.findById(pinId)
-    if (!pin) {
-      throw new PinNotFoundError(pinId)
-    }
-    if (pin.userId !== userId) {
-      throw new UnauthorizedPinAccessError(pinId)
-    }
-
-    // Update content path
-    await this.pinRepository.update(pinId, { contentPath })
-  }
-
-  async updatePinImage(
-    userId: string,
-    pinId: string,
-    imagePath: string | null
-  ): Promise<void> {
-    // Validate image path
-    const validationResult = imagePathSchema.safeParse(imagePath)
-    if (!validationResult.success) {
-      throw new Error(
-        `Invalid image path: ${validationResult.error.issues[0]?.message}`
-      )
-    }
-
-    // Get pin and check ownership
-    const pin = await this.pinRepository.findById(pinId)
-    if (!pin) {
-      throw new PinNotFoundError(pinId)
-    }
-    if (pin.userId !== userId) {
-      throw new UnauthorizedPinAccessError(pinId)
-    }
-
-    // Update image path
-    await this.pinRepository.update(pinId, { imagePath })
-  }
 }
