@@ -452,23 +452,6 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       expect(result!.tags).toEqual([])
     })
 
-    it('should update pin contentPath and imagePath', async () => {
-      const updateData = {
-        contentPath: '/path/to/content.html',
-        imagePath: '/path/to/image.jpg',
-      }
-
-      const result = await pinRepository.update(existingPinId, updateData)
-
-      expect(result).not.toBeNull()
-      expect(result!.contentPath).toBe('/path/to/content.html')
-      expect(result!.imagePath).toBe('/path/to/image.jpg')
-
-      // Verify it was updated in database
-      const updated = await pinRepository.findById(existingPinId)
-      expect(updated!.contentPath).toBe('/path/to/content.html')
-      expect(updated!.imagePath).toBe('/path/to/image.jpg')
-    })
 
     it('should return null when pin not found', async () => {
       const result = await pinRepository.update('nonexistent-id', {

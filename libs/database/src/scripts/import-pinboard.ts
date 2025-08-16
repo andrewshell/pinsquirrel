@@ -109,8 +109,6 @@ async function importPinboard() {
         title: pinboardPin.description,
         description: pinboardPin.extended || null,
         readLater: pinboardPin.toread === 'yes',
-        contentPath: null,
-        imagePath: null,
         createdAt: pinboardDate,
         updatedAt: pinboardDate,
       })

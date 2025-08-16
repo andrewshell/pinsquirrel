@@ -10,8 +10,6 @@ export const pins = pgTable('pins', {
   title: text('title').notNull(),
   description: text('description'),
   readLater: boolean('read_later').default(false).notNull(),
-  contentPath: text('content_path'),
-  imagePath: text('image_path'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })

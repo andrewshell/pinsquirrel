@@ -155,8 +155,6 @@ export class DrizzlePinRepository implements PinRepository {
         title: data.title,
         description: data.description ?? null,
         readLater: data.readLater ?? false,
-        contentPath: data.contentPath ?? null,
-        imagePath: data.imagePath ?? null,
         createdAt: now,
         updatedAt: now,
       })
@@ -207,9 +205,6 @@ export class DrizzlePinRepository implements PinRepository {
     if (data.description !== undefined)
       updateValues.description = data.description
     if (data.readLater !== undefined) updateValues.readLater = data.readLater
-    if (data.contentPath !== undefined)
-      updateValues.contentPath = data.contentPath
-    if (data.imagePath !== undefined) updateValues.imagePath = data.imagePath
 
     const [updatedPin] = await this.db
       .update(pins)
@@ -325,8 +320,6 @@ export class DrizzlePinRepository implements PinRepository {
       title: pin.title,
       description: pin.description,
       readLater: pin.readLater,
-      contentPath: pin.contentPath,
-      imagePath: pin.imagePath,
       tags: pinTags.map(tag => ({
         id: tag.id,
         userId: tag.userId,
