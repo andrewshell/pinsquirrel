@@ -31,10 +31,10 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 3.5 Handle success and error notifications
   - [x] 3.6 Verify all tests pass
 
-- [ ] 4. Integration Testing and Error Handling
-  - [ ] 4.1 Write integration tests for complete deletion workflow
-  - [ ] 4.2 Add error boundary handling for deletion failures
-  - [ ] 4.3 Test unauthorized deletion attempts
-  - [ ] 4.4 Verify proper redirect behavior after deletion
-  - [ ] 4.5 Test accessibility compliance with screen readers
-  - [ ] 4.6 Verify all integration tests pass
+- [x] 4. Integration Testing and Error Handling
+  - [x] 4.1 Write integration tests for complete deletion workflow
+  - [x] 4.2 Add error boundary handling for deletion failures
+  - [x] 4.3 Test unauthorized deletion attempts
+  - [x] 4.4 Verify proper redirect behavior after deletion
+  - [x] 4.5 Test accessibility compliance with screen readers
+  - [x] 4.6 Verify all integration tests pass
