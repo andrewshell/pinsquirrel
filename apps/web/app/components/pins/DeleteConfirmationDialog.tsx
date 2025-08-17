@@ -1,6 +1,7 @@
+import type { Pin } from '@pinsquirrel/core'
 import { useEffect, useRef } from 'react'
 import { Form, useNavigation } from 'react-router'
-import type { Pin } from '@pinsquirrel/core'
+import { Button } from '~/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -9,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { Button } from '~/components/ui/button'
 
 interface DeleteConfirmationDialogProps {
   pin: Pin
@@ -81,6 +81,7 @@ export function DeleteConfirmationDialog({
               variant="destructive"
               disabled={isDeleting}
               aria-describedby="delete-dialog-description"
+              className="w-full"
             >
               {isDeleting ? 'Deleting...' : 'Delete Pin'}
             </Button>

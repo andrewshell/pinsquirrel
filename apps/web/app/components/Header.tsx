@@ -1,4 +1,6 @@
 import type { User } from '@pinsquirrel/core'
+import { Menu, X } from 'lucide-react'
+import { useState } from 'react'
 import { Form, Link } from 'react-router'
 import { Button } from '~/components/ui/button'
 
@@ -7,8 +9,10 @@ interface HeaderProps {
 }
 
 export function Header({ user }: HeaderProps) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
   return (
-    <header className="bg-background border-b-4 border-foreground neobrutalism-shadow">
+    <header className="w-full bg-background border-b-4 border-foreground shadow-[0_4px_0_0_theme(colors.foreground)] sm:shadow-[4px_4px_0_0_theme(colors.foreground)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
           {/* Logo/Brand */}
@@ -25,8 +29,8 @@ export function Header({ user }: HeaderProps) {
             </Link>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex items-center space-x-4">
+          {/* Desktop Navigation */}
+          <nav className="hidden sm:flex items-center space-x-4">
             {user ? (
               // Logged in state
               <div className="flex items-center space-x-4">
@@ -54,8 +58,67 @@ export function Header({ user }: HeaderProps) {
               </div>
             )}
           </nav>
+
+          {/* Mobile Menu Button */}
+          <button
+            className="sm:hidden p-2 text-foreground hover:bg-accent rounded-md transition-colors"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Toggle menu"
+            aria-expanded={isMobileMenuOpen}
+          >
+            {isMobileMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
+          </button>
         </div>
       </div>
+
+      {/* Mobile Menu */}
+      {isMobileMenuOpen && (
+        <div className="sm:hidden border-t-4 border-foreground bg-background">
+          <div className="px-4 py-4 space-y-3">
+            {user ? (
+              // Logged in mobile menu
+              <div className="space-y-2">
+                <Button variant="ghost" className="w-full" asChild>
+                  <Link
+                    to="/profile"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    {user.username}
+                  </Link>
+                </Button>
+                <Form method="post" action="/logout">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    type="submit"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Sign Out
+                  </Button>
+                </Form>
+              </div>
+            ) : (
+              // Logged out mobile menu
+              <div className="space-y-2">
+                <Button variant="outline" className="w-full" asChild>
+                  <Link to="/signin" onClick={() => setIsMobileMenuOpen(false)}>
+                    Sign In
+                  </Link>
+                </Button>
+                <Button className="w-full" asChild>
+                  <Link to="/signup" onClick={() => setIsMobileMenuOpen(false)}>
+                    Sign Up
+                  </Link>
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   )
 }

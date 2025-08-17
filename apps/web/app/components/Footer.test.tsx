@@ -32,10 +32,9 @@ describe('Footer', () => {
 
     const currentYear = new Date().getFullYear()
     expect(
-      screen.getByText(
-        `© ${currentYear} Andrew Shell LLC. All rights reserved.`
-      )
+      screen.getByText(`© ${currentYear} Andrew Shell LLC.`)
     ).toBeInTheDocument()
+    expect(screen.getByText('All rights reserved.')).toBeInTheDocument()
   })
 
   it('should render privacy policy link', () => {

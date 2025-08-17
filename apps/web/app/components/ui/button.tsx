@@ -5,7 +5,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '~/lib/utils'
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-bold transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none border-4 border-foreground neobrutalism-shadow hover:neobrutalism-shadow-hover active:neobrutalism-shadow-pressed hover:-translate-x-1 hover:-translate-y-1 active:translate-x-1 active:translate-y-1 uppercase",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-bold transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none border-4 border-foreground neobrutalism-shadow uppercase",
   {
     variants: {
       variant: {
@@ -17,7 +17,7 @@ const buttonVariants = cva(
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         ghost:
-          'border-transparent neobrutalism-shadow-none hover:bg-accent hover:text-accent-foreground hover:border-foreground hover:neobrutalism-shadow',
+          'border-transparent !shadow-none hover:bg-accent hover:text-accent-foreground hover:border-transparent hover:!shadow-none hover:translate-x-0 hover:translate-y-0',
         link: 'border-transparent neobrutalism-shadow-none text-primary underline-offset-4 hover:underline hover:border-transparent hover:shadow-none',
       },
       size: {
