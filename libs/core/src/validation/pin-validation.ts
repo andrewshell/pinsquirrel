@@ -151,11 +151,13 @@ export function validatePinCreation(data: unknown): ValidationResult<{
   url: string
   title: string
   description?: string
+  readLater?: boolean
 }> {
   const pinCreationSchema = z.object({
     url: urlSchema,
     title: pinTitleSchema,
     description: z.string().optional(),
+    readLater: z.coerce.boolean().optional(),
   })
 
   const result = pinCreationSchema.safeParse(data)

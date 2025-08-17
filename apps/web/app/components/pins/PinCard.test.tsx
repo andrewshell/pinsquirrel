@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { PinCard } from './PinCard'
@@ -162,6 +162,119 @@ describe('PinCard', () => {
       renderWithRouter(<PinCard pin={customPin} />)
       const editLink = screen.getByRole('link', { name: /edit custom pin/i })
       expect(editLink).toHaveAttribute('href', '/pins/custom-pin-123/edit')
+    })
+  })
+
+  describe('Read Later functionality', () => {
+    it('shows bold title with bullet for read-later pins', () => {
+      const readLaterPin = { ...mockPin, readLater: true }
+      renderWithRouter(<PinCard pin={readLaterPin} />)
+
+      // Find the title link specifically (now includes bullet)
+      const titleLink = screen.getByRole('link', { name: '• Example Pin' })
+      expect(titleLink).toHaveClass('font-bold')
+
+      // Check for bullet character in the title
+      expect(titleLink).toHaveTextContent('•')
+      expect(titleLink).toHaveTextContent('• Example Pin')
+    })
+
+    it('shows normal title without bullet for regular pins', () => {
+      const regularPin = { ...mockPin, readLater: false }
+      renderWithRouter(<PinCard pin={regularPin} />)
+
+      // Find the title link specifically (not the URL link)
+      const titleLink = screen.getByRole('link', { name: 'Example Pin' })
+      expect(titleLink).not.toHaveClass('font-bold')
+
+      // Should not have bullet character
+      expect(titleLink).not.toHaveTextContent('•')
+      expect(titleLink).toHaveTextContent('Example Pin')
+      expect(titleLink).not.toHaveTextContent('• Example Pin')
+    })
+  })
+
+  describe('Mark as Read functionality', () => {
+    it('shows mark as read button only for read-later pins', () => {
+      const readLaterPin = { ...mockPin, readLater: true }
+      renderWithRouter(<PinCard pin={readLaterPin} />)
+
+      const markAsReadButton = screen.getByRole('button', {
+        name: /mark.*as read/i,
+      })
+      expect(markAsReadButton).toBeInTheDocument()
+    })
+
+    it('does not show mark as read button for regular pins', () => {
+      const regularPin = { ...mockPin, readLater: false }
+      renderWithRouter(<PinCard pin={regularPin} />)
+
+      const markAsReadButton = screen.queryByRole('button', {
+        name: /mark.*as read/i,
+      })
+      expect(markAsReadButton).not.toBeInTheDocument()
+    })
+
+    it('positions mark as read button after edit and delete actions', () => {
+      const readLaterPin = { ...mockPin, readLater: true }
+      renderWithRouter(<PinCard pin={readLaterPin} />)
+
+      const actionsGroup = screen.getByRole('group', { name: /actions for/i })
+
+      // Get all elements in order (buttons and links)
+      const allActions = actionsGroup.children
+
+      // Should have edit link, delete button, and mark as read form
+      expect(allActions).toHaveLength(3)
+
+      // Check order: edit link first, delete button second, mark as read form third
+      const editLink = allActions[0] as HTMLElement
+      const deleteButton = allActions[1] as HTMLElement
+      const markAsReadForm = allActions[2] as HTMLElement
+
+      expect(editLink.tagName.toLowerCase()).toBe('a')
+      expect(editLink).toHaveTextContent('edit')
+
+      expect(deleteButton.tagName.toLowerCase()).toBe('button')
+      expect(deleteButton).toHaveTextContent('delete')
+
+      expect(markAsReadForm.tagName.toLowerCase()).toBe('form')
+      expect(within(markAsReadForm).getByRole('button')).toHaveTextContent(
+        'mark as read'
+      )
+    })
+
+    it('has proper accessibility attributes', () => {
+      const readLaterPin = { ...mockPin, readLater: true }
+      renderWithRouter(<PinCard pin={readLaterPin} />)
+
+      const markAsReadButton = screen.getByRole('button', {
+        name: /mark.*as read/i,
+      })
+      expect(markAsReadButton).toHaveAttribute(
+        'aria-label',
+        `Mark ${mockPin.title} as read`
+      )
+      expect(markAsReadButton).toHaveAttribute('type', 'submit')
+    })
+
+    it('submits PATCH request when clicked', async () => {
+      const user = userEvent.setup()
+      const readLaterPin = { ...mockPin, readLater: true }
+      renderWithRouter(<PinCard pin={readLaterPin} />)
+
+      const markAsReadButton = screen.getByRole('button', {
+        name: /mark.*as read/i,
+      })
+      await user.click(markAsReadButton)
+
+      // The form should submit to the edit route with PATCH method
+      // This will be tested more thoroughly in integration tests
+      expect(markAsReadButton.closest('form')).toHaveAttribute(
+        'action',
+        `/pins/${mockPin.id}/edit`
+      )
+      expect(markAsReadButton.closest('form')).toHaveAttribute('method', 'post')
     })
   })
 

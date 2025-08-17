@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useFetcher } from 'react-router'
 import type { Pin } from '@pinsquirrel/core'
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
 
@@ -7,8 +7,34 @@ interface PinCardProps {
   pin: Pin
 }
 
+// Type guard for mark as read response
+function isMarkAsReadResponse(
+  data: unknown
+): data is { success: boolean; readLater: boolean } {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'success' in data &&
+    'readLater' in data &&
+    typeof (data as { success: unknown; readLater: unknown }).success ===
+      'boolean' &&
+    typeof (data as { success: unknown; readLater: unknown }).readLater ===
+      'boolean'
+  )
+}
+
 export function PinCard({ pin }: PinCardProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const markAsReadFetcher = useFetcher()
+
+  // Determine optimistic pin state
+  const isMarking = markAsReadFetcher.state === 'submitting'
+  const markAsReadResponse = isMarkAsReadResponse(markAsReadFetcher.data)
+    ? markAsReadFetcher.data
+    : null
+  const hasBeenMarked =
+    markAsReadResponse?.success && markAsReadResponse.readLater === false
+  const optimisticReadLater = isMarking || hasBeenMarked ? false : pin.readLater
 
   // Format relative time (simplified for now)
   const getRelativeTime = (date: Date) => {
@@ -42,8 +68,9 @@ export function PinCard({ pin }: PinCardProps) {
             href={pin.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-accent hover:text-accent/80 font-bold text-base"
+            className={`text-accent hover:text-accent/80 text-base ${optimisticReadLater ? 'font-bold' : ''}`}
           >
+            {optimisticReadLater && '• '}
             {pin.title}
           </a>
         </h3>
@@ -118,6 +145,25 @@ export function PinCard({ pin }: PinCardProps) {
             >
               delete
             </button>
+            
+            {/* Mark as Read action - only show for read-later pins */}
+            {optimisticReadLater && (
+              <markAsReadFetcher.Form
+                method="patch"
+                action={`/pins/${pin.id}/edit`}
+                style={{ display: 'inline' }}
+              >
+                <input type="hidden" name="readLater" value="false" />
+                <button
+                  type="submit"
+                  className="text-accent hover:text-accent/80 font-bold hover:underline"
+                  aria-label={`Mark ${pin.title} as read`}
+                  disabled={isMarking}
+                >
+                  {isMarking ? 'marking...' : 'mark as read'}
+                </button>
+              </markAsReadFetcher.Form>
+            )}
           </div>
         </div>
       </div>

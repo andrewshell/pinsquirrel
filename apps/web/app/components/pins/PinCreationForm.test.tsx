@@ -14,7 +14,12 @@ interface PinCreationFormProps {
   successMessage?: string
   errorMessage?: string
   editMode?: boolean
-  initialData?: { url: string; title: string; description: string }
+  initialData?: {
+    url: string
+    title: string
+    description: string
+    readLater?: boolean
+  }
   actionUrl?: string
 }
 
@@ -188,6 +193,80 @@ describe('PinCreationForm', () => {
       expect(screen.getByLabelText(/title/i)).toHaveValue(
         'Page Title from Metadata'
       )
+    })
+  })
+
+  describe('Read Later functionality', () => {
+    it('renders a read later checkbox', () => {
+      const Stub = createPinCreationFormStub()
+      render(<Stub initialEntries={['/pins/new']} />)
+
+      const checkbox = screen.getByRole('checkbox', { name: /read later/i })
+      expect(checkbox).toBeInTheDocument()
+      expect(checkbox).not.toBeChecked()
+    })
+
+    it('can be checked and unchecked', async () => {
+      const user = userEvent.setup()
+      const Stub = createPinCreationFormStub()
+      render(<Stub initialEntries={['/pins/new']} />)
+
+      const checkbox = screen.getByRole('checkbox', { name: /read later/i })
+
+      // Initially unchecked
+      expect(checkbox).not.toBeChecked()
+
+      // Check it
+      await user.click(checkbox)
+      expect(checkbox).toBeChecked()
+
+      // Uncheck it
+      await user.click(checkbox)
+      expect(checkbox).not.toBeChecked()
+    })
+
+    it('has proper form field name for submission', () => {
+      const Stub = createPinCreationFormStub()
+      render(<Stub initialEntries={['/pins/new']} />)
+
+      const checkbox = screen.getByRole('checkbox', { name: /read later/i })
+      expect(checkbox).toHaveAttribute('name', 'readLater')
+    })
+
+    it('pre-populates checkbox when initial data includes readLater: true', () => {
+      const initialData = {
+        url: 'https://example.com',
+        title: 'Test Title',
+        description: 'Test Description',
+        readLater: true,
+      }
+
+      const Stub = createPinCreationFormStub({
+        initialData,
+        editMode: true,
+      })
+      render(<Stub initialEntries={['/pins/new']} />)
+
+      const checkbox = screen.getByRole('checkbox', { name: /read later/i })
+      expect(checkbox).toBeChecked()
+    })
+
+    it('checkbox is unchecked when initial data includes readLater: false', () => {
+      const initialData = {
+        url: 'https://example.com',
+        title: 'Test Title',
+        description: 'Test Description',
+        readLater: false,
+      }
+
+      const Stub = createPinCreationFormStub({
+        initialData,
+        editMode: true,
+      })
+      render(<Stub initialEntries={['/pins/new']} />)
+
+      const checkbox = screen.getByRole('checkbox', { name: /read later/i })
+      expect(checkbox).not.toBeChecked()
     })
   })
 })

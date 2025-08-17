@@ -5,6 +5,7 @@ import { Input } from '~/components/ui/input'
 import { Textarea } from '~/components/ui/textarea'
 import { Label } from '~/components/ui/label'
 import { FormText } from '~/components/ui/form-text'
+import { Checkbox } from '~/components/ui/checkbox'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import type { FieldErrors } from '@pinsquirrel/core'
 import { isValidUrl } from '@pinsquirrel/core'
@@ -14,6 +15,7 @@ type PinCreationFormData = {
   url: string
   title: string
   description?: string
+  readLater?: boolean
 }
 
 interface PinCreationFormProps {
@@ -219,6 +221,18 @@ export function PinCreationForm({
         />
         <FormText id="description-help" size="xs">
           Optional notes or context about this pin
+        </FormText>
+      </div>
+
+      <div className="space-y-2">
+        <Checkbox
+          id="readLater"
+          name="readLater"
+          label="Read Later"
+          defaultChecked={initialData?.readLater || false}
+        />
+        <FormText id="readLater-help" size="xs">
+          Mark this pin to read later
         </FormText>
       </div>
 

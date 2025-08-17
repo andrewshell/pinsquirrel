@@ -14,6 +14,7 @@ export type PinCreationFormData = {
   url: string
   title: string
   description?: string
+  readLater?: boolean
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -56,6 +57,52 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (!pinIdResult.success) {
     // eslint-disable-next-line @typescript-eslint/only-throw-error
     throw new Response('Invalid pin ID', { status: 404 })
+  }
+
+  // Handle PATCH requests for quick updates (like toggling readLater)
+  if (request.method === 'PATCH') {
+    try {
+      // Parse and validate form data for partial updates
+      const formData = await parseFormData(request)
+
+      // For PATCH requests, we only update the readLater field
+      if (formData.readLater !== undefined) {
+        const readLater =
+          formData.readLater === 'false' ? false : Boolean(formData.readLater)
+
+        await pinService.updatePin(user.id, pinIdResult.data, {
+          readLater,
+        })
+
+        logger.info('Pin readLater status updated', {
+          pinId: pinIdResult.data,
+          userId: user.id,
+          readLater,
+        })
+
+        // Return JSON response for AJAX requests
+        return data({ success: true, readLater })
+      }
+
+      return data(
+        { errors: { _form: 'Invalid PATCH request' } },
+        { status: 400 }
+      )
+    } catch (error) {
+      logger.exception(error, 'Failed to update pin readLater status', {
+        pinId: pinIdResult.data,
+        userId: user.id,
+      })
+
+      return data(
+        {
+          errors: {
+            _form: 'Failed to update pin. Please try again.',
+          },
+        },
+        { status: 400 }
+      )
+    }
   }
 
   // Handle DELETE requests for pin deletion
@@ -119,7 +166,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       url: result.data.url,
       title: result.data.title,
       description: result.data.description,
-      readLater: false, // Keep existing readLater value (not edited in this form)
+      readLater: result.data.readLater || false,
     })
 
     logger.info('Pin updated successfully', {
@@ -168,6 +215,7 @@ export default function PinEditPage() {
     url: pin.url,
     title: pin.title,
     description: pin.description || '',
+    readLater: pin.readLater,
   }
 
   return (
@@ -192,7 +240,7 @@ export default function PinEditPage() {
               metadataError={metadataError || undefined}
               isMetadataLoading={isMetadataLoading}
               errorMessage={
-                actionData?.errors?._form
+                actionData && 'errors' in actionData && actionData.errors?._form
                   ? Array.isArray(actionData.errors._form)
                     ? actionData.errors._form.join(', ')
                     : actionData.errors._form

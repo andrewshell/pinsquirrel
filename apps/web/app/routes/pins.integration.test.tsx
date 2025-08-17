@@ -154,7 +154,7 @@ describe('PinsPage Integration', () => {
     // Component rendered via renderWithRouter
 
     expect(await screen.findByText('Example Pin')).toBeInTheDocument()
-    expect(screen.getByText('Another Pin')).toBeInTheDocument()
+    expect(screen.getByText('• Another Pin')).toBeInTheDocument()
     expect(screen.getByText('https://example.com')).toBeInTheDocument()
     expect(screen.getByText('https://example2.com')).toBeInTheDocument()
   })

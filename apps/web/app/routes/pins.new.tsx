@@ -35,7 +35,7 @@ export async function action({ request }: Route.ActionArgs) {
       url: result.data.url,
       title: result.data.title,
       description: result.data.description || '',
-      readLater: false,
+      readLater: result.data.readLater || false,
     })
 
     logger.info('Pin created successfully', {
