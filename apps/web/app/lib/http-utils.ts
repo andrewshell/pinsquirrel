@@ -6,21 +6,40 @@ import type { GenericValidationResult, FieldErrors } from '@pinsquirrel/core'
 // Re-export types for convenience
 export type { GenericValidationResult as ValidationResult, FieldErrors }
 
-// Parse FormData into a plain object
+// Parse FormData into a plain object with proper type handling
 export async function parseFormData(
   request: Request
-): Promise<Record<string, string>> {
+): Promise<Record<string, string | string[] | boolean>> {
   try {
     const formData = await request.formData()
 
-    // Convert FormData to a plain object, treating missing fields as empty strings
-    const rawData: Record<string, string> = {}
-    for (const [key, value] of formData.entries()) {
-      if (value instanceof File) {
-        rawData[key] = '' // Files are not supported yet
-      } else {
-        rawData[key] = String(value)
+    // Get all keys to handle multiple values properly
+    const keys = Array.from(new Set(formData.keys()))
+    const rawData: Record<string, string | string[] | boolean> = {}
+
+    for (const key of keys) {
+      const allValues = formData.getAll(key)
+
+      // Handle files by converting to empty string
+      const stringValues = allValues.map(value =>
+        value instanceof File ? '' : String(value)
+      )
+
+      // Special handling for boolean fields (checkboxes)
+      if (key === 'readLater') {
+        // Checkbox sends "on" when checked, nothing when unchecked
+        rawData[key] = stringValues.length > 0 && stringValues[0] === 'on'
+      } else if (key === 'tagNames') {
+        // Tag names should always be an array, even if there's only one
+        rawData[key] = stringValues
+      } else if (stringValues.length === 1) {
+        // Single value - return as string
+        rawData[key] = stringValues[0]
+      } else if (stringValues.length > 1) {
+        // Multiple values - return as array
+        rawData[key] = stringValues
       }
+      // If no values, don't set the key (undefined)
     }
 
     return rawData

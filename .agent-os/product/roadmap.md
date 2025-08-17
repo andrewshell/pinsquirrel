@@ -22,6 +22,8 @@ The following features have been implemented:
 - [x] Pin editing - Update existing pin information `S`
 - [x] Pin deletion with confirmation - Safe deletion workflow `XS`
 - [x] Read later flag and user interface
+- [x] Tag management UI - Add/remove tags from pins `M`
+- [x] Tag autocomplete - Suggest existing tags during input `S`
 
 ## Phase 1: Pin Management UI (1-2 weeks)
 
@@ -30,12 +32,8 @@ The following features have been implemented:
 
 ### Must-Have Features
 
-- [ ] Tag management UI - Add/remove tags from pins `M`
+- [ ] Filter pins by tag page `M`
 - [ ] Basic search - Search pins by title and description `M`
-
-### Should-Have Features
-
-- [ ] Tag autocomplete - Suggest existing tags during input `S`
 
 ### Dependencies
 

@@ -83,13 +83,18 @@ vi.mock('@pinsquirrel/core', async () => {
   return {
     ...actual,
     validatePinCreation: vi.fn(),
+    validatePinDataUpdate: vi.fn(),
     validateIdParam: vi.fn(),
   }
 })
 
 import { requireUser } from '~/lib/session.server'
 import { pinService } from '~/lib/services/container.server'
-import { validatePinCreation, validateIdParam } from '@pinsquirrel/core'
+import {
+  validatePinCreation,
+  validatePinDataUpdate,
+  validateIdParam,
+} from '@pinsquirrel/core'
 import { loader, action } from './pins.$id.edit'
 
 const mockRequireUser = vi.mocked(requireUser)
@@ -99,7 +104,8 @@ const mockGetPin = vi.mocked(pinService.getPin)
 const mockUpdatePinService = vi.mocked(pinService.updatePin)
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const mockDeletePinService = vi.mocked(pinService.deletePin)
-const mockValidatePinCreation = vi.mocked(validatePinCreation)
+const _mockValidatePinCreation = vi.mocked(validatePinCreation)
+const mockValidatePinDataUpdate = vi.mocked(validatePinDataUpdate)
 const mockValidateIdParam = vi.mocked(validateIdParam)
 
 describe('pins.$id.edit route', () => {
@@ -278,7 +284,7 @@ describe('pins.$id.edit route', () => {
         success: true,
         data: 'pin-1',
       })
-      mockValidatePinCreation.mockReturnValue({
+      mockValidatePinDataUpdate.mockReturnValue({
         success: true,
         data: {
           url: 'https://updated.com',
@@ -310,7 +316,7 @@ describe('pins.$id.edit route', () => {
         success: true,
         data: 'pin-1',
       })
-      mockValidatePinCreation.mockReturnValue({
+      mockValidatePinDataUpdate.mockReturnValue({
         success: true,
         data: {
           url: 'https://updated.com',
@@ -357,7 +363,7 @@ describe('pins.$id.edit route', () => {
         success: true,
         data: 'pin-1',
       })
-      mockValidatePinCreation.mockReturnValue({
+      mockValidatePinDataUpdate.mockReturnValue({
         success: false,
         errors: { url: 'Invalid URL', title: 'Title required' },
       })
@@ -378,6 +384,153 @@ describe('pins.$id.edit route', () => {
       // Should return validation errors (actual validation logic tested in core)
       expect(result).toHaveProperty('errors')
       expect(mockUpdatePinService).not.toHaveBeenCalled()
+    })
+
+    it('should update pin with tags', async () => {
+      mockRequireUser.mockResolvedValue(mockUser)
+      mockValidateIdParam.mockReturnValue({
+        success: true,
+        data: 'pin-1',
+      })
+      mockValidatePinDataUpdate.mockReturnValue({
+        success: true,
+        data: {
+          url: 'https://updated.com',
+          title: 'Updated Pin',
+          description: 'Updated description',
+          tagNames: ['javascript', 'react', 'frontend'],
+        },
+      })
+      mockUpdatePinService.mockResolvedValue({
+        ...mockPin,
+        url: 'https://updated.com',
+        title: 'Updated Pin',
+        description: 'Updated description',
+      })
+
+      const formData = new FormData()
+      formData.append('url', 'https://updated.com')
+      formData.append('title', 'Updated Pin')
+      formData.append('description', 'Updated description')
+      formData.append('tagNames', 'javascript')
+      formData.append('tagNames', 'react')
+      formData.append('tagNames', 'frontend')
+
+      const request = new Request('http://localhost:3000/pins/pin-1/edit', {
+        method: 'POST',
+        body: formData,
+      })
+      const params = { id: 'pin-1' }
+
+      const response = await action({ request, params, context: {} })
+
+      expect(mockUpdatePinService).toHaveBeenCalledWith('user-1', 'pin-1', {
+        url: 'https://updated.com',
+        title: 'Updated Pin',
+        description: 'Updated description',
+        readLater: false,
+        tagNames: ['javascript', 'react', 'frontend'],
+      })
+      expect(response).toBeInstanceOf(Response)
+      expect((response as Response).status).toBe(302)
+      expect((response as Response).headers.get('Location')).toBe('/pins')
+    })
+
+    it('should update pin by removing existing tags and adding new ones', async () => {
+      mockRequireUser.mockResolvedValue(mockUser)
+      mockValidateIdParam.mockReturnValue({
+        success: true,
+        data: 'pin-1',
+      })
+      mockValidatePinDataUpdate.mockReturnValue({
+        success: true,
+        data: {
+          url: 'https://updated.com',
+          title: 'Updated Pin',
+          description: 'Updated description',
+          tagNames: ['typescript', 'node'],
+        },
+      })
+      mockUpdatePinService.mockResolvedValue({
+        ...mockPin,
+        url: 'https://updated.com',
+        title: 'Updated Pin',
+        description: 'Updated description',
+      })
+
+      const formData = new FormData()
+      formData.append('url', 'https://updated.com')
+      formData.append('title', 'Updated Pin')
+      formData.append('description', 'Updated description')
+      formData.append('tagNames', 'typescript')
+      formData.append('tagNames', 'node')
+
+      const request = new Request('http://localhost:3000/pins/pin-1/edit', {
+        method: 'POST',
+        body: formData,
+      })
+      const params = { id: 'pin-1' }
+
+      const response = await action({ request, params, context: {} })
+
+      expect(mockUpdatePinService).toHaveBeenCalledWith('user-1', 'pin-1', {
+        url: 'https://updated.com',
+        title: 'Updated Pin',
+        description: 'Updated description',
+        readLater: false,
+        tagNames: ['typescript', 'node'],
+      })
+      expect(response).toBeInstanceOf(Response)
+      expect((response as Response).status).toBe(302)
+      expect((response as Response).headers.get('Location')).toBe('/pins')
+    })
+
+    it('should update pin by removing all tags when no tagNames provided', async () => {
+      mockRequireUser.mockResolvedValue(mockUser)
+      mockValidateIdParam.mockReturnValue({
+        success: true,
+        data: 'pin-1',
+      })
+      mockValidatePinDataUpdate.mockReturnValue({
+        success: true,
+        data: {
+          url: 'https://updated.com',
+          title: 'Updated Pin',
+          description: 'Updated description',
+          tagNames: [],
+        },
+      })
+      mockUpdatePinService.mockResolvedValue({
+        ...mockPin,
+        url: 'https://updated.com',
+        title: 'Updated Pin',
+        description: 'Updated description',
+      })
+
+      const formData = new FormData()
+      formData.append('url', 'https://updated.com')
+      formData.append('title', 'Updated Pin')
+      formData.append('description', 'Updated description')
+      // No tagNames appended - should remove all tags
+
+      const request = new Request('http://localhost:3000/pins/pin-1/edit', {
+        method: 'POST',
+        body: formData,
+      })
+      const params = { id: 'pin-1' }
+
+      const response = await action({ request, params, context: {} })
+
+      expect(mockUpdatePinService).toHaveBeenCalledWith('user-1', 'pin-1', {
+        url: 'https://updated.com',
+        title: 'Updated Pin',
+        description: 'Updated description',
+        readLater: false,
+        tagNames: [],
+      })
+      expect(response).toBeInstanceOf(Response)
+      expect((response as Response).status).toBe(302)
+      expect((response as Response).headers.get('Location')).toBe('/pins')
     })
 
     it('should return 404 response when pin id is missing', async () => {
@@ -414,7 +567,7 @@ describe('pins.$id.edit route', () => {
         success: true,
         data: 'pin-1',
       })
-      mockValidatePinCreation.mockReturnValue({
+      mockValidatePinDataUpdate.mockReturnValue({
         success: true,
         data: {
           url: 'https://updated.com',

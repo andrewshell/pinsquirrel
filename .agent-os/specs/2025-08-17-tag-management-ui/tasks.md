@@ -27,16 +27,16 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 3.4 Update form action to handle tag data using existing patterns
   - [x] 3.5 Verify all pin creation form tests pass
 
-- [ ] 4. Update pin editing form with tag functionality
-  - [ ] 4.1 Write tests for tag editing in existing pins
-  - [ ] 4.2 Load existing pin tags into TagInput component with suggestions from loader
-  - [ ] 4.3 Handle tag updates in pin edit form submission
-  - [ ] 4.4 Update pin edit action to process tagNames using existing patterns
-  - [ ] 4.5 Verify all pin editing tests pass
+- [x] 4. Update pin editing form with tag functionality
+  - [x] 4.1 Write tests for tag editing in existing pins
+  - [x] 4.2 Load existing pin tags into TagInput component with suggestions from loader
+  - [x] 4.3 Handle tag updates in pin edit form submission
+  - [x] 4.4 Update pin edit action to process tagNames using existing patterns
+  - [x] 4.5 Verify all pin editing tests pass
 
-- [ ] 5. Integration testing and quality assurance
-  - [ ] 5.1 Write end-to-end tests for complete tag management workflow using React Router 7 patterns
-  - [ ] 5.2 Test tag autocomplete functionality with local filtering
-  - [ ] 5.3 Verify accessibility compliance for tag input components
-  - [ ] 5.4 Run all quality checks (typecheck, lint, test, format)
-  - [ ] 5.5 Verify all tests pass and functionality works end-to-end
+- [x] 5. Integration testing and quality assurance
+  - [x] 5.1 Write end-to-end tests for complete tag management workflow using React Router 7 patterns
+  - [x] 5.2 Test tag autocomplete functionality with local filtering
+  - [x] 5.3 Verify accessibility compliance for tag input components
+  - [x] 5.4 Run all quality checks (typecheck, lint, test, format)
+  - [x] 5.5 Verify all tests pass and functionality works end-to-end
