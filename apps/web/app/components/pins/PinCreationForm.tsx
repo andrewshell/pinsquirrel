@@ -7,6 +7,7 @@ import { Label } from '~/components/ui/label'
 import { FormText } from '~/components/ui/form-text'
 import { Checkbox } from '~/components/ui/checkbox'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
+import { TagInput } from '~/components/ui/tag-input'
 import type { FieldErrors } from '@pinsquirrel/core'
 import { isValidUrl } from '@pinsquirrel/core'
 
@@ -16,6 +17,7 @@ type PinCreationFormData = {
   title: string
   description?: string
   readLater?: boolean
+  tags?: string[]
 }
 
 interface PinCreationFormProps {
@@ -28,6 +30,7 @@ interface PinCreationFormProps {
   editMode?: boolean
   initialData?: PinCreationFormData
   actionUrl?: string
+  tagSuggestions?: string[]
 }
 
 export function PinCreationForm({
@@ -40,6 +43,7 @@ export function PinCreationForm({
   editMode = false,
   initialData,
   actionUrl,
+  tagSuggestions = [],
 }: PinCreationFormProps) {
   const fetcher = useFetcher<{ errors?: FieldErrors }>()
   const formRef = useRef<HTMLFormElement>(null)
@@ -50,6 +54,7 @@ export function PinCreationForm({
   const [showSuccessMessage, setShowSuccessMessage] = useState(!!successMessage)
   const [showErrorMessage, setShowErrorMessage] = useState(!!errorMessage)
   const [urlValue, setUrlValue] = useState(initialData?.url || '')
+  const [tags, setTags] = useState<string[]>(initialData?.tags || [])
 
   // Get validation errors from fetcher or props (memoized to prevent useEffect dependencies changing)
   const errors = useMemo(
@@ -222,6 +227,34 @@ export function PinCreationForm({
         <FormText id="description-help" size="xs">
           Optional notes or context about this pin
         </FormText>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="tags" id="tags-label">
+          Tags (optional)
+        </Label>
+        <TagInput
+          id="tags"
+          aria-labelledby="tags-label"
+          tags={tags}
+          onTagsChange={setTags}
+          suggestions={tagSuggestions}
+          placeholder="Add tags..."
+          disabled={isSubmitting}
+          maxTags={10}
+        />
+        <FormText id="tags-help" size="xs">
+          Add tags to help organize and find your pins
+        </FormText>
+        {/* Hidden inputs for form submission */}
+        {tags.map((tag, index) => (
+          <input
+            key={`tag-${index}`}
+            type="hidden"
+            name="tagNames"
+            value={tag}
+          />
+        ))}
       </div>
 
       <div className="space-y-2">

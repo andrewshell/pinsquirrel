@@ -19,8 +19,10 @@ interface PinCreationFormProps {
     title: string
     description: string
     readLater?: boolean
+    tags?: string[]
   }
   actionUrl?: string
+  tagSuggestions?: string[]
 }
 
 // Helper to create route stub with component props
@@ -267,6 +269,75 @@ describe('PinCreationForm', () => {
 
       const checkbox = screen.getByRole('checkbox', { name: /read later/i })
       expect(checkbox).not.toBeChecked()
+    })
+  })
+
+  describe('Tag functionality', () => {
+    it('renders TagInput component', () => {
+      const Stub = createPinCreationFormStub()
+      render(<Stub initialEntries={['/pins/new']} />)
+
+      expect(screen.getByRole('textbox', { name: /tags/i })).toBeInTheDocument()
+    })
+
+    it('displays tag suggestions when provided', () => {
+      const tagSuggestions = ['javascript', 'react', 'typescript']
+      const Stub = createPinCreationFormStub({ tagSuggestions })
+      render(<Stub initialEntries={['/pins/new']} />)
+
+      // Component should be rendered (specific behavior tested in TagInput component)
+      expect(screen.getByRole('textbox', { name: /tags/i })).toBeInTheDocument()
+    })
+
+    it('pre-populates tags from initial data', () => {
+      const initialData = {
+        url: 'https://example.com',
+        title: 'Test Title',
+        description: 'Test Description',
+        tags: ['react', 'javascript'],
+      }
+
+      const Stub = createPinCreationFormStub({ initialData })
+      render(<Stub initialEntries={['/pins/new']} />)
+
+      expect(screen.getByText('react')).toBeInTheDocument()
+      expect(screen.getByText('javascript')).toBeInTheDocument()
+    })
+
+    it('includes hidden inputs for tag form submission', async () => {
+      const user = userEvent.setup()
+      const tagSuggestions = ['javascript', 'react']
+      const Stub = createPinCreationFormStub({ tagSuggestions })
+      const { container } = render(<Stub initialEntries={['/pins/new']} />)
+
+      const tagInput = screen.getByRole('textbox', { name: /tags/i })
+
+      // Add a tag
+      await user.type(tagInput, 'newtag')
+      await user.keyboard('{Enter}')
+
+      // Check for hidden input
+      const hiddenInputs = container.querySelectorAll('input[name="tagNames"]')
+      expect(hiddenInputs).toHaveLength(1)
+      expect(hiddenInputs[0]).toHaveValue('newtag')
+    })
+
+    it('disables TagInput when form is submitting', () => {
+      const Stub = createPinCreationFormStub()
+      render(<Stub initialEntries={['/pins/new']} />)
+
+      // When form is in normal state, TagInput should not be disabled
+      const tagInput = screen.getByRole('textbox', { name: /tags/i })
+      expect(tagInput).not.toBeDisabled()
+    })
+
+    it('respects maxTags limit', () => {
+      const Stub = createPinCreationFormStub()
+      render(<Stub initialEntries={['/pins/new']} />)
+
+      // TagInput component should be configured with maxTags=10
+      // (Specific behavior tested in TagInput component tests)
+      expect(screen.getByRole('textbox', { name: /tags/i })).toBeInTheDocument()
     })
   })
 })

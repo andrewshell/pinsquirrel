@@ -4,6 +4,7 @@ import type { Pin } from '@pinsquirrel/core'
 // Create mock functions in hoisted scope
 const mockFindById = vi.hoisted(() => vi.fn())
 const mockUpdatePin = vi.hoisted(() => vi.fn())
+const mockFindByUserId = vi.hoisted(() => vi.fn())
 
 // Mock the session.server module
 vi.mock('~/lib/session.server', () => ({
@@ -25,7 +26,9 @@ vi.mock('@pinsquirrel/database', () => ({
     findById: mockFindById,
     update: mockUpdatePin,
   })),
-  DrizzleTagRepository: vi.fn().mockImplementation(() => ({})),
+  DrizzleTagRepository: vi.fn().mockImplementation(() => ({
+    findByUserId: mockFindByUserId,
+  })),
   db: {},
 }))
 
@@ -35,6 +38,11 @@ vi.mock('~/lib/services/container.server', () => ({
     getPin: vi.fn(),
     updatePin: vi.fn(),
     deletePin: vi.fn(),
+  },
+  repositories: {
+    tag: {
+      findByUserId: mockFindByUserId,
+    },
   },
 }))
 
@@ -134,6 +142,7 @@ describe('pins.$id.edit route', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockFindByUserId.mockResolvedValue([])
   })
 
   describe('loader', () => {
@@ -153,9 +162,29 @@ describe('pins.$id.edit route', () => {
       expect(mockRequireUser).toHaveBeenCalledWith(request)
     })
 
-    it('should fetch pin by id for authenticated user', async () => {
+    it('should fetch pin by id and user tags for authenticated user', async () => {
+      const mockTags = [
+        {
+          id: 'tag-1',
+          name: 'javascript',
+          userId: 'user-1',
+          usageCount: 5,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'tag-2',
+          name: 'react',
+          userId: 'user-1',
+          usageCount: 3,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ]
+
       mockRequireUser.mockResolvedValue(mockUser)
       mockGetPin.mockResolvedValue(mockPin)
+      mockFindByUserId.mockResolvedValue(mockTags)
       mockValidateIdParam.mockReturnValue({
         success: true,
         data: 'pin-1',
@@ -168,8 +197,34 @@ describe('pins.$id.edit route', () => {
 
       // The data function returns the data directly in our mock
       expect(mockGetPin).toHaveBeenCalledWith('user-1', 'pin-1')
+      expect(mockFindByUserId).toHaveBeenCalledWith('user-1')
       // In our mock, data() just returns the object directly
-      expect(result).toEqual({ pin: mockPin })
+      expect(result).toMatchObject({
+        pin: mockPin,
+        userTags: ['javascript', 'react'],
+      })
+    })
+
+    it('should fetch pin and return empty tags array when user has no tags', async () => {
+      mockRequireUser.mockResolvedValue(mockUser)
+      mockGetPin.mockResolvedValue(mockPin)
+      mockFindByUserId.mockResolvedValue([])
+      mockValidateIdParam.mockReturnValue({
+        success: true,
+        data: 'pin-1',
+      })
+
+      const request = new Request('http://localhost:3000/pins/pin-1/edit')
+      const params = { id: 'pin-1' }
+
+      const result = await loader({ request, params, context: {} })
+
+      expect(mockGetPin).toHaveBeenCalledWith('user-1', 'pin-1')
+      expect(mockFindByUserId).toHaveBeenCalledWith('user-1')
+      expect(result).toMatchObject({
+        pin: mockPin,
+        userTags: [],
+      })
     })
 
     it('should return 404 response when pin is not found', async () => {
@@ -288,6 +343,7 @@ describe('pins.$id.edit route', () => {
         title: 'Updated Pin',
         description: 'Updated description',
         readLater: false,
+        tagNames: [],
       })
       // setFlashMessage returns a Response with redirect
       expect(response).toBeInstanceOf(Response)

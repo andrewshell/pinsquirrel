@@ -7,25 +7,25 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
 
 ## Tasks
 
-- [ ] 1. Create TagInput component with autocomplete functionality
-  - [ ] 1.1 Write tests for TagInput component behavior and interactions
-  - [ ] 1.2 Implement TagInput component with tag chips and text input
-  - [ ] 1.3 Add autocomplete dropdown with keyboard navigation
-  - [ ] 1.4 Implement tag validation using existing tagNameSchema
-  - [ ] 1.5 Verify all TagInput tests pass
+- [x] 1. Create TagInput component with autocomplete functionality
+  - [x] 1.1 Write tests for TagInput component behavior and interactions
+  - [x] 1.2 Implement TagInput component with tag chips and text input
+  - [x] 1.3 Add autocomplete dropdown with keyboard navigation
+  - [x] 1.4 Implement tag validation using existing tagNameSchema
+  - [x] 1.5 Verify all TagInput tests pass
 
-- [ ] 2. Update route loaders to include user tags
-  - [ ] 2.1 Write tests for tag loading in pins.new.tsx loader
-  - [ ] 2.2 Update pins.new.tsx loader to fetch and include user tags
-  - [ ] 2.3 Update pins.$id.edit.tsx loader to fetch and include user tags
-  - [ ] 2.4 Verify all route loader tests pass
+- [x] 2. Update route loaders to include user tags
+  - [x] 2.1 Write tests for tag loading in pins.new.tsx loader
+  - [x] 2.2 Update pins.new.tsx loader to fetch and include user tags
+  - [x] 2.3 Update pins.$id.edit.tsx loader to fetch and include user tags
+  - [x] 2.4 Verify all route loader tests pass
 
-- [ ] 3. Update pin creation form with tag functionality
-  - [ ] 3.1 Write tests for tag integration in pin creation form
-  - [ ] 3.2 Add TagInput component to PinCreationForm with tag suggestions from loader
-  - [ ] 3.3 Update form validation to include tagNames field
-  - [ ] 3.4 Update form action to handle tag data using existing patterns
-  - [ ] 3.5 Verify all pin creation form tests pass
+- [x] 3. Update pin creation form with tag functionality
+  - [x] 3.1 Write tests for tag integration in pin creation form
+  - [x] 3.2 Add TagInput component to PinCreationForm with tag suggestions from loader
+  - [x] 3.3 Update form validation to include tagNames field
+  - [x] 3.4 Update form action to handle tag data using existing patterns
+  - [x] 3.5 Verify all pin creation form tests pass
 
 - [ ] 4. Update pin editing form with tag functionality
   - [ ] 4.1 Write tests for tag editing in existing pins

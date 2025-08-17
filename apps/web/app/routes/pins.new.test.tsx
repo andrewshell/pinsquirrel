@@ -4,6 +4,7 @@ import type { User } from '@pinsquirrel/core'
 
 // Create mock functions in hoisted scope
 const mockCreate = vi.hoisted(() => vi.fn())
+const mockFindByUserId = vi.hoisted(() => vi.fn())
 
 // Mock the session.server module
 vi.mock('~/lib/session.server', () => ({
@@ -22,7 +23,9 @@ vi.mock('@pinsquirrel/database', () => ({
   DrizzlePinRepository: vi.fn().mockImplementation(() => ({
     create: mockCreate,
   })),
-  DrizzleTagRepository: vi.fn().mockImplementation(() => ({})),
+  DrizzleTagRepository: vi.fn().mockImplementation(() => ({
+    findByUserId: mockFindByUserId,
+  })),
   DrizzleUserRepository: vi.fn().mockImplementation(() => ({})),
   db: {},
 }))
@@ -56,6 +59,7 @@ describe('pins/new route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockRequireUser.mockResolvedValue(mockUser)
+    mockFindByUserId.mockResolvedValue([])
   })
 
   describe('loader', () => {
@@ -66,11 +70,51 @@ describe('pins/new route', () => {
       expect(mockRequireUser).toHaveBeenCalledWith(request)
     })
 
-    it('returns null for authenticated user', async () => {
+    it('fetches and returns user tags for authenticated user', async () => {
+      const mockTags = [
+        {
+          id: 'tag-1',
+          name: 'javascript',
+          userId: 'user-1',
+          usageCount: 5,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'tag-2',
+          name: 'react',
+          userId: 'user-1',
+          usageCount: 3,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ]
+
+      mockFindByUserId.mockResolvedValue(mockTags)
+
       const request = new Request('http://localhost/pins/new')
       const result = await loader({ request } as Parameters<typeof loader>[0])
 
-      expect(result).toBe(null)
+      expect(mockFindByUserId).toHaveBeenCalledWith('user-1')
+      expect(result).toMatchObject({
+        data: {
+          userTags: ['javascript', 'react'],
+        },
+      })
+    })
+
+    it('returns empty tags array when user has no tags', async () => {
+      mockFindByUserId.mockResolvedValue([])
+
+      const request = new Request('http://localhost/pins/new')
+      const result = await loader({ request } as Parameters<typeof loader>[0])
+
+      expect(mockFindByUserId).toHaveBeenCalledWith('user-1')
+      expect(result).toMatchObject({
+        data: {
+          userTags: [],
+        },
+      })
     })
 
     it('handles authentication errors', async () => {
@@ -135,6 +179,7 @@ describe('pins/new route', () => {
         title: 'Test Pin',
         description: 'Test description',
         readLater: false,
+        tagNames: [],
       })
 
       expect(response).toEqual(
@@ -178,6 +223,7 @@ describe('pins/new route', () => {
         title: 'Test Pin',
         description: '',
         readLater: false,
+        tagNames: [],
       })
     })
 

@@ -1,18 +1,24 @@
-import { useActionData, data } from 'react-router'
+import { useLoaderData, useActionData, data } from 'react-router'
 import type { Route } from './+types/pins.new'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
 import { repositories } from '~/lib/services/container.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
-import { validatePinCreation } from '@pinsquirrel/core'
+import { validateNewPinData } from '@pinsquirrel/core'
 import { parseFormData } from '~/lib/http-utils'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
 import { logger } from '~/lib/logger.server'
 
 export async function loader({ request }: Route.LoaderArgs) {
   // Ensure user is authenticated
-  await requireUser(request)
-  return null
+  const user = await requireUser(request)
+
+  // Fetch user's existing tags for autocomplete
+  const userTags = await repositories.tag.findByUserId(user.id)
+
+  return data({
+    userTags: userTags.map(tag => tag.name),
+  })
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -21,7 +27,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   // Parse and validate form data
   const formData = await parseFormData(request)
-  const result = validatePinCreation(formData)
+  const result = validateNewPinData(formData)
 
   if (!result.success) {
     logger.debug('Pin creation validation failed', { errors: result.errors })
@@ -36,6 +42,7 @@ export async function action({ request }: Route.ActionArgs) {
       title: result.data.title,
       description: result.data.description || '',
       readLater: result.data.readLater || false,
+      tagNames: result.data.tagNames || [],
     })
 
     logger.info('Pin created successfully', {
@@ -69,6 +76,7 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function PinsNewPage() {
+  const { userTags } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
   const {
     loading: isMetadataLoading,
@@ -97,6 +105,7 @@ export default function PinsNewPage() {
               metadataTitle={metadata?.title}
               metadataError={metadataError || undefined}
               isMetadataLoading={isMetadataLoading}
+              tagSuggestions={userTags}
               errorMessage={
                 actionData?.errors?._form
                   ? Array.isArray(actionData.errors._form)

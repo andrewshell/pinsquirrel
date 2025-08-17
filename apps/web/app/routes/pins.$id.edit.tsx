@@ -1,10 +1,10 @@
 import { useLoaderData, useActionData, data } from 'react-router'
 import type { Route } from './+types/pins.$id.edit'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
-import { pinService } from '~/lib/services/container.server'
+import { pinService, repositories } from '~/lib/services/container.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
-import { validatePinCreation, validateIdParam } from '@pinsquirrel/core'
+import { validatePinDataUpdate, validateIdParam } from '@pinsquirrel/core'
 import { parseFormData, parseParams } from '~/lib/http-utils'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
 import { logger } from '~/lib/logger.server'
@@ -15,6 +15,7 @@ export type PinCreationFormData = {
   title: string
   description?: string
   readLater?: boolean
+  tags?: string[]
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -30,10 +31,17 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response('Invalid pin ID', { status: 404 })
   }
 
-  // Fetch the pin using the service
+  // Fetch the pin using the service and user's existing tags for autocomplete
   try {
-    const pin = await pinService.getPin(user.id, pinIdResult.data)
-    return data({ pin })
+    const [pin, userTags] = await Promise.all([
+      pinService.getPin(user.id, pinIdResult.data),
+      repositories.tag.findByUserId(user.id),
+    ])
+
+    return data({
+      pin,
+      userTags: userTags.map(tag => tag.name),
+    })
   } catch (error) {
     logger.exception(error, 'Failed to load pin for editing', {
       pinId: pinIdResult.data,
@@ -153,7 +161,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   // Parse and validate form data
   const formData = await parseFormData(request)
-  const result = validatePinCreation(formData)
+  const result = validatePinDataUpdate(formData)
 
   if (!result.success) {
     logger.debug('Pin edit validation failed', { errors: result.errors })
@@ -167,6 +175,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       title: result.data.title,
       description: result.data.description,
       readLater: result.data.readLater || false,
+      tagNames: result.data.tagNames || [],
     })
 
     logger.info('Pin updated successfully', {
@@ -201,7 +210,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function PinEditPage() {
-  const { pin } = useLoaderData<typeof loader>()
+  const { pin, userTags } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
   const {
     loading: isMetadataLoading,
@@ -216,6 +225,7 @@ export default function PinEditPage() {
     title: pin.title,
     description: pin.description || '',
     readLater: pin.readLater,
+    tags: pin.tags?.map(tag => tag.name) || [],
   }
 
   return (
@@ -239,6 +249,7 @@ export default function PinEditPage() {
               metadataTitle={metadata?.title}
               metadataError={metadataError || undefined}
               isMetadataLoading={isMetadataLoading}
+              tagSuggestions={userTags}
               errorMessage={
                 actionData && 'errors' in actionData && actionData.errors?._form
                   ? Array.isArray(actionData.errors._form)
