@@ -1,14 +1,15 @@
-import { useLoaderData, useNavigation, Link, data } from 'react-router'
+import { calculatePagination, parsePaginationParams } from '@pinsquirrel/core'
+import { Plus } from 'lucide-react'
 import { useState } from 'react'
-import type { Route } from './+types/pins'
-import { requireUser, getSession, commitSession } from '~/lib/session.server'
-import { repositories } from '~/lib/services/container.server'
-import { parsePaginationParams, calculatePagination } from '@pinsquirrel/core'
+import { Link, data, useLoaderData, useNavigation } from 'react-router'
+import { PinFilter } from '~/components/pins/PinFilter'
 import { PinList } from '~/components/pins/PinList'
-import { PinsPagination } from '~/components/ui/pins-pagination'
 import { Button } from '~/components/ui/button'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
-import { Plus } from 'lucide-react'
+import { PinsPagination } from '~/components/ui/pins-pagination'
+import { repositories } from '~/lib/services/container.server'
+import { commitSession, getSession, requireUser } from '~/lib/session.server'
+import type { Route } from './+types/pins'
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url)
@@ -18,6 +19,16 @@ export async function loader({ request }: Route.LoaderArgs) {
     page: url.searchParams.get('page') || undefined,
     pageSize: url.searchParams.get('pageSize') || undefined,
   })
+
+  // Parse filter parameter from URL
+  const filterParam = url.searchParams.get('filter')
+  const currentFilter = filterParam === 'toread' ? 'toread' : 'all'
+
+  // Build filter object for repository
+  const filter: { readLater?: boolean } = {}
+  if (currentFilter === 'toread') {
+    filter.readLater = true
+  }
 
   // Get authenticated user
   const user = await requireUser(request)
@@ -29,8 +40,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   const successMessage = session.get('flash-success') as string | null
   const errorMessage = session.get('flash-error') as string | null
 
-  // Get total count for pagination calculation
-  const totalCount = await repositories.pin.countByUserId(user.id)
+  // Get total count for pagination calculation with filter
+  const totalCount = await repositories.pin.countByUserIdWithFilter(
+    user.id,
+    filter
+  )
 
   // Calculate pagination details
   const pagination = calculatePagination(totalCount, {
@@ -39,8 +53,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     maxPageSize: 100,
   })
 
-  // Fetch pins with pagination
-  const pins = await repositories.pin.findByUserId(user.id, {
+  // Fetch pins with pagination and filter
+  const pins = await repositories.pin.findByUserIdWithFilter(user.id, filter, {
     limit: pagination.pageSize,
     offset: pagination.offset,
   })
@@ -52,6 +66,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       totalPages: pagination.totalPages,
       currentPage: pagination.page,
       totalCount,
+      currentFilter,
       successMessage,
       errorMessage,
     },
@@ -84,14 +99,9 @@ export default function PinsPage() {
   return (
     <div className="min-h-screen bg-background py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8 flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">My Pins</h1>
-            <p className="mt-2 text-muted-foreground">
-              Manage your saved bookmarks, images, and articles
-            </p>
-          </div>
-          <Button asChild>
+        <div className="mb-8 flex justify-between items-center">
+          <PinFilter />
+          <Button size="sm" asChild>
             <Link to="/pins/new">
               <Plus className="h-4 w-4 mr-2" />
               Create Pin

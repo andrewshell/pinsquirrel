@@ -145,7 +145,7 @@ export function PinCard({ pin }: PinCardProps) {
             >
               delete
             </button>
-            
+
             {/* Mark as Read action - only show for read-later pins */}
             {optimisticReadLater && (
               <markAsReadFetcher.Form

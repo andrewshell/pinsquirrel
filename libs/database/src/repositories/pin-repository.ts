@@ -67,6 +67,57 @@ export class DrizzlePinRepository implements PinRepository {
     return result[0]?.count ?? 0
   }
 
+  async findByUserIdWithFilter(
+    userId: string,
+    filter: { readLater?: boolean },
+    options?: { limit?: number; offset?: number }
+  ): Promise<Pin[]> {
+    // Build the where conditions
+    const conditions = [eq(pins.userId, userId)]
+    if (filter.readLater !== undefined) {
+      conditions.push(eq(pins.readLater, filter.readLater))
+    }
+
+    const baseQuery = this.db
+      .select()
+      .from(pins)
+      .where(and(...conditions))
+      .orderBy(desc(pins.createdAt))
+
+    let query
+    if (options?.limit !== undefined && options?.offset !== undefined) {
+      query = baseQuery.limit(options.limit).offset(options.offset)
+    } else if (options?.limit !== undefined) {
+      query = baseQuery.limit(options.limit)
+    } else if (options?.offset !== undefined) {
+      query = baseQuery.offset(options.offset)
+    } else {
+      query = baseQuery
+    }
+
+    const result = await query
+
+    return this.mapPinsBulk(result)
+  }
+
+  async countByUserIdWithFilter(
+    userId: string,
+    filter: { readLater?: boolean }
+  ): Promise<number> {
+    // Build the where conditions
+    const conditions = [eq(pins.userId, userId)]
+    if (filter.readLater !== undefined) {
+      conditions.push(eq(pins.readLater, filter.readLater))
+    }
+
+    const result = await this.db
+      .select({ count: count() })
+      .from(pins)
+      .where(and(...conditions))
+
+    return result[0]?.count ?? 0
+  }
+
   async findByUserIdAndTag(userId: string, tagId: string): Promise<Pin[]> {
     const result = await this.db
       .select({

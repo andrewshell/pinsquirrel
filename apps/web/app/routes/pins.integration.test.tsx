@@ -109,13 +109,12 @@ describe('PinsPage Integration', () => {
 
     // Component rendered via renderWithRouter
 
-    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
-      'My Pins'
-    )
+    // Verify filter buttons are present instead of title
     expect(
-      await screen.findByText(
-        'Manage your saved bookmarks, images, and articles'
-      )
+      await screen.findByRole('button', { name: 'All' })
+    ).toBeInTheDocument()
+    expect(
+      await screen.findByRole('button', { name: 'To Read' })
     ).toBeInTheDocument()
   })
 
@@ -209,10 +208,10 @@ describe('PinsPage Integration', () => {
 
     // Component rendered via renderWithRouter
 
-    // Check main container structure - traverse from h1 -> div -> div -> div
-    const titleElement = await screen.findByText('My Pins') // h1 element
-    const titleWrapper = titleElement.parentElement // div wrapper for title
-    const headerContainer = titleWrapper?.parentElement // mb-8 flex div
+    // Check main container structure - traverse from filter button -> div -> div -> div
+    const allFilterButton = await screen.findByRole('button', { name: 'All' })
+    const filterContainer = allFilterButton.parentElement // filter component div
+    const headerContainer = filterContainer?.parentElement // mb-8 flex div
     const mainContainer = headerContainer?.parentElement // max-w-7xl mx-auto div
     expect(mainContainer).toHaveClass(
       'max-w-7xl',
@@ -238,19 +237,14 @@ describe('PinsPage Integration', () => {
 
     // Component rendered via renderWithRouter
 
-    // Find the header section (mb-8 flex div) - traverse from h1 -> div -> div
-    const titleElement = await screen.findByText('My Pins') // h1 element
-    const titleWrapper = titleElement.parentElement // div wrapper for title
-    const headerSection = titleWrapper?.parentElement // mb-8 flex div
+    // Find the header section (mb-8 flex div) - look for the filter component
+    const allFilterButton = await screen.findByRole('button', { name: 'All' })
+    const headerSection = allFilterButton.parentElement?.parentElement // mb-8 flex div
     expect(headerSection).toHaveClass('mb-8')
 
-    const title = screen.getByRole('heading', { level: 1 })
-    expect(title).toHaveClass('text-3xl', 'font-bold', 'text-foreground')
-
-    const subtitle = screen.getByText(
-      'Manage your saved bookmarks, images, and articles'
-    )
-    expect(subtitle).toHaveClass('mt-2', 'text-muted-foreground')
+    // Verify filter buttons are present
+    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'To Read' })).toBeInTheDocument()
   })
 
   it('integrates PinList component correctly', async () => {

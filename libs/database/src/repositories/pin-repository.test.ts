@@ -550,4 +550,116 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       expect(result.length).toBeGreaterThanOrEqual(5) // We create 5 pins in beforeEach
     })
   })
+
+  describe('findByUserIdWithFilter', () => {
+    beforeEach(async () => {
+      // Create test pins with different readLater values
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://normal-pin.com',
+        title: 'Normal Pin',
+        readLater: false,
+      })
+
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://read-later-pin1.com',
+        title: 'Read Later Pin 1',
+        readLater: true,
+      })
+
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://read-later-pin2.com',
+        title: 'Read Later Pin 2',
+        readLater: true,
+      })
+    })
+
+    it('should return all pins when no filter is applied', async () => {
+      const result = await pinRepository.findByUserIdWithFilter(testUser.id, {})
+      expect(result.length).toBe(3)
+    })
+
+    it('should return only read later pins when readLater filter is true', async () => {
+      const result = await pinRepository.findByUserIdWithFilter(testUser.id, {
+        readLater: true,
+      })
+      expect(result.length).toBe(2)
+      expect(result.every(pin => pin.readLater)).toBe(true)
+    })
+
+    it('should return only non-read-later pins when readLater filter is false', async () => {
+      const result = await pinRepository.findByUserIdWithFilter(testUser.id, {
+        readLater: false,
+      })
+      expect(result.length).toBe(1)
+      expect(result.every(pin => !pin.readLater)).toBe(true)
+    })
+
+    it('should support pagination with filter', async () => {
+      const result = await pinRepository.findByUserIdWithFilter(
+        testUser.id,
+        { readLater: true },
+        { limit: 1 }
+      )
+      expect(result.length).toBe(1)
+      expect(result[0].readLater).toBe(true)
+    })
+
+    it('should support offset with filter', async () => {
+      const result = await pinRepository.findByUserIdWithFilter(
+        testUser.id,
+        { readLater: true },
+        { limit: 1, offset: 1 }
+      )
+      expect(result.length).toBe(1)
+      expect(result[0].readLater).toBe(true)
+    })
+  })
+
+  describe('countByUserIdWithFilter', () => {
+    beforeEach(async () => {
+      // Create test pins with different readLater values
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://normal-pin.com',
+        title: 'Normal Pin',
+        readLater: false,
+      })
+
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://read-later-pin1.com',
+        title: 'Read Later Pin 1',
+        readLater: true,
+      })
+
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://read-later-pin2.com',
+        title: 'Read Later Pin 2',
+        readLater: true,
+      })
+    })
+
+    it('should count all pins when no filter is applied', async () => {
+      const count = await pinRepository.countByUserIdWithFilter(testUser.id, {})
+      expect(count).toBe(3)
+    })
+
+    it('should count only read later pins when readLater filter is true', async () => {
+      const count = await pinRepository.countByUserIdWithFilter(testUser.id, {
+        readLater: true,
+      })
+      expect(count).toBe(2)
+    })
+
+    it('should count only non-read-later pins when readLater filter is false', async () => {
+      const count = await pinRepository.countByUserIdWithFilter(testUser.id, {
+        readLater: false,
+      })
+      expect(count).toBe(1)
+    })
+  })
 })

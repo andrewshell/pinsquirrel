@@ -21,6 +21,7 @@ The following features have been implemented:
 - [x] Pin creation form - Add new pins with URL, title, description `S`
 - [x] Pin editing - Update existing pin information `S`
 - [x] Pin deletion with confirmation - Safe deletion workflow `XS`
+- [x] Read later flag and user interface
 
 ## Phase 1: Pin Management UI (1-2 weeks)
 
@@ -29,7 +30,6 @@ The following features have been implemented:
 
 ### Must-Have Features
 
-- [ ] Read later flag and user interface
 - [ ] Tag management UI - Add/remove tags from pins `M`
 - [ ] Basic search - Search pins by title and description `M`
 
