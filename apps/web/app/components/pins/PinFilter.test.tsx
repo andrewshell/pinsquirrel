@@ -40,7 +40,7 @@ describe('PinFilter', () => {
 
     // Desktop All button should have default variant styling
     expect(allButtons[0].className).toContain('bg-primary')
-    // Desktop To Read button should have outline variant styling  
+    // Desktop To Read button should have outline variant styling
     expect(toReadButtons[0].className).toContain('bg-background')
   })
 

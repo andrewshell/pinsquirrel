@@ -113,6 +113,24 @@ describe('tagNameSchema', () => {
       expect(result.success).toBe(false)
     })
   })
+
+  it('should transform tag names to lowercase', () => {
+    const testCases = [
+      { input: 'JavaScript', expected: 'javascript' },
+      { input: 'Web-Development', expected: 'web-development' },
+      { input: 'REACT', expected: 'react' },
+      { input: 'AI-ML', expected: 'ai-ml' },
+      { input: 'node123', expected: 'node123' },
+    ]
+
+    testCases.forEach(({ input, expected }) => {
+      const result = tagNameSchema.safeParse(input)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data).toBe(expected)
+      }
+    })
+  })
 })
 
 describe('createPinDataSchema', () => {

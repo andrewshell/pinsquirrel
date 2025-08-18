@@ -110,9 +110,9 @@ describe('PinsPage Integration', () => {
     // Component rendered via renderWithRouter
 
     // Verify filter buttons are present instead of title
-    expect(
-      await screen.findAllByRole('button', { name: 'All' })
-    ).toHaveLength(2) // Desktop + Mobile
+    expect(await screen.findAllByRole('button', { name: 'All' })).toHaveLength(
+      2
+    ) // Desktop + Mobile
     expect(
       await screen.findAllByRole('button', { name: 'To Read' })
     ).toHaveLength(1) // Desktop only
@@ -209,7 +209,9 @@ describe('PinsPage Integration', () => {
     // Component rendered via renderWithRouter
 
     // Check main container structure - traverse from filter button -> div -> div -> div -> div
-    const allFilterButtons = await screen.findAllByRole('button', { name: 'All' })
+    const allFilterButtons = await screen.findAllByRole('button', {
+      name: 'All',
+    })
     const allFilterButton = allFilterButtons[0] // Use desktop button
     const desktopFilterContainer = allFilterButton.parentElement // hidden sm:flex gap-2 div
     const filterComponent = desktopFilterContainer?.parentElement // flex gap-2 div (PinFilter root)
@@ -240,7 +242,9 @@ describe('PinsPage Integration', () => {
     // Component rendered via renderWithRouter
 
     // Find the header section (mb-8 flex div) - look for the filter component
-    const allFilterButtons = await screen.findAllByRole('button', { name: 'All' })
+    const allFilterButtons = await screen.findAllByRole('button', {
+      name: 'All',
+    })
     const allFilterButton = allFilterButtons[0] // Use desktop button
     const desktopFilterContainer = allFilterButton.parentElement // hidden sm:flex gap-2 div
     const filterComponent = desktopFilterContainer?.parentElement // flex gap-2 div (PinFilter root)

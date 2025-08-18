@@ -35,10 +35,11 @@ export class DrizzleTagRepository implements TagRepository {
   }
 
   async findByUserIdAndName(userId: string, name: string): Promise<Tag | null> {
+    const normalizedName = name.toLowerCase()
     const result = await this.db
       .select()
       .from(tags)
-      .where(and(eq(tags.userId, userId), eq(tags.name, name)))
+      .where(and(eq(tags.userId, userId), eq(tags.name, normalizedName)))
       .limit(1)
 
     if (result.length === 0) {
@@ -53,8 +54,10 @@ export class DrizzleTagRepository implements TagRepository {
       return []
     }
 
-    // Remove duplicates from input
-    const uniqueNames = Array.from(new Set(names))
+    // Normalize to lowercase and remove duplicates from input
+    const uniqueNames = Array.from(
+      new Set(names.map(name => name.toLowerCase()))
+    )
 
     // Find existing tags
     const existingTags = await this.db
@@ -72,7 +75,7 @@ export class DrizzleTagRepository implements TagRepository {
       const tagValues = tagsToCreate.map(name => ({
         id: crypto.randomUUID(),
         userId,
-        name,
+        name: name.toLowerCase(),
         createdAt: now,
         updatedAt: now,
       }))
@@ -124,7 +127,7 @@ export class DrizzleTagRepository implements TagRepository {
       .values({
         id,
         userId: data.userId,
-        name: data.name,
+        name: data.name.toLowerCase(),
         createdAt: now,
         updatedAt: now,
       })
@@ -139,7 +142,7 @@ export class DrizzleTagRepository implements TagRepository {
     }
 
     if (data.name !== undefined) {
-      updateValues.name = data.name
+      updateValues.name = data.name.toLowerCase()
     }
 
     const result = await this.db

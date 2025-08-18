@@ -42,11 +42,14 @@ export function TagInput({
   const filteredSuggestions = useMemo(() => {
     if (!inputValue.trim()) return []
 
-    return suggestions.filter(
-      suggestion =>
-        suggestion.toLowerCase().includes(inputValue.toLowerCase()) &&
-        !tags.includes(suggestion)
-    )
+    const normalizedInput = inputValue.toLowerCase()
+    return suggestions.filter(suggestion => {
+      const normalizedSuggestion = suggestion.toLowerCase()
+      return (
+        normalizedSuggestion.includes(normalizedInput) &&
+        !tags.includes(normalizedSuggestion)
+      )
+    })
   }, [inputValue, suggestions, tags])
 
   // Update popover state based on filtered suggestions
@@ -64,24 +67,24 @@ export function TagInput({
   }
 
   const addTag = (tagName: string) => {
-    const trimmedTag = tagName.trim()
+    const normalizedTag = tagName.trim().toLowerCase()
 
-    if (!trimmedTag) return
+    if (!normalizedTag) return
 
     // Validate tag name
-    const error = validateTag(trimmedTag)
+    const error = validateTag(normalizedTag)
     if (error) {
       setValidationError(error)
       return
     }
 
     // Check for duplicates
-    if (tags.includes(trimmedTag)) return
+    if (tags.includes(normalizedTag)) return
 
     // Check max tags limit
     if (maxTags && tags.length >= maxTags) return
 
-    onTagsChange([...tags, trimmedTag])
+    onTagsChange([...tags, normalizedTag])
     setInputValue('')
     setValidationError(null)
     inputRef.current?.focus()

@@ -29,6 +29,7 @@ export const tagNameSchema = z
     /^[a-zA-Z0-9-]+$/,
     'Tag name can only contain letters, numbers, and hyphens'
   )
+  .transform(val => val.toLowerCase())
 
 export const tagNamesSchema = z.array(tagNameSchema).optional()
 

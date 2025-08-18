@@ -169,6 +169,27 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       )
       expect(result).toBeNull()
     })
+
+    it('should find tag by case-insensitive name search', async () => {
+      const tagId = crypto.randomUUID()
+      const tagName = `mixed-case-tag-${crypto.randomUUID().slice(0, 8)}`
+
+      await testPool.query(
+        `
+        INSERT INTO tags (id, user_id, name, created_at, updated_at)
+        VALUES ($2, $1, $3, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+      `,
+        [testUser.id, tagId, tagName.toLowerCase()]
+      )
+
+      const result = await tagRepository.findByUserIdAndName(
+        testUser.id,
+        tagName.toUpperCase()
+      )
+
+      expect(result).not.toBeNull()
+      expect(result!.name).toBe(tagName.toLowerCase())
+    })
   })
 
   describe('fetchOrCreateByNames', () => {
@@ -257,6 +278,15 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       // Verify it was saved
       const saved = await tagRepository.findById(result.id)
       expect(saved).toEqual(result)
+    })
+
+    it('should create tag with normalized lowercase name', async () => {
+      const createData = {
+        userId: testUser.id,
+        name: 'UPPERCASE-Tag',
+      }
+      const result = await tagRepository.create(createData)
+      expect(result.name).toBe('uppercase-tag')
     })
   })
 
