@@ -12,7 +12,7 @@ export function Header({ user }: HeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   return (
-    <header className="w-full bg-background border-b-4 border-foreground shadow-[0_4px_0_0_theme(colors.foreground)] sm:shadow-[4px_4px_0_0_theme(colors.foreground)]">
+    <header className="w-full bg-background border-b-4 border-foreground">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
           {/* Logo/Brand */}
