@@ -9,9 +9,10 @@ import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import { PinsPagination } from '~/components/ui/pins-pagination'
 import { repositories } from '~/lib/services/container.server'
 import { commitSession, getSession, requireUser } from '~/lib/session.server'
-import type { Route } from './+types/pins'
+import { requireUsernameMatch } from '~/lib/auth.server'
+import type { Route } from './+types/$username.pins'
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request, params }: Route.LoaderArgs) {
   const url = new URL(request.url)
 
   // Parse pagination parameters from URL
@@ -30,8 +31,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     filter.readLater = true
   }
 
-  // Get authenticated user
+  // Get authenticated user and validate username match
   const user = await requireUser(request)
+  requireUsernameMatch(user, params.username)
 
   // Get session for flash messages
   const session = await getSession(request)
@@ -67,6 +69,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       currentPage: pagination.page,
       totalCount,
       currentFilter,
+      username: user.username,
       successMessage,
       errorMessage,
     },
@@ -84,6 +87,7 @@ export default function PinsPage() {
     totalPages,
     currentPage,
     totalCount,
+    username,
     successMessage,
     errorMessage,
   } = useLoaderData<typeof loader>()
@@ -102,7 +106,7 @@ export default function PinsPage() {
         <div className="mb-8 flex justify-between items-center">
           <PinFilter />
           <Button size="sm" asChild>
-            <Link to="/pins/new">
+            <Link to="new">
               <Plus className="h-4 w-4 mr-2" />
               Create Pin
             </Link>
@@ -129,7 +133,7 @@ export default function PinsPage() {
           />
         )}
 
-        <PinList pins={pins} isLoading={isLoading} />
+        <PinList pins={pins} isLoading={isLoading} username={username} />
 
         <PinsPagination
           currentPage={currentPage}

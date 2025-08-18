@@ -1,6 +1,7 @@
 import { useLoaderData, useActionData, data } from 'react-router'
-import type { Route } from './+types/pins.$id.edit'
+import type { Route } from './+types/$username.pins.$id.edit'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
+import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
 import { pinService, repositories } from '~/lib/services/container.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
@@ -19,8 +20,9 @@ export type PinCreationFormData = {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  // Ensure user is authenticated
+  // Ensure user is authenticated and username matches
   const user = await requireUser(request)
+  requireUsernameMatch(user, params.username)
 
   // Validate pin ID from params
   const paramData = parseParams(params)
@@ -55,8 +57,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  // Ensure user is authenticated
+  // Ensure user is authenticated and username matches
   const user = await requireUser(request)
+  requireUsernameMatch(user, params.username)
 
   // Validate pin ID from params
   const paramData = parseParams(params)
@@ -124,12 +127,13 @@ export async function action({ request, params }: Route.ActionArgs) {
         userId: user.id,
       })
 
-      // Redirect to pins list with success message
+      // Redirect to user's pins list with success message
+      const redirectTo = getUserPath(user.username)
       return setFlashMessage(
         request,
         'success',
         'Pin deleted successfully!',
-        '/pins'
+        redirectTo
       )
     } catch (error) {
       logger.exception(error, 'Failed to delete pin', {
@@ -184,12 +188,13 @@ export async function action({ request, params }: Route.ActionArgs) {
       url: result.data.url,
     })
 
-    // Redirect to pins list with success message
+    // Redirect to user's pins list with success message
+    const redirectTo = getUserPath(user.username)
     return setFlashMessage(
       request,
       'success',
       'Pin updated successfully!',
-      '/pins'
+      redirectTo
     )
   } catch (error) {
     logger.exception(error, 'Failed to update pin', {

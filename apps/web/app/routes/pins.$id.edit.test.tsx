@@ -95,7 +95,7 @@ import {
   validatePinDataUpdate,
   validateIdParam,
 } from '@pinsquirrel/core'
-import { loader, action } from './pins.$id.edit'
+import { loader, action } from './$username.pins.$id.edit'
 
 const mockRequireUser = vi.mocked(requireUser)
 // eslint-disable-next-line @typescript-eslint/unbound-method
@@ -160,8 +160,10 @@ describe('pins.$id.edit route', () => {
         data: 'pin-1',
       })
 
-      const request = new Request('http://localhost:3000/pins/pin-1/edit')
-      const params = { id: 'pin-1' }
+      const request = new Request(
+        'http://localhost:3000/testuser/pins/pin-1/edit'
+      )
+      const params = { id: 'pin-1', username: 'testuser' }
 
       await loader({ request, params, context: {} })
 
@@ -196,8 +198,10 @@ describe('pins.$id.edit route', () => {
         data: 'pin-1',
       })
 
-      const request = new Request('http://localhost:3000/pins/pin-1/edit')
-      const params = { id: 'pin-1' }
+      const request = new Request(
+        'http://localhost:3000/testuser/pins/pin-1/edit'
+      )
+      const params = { id: 'pin-1', username: 'testuser' }
 
       const result = await loader({ request, params, context: {} })
 
@@ -220,8 +224,10 @@ describe('pins.$id.edit route', () => {
         data: 'pin-1',
       })
 
-      const request = new Request('http://localhost:3000/pins/pin-1/edit')
-      const params = { id: 'pin-1' }
+      const request = new Request(
+        'http://localhost:3000/testuser/pins/pin-1/edit'
+      )
+      const params = { id: 'pin-1', username: 'testuser' }
 
       const result = await loader({ request, params, context: {} })
 
@@ -241,8 +247,10 @@ describe('pins.$id.edit route', () => {
         data: 'pin-1',
       })
 
-      const request = new Request('http://localhost:3000/pins/pin-1/edit')
-      const params = { id: 'pin-1' }
+      const request = new Request(
+        'http://localhost:3000/testuser/pins/pin-1/edit'
+      )
+      const params = { id: 'pin-1', username: 'testuser' }
 
       try {
         await loader({ request, params, context: {} })
@@ -262,8 +270,13 @@ describe('pins.$id.edit route', () => {
         errors: { id: 'Invalid ID format' },
       })
 
-      const request = new Request('http://localhost:3000/pins/undefined/edit')
-      const params = { id: undefined as unknown as string }
+      const request = new Request(
+        'http://localhost:3000/testuser/pins/undefined/edit'
+      )
+      const params = {
+        id: undefined as unknown as string,
+        username: 'testuser',
+      }
 
       try {
         await loader({ request, params, context: {} })
@@ -299,11 +312,14 @@ describe('pins.$id.edit route', () => {
       formData.append('title', 'Updated Pin')
       formData.append('description', 'Updated description')
 
-      const request = new Request('http://localhost:3000/pins/pin-1/edit', {
-        method: 'POST',
-        body: formData,
-      })
-      const params = { id: 'pin-1' }
+      const request = new Request(
+        'http://localhost:3000/testuser/pins/pin-1/edit',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+      const params = { id: 'pin-1', username: 'testuser' }
 
       await action({ request, params, context: {} })
 
@@ -336,11 +352,14 @@ describe('pins.$id.edit route', () => {
       formData.append('title', 'Updated Pin')
       formData.append('description', 'Updated description')
 
-      const request = new Request('http://localhost:3000/pins/pin-1/edit', {
-        method: 'POST',
-        body: formData,
-      })
-      const params = { id: 'pin-1' }
+      const request = new Request(
+        'http://localhost:3000/testuser/pins/pin-1/edit',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+      const params = { id: 'pin-1', username: 'testuser' }
 
       const response = await action({ request, params, context: {} })
 
@@ -373,11 +392,14 @@ describe('pins.$id.edit route', () => {
       formData.append('title', '')
       formData.append('description', 'Some description')
 
-      const request = new Request('http://localhost:3000/pins/pin-1/edit', {
-        method: 'POST',
-        body: formData,
-      })
-      const params = { id: 'pin-1' }
+      const request = new Request(
+        'http://localhost:3000/testuser/pins/pin-1/edit',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+      const params = { id: 'pin-1', username: 'testuser' }
 
       const result = await action({ request, params, context: {} })
 
@@ -416,11 +438,14 @@ describe('pins.$id.edit route', () => {
       formData.append('tagNames', 'react')
       formData.append('tagNames', 'frontend')
 
-      const request = new Request('http://localhost:3000/pins/pin-1/edit', {
-        method: 'POST',
-        body: formData,
-      })
-      const params = { id: 'pin-1' }
+      const request = new Request(
+        'http://localhost:3000/testuser/pins/pin-1/edit',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+      const params = { id: 'pin-1', username: 'testuser' }
 
       const response = await action({ request, params, context: {} })
 
@@ -465,11 +490,14 @@ describe('pins.$id.edit route', () => {
       formData.append('tagNames', 'typescript')
       formData.append('tagNames', 'node')
 
-      const request = new Request('http://localhost:3000/pins/pin-1/edit', {
-        method: 'POST',
-        body: formData,
-      })
-      const params = { id: 'pin-1' }
+      const request = new Request(
+        'http://localhost:3000/testuser/pins/pin-1/edit',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+      const params = { id: 'pin-1', username: 'testuser' }
 
       const response = await action({ request, params, context: {} })
 
@@ -513,11 +541,14 @@ describe('pins.$id.edit route', () => {
       formData.append('description', 'Updated description')
       // No tagNames appended - should remove all tags
 
-      const request = new Request('http://localhost:3000/pins/pin-1/edit', {
-        method: 'POST',
-        body: formData,
-      })
-      const params = { id: 'pin-1' }
+      const request = new Request(
+        'http://localhost:3000/testuser/pins/pin-1/edit',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+      const params = { id: 'pin-1', username: 'testuser' }
 
       const response = await action({ request, params, context: {} })
 
@@ -548,7 +579,10 @@ describe('pins.$id.edit route', () => {
         method: 'POST',
         body: formData,
       })
-      const params = { id: undefined as unknown as string }
+      const params = {
+        id: undefined as unknown as string,
+        username: 'testuser',
+      }
 
       try {
         await action({ request, params, context: {} })
@@ -582,11 +616,14 @@ describe('pins.$id.edit route', () => {
       formData.append('title', 'Updated Pin')
       formData.append('description', 'Updated description')
 
-      const request = new Request('http://localhost:3000/pins/pin-1/edit', {
-        method: 'POST',
-        body: formData,
-      })
-      const params = { id: 'pin-1' }
+      const request = new Request(
+        'http://localhost:3000/testuser/pins/pin-1/edit',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+      const params = { id: 'pin-1', username: 'testuser' }
 
       const result = await action({ request, params, context: {} })
 
@@ -609,10 +646,13 @@ describe('pins.$id.edit route', () => {
         })
         mockDeletePinService.mockResolvedValue()
 
-        const request = new Request('http://localhost:3000/pins/pin-1/edit', {
-          method: 'DELETE',
-        })
-        const params = { id: 'pin-1' }
+        const request = new Request(
+          'http://localhost:3000/testuser/pins/pin-1/edit',
+          {
+            method: 'DELETE',
+          }
+        )
+        const params = { id: 'pin-1', username: 'testuser' }
 
         const response = await action({ request, params, context: {} })
 
@@ -630,12 +670,12 @@ describe('pins.$id.edit route', () => {
         })
 
         const request = new Request(
-          'http://localhost:3000/pins/invalid-id/edit',
+          'http://localhost:3000/testuser/pins/invalid-id/edit',
           {
             method: 'DELETE',
           }
         )
-        const params = { id: 'invalid-id' }
+        const params = { id: 'invalid-id', username: 'testuser' }
 
         try {
           await action({ request, params, context: {} })
@@ -660,10 +700,13 @@ describe('pins.$id.edit route', () => {
           new Error('Unauthorized access to pin')
         )
 
-        const request = new Request('http://localhost:3000/pins/pin-1/edit', {
-          method: 'DELETE',
-        })
-        const params = { id: 'pin-1' }
+        const request = new Request(
+          'http://localhost:3000/testuser/pins/pin-1/edit',
+          {
+            method: 'DELETE',
+          }
+        )
+        const params = { id: 'pin-1', username: 'testuser' }
 
         try {
           await action({ request, params, context: {} })
@@ -686,10 +729,13 @@ describe('pins.$id.edit route', () => {
         })
         mockDeletePinService.mockRejectedValue(new Error('Pin not found'))
 
-        const request = new Request('http://localhost:3000/pins/pin-1/edit', {
-          method: 'DELETE',
-        })
-        const params = { id: 'pin-1' }
+        const request = new Request(
+          'http://localhost:3000/testuser/pins/pin-1/edit',
+          {
+            method: 'DELETE',
+          }
+        )
+        const params = { id: 'pin-1', username: 'testuser' }
 
         try {
           await action({ request, params, context: {} })
@@ -714,10 +760,13 @@ describe('pins.$id.edit route', () => {
           new Error('Database connection failed')
         )
 
-        const request = new Request('http://localhost:3000/pins/pin-1/edit', {
-          method: 'DELETE',
-        })
-        const params = { id: 'pin-1' }
+        const request = new Request(
+          'http://localhost:3000/testuser/pins/pin-1/edit',
+          {
+            method: 'DELETE',
+          }
+        )
+        const params = { id: 'pin-1', username: 'testuser' }
 
         try {
           await action({ request, params, context: {} })

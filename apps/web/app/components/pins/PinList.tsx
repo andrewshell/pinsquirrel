@@ -5,6 +5,7 @@ import { EmptyState } from './EmptyState'
 interface PinListProps {
   pins: Pin[]
   isLoading: boolean
+  username?: string
 }
 
 function PinSkeleton({ index }: { index: number }) {
@@ -40,7 +41,7 @@ function PinSkeleton({ index }: { index: number }) {
   )
 }
 
-export function PinList({ pins, isLoading }: PinListProps) {
+export function PinList({ pins, isLoading, username }: PinListProps) {
   // Show loading state with skeleton cards
   if (isLoading) {
     return (
@@ -74,7 +75,7 @@ export function PinList({ pins, isLoading }: PinListProps) {
       aria-label={`${pins.length} pins`}
     >
       {pins.map(pin => (
-        <PinCard key={pin.id} pin={pin} />
+        <PinCard key={pin.id} pin={pin} username={username} />
       ))}
     </div>
   )

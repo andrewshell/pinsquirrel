@@ -137,7 +137,7 @@ describe('PinCard', () => {
       renderWithRouter(<PinCard pin={mockPin} />)
       const editLink = screen.getByRole('link', { name: /edit example pin/i })
       expect(editLink).toBeInTheDocument()
-      expect(editLink).toHaveAttribute('href', '/pins/pin-1/edit')
+      expect(editLink).toHaveAttribute('href', '/pin-1/edit')
     })
 
     it('has proper accessibility attributes for edit link', () => {
@@ -161,7 +161,7 @@ describe('PinCard', () => {
       }
       renderWithRouter(<PinCard pin={customPin} />)
       const editLink = screen.getByRole('link', { name: /edit custom pin/i })
-      expect(editLink).toHaveAttribute('href', '/pins/custom-pin-123/edit')
+      expect(editLink).toHaveAttribute('href', '/custom-pin-123/edit')
     })
   })
 
@@ -272,7 +272,7 @@ describe('PinCard', () => {
       // This will be tested more thoroughly in integration tests
       expect(markAsReadButton.closest('form')).toHaveAttribute(
         'action',
-        `/pins/${mockPin.id}/edit`
+        `/${mockPin.id}/edit`
       )
       expect(markAsReadButton.closest('form')).toHaveAttribute('method', 'post')
     })

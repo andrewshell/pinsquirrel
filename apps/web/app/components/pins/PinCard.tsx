@@ -5,6 +5,7 @@ import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
 
 interface PinCardProps {
   pin: Pin
+  username?: string
 }
 
 // Type guard for mark as read response
@@ -23,7 +24,7 @@ function isMarkAsReadResponse(
   )
 }
 
-export function PinCard({ pin }: PinCardProps) {
+export function PinCard({ pin, username }: PinCardProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const markAsReadFetcher = useFetcher()
 
@@ -131,7 +132,9 @@ export function PinCard({ pin }: PinCardProps) {
             aria-label={`Actions for ${pin.title}`}
           >
             <Link
-              to={`/pins/${pin.id}/edit`}
+              to={
+                username ? `/${username}/pins/${pin.id}/edit` : `${pin.id}/edit`
+              }
               className="text-accent hover:text-accent/80 font-bold hover:underline"
               aria-label={`Edit ${pin.title}`}
             >
@@ -150,7 +153,11 @@ export function PinCard({ pin }: PinCardProps) {
             {optimisticReadLater && (
               <markAsReadFetcher.Form
                 method="patch"
-                action={`/pins/${pin.id}/edit`}
+                action={
+                  username
+                    ? `/${username}/pins/${pin.id}/edit`
+                    : `${pin.id}/edit`
+                }
                 style={{ display: 'inline' }}
               >
                 <input type="hidden" name="readLater" value="false" />
@@ -173,6 +180,7 @@ export function PinCard({ pin }: PinCardProps) {
         pin={pin}
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
+        username={username}
       />
     </div>
   )

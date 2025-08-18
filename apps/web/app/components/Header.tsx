@@ -35,6 +35,12 @@ export function Header({ user }: HeaderProps) {
               // Logged in state
               <div className="flex items-center space-x-4">
                 <Link
+                  to={`/${user.username}/pins`}
+                  className="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
+                >
+                  My Pins
+                </Link>
+                <Link
                   to="/profile"
                   className="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
                 >
@@ -82,6 +88,14 @@ export function Header({ user }: HeaderProps) {
             {user ? (
               // Logged in mobile menu
               <div className="space-y-2">
+                <Button variant="ghost" className="w-full" asChild>
+                  <Link
+                    to={`/${user.username}/pins`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    My Pins
+                  </Link>
+                </Button>
                 <Button variant="ghost" className="w-full" asChild>
                   <Link
                     to="/profile"

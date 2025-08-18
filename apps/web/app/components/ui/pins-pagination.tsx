@@ -119,7 +119,7 @@ export function PinsPagination({
                 <span className="hidden sm:block">Previous</span>
               </span>
             ) : (
-              <PaginationPrevious to={`/pins?page=${currentPage - 1}`} />
+              <PaginationPrevious to={`?page=${currentPage - 1}`} />
             )}
           </PaginationItem>
 
@@ -131,7 +131,7 @@ export function PinsPagination({
                 <PaginationEllipsis />
               ) : (
                 <PaginationLink
-                  to={`/pins?page=${page}`}
+                  to={`?page=${page}`}
                   isActive={page === currentPage}
                 >
                   {page}
@@ -153,7 +153,7 @@ export function PinsPagination({
                 <ChevronRightIcon className="h-4 w-4" />
               </span>
             ) : (
-              <PaginationNext to={`/pins?page=${currentPage + 1}`} />
+              <PaginationNext to={`?page=${currentPage + 1}`} />
             )}
           </PaginationItem>
         </PaginationContent>

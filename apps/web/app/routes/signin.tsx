@@ -3,6 +3,7 @@ import type { Route } from './+types/signin'
 import { validateLogin } from '@pinsquirrel/core'
 import { authService } from '~/lib/services/container.server'
 import { createUserSession, getUserId } from '~/lib/session.server'
+import { getUserPath } from '~/lib/auth.server'
 import { LoginForm } from '~/components/auth/LoginForm'
 import { parseFormData } from '~/lib/http-utils'
 import { logger } from '~/lib/logger.server'
@@ -49,8 +50,9 @@ export async function action({ request }: Route.ActionArgs) {
       username: user.username,
     })
 
-    // Create session and redirect
-    return await createUserSession(user.id, '/')
+    // Create session and redirect to user's pins
+    const redirectTo = getUserPath(user.username)
+    return await createUserSession(user.id, redirectTo)
   } catch (error) {
     logger.exception(error, 'Login failed', {
       username: result.data.username,

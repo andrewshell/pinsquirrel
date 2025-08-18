@@ -1,6 +1,7 @@
 import { useLoaderData, useActionData, data } from 'react-router'
-import type { Route } from './+types/pins.new'
+import type { Route } from './+types/$username.pins.new'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
+import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
 import { repositories } from '~/lib/services/container.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
@@ -9,9 +10,10 @@ import { parseFormData } from '~/lib/http-utils'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
 import { logger } from '~/lib/logger.server'
 
-export async function loader({ request }: Route.LoaderArgs) {
-  // Ensure user is authenticated
+export async function loader({ request, params }: Route.LoaderArgs) {
+  // Ensure user is authenticated and username matches
   const user = await requireUser(request)
+  requireUsernameMatch(user, params.username)
 
   // Fetch user's existing tags for autocomplete
   const userTags = await repositories.tag.findByUserId(user.id)
@@ -21,9 +23,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   })
 }
 
-export async function action({ request }: Route.ActionArgs) {
-  // Ensure user is authenticated
+export async function action({ request, params }: Route.ActionArgs) {
+  // Ensure user is authenticated and username matches
   const user = await requireUser(request)
+  requireUsernameMatch(user, params.username)
 
   // Parse and validate form data
   const formData = await parseFormData(request)
@@ -51,12 +54,13 @@ export async function action({ request }: Route.ActionArgs) {
       url: pin.url,
     })
 
-    // Redirect to pins list with success message
+    // Redirect to user's pins list with success message
+    const redirectTo = getUserPath(user.username)
     return setFlashMessage(
       request,
       'success',
       'Pin created successfully!',
-      '/pins'
+      redirectTo
     )
   } catch (error) {
     logger.exception(error, 'Failed to create pin', {

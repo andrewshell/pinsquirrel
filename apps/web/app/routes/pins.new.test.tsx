@@ -42,7 +42,7 @@ vi.mock('~/lib/logger.server', () => ({
 }))
 
 import { requireUser } from '~/lib/session.server'
-import { action, loader } from './pins.new'
+import { action, loader } from './$username.pins.new'
 
 const mockRequireUser = vi.mocked(requireUser)
 
@@ -64,8 +64,9 @@ describe('pins/new route', () => {
 
   describe('loader', () => {
     it('requires user authentication', async () => {
-      const request = new Request('http://localhost/pins/new')
-      await loader({ request } as Parameters<typeof loader>[0])
+      const request = new Request('http://localhost/testuser/pins/new')
+      const params = { username: 'testuser' }
+      await loader({ request, params } as Parameters<typeof loader>[0])
 
       expect(mockRequireUser).toHaveBeenCalledWith(request)
     })
@@ -92,8 +93,11 @@ describe('pins/new route', () => {
 
       mockFindByUserId.mockResolvedValue(mockTags)
 
-      const request = new Request('http://localhost/pins/new')
-      const result = await loader({ request } as Parameters<typeof loader>[0])
+      const request = new Request('http://localhost/testuser/pins/new')
+      const params = { username: 'testuser' }
+      const result = await loader({ request, params } as Parameters<
+        typeof loader
+      >[0])
 
       expect(mockFindByUserId).toHaveBeenCalledWith('user-1')
       expect(result).toMatchObject({
@@ -106,8 +110,11 @@ describe('pins/new route', () => {
     it('returns empty tags array when user has no tags', async () => {
       mockFindByUserId.mockResolvedValue([])
 
-      const request = new Request('http://localhost/pins/new')
-      const result = await loader({ request } as Parameters<typeof loader>[0])
+      const request = new Request('http://localhost/testuser/pins/new')
+      const params = { username: 'testuser' }
+      const result = await loader({ request, params } as Parameters<
+        typeof loader
+      >[0])
 
       expect(mockFindByUserId).toHaveBeenCalledWith('user-1')
       expect(result).toMatchObject({
@@ -120,10 +127,11 @@ describe('pins/new route', () => {
     it('handles authentication errors', async () => {
       mockRequireUser.mockRejectedValue(new Error('Unauthorized'))
 
-      const request = new Request('http://localhost/pins/new')
+      const request = new Request('http://localhost/testuser/pins/new')
+      const params = { username: 'testuser' }
 
       await expect(
-        loader({ request } as Parameters<typeof loader>[0])
+        loader({ request, params } as Parameters<typeof loader>[0])
       ).rejects.toThrow('Unauthorized')
     })
   })
@@ -134,12 +142,13 @@ describe('pins/new route', () => {
       formData.append('url', 'https://example.com')
       formData.append('title', 'Test Pin')
 
-      const request = new Request('http://localhost/pins/new', {
+      const request = new Request('http://localhost/testuser/pins/new', {
         method: 'POST',
         body: formData,
       })
 
-      await action({ request } as Parameters<typeof action>[0])
+      const params = { username: 'testuser' }
+      await action({ request, params } as Parameters<typeof action>[0])
 
       expect(mockRequireUser).toHaveBeenCalledWith(request)
     })
@@ -166,12 +175,15 @@ describe('pins/new route', () => {
       formData.append('title', 'Test Pin')
       formData.append('description', 'Test description')
 
-      const request = new Request('http://localhost/pins/new', {
+      const request = new Request('http://localhost/testuser/pins/new', {
         method: 'POST',
         body: formData,
       })
 
-      const response = await action({ request } as Parameters<typeof action>[0])
+      const params = { username: 'testuser' }
+      const response = await action({ request, params } as Parameters<
+        typeof action
+      >[0])
 
       expect(mockCreate).toHaveBeenCalledWith({
         userId: 'user-1',
@@ -210,12 +222,13 @@ describe('pins/new route', () => {
       formData.append('url', 'https://example.com')
       formData.append('title', 'Test Pin')
 
-      const request = new Request('http://localhost/pins/new', {
+      const request = new Request('http://localhost/testuser/pins/new', {
         method: 'POST',
         body: formData,
       })
 
-      await action({ request } as Parameters<typeof action>[0])
+      const params = { username: 'testuser' }
+      await action({ request, params } as Parameters<typeof action>[0])
 
       expect(mockCreate).toHaveBeenCalledWith({
         userId: 'user-1',
@@ -232,12 +245,15 @@ describe('pins/new route', () => {
       formData.append('url', 'invalid-url')
       formData.append('title', '')
 
-      const request = new Request('http://localhost/pins/new', {
+      const request = new Request('http://localhost/testuser/pins/new', {
         method: 'POST',
         body: formData,
       })
 
-      const result = await action({ request } as Parameters<typeof action>[0])
+      const params = { username: 'testuser' }
+      const result = await action({ request, params } as Parameters<
+        typeof action
+      >[0])
 
       // Should return validation errors (actual validation is tested in core)
       expect(result).toHaveProperty('data.errors')
@@ -252,12 +268,15 @@ describe('pins/new route', () => {
       formData.append('url', 'https://example.com')
       formData.append('title', 'Test Pin')
 
-      const request = new Request('http://localhost/pins/new', {
+      const request = new Request('http://localhost/testuser/pins/new', {
         method: 'POST',
         body: formData,
       })
 
-      const result = await action({ request } as Parameters<typeof action>[0])
+      const params = { username: 'testuser' }
+      const result = await action({ request, params } as Parameters<
+        typeof action
+      >[0])
 
       expect(result).toMatchObject({
         data: {
@@ -278,13 +297,14 @@ describe('pins/new route', () => {
       formData.append('url', 'https://example.com')
       formData.append('title', 'Test Pin')
 
-      const request = new Request('http://localhost/pins/new', {
+      const request = new Request('http://localhost/testuser/pins/new', {
         method: 'POST',
         body: formData,
       })
 
+      const params = { username: 'testuser' }
       await expect(
-        action({ request } as Parameters<typeof action>[0])
+        action({ request, params } as Parameters<typeof action>[0])
       ).rejects.toThrow('Unauthorized')
     })
   })
