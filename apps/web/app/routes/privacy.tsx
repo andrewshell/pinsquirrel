@@ -27,7 +27,7 @@ export default function Privacy() {
             <div className="space-y-6">
               <section>
                 <h2 className="text-xl font-semibold text-foreground mb-3">
-                  We Don&apos;t Give a Shit About Your Data
+                  We Don&apos;t Want Your Personal Information
                 </h2>
                 <p className="text-muted-foreground">
                   Seriously. We built PinSquirrel because we needed it, not to
