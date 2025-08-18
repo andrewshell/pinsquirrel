@@ -49,14 +49,10 @@ export function DeleteConfirmationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="sm:max-w-[425px]"
-        aria-labelledby="delete-dialog-title"
-        aria-describedby="delete-dialog-description"
-      >
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle id="delete-dialog-title">Delete Pin</DialogTitle>
-          <DialogDescription id="delete-dialog-description">
+          <DialogTitle>Delete Pin</DialogTitle>
+          <DialogDescription>
             Are you sure you want to delete this pin? This action cannot be
             undone.
           </DialogDescription>
@@ -92,7 +88,6 @@ export function DeleteConfirmationDialog({
               type="submit"
               variant="destructive"
               disabled={isDeleting}
-              aria-describedby="delete-dialog-description"
               className="w-full"
             >
               {isDeleting ? 'Deleting...' : 'Delete Pin'}

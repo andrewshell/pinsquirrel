@@ -60,6 +60,7 @@ describe('DeleteConfirmationDialog', () => {
         pin={mockPin}
         open={true}
         onOpenChange={vi.fn()}
+        username="testuser"
       />
     )
 
@@ -80,6 +81,7 @@ describe('DeleteConfirmationDialog', () => {
         pin={mockPin}
         open={false}
         onOpenChange={vi.fn()}
+        username="testuser"
       />
     )
 
@@ -92,6 +94,7 @@ describe('DeleteConfirmationDialog', () => {
         pin={mockPin}
         open={true}
         onOpenChange={vi.fn()}
+        username="testuser"
       />
     )
 
@@ -143,6 +146,7 @@ describe('DeleteConfirmationDialog', () => {
         pin={mockPin}
         open={true}
         onOpenChange={vi.fn()}
+        username="testuser"
       />
     )
 
@@ -164,7 +168,7 @@ describe('DeleteConfirmationDialog', () => {
         key: 'test',
       },
       formMethod: 'DELETE',
-      formAction: '/pins/pin-1/edit',
+      formAction: '/testuser/pins/pin-1/edit',
       formEncType: 'application/x-www-form-urlencoded',
       formData: undefined,
       json: undefined,
@@ -176,6 +180,7 @@ describe('DeleteConfirmationDialog', () => {
         pin={mockPin}
         open={true}
         onOpenChange={vi.fn()}
+        username="testuser"
       />
     )
 
@@ -194,7 +199,7 @@ describe('DeleteConfirmationDialog', () => {
         key: 'test',
       },
       formMethod: 'DELETE',
-      formAction: '/pins/pin-1/edit',
+      formAction: '/testuser/pins/pin-1/edit',
       formEncType: 'application/x-www-form-urlencoded',
       formData: undefined,
       json: undefined,
@@ -206,6 +211,7 @@ describe('DeleteConfirmationDialog', () => {
         pin={mockPin}
         open={true}
         onOpenChange={vi.fn()}
+        username="testuser"
       />
     )
 
@@ -222,6 +228,7 @@ describe('DeleteConfirmationDialog', () => {
         pin={mockPin}
         open={true}
         onOpenChange={vi.fn()}
+        username="testuser"
       />
     )
 
@@ -236,6 +243,7 @@ describe('DeleteConfirmationDialog', () => {
         pin={mockPin}
         open={true}
         onOpenChange={vi.fn()}
+        username="testuser"
       />
     )
 
@@ -250,6 +258,7 @@ describe('DeleteConfirmationDialog', () => {
         pin={mockPin}
         open={true}
         onOpenChange={vi.fn()}
+        username="testuser"
       />
     )
 

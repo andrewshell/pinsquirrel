@@ -1,4 +1,4 @@
-import { useLoaderData, useActionData, data } from 'react-router'
+import { useLoaderData, useActionData, useParams, data } from 'react-router'
 import type { Route } from './+types/$username.pins.$id.edit'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
 import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
@@ -217,6 +217,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 export default function PinEditPage() {
   const { pin, userTags } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
+  const params = useParams()
   const {
     loading: isMetadataLoading,
     error: metadataError,
@@ -249,7 +250,7 @@ export default function PinEditPage() {
             <PinCreationForm
               editMode
               initialData={initialData}
-              actionUrl={`/pins/${pin.id}/edit`}
+              actionUrl={`/${params.username}/pins/${pin.id}/edit`}
               onMetadataFetch={fetchMetadata}
               metadataTitle={metadata?.title}
               metadataError={metadataError || undefined}

@@ -14,7 +14,20 @@ const renderWithRouter = (component: React.ReactNode) => {
         element: component,
       },
       {
-        path: '/pins/:id/edit',
+        path: '/:username/pins/:id/edit',
+        action: ({ request }) => {
+          if (request.method === 'PATCH') {
+            // Mock successful PATCH response for readLater toggle
+            return new Response(
+              JSON.stringify({ success: true, readLater: true }),
+              {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+              }
+            )
+          }
+          return null
+        },
         element: <div>Edit Route</div>,
       },
     ],
@@ -54,65 +67,65 @@ describe('PinCard', () => {
   }
 
   it('renders pin title correctly', () => {
-    renderWithRouter(<PinCard pin={mockPin} />)
+    renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
     expect(screen.getByText('Example Pin')).toBeInTheDocument()
   })
 
   it('displays full URL', () => {
-    renderWithRouter(<PinCard pin={mockPin} />)
+    renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
     expect(screen.getByText('https://example.com')).toBeInTheDocument()
   })
 
   it('displays description when present', () => {
-    renderWithRouter(<PinCard pin={mockPin} />)
+    renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
     const description = screen.getByTestId('pin-description')
     expect(description).toHaveTextContent('This is a test pin description')
   })
 
   it('shows all associated tags as badges', () => {
-    renderWithRouter(<PinCard pin={mockPin} />)
+    renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
     expect(screen.getByText('javascript')).toBeInTheDocument()
     expect(screen.getByText('react')).toBeInTheDocument()
   })
 
   it('hides description when not provided', () => {
     const pinWithoutDesc = { ...mockPin, description: null }
-    renderWithRouter(<PinCard pin={pinWithoutDesc} />)
+    renderWithRouter(<PinCard pin={pinWithoutDesc} username="testuser" />)
     expect(screen.queryByTestId('pin-description')).not.toBeInTheDocument()
   })
 
   it('renders action buttons appropriately', () => {
-    renderWithRouter(<PinCard pin={mockPin} />)
+    renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
     expect(screen.getByLabelText('Edit Example Pin')).toBeInTheDocument()
     expect(screen.getByLabelText('Delete Example Pin')).toBeInTheDocument()
   })
 
   it('handles pins with no tags', () => {
     const pinWithoutTags = { ...mockPin, tags: [] }
-    renderWithRouter(<PinCard pin={pinWithoutTags} />)
+    renderWithRouter(<PinCard pin={pinWithoutTags} username="testuser" />)
     expect(screen.queryByTestId('pin-tags')).not.toBeInTheDocument()
   })
 
   it('handles invalid URLs gracefully', () => {
     const pinWithInvalidUrl = { ...mockPin, url: 'not-a-valid-url' }
-    renderWithRouter(<PinCard pin={pinWithInvalidUrl} />)
+    renderWithRouter(<PinCard pin={pinWithInvalidUrl} username="testuser" />)
     expect(screen.getByText('not-a-valid-url')).toBeInTheDocument()
   })
 
   it('displays full URL including www and path', () => {
     const pinWithWww = { ...mockPin, url: 'https://www.example.com/path' }
-    renderWithRouter(<PinCard pin={pinWithWww} />)
+    renderWithRouter(<PinCard pin={pinWithWww} username="testuser" />)
     expect(screen.getByText('https://www.example.com/path')).toBeInTheDocument()
   })
 
   it('handles empty description with null value', () => {
     const pinWithNullDesc = { ...mockPin, description: null }
-    renderWithRouter(<PinCard pin={pinWithNullDesc} />)
+    renderWithRouter(<PinCard pin={pinWithNullDesc} username="testuser" />)
     expect(screen.queryByTestId('pin-description')).not.toBeInTheDocument()
   })
 
   it('renders action buttons as text links with proper accessibility', () => {
-    renderWithRouter(<PinCard pin={mockPin} />)
+    renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
     const editButton = screen.getByLabelText('Edit Example Pin')
     const deleteButton = screen.getByLabelText('Delete Example Pin')
 
@@ -128,26 +141,26 @@ describe('PinCard', () => {
     twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
     const pinWithOldDate = { ...mockPin, createdAt: twoDaysAgo }
 
-    renderWithRouter(<PinCard pin={pinWithOldDate} />)
+    renderWithRouter(<PinCard pin={pinWithOldDate} username="testuser" />)
     expect(screen.getByText('2 days ago')).toBeInTheDocument()
   })
 
   describe('Edit button', () => {
     it('renders edit button as a link to edit route', () => {
-      renderWithRouter(<PinCard pin={mockPin} />)
+      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
       const editLink = screen.getByRole('link', { name: /edit example pin/i })
       expect(editLink).toBeInTheDocument()
-      expect(editLink).toHaveAttribute('href', '/pin-1/edit')
+      expect(editLink).toHaveAttribute('href', '/testuser/pins/pin-1/edit')
     })
 
     it('has proper accessibility attributes for edit link', () => {
-      renderWithRouter(<PinCard pin={mockPin} />)
+      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
       const editLink = screen.getByRole('link', { name: /edit example pin/i })
       expect(editLink).toHaveAttribute('aria-label', 'Edit Example Pin')
     })
 
     it('maintains edit button styling as a link', () => {
-      renderWithRouter(<PinCard pin={mockPin} />)
+      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
       const editLink = screen.getByRole('link', { name: /edit example pin/i })
       expect(editLink).toHaveClass('text-accent', 'font-bold')
       expect(editLink).toHaveTextContent('edit')
@@ -159,16 +172,19 @@ describe('PinCard', () => {
         id: 'custom-pin-123',
         title: 'Custom Pin',
       }
-      renderWithRouter(<PinCard pin={customPin} />)
+      renderWithRouter(<PinCard pin={customPin} username="testuser" />)
       const editLink = screen.getByRole('link', { name: /edit custom pin/i })
-      expect(editLink).toHaveAttribute('href', '/custom-pin-123/edit')
+      expect(editLink).toHaveAttribute(
+        'href',
+        '/testuser/pins/custom-pin-123/edit'
+      )
     })
   })
 
   describe('Read Later functionality', () => {
     it('shows bold title with bullet for read-later pins', () => {
       const readLaterPin = { ...mockPin, readLater: true }
-      renderWithRouter(<PinCard pin={readLaterPin} />)
+      renderWithRouter(<PinCard pin={readLaterPin} username="testuser" />)
 
       // Find the title link specifically (now includes bullet)
       const titleLink = screen.getByRole('link', { name: '• Example Pin' })
@@ -181,7 +197,7 @@ describe('PinCard', () => {
 
     it('shows normal title without bullet for regular pins', () => {
       const regularPin = { ...mockPin, readLater: false }
-      renderWithRouter(<PinCard pin={regularPin} />)
+      renderWithRouter(<PinCard pin={regularPin} username="testuser" />)
 
       // Find the title link specifically (not the URL link)
       const titleLink = screen.getByRole('link', { name: 'Example Pin' })
@@ -197,7 +213,7 @@ describe('PinCard', () => {
   describe('Mark as Read functionality', () => {
     it('shows mark as read button only for read-later pins', () => {
       const readLaterPin = { ...mockPin, readLater: true }
-      renderWithRouter(<PinCard pin={readLaterPin} />)
+      renderWithRouter(<PinCard pin={readLaterPin} username="testuser" />)
 
       const markAsReadButton = screen.getByRole('button', {
         name: /mark.*as read/i,
@@ -207,7 +223,7 @@ describe('PinCard', () => {
 
     it('does not show mark as read button for regular pins', () => {
       const regularPin = { ...mockPin, readLater: false }
-      renderWithRouter(<PinCard pin={regularPin} />)
+      renderWithRouter(<PinCard pin={regularPin} username="testuser" />)
 
       const markAsReadButton = screen.queryByRole('button', {
         name: /mark.*as read/i,
@@ -217,7 +233,7 @@ describe('PinCard', () => {
 
     it('positions mark as read button after edit and delete actions', () => {
       const readLaterPin = { ...mockPin, readLater: true }
-      renderWithRouter(<PinCard pin={readLaterPin} />)
+      renderWithRouter(<PinCard pin={readLaterPin} username="testuser" />)
 
       const actionsGroup = screen.getByRole('group', { name: /actions for/i })
 
@@ -246,7 +262,7 @@ describe('PinCard', () => {
 
     it('has proper accessibility attributes', () => {
       const readLaterPin = { ...mockPin, readLater: true }
-      renderWithRouter(<PinCard pin={readLaterPin} />)
+      renderWithRouter(<PinCard pin={readLaterPin} username="testuser" />)
 
       const markAsReadButton = screen.getByRole('button', {
         name: /mark.*as read/i,
@@ -261,7 +277,7 @@ describe('PinCard', () => {
     it('submits PATCH request when clicked', async () => {
       const user = userEvent.setup()
       const readLaterPin = { ...mockPin, readLater: true }
-      renderWithRouter(<PinCard pin={readLaterPin} />)
+      renderWithRouter(<PinCard pin={readLaterPin} username="testuser" />)
 
       const markAsReadButton = screen.getByRole('button', {
         name: /mark.*as read/i,
@@ -272,7 +288,7 @@ describe('PinCard', () => {
       // This will be tested more thoroughly in integration tests
       expect(markAsReadButton.closest('form')).toHaveAttribute(
         'action',
-        `/${mockPin.id}/edit`
+        `/testuser/pins/${mockPin.id}/edit`
       )
       expect(markAsReadButton.closest('form')).toHaveAttribute('method', 'post')
     })
@@ -280,7 +296,7 @@ describe('PinCard', () => {
 
   describe('Delete functionality', () => {
     it('should render delete button', () => {
-      renderWithRouter(<PinCard pin={mockPin} />)
+      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
       const deleteButton = screen.getByRole('button', {
         name: /delete example pin/i,
       })
@@ -290,7 +306,7 @@ describe('PinCard', () => {
 
     it('should open confirmation dialog when delete button is clicked', async () => {
       const user = userEvent.setup()
-      renderWithRouter(<PinCard pin={mockPin} />)
+      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
 
       const deleteButton = screen.getByRole('button', {
         name: /delete example pin/i,
@@ -311,7 +327,7 @@ describe('PinCard', () => {
 
     it('should display pin details in confirmation dialog', async () => {
       const user = userEvent.setup()
-      renderWithRouter(<PinCard pin={mockPin} />)
+      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
 
       const deleteButton = screen.getByRole('button', {
         name: /delete example pin/i,
@@ -326,7 +342,7 @@ describe('PinCard', () => {
 
     it('should close dialog when cancel is clicked', async () => {
       const user = userEvent.setup()
-      renderWithRouter(<PinCard pin={mockPin} />)
+      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
 
       // Open dialog
       const deleteButton = screen.getByRole('button', {
@@ -343,7 +359,7 @@ describe('PinCard', () => {
 
     it('should close dialog when X button is clicked', async () => {
       const user = userEvent.setup()
-      renderWithRouter(<PinCard pin={mockPin} />)
+      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
 
       // Open dialog
       const deleteButton = screen.getByRole('button', {
@@ -360,7 +376,7 @@ describe('PinCard', () => {
 
     it('should close dialog when escape key is pressed', async () => {
       const user = userEvent.setup()
-      renderWithRouter(<PinCard pin={mockPin} />)
+      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
 
       // Open dialog
       const deleteButton = screen.getByRole('button', {
@@ -411,7 +427,7 @@ describe('PinCard', () => {
     })
 
     it('should have proper accessibility attributes for delete button', () => {
-      renderWithRouter(<PinCard pin={mockPin} />)
+      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
       const deleteButton = screen.getByRole('button', {
         name: /delete example pin/i,
       })

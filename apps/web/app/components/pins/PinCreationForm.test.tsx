@@ -65,11 +65,13 @@ describe('PinCreationForm', () => {
   })
 
   it('uses custom action URL when provided', () => {
-    const Stub = createPinCreationFormStub({ actionUrl: '/pins/123/edit' })
+    const Stub = createPinCreationFormStub({
+      actionUrl: '/testuser/pins/123/edit',
+    })
     render(<Stub initialEntries={['/pins/new']} />)
 
     const form = screen.getByRole('form', { name: /create new pin/i })
-    expect(form).toHaveAttribute('action', '/pins/123/edit')
+    expect(form).toHaveAttribute('action', '/testuser/pins/123/edit')
   })
 
   it('shows "Update Pin" button text in edit mode', () => {

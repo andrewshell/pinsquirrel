@@ -57,23 +57,46 @@ describe('Pin Deletion Integration Tests', () => {
       [
         {
           path: '/',
-          element: <PinList pins={pins} isLoading={false} />,
+          element: (
+            <PinList pins={pins} isLoading={false} username="testuser" />
+          ),
         },
         {
-          path: '/pins/:id/edit',
+          path: '/:username/pins/:id/edit',
           action: async ({ request, params }) => {
             if (request.method === 'DELETE') {
               const pinId = params.id
-              await mockDeletePin('user-1', pinId)
-              // Simulate successful deletion redirect
-              return new Response(null, {
-                status: 302,
-                headers: { Location: '/' },
-              })
+              try {
+                await mockDeletePin('user-1', pinId)
+                // Simulate successful deletion redirect
+                return new Response(null, {
+                  status: 302,
+                  headers: { Location: '/' },
+                })
+              } catch (error) {
+                // Mirror the actual route's error handling logic
+                const errorMessage =
+                  error instanceof Error ? error.message : 'Unknown error'
+
+                if (
+                  errorMessage.includes('not found') ||
+                  errorMessage.includes('Unauthorized')
+                ) {
+                  // eslint-disable-next-line @typescript-eslint/only-throw-error
+                  throw new Response('Pin not found', { status: 404 })
+                }
+
+                // Generic server error for other cases
+                // eslint-disable-next-line @typescript-eslint/only-throw-error
+                throw new Response('Failed to delete pin. Please try again.', {
+                  status: 500,
+                })
+              }
             }
             return null
           },
           element: <div>Edit Route</div>,
+          errorElement: <div>Error occurred</div>,
         },
       ],
       {
@@ -256,10 +279,10 @@ describe('Pin Deletion Integration Tests', () => {
   })
 
   describe('Error Handling', () => {
-    it('should call deletion service even when server errors occur', async () => {
+    it('should handle server errors by displaying error page', async () => {
       const user = userEvent.setup()
 
-      // Mock a server error - but allow the test to continue
+      // Mock a server error
       mockDeletePin.mockRejectedValue(new Error('Server error'))
 
       renderWithRouter()
@@ -275,28 +298,27 @@ describe('Pin Deletion Integration Tests', () => {
 
       const confirmButton = screen.getByRole('button', { name: /delete pin/i })
 
-      // Attempt to delete - this will call the service
+      // Attempt to delete - this will trigger an error
       await user.click(confirmButton)
 
-      // Verify delete service was called despite the error
+      // Verify delete service was called
       await waitFor(() => {
         expect(mockDeletePin).toHaveBeenCalledWith('user-1', 'pin-1')
       })
 
-      // This verifies the integration flow works end-to-end
-      expect(mockDeletePin).toHaveBeenCalledTimes(1)
+      // Verify error page is displayed (the route throws a 500 response)
+      await waitFor(() => {
+        expect(screen.getByText('Error occurred')).toBeInTheDocument()
+      })
     })
 
-    it('should call deletion service for network error scenarios', async () => {
+    it('should handle not found errors by displaying error page', async () => {
       const user = userEvent.setup()
 
-      // Mock a network error
-      mockDeletePin.mockRejectedValue(new Error('NetworkError'))
+      // Mock a "not found" error
+      mockDeletePin.mockRejectedValue(new Error('Pin not found'))
 
       renderWithRouter()
-
-      // Verify pin is initially present
-      expect(await screen.findByText('Example Pin')).toBeInTheDocument()
 
       // Open dialog and attempt deletion
       const deleteButton = screen.getAllByRole('button', {
@@ -307,42 +329,43 @@ describe('Pin Deletion Integration Tests', () => {
       const confirmButton = screen.getByRole('button', { name: /delete pin/i })
       await user.click(confirmButton)
 
-      // Verify delete service was called despite network error
+      // Verify delete service was called
       await waitFor(() => {
         expect(mockDeletePin).toHaveBeenCalledWith('user-1', 'pin-1')
       })
 
-      expect(mockDeletePin).toHaveBeenCalledTimes(1)
+      // Verify error page is displayed (the route throws a 404 response)
+      await waitFor(() => {
+        expect(screen.getByText('Error occurred')).toBeInTheDocument()
+      })
     })
 
-    it('should properly invoke deletion workflow even with service failures', async () => {
+    it('should handle unauthorized errors by displaying error page', async () => {
       const user = userEvent.setup()
 
-      // Mock deletion failure
-      mockDeletePin.mockRejectedValue(new Error('Deletion failed'))
+      // Mock an unauthorized error
+      mockDeletePin.mockRejectedValue(new Error('Unauthorized access'))
 
       renderWithRouter()
 
-      // Open dialog
+      // Open dialog and attempt deletion
       const deleteButton = screen.getAllByRole('button', {
         name: /delete example pin/i,
       })[0]
       await user.click(deleteButton)
 
-      // Verify dialog is open
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
-
-      // Attempt deletion that will fail at service level
       const confirmButton = screen.getByRole('button', { name: /delete pin/i })
       await user.click(confirmButton)
 
-      // Wait for the deletion attempt
+      // Verify delete service was called
       await waitFor(() => {
         expect(mockDeletePin).toHaveBeenCalledWith('user-1', 'pin-1')
       })
 
-      // Verify the deletion workflow was executed properly
-      expect(mockDeletePin).toHaveBeenCalledTimes(1)
+      // Verify error page is displayed (the route throws a 404 response)
+      await waitFor(() => {
+        expect(screen.getByText('Error occurred')).toBeInTheDocument()
+      })
     })
   })
 
