@@ -272,13 +272,11 @@ describe('TagInput', () => {
       render(<TagInput {...defaultProps} />)
 
       const input = screen.getByRole('textbox')
-      await user.type(input, 'invalid tag!')
+      await user.type(input, 'invalid\x00tag')
       await user.keyboard('{Enter}')
 
       expect(
-        screen.getByText(
-          /tag name can only contain letters, numbers, and hyphens/i
-        )
+        screen.getByText(/tag name cannot contain control characters/i)
       ).toBeInTheDocument()
       expect(mockOnTagsChange).not.toHaveBeenCalled()
     })
@@ -288,13 +286,11 @@ describe('TagInput', () => {
       render(<TagInput {...defaultProps} />)
 
       const input = screen.getByRole('textbox')
-      await user.type(input, 'invalid!')
+      await user.type(input, 'invalid\x01tag')
       await user.keyboard('{Enter}')
 
       expect(
-        screen.getByText(
-          /tag name can only contain letters, numbers, and hyphens/i
-        )
+        screen.getByText(/tag name cannot contain control characters/i)
       ).toBeInTheDocument()
 
       await user.clear(input)
@@ -302,9 +298,7 @@ describe('TagInput', () => {
 
       await waitFor(() => {
         expect(
-          screen.queryByText(
-            /tag name can only contain letters, numbers, and hyphens/i
-          )
+          screen.queryByText(/tag name cannot contain control characters/i)
         ).not.toBeInTheDocument()
       })
     })

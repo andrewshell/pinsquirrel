@@ -25,11 +25,13 @@ export const tagNameSchema = z
   .string()
   .min(1, 'Tag name must be at least 1 character')
   .max(50, 'Tag name must be at most 50 characters')
-  .regex(
-    /^[a-zA-Z0-9-]+$/,
-    'Tag name can only contain letters, numbers, and hyphens'
+  .refine(val => val.trim().length > 0, 'Tag name cannot be only whitespace')
+  .refine(
+    // eslint-disable-next-line no-control-regex
+    val => !/[\x00-\x1f\x7f]/.test(val),
+    'Tag name cannot contain control characters'
   )
-  .transform(val => val.toLowerCase())
+  .transform(val => val.trim().toLowerCase())
 
 export const tagNamesSchema = z.array(tagNameSchema).optional()
 

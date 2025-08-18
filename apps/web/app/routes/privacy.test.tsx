@@ -15,7 +15,7 @@ describe('Privacy Page', () => {
     render(<Privacy />)
 
     expect(
-      screen.getByText("We Don't Give a Shit About Your Data")
+      screen.getByText("We Don't Want Your Personal Information")
     ).toBeInTheDocument()
     expect(screen.getByText('What We Collect')).toBeInTheDocument()
     expect(screen.getByText("What We Don't Collect")).toBeInTheDocument()

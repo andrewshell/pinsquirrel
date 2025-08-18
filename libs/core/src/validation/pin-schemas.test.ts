@@ -99,18 +99,86 @@ describe('tagNameSchema', () => {
     })
   })
 
+  it('should accept Unicode and international characters', () => {
+    const unicodeNames = [
+      'לְמִידָה', // Hebrew
+      'تعلم', // Arabic
+      '学习', // Chinese
+      'プログラミング', // Japanese
+      'café', // French
+      'naïve', // French with diacritic
+      'résumé', // French
+      'piñata', // Spanish
+      'Москва', // Russian
+    ]
+
+    unicodeNames.forEach(name => {
+      const result = tagNameSchema.safeParse(name)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data).toBe(name.trim().toLowerCase())
+      }
+    })
+  })
+
+  it('should accept special characters and symbols', () => {
+    const specialNames = [
+      'hack/sign',
+      'tag@domain',
+      'tag_with_underscore',
+      'tag.with.dots',
+      'tag+plus',
+      'tag&more',
+      'tag?question',
+      'tag#hash',
+      'tag%percent',
+      'tag:colon',
+      'tag;semicolon',
+      'tag=equals',
+      'tag$dollar',
+      'tag*star',
+    ]
+
+    specialNames.forEach(name => {
+      const result = tagNameSchema.safeParse(name)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data).toBe(name.trim().toLowerCase())
+      }
+    })
+  })
+
   it('should reject invalid tag names', () => {
     const invalidNames = [
-      '',
-      'tag with spaces',
-      'tag_with_underscore',
-      'tag@special',
-      'a'.repeat(51),
+      '', // empty string
+      '   ', // only whitespace
+      '\t\n', // only whitespace characters
+      'a'.repeat(51), // too long
+      '\x00tag', // null character (control character)
+      'tag\x01', // control character
+      '\x1ftag', // control character
+      'tag\x7f', // delete character
     ]
 
     invalidNames.forEach(name => {
       const result = tagNameSchema.safeParse(name)
       expect(result.success).toBe(false)
+    })
+  })
+
+  it('should handle whitespace trimming and validation', () => {
+    const testCases = [
+      { input: '  javascript  ', expected: 'javascript' },
+      { input: '   tag   ', expected: 'tag' }, // Changed from \t and \n which are control chars
+      { input: '  café  ', expected: 'café' },
+    ]
+
+    testCases.forEach(({ input, expected }) => {
+      const result = tagNameSchema.safeParse(input)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data).toBe(expected)
+      }
     })
   })
 
@@ -209,7 +277,7 @@ describe('createTagDataSchema', () => {
 
   it('should reject invalid tag names', () => {
     const invalidData = {
-      name: 'invalid tag name',
+      name: 'tag\x00with\x01control', // Control characters
     }
 
     const result = createTagDataSchema.safeParse(invalidData)

@@ -433,7 +433,7 @@ describe('PinService', () => {
 
     it('should validate tag name', async () => {
       await expect(
-        pinService.createTag('user-123', { name: 'invalid tag name' })
+        pinService.createTag('user-123', { name: 'invalid\x00tag' })
       ).rejects.toThrow('Invalid name')
     })
   })
