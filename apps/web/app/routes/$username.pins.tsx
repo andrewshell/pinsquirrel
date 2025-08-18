@@ -1,7 +1,7 @@
 import { calculatePagination, parsePaginationParams } from '@pinsquirrel/core'
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
-import { Link, data, useLoaderData, useNavigation } from 'react-router'
+import { Link, data, useLoaderData, useNavigation, Outlet } from 'react-router'
 import { PinFilter } from '~/components/pins/PinFilter'
 import { PinList } from '~/components/pins/PinList'
 import { Button } from '~/components/ui/button'
@@ -141,6 +141,9 @@ export default function PinsPage() {
           totalCount={totalCount}
         />
       </div>
+
+      {/* Nested routes render here as modals */}
+      <Outlet />
     </div>
   )
 }

@@ -240,19 +240,19 @@ describe('PinCard', () => {
       // Get all elements in order (buttons and links)
       const allActions = actionsGroup.children
 
-      // Should have edit link, delete button, and mark as read form
+      // Should have edit link, delete link, and mark as read form
       expect(allActions).toHaveLength(3)
 
-      // Check order: edit link first, delete button second, mark as read form third
+      // Check order: edit link first, delete link second, mark as read form third
       const editLink = allActions[0] as HTMLElement
-      const deleteButton = allActions[1] as HTMLElement
+      const deleteLink = allActions[1] as HTMLElement
       const markAsReadForm = allActions[2] as HTMLElement
 
       expect(editLink.tagName.toLowerCase()).toBe('a')
       expect(editLink).toHaveTextContent('edit')
 
-      expect(deleteButton.tagName.toLowerCase()).toBe('button')
-      expect(deleteButton).toHaveTextContent('delete')
+      expect(deleteLink.tagName.toLowerCase()).toBe('a')
+      expect(deleteLink).toHaveTextContent('delete')
 
       expect(markAsReadForm.tagName.toLowerCase()).toBe('form')
       expect(within(markAsReadForm).getByRole('button')).toHaveTextContent(
@@ -295,103 +295,70 @@ describe('PinCard', () => {
   })
 
   describe('Delete functionality', () => {
-    it('should render delete button', () => {
+    it('should render delete link', () => {
       renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
-      const deleteButton = screen.getByRole('button', {
+      const deleteLink = screen.getByRole('link', {
         name: /delete example pin/i,
       })
-      expect(deleteButton).toBeInTheDocument()
-      expect(deleteButton).toHaveTextContent('delete')
+      expect(deleteLink).toBeInTheDocument()
+      expect(deleteLink).toHaveTextContent('delete')
     })
 
-    it('should open confirmation dialog when delete button is clicked', async () => {
-      const user = userEvent.setup()
+    it('should have correct delete link href', () => {
       renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
 
-      const deleteButton = screen.getByRole('button', {
+      const deleteLink = screen.getByRole('link', {
         name: /delete example pin/i,
       })
-      await user.click(deleteButton)
+      expect(deleteLink).toHaveAttribute('href', '/pin-1/delete')
+    })
 
-      // Dialog should be open and visible
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    it('should not render confirmation dialog in component', () => {
+      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
+
+      // Dialog should not be rendered in the component anymore (it's now a route)
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(
-        screen.getByRole('heading', { name: 'Delete Pin' })
-      ).toBeInTheDocument()
-      expect(
-        screen.getByText(
-          'Are you sure you want to delete this pin? This action cannot be undone.'
-        )
-      ).toBeInTheDocument()
+        screen.queryByText('Are you sure you want to delete this pin?')
+      ).not.toBeInTheDocument()
     })
 
-    it('should display pin details in confirmation dialog', async () => {
-      const user = userEvent.setup()
+    it('should have proper CSS classes for delete link', () => {
       renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
 
-      const deleteButton = screen.getByRole('button', {
+      const deleteLink = screen.getByRole('link', {
         name: /delete example pin/i,
       })
-      await user.click(deleteButton)
-
-      // Pin details should be visible in dialog - check within dialog context
-      const dialog = screen.getByRole('dialog')
-      expect(dialog).toHaveTextContent('Example Pin')
-      expect(dialog).toHaveTextContent('https://example.com')
+      expect(deleteLink).toHaveClass(
+        'text-destructive',
+        'hover:text-destructive/80',
+        'font-bold',
+        'hover:underline'
+      )
     })
 
-    it('should close dialog when cancel is clicked', async () => {
-      const user = userEvent.setup()
+    it('should generate correct delete URL for different pins', () => {
+      const differentPin = {
+        ...mockPin,
+        id: 'different-pin-id',
+        title: 'Different Pin',
+      }
+      renderWithRouter(<PinCard pin={differentPin} username="testuser" />)
+
+      const deleteLink = screen.getByRole('link', {
+        name: /delete different pin/i,
+      })
+      expect(deleteLink).toHaveAttribute('href', '/different-pin-id/delete')
+    })
+
+    it('should not have dialog component state management', () => {
       renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
 
-      // Open dialog
-      const deleteButton = screen.getByRole('button', {
-        name: /delete example pin/i,
-      })
-      await user.click(deleteButton)
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
-
-      // Close dialog
-      const cancelButton = screen.getByRole('button', { name: /cancel/i })
-      await user.click(cancelButton)
+      // Since delete is now a route, the component should not manage dialog state
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
 
-    it('should close dialog when X button is clicked', async () => {
-      const user = userEvent.setup()
-      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
-
-      // Open dialog
-      const deleteButton = screen.getByRole('button', {
-        name: /delete example pin/i,
-      })
-      await user.click(deleteButton)
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
-
-      // Close dialog with X button
-      const closeButton = screen.getByRole('button', { name: /close/i })
-      await user.click(closeButton)
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    })
-
-    it('should close dialog when escape key is pressed', async () => {
-      const user = userEvent.setup()
-      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
-
-      // Open dialog
-      const deleteButton = screen.getByRole('button', {
-        name: /delete example pin/i,
-      })
-      await user.click(deleteButton)
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
-
-      // Close with escape key
-      await user.keyboard('{Escape}')
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    })
-
-    it('should handle dialog state properly for different pins', async () => {
-      const user = userEvent.setup()
+    it('should render separate delete links for different pins', () => {
       const secondPin = {
         ...mockPin,
         id: 'pin-2',
@@ -406,35 +373,26 @@ describe('PinCard', () => {
         </div>
       )
 
-      // Click delete on first pin
-      const firstDeleteButton = screen.getByRole('button', {
+      // Verify each pin has its own delete link with correct href
+      const firstDeleteLink = screen.getByRole('link', {
         name: /delete example pin/i,
       })
-      await user.click(firstDeleteButton)
+      const secondDeleteLink = screen.getByRole('link', {
+        name: /delete second pin/i,
+      })
 
-      // Verify dialog is open and shows correct pin details
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
-
-      // Within the dialog specifically, check for the pin details
-      const dialog = screen.getByRole('dialog')
-      expect(dialog).toHaveTextContent('Example Pin')
-      expect(dialog).toHaveTextContent('https://example.com')
-
-      // The second pin's details should still be visible in the page, but not in the dialog
-      // This test confirms the correct pin is shown in the delete dialog
-      const pinElements = screen.getAllByText('Example Pin')
-      expect(pinElements.length).toBeGreaterThanOrEqual(2) // One in page, one in dialog
+      expect(firstDeleteLink).toHaveAttribute('href', '/pin-1/delete')
+      expect(secondDeleteLink).toHaveAttribute('href', '/pin-2/delete')
     })
 
-    it('should have proper accessibility attributes for delete button', () => {
+    it('should have proper accessibility attributes for delete link', () => {
       renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
-      const deleteButton = screen.getByRole('button', {
+      const deleteLink = screen.getByRole('link', {
         name: /delete example pin/i,
       })
 
-      expect(deleteButton).toHaveAttribute('aria-label', 'Delete Example Pin')
-      expect(deleteButton).toHaveClass('text-destructive', 'font-bold')
-      expect(deleteButton).toHaveAttribute('type', 'button')
+      expect(deleteLink).toHaveAttribute('aria-label', 'Delete Example Pin')
+      expect(deleteLink).toHaveClass('text-destructive', 'font-bold')
     })
   })
 })

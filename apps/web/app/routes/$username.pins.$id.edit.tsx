@@ -1,10 +1,21 @@
-import { useLoaderData, useActionData, useParams, data } from 'react-router'
+import {
+  useLoaderData,
+  useActionData,
+  useParams,
+  useNavigate,
+  data,
+} from 'react-router'
 import type { Route } from './+types/$username.pins.$id.edit'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
 import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
 import { pinService, repositories } from '~/lib/services/container.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
 import { validatePinDataUpdate, validateIdParam } from '@pinsquirrel/core'
 import { parseFormData, parseParams } from '~/lib/http-utils'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
@@ -218,6 +229,7 @@ export default function PinEditPage() {
   const { pin, userTags } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
   const params = useParams()
+  const navigate = useNavigate()
   const {
     loading: isMetadataLoading,
     error: metadataError,
@@ -234,39 +246,34 @@ export default function PinEditPage() {
     tags: pin.tags?.map(tag => tag.name) || [],
   }
 
-  return (
-    <div className="min-h-screen bg-background py-12">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Edit Pin</h1>
-          <p className="mt-2 text-muted-foreground">Update your pin details</p>
-        </div>
+  const handleClose = () => {
+    void navigate('..')
+  }
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Pin Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PinCreationForm
-              editMode
-              initialData={initialData}
-              actionUrl={`/${params.username}/pins/${pin.id}/edit`}
-              onMetadataFetch={fetchMetadata}
-              metadataTitle={metadata?.title}
-              metadataError={metadataError || undefined}
-              isMetadataLoading={isMetadataLoading}
-              tagSuggestions={userTags}
-              errorMessage={
-                actionData && 'errors' in actionData && actionData.errors?._form
-                  ? Array.isArray(actionData.errors._form)
-                    ? actionData.errors._form.join(', ')
-                    : actionData.errors._form
-                  : undefined
-              }
-            />
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+  return (
+    <Dialog open onOpenChange={handleClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Edit Pin</DialogTitle>
+        </DialogHeader>
+        <PinCreationForm
+          editMode
+          initialData={initialData}
+          actionUrl={`/${params.username}/pins/${pin.id}/edit`}
+          onMetadataFetch={fetchMetadata}
+          metadataTitle={metadata?.title}
+          metadataError={metadataError || undefined}
+          isMetadataLoading={isMetadataLoading}
+          tagSuggestions={userTags}
+          errorMessage={
+            actionData && 'errors' in actionData && actionData.errors?._form
+              ? Array.isArray(actionData.errors._form)
+                ? actionData.errors._form.join(', ')
+                : actionData.errors._form
+              : undefined
+          }
+        />
+      </DialogContent>
+    </Dialog>
   )
 }

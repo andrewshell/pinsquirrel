@@ -1,7 +1,5 @@
-import { useState } from 'react'
 import { Link, useFetcher } from 'react-router'
 import type { Pin } from '@pinsquirrel/core'
-import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
 
 interface PinCardProps {
   pin: Pin
@@ -25,7 +23,6 @@ function isMarkAsReadResponse(
 }
 
 export function PinCard({ pin, username }: PinCardProps) {
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const markAsReadFetcher = useFetcher()
 
   // Determine optimistic pin state
@@ -140,14 +137,13 @@ export function PinCard({ pin, username }: PinCardProps) {
             >
               edit
             </Link>
-            <button
-              type="button"
+            <Link
+              to={`${pin.id}/delete`}
               className="text-destructive hover:text-destructive/80 font-bold hover:underline"
               aria-label={`Delete ${pin.title}`}
-              onClick={() => setIsDeleteDialogOpen(true)}
             >
               delete
-            </button>
+            </Link>
 
             {/* Mark as Read action - only show for read-later pins */}
             {optimisticReadLater && (
@@ -174,14 +170,6 @@ export function PinCard({ pin, username }: PinCardProps) {
           </div>
         </div>
       </div>
-
-      {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
-        pin={pin}
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-        username={username}
-      />
     </div>
   )
 }
