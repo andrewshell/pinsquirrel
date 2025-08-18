@@ -8,7 +8,7 @@ const sessionStorage = createCookieSessionStorage({
     name: '__session',
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: 60 * 60 * 24 * 30, // 30 days
+    // No default maxAge - we'll set it per session based on keepSignedIn
     sameSite: 'lax',
     secrets: [process.env.SESSION_SECRET || 'dev-secret-change-in-production'],
   },
@@ -32,7 +32,9 @@ export async function getUser(request: Request) {
     const user = await repositories.user.findById(userId)
     if (!user) {
       logger.warn('User not found for valid session', { userId })
+      return null
     }
+
     return user
   } catch (error) {
     logger.exception(error, 'Failed to fetch user from session', { userId })
@@ -48,6 +50,19 @@ export async function getUser(request: Request) {
   }
 }
 
+export async function extendSessionIfNeeded(request: Request): Promise<string | null> {
+  const session = await getSession(request)
+  const keepSignedIn = session.get('keepSignedIn') as boolean | undefined
+
+  // Only extend session if user chose to keep signed in
+  if (keepSignedIn) {
+    const cookieOptions = { maxAge: 60 * 60 * 24 * 30 } // Reset to 30 days
+    return await sessionStorage.commitSession(session, cookieOptions)
+  }
+
+  return null
+}
+
 export async function requireUser(request: Request) {
   const user = await getUser(request)
   if (!user) {
@@ -59,16 +74,36 @@ export async function requireUser(request: Request) {
 
 export async function createUserSession(
   userId: string,
-  redirectTo: string = '/'
+  redirectTo: string = '/',
+  keepSignedIn: boolean = true
 ) {
   const session = await sessionStorage.getSession()
   session.set('userId', userId)
+  session.set('keepSignedIn', keepSignedIn)
 
-  logger.info('User session created', { userId, redirectTo })
+  // Create true session cookies when keepSignedIn is false
+  // NOTE: Modern browsers (Chrome, Firefox, Safari) with session restore features
+  // may persist session cookies across browser restarts. This is browser behavior,
+  // not an application bug. True session-only behavior requires disabling session restore.
+  const cookieOptions = keepSignedIn
+    ? { maxAge: 60 * 60 * 24 * 30 } // 30 days persistent cookie
+    : {} // True session cookie - no maxAge or expires
+
+  const cookieHeader = await sessionStorage.commitSession(
+    session,
+    cookieOptions
+  )
+
+  logger.info('User session created', {
+    userId,
+    redirectTo,
+    keepSignedIn,
+    cookieOptions,
+  })
 
   return redirect(redirectTo, {
     headers: {
-      'Set-Cookie': await sessionStorage.commitSession(session),
+      'Set-Cookie': cookieHeader,
     },
   })
 }
@@ -97,9 +132,13 @@ export async function setFlashMessage(
   const session = await getSession(request)
   session.flash(`flash-${type}`, message)
 
+  // Preserve the user's keepSignedIn preference when setting flash message
+  const keepSignedIn = session.get('keepSignedIn') as boolean | undefined
+  const cookieOptions = keepSignedIn ? { maxAge: 60 * 60 * 24 * 30 } : {} // Session cookie - subject to browser session restore behavior
+
   return redirect(redirectTo, {
     headers: {
-      'Set-Cookie': await sessionStorage.commitSession(session),
+      'Set-Cookie': await sessionStorage.commitSession(session, cookieOptions),
     },
   })
 }
@@ -117,5 +156,9 @@ export async function getFlashMessage(
 export async function commitSession(
   session: Awaited<ReturnType<typeof getSession>>
 ) {
-  return sessionStorage.commitSession(session)
+  // Preserve the user's keepSignedIn preference when committing session
+  const keepSignedIn = session.get('keepSignedIn') as boolean | undefined
+  const cookieOptions = keepSignedIn ? { maxAge: 60 * 60 * 24 * 30 } : {} // Session cookie - subject to browser session restore behavior
+
+  return sessionStorage.commitSession(session, cookieOptions)
 }

@@ -56,6 +56,7 @@ export const updateUserDataSchema = z
 export const loginCredentialsSchema = z.object({
   username: usernameSchema,
   password: passwordSchema,
+  keepSignedIn: z.boolean().optional().default(true),
 })
 
 // Type exports for domain use

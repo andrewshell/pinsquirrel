@@ -126,6 +126,7 @@ export function validateUpdateUserData(data: unknown): ValidationResult<{
 export function validateLoginCredentials(data: unknown): ValidationResult<{
   username: string
   password: string
+  keepSignedIn: boolean
 }> {
   const result = loginCredentialsSchema.safeParse(data)
 
@@ -148,6 +149,7 @@ export function validateRegistration(data: unknown): ValidationResult<{
 export function validateLogin(data: unknown): ValidationResult<{
   username: string
   password: string
+  keepSignedIn: boolean
 }> {
   return validateLoginCredentials(data)
 }

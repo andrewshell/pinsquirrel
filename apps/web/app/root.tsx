@@ -9,7 +9,7 @@ import {
 } from 'react-router'
 
 import type { Route } from './+types/root'
-import { getUser } from '~/lib/session.server'
+import { getUser, extendSessionIfNeeded } from '~/lib/session.server'
 import { Header } from '~/components/Header'
 import { Footer } from '~/components/Footer'
 import './app.css'
@@ -44,7 +44,13 @@ export const links: Route.LinksFunction = () => [
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await getUser(request)
-  return { user }
+  
+  // Extend session if user is logged in and chose to keep signed in
+  const sessionCookie = user ? await extendSessionIfNeeded(request) : null
+  
+  const headers = sessionCookie ? { 'Set-Cookie': sessionCookie } : {}
+  
+  return Response.json({ user }, { headers })
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {

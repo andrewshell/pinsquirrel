@@ -224,7 +224,54 @@ describe('validators', () => {
 
       expect(result.success).toBe(true)
       if (result.success) {
+        expect(result.data).toEqual({
+          ...validData,
+          keepSignedIn: true, // default value
+        })
+      }
+    })
+
+    it('should validate login credentials with keepSignedIn explicitly set to true', () => {
+      const validData = {
+        username: 'testuser',
+        password: 'password123',
+        keepSignedIn: true,
+      }
+
+      const result = validateLoginCredentials(validData)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
         expect(result.data).toEqual(validData)
+      }
+    })
+
+    it('should validate login credentials with keepSignedIn set to false', () => {
+      const validData = {
+        username: 'testuser',
+        password: 'password123',
+        keepSignedIn: false,
+      }
+
+      const result = validateLoginCredentials(validData)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data).toEqual(validData)
+      }
+    })
+
+    it('should validate login credentials without keepSignedIn (defaults to true)', () => {
+      const validData = {
+        username: 'testuser',
+        password: 'password123',
+      }
+
+      const result = validateLoginCredentials(validData)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.keepSignedIn).toBe(true)
       }
     })
 

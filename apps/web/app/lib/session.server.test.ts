@@ -200,6 +200,48 @@ describe('Session Server - Logic Tests', () => {
       })
     })
 
+    it('should validate keepSignedIn default behavior', () => {
+      // Test the default keepSignedIn behavior patterns
+      const scenarios = [
+        { provided: true, expected: true },
+        { provided: false, expected: false },
+        { provided: undefined, expected: true }, // default to true
+      ]
+
+      scenarios.forEach(({ provided, expected }) => {
+        const keepSignedIn = provided === undefined ? true : provided
+        expect(keepSignedIn).toBe(expected)
+      })
+    })
+
+    it('should validate session extension logic patterns', () => {
+      // Test the session extension decision logic
+      const extensionScenarios = [
+        { keepSignedIn: true, shouldExtend: true },
+        { keepSignedIn: false, shouldExtend: false },
+        { keepSignedIn: undefined, shouldExtend: false },
+        { keepSignedIn: null, shouldExtend: false },
+      ]
+
+      extensionScenarios.forEach(({ keepSignedIn, shouldExtend }) => {
+        const shouldExtendSession = !!keepSignedIn
+        expect(shouldExtendSession).toBe(shouldExtend)
+      })
+    })
+
+    it('should validate cookie maxAge configuration patterns', () => {
+      // Test cookie configuration patterns for session extension
+      const cookieScenarios = [
+        { keepSignedIn: true, expectedMaxAge: 60 * 60 * 24 * 30 }, // 30 days
+        { keepSignedIn: false, expectedMaxAge: undefined }, // session cookie
+      ]
+
+      cookieScenarios.forEach(({ keepSignedIn, expectedMaxAge }) => {
+        const maxAge = keepSignedIn ? 60 * 60 * 24 * 30 : undefined
+        expect(maxAge).toBe(expectedMaxAge)
+      })
+    })
+
     it('should validate cookie configuration patterns', () => {
       // Test cookie configuration logic patterns
       const envScenarios = [

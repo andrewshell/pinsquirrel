@@ -2,6 +2,7 @@ import type { FieldErrors } from '@pinsquirrel/core'
 import { useFetcher } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
+import { Checkbox } from '~/components/ui/checkbox'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 
@@ -57,6 +58,17 @@ export function LoginForm() {
                 {actionData.errors.password}
               </p>
             )}
+          </div>
+
+          <div className="space-y-2">
+            {/* Hidden input ensures keepSignedIn is always sent as false when checkbox is unchecked */}
+            <input type="hidden" name="keepSignedIn" value="false" />
+            <Checkbox
+              id="keepSignedIn"
+              name="keepSignedIn"
+              label="Keep me signed in"
+              defaultChecked={true}
+            />
           </div>
 
           <Button type="submit" disabled={isSubmitting} className="w-full">

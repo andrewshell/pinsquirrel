@@ -28,13 +28,28 @@ describe('LoginForm', () => {
 
     const usernameInput = screen.getByLabelText('Username')
     const passwordInput = screen.getByLabelText('Password')
+    const keepSignedInCheckbox = screen.getByLabelText('Keep me signed in')
     const submitButton = screen.getByRole('button', { name: 'Sign In' })
 
     expect(usernameInput).toHaveAttribute('name', 'username')
     expect(usernameInput).toHaveAttribute('required')
     expect(passwordInput).toHaveAttribute('name', 'password')
     expect(passwordInput).toHaveAttribute('required')
+    expect(keepSignedInCheckbox).toHaveAttribute('name', 'keepSignedIn')
+    expect(keepSignedInCheckbox).toBeChecked() // Default is checked
     expect(submitButton).toHaveAttribute('type', 'submit')
+  })
+
+  it('renders "Keep me signed in" checkbox with correct default state', () => {
+    renderWithRouter()
+
+    const keepSignedInCheckbox = screen.getByLabelText('Keep me signed in')
+
+    expect(keepSignedInCheckbox).toBeInTheDocument()
+    expect(keepSignedInCheckbox).toHaveAttribute('type', 'checkbox')
+    expect(keepSignedInCheckbox).toHaveAttribute('id', 'keepSignedIn')
+    expect(keepSignedInCheckbox).toHaveAttribute('name', 'keepSignedIn')
+    expect(keepSignedInCheckbox).toBeChecked() // Should be checked by default
   })
 
   it('displays form-level error message', () => {

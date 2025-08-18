@@ -127,7 +127,10 @@ describe('Domain Schemas', () => {
         username: 'testuser',
         password: 'password123',
       }
-      expect(loginCredentialsSchema.parse(validData)).toEqual(validData)
+      expect(loginCredentialsSchema.parse(validData)).toEqual({
+        ...validData,
+        keepSignedIn: true, // default value
+      })
     })
 
     it('should reject invalid credentials', () => {

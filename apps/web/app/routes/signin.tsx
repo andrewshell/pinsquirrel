@@ -52,7 +52,11 @@ export async function action({ request }: Route.ActionArgs) {
 
     // Create session and redirect to user's pins
     const redirectTo = getUserPath(user.username)
-    return await createUserSession(user.id, redirectTo)
+    return await createUserSession(
+      user.id,
+      redirectTo,
+      result.data.keepSignedIn
+    )
   } catch (error) {
     logger.exception(error, 'Login failed', {
       username: result.data.username,

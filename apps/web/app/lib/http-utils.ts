@@ -26,9 +26,13 @@ export async function parseFormData(
       )
 
       // Special handling for boolean fields (checkboxes)
-      if (key === 'readLater') {
-        // Checkbox sends "on" when checked, nothing when unchecked
-        rawData[key] = stringValues.length > 0 && stringValues[0] === 'on'
+      if (key === 'readLater' || key === 'keepSignedIn') {
+        // With hidden input + checkbox pattern:
+        // - Unchecked: ["false"] (from hidden input)
+        // - Checked: ["false", "on"] (hidden input + checkbox)
+        // We want the checkbox to override the hidden input
+        const hasCheckboxValue = stringValues.includes('on')
+        rawData[key] = hasCheckboxValue
       } else if (key === 'tagNames') {
         // Tag names should always be an array, even if there's only one
         rawData[key] = stringValues
