@@ -107,8 +107,8 @@ export default function PinsPage() {
           <PinFilter />
           <Button size="sm" asChild>
             <Link to="new">
-              <Plus className="h-4 w-4 mr-2" />
-              Create Pin
+              <Plus className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Create Pin</span>
             </Link>
           </Button>
         </div>

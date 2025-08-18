@@ -111,11 +111,11 @@ describe('PinsPage Integration', () => {
 
     // Verify filter buttons are present instead of title
     expect(
-      await screen.findByRole('button', { name: 'All' })
-    ).toBeInTheDocument()
+      await screen.findAllByRole('button', { name: 'All' })
+    ).toHaveLength(2) // Desktop + Mobile
     expect(
-      await screen.findByRole('button', { name: 'To Read' })
-    ).toBeInTheDocument()
+      await screen.findAllByRole('button', { name: 'To Read' })
+    ).toHaveLength(1) // Desktop only
   })
 
   it('renders empty state when user has no pins', async () => {
@@ -208,10 +208,12 @@ describe('PinsPage Integration', () => {
 
     // Component rendered via renderWithRouter
 
-    // Check main container structure - traverse from filter button -> div -> div -> div
-    const allFilterButton = await screen.findByRole('button', { name: 'All' })
-    const filterContainer = allFilterButton.parentElement // filter component div
-    const headerContainer = filterContainer?.parentElement // mb-8 flex div
+    // Check main container structure - traverse from filter button -> div -> div -> div -> div
+    const allFilterButtons = await screen.findAllByRole('button', { name: 'All' })
+    const allFilterButton = allFilterButtons[0] // Use desktop button
+    const desktopFilterContainer = allFilterButton.parentElement // hidden sm:flex gap-2 div
+    const filterComponent = desktopFilterContainer?.parentElement // flex gap-2 div (PinFilter root)
+    const headerContainer = filterComponent?.parentElement // mb-8 flex div
     const mainContainer = headerContainer?.parentElement // max-w-7xl mx-auto div
     expect(mainContainer).toHaveClass(
       'max-w-7xl',
@@ -238,13 +240,16 @@ describe('PinsPage Integration', () => {
     // Component rendered via renderWithRouter
 
     // Find the header section (mb-8 flex div) - look for the filter component
-    const allFilterButton = await screen.findByRole('button', { name: 'All' })
-    const headerSection = allFilterButton.parentElement?.parentElement // mb-8 flex div
+    const allFilterButtons = await screen.findAllByRole('button', { name: 'All' })
+    const allFilterButton = allFilterButtons[0] // Use desktop button
+    const desktopFilterContainer = allFilterButton.parentElement // hidden sm:flex gap-2 div
+    const filterComponent = desktopFilterContainer?.parentElement // flex gap-2 div (PinFilter root)
+    const headerSection = filterComponent?.parentElement // mb-8 flex div
     expect(headerSection).toHaveClass('mb-8')
 
     // Verify filter buttons are present
-    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'To Read' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'All' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'To Read' })).toHaveLength(1)
   })
 
   it('integrates PinList component correctly', async () => {

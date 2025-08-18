@@ -27,40 +27,42 @@ describe('PinFilter', () => {
   it('renders both filter buttons', () => {
     renderWithRouter()
 
-    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'To Read' })).toBeInTheDocument()
+    // Should have multiple All and To Read buttons (desktop + mobile)
+    expect(screen.getAllByRole('button', { name: 'All' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'To Read' })).toHaveLength(1)
   })
 
   it('shows All button as active by default', () => {
     renderWithRouter()
 
-    const allButton = screen.getByRole('button', { name: 'All' })
-    const toReadButton = screen.getByRole('button', { name: 'To Read' })
+    const allButtons = screen.getAllByRole('button', { name: 'All' })
+    const toReadButtons = screen.getAllByRole('button', { name: 'To Read' })
 
-    // Active button should have default variant styling
-    expect(allButton.className).toContain('bg-primary')
-    // Inactive button should have outline variant styling
-    expect(toReadButton.className).toContain('bg-background')
+    // Desktop All button should have default variant styling
+    expect(allButtons[0].className).toContain('bg-primary')
+    // Desktop To Read button should have outline variant styling  
+    expect(toReadButtons[0].className).toContain('bg-background')
   })
 
   it('shows To Read button as active when filter=toread in URL', () => {
     renderWithRouter('/?filter=toread')
 
-    const allButton = screen.getByRole('button', { name: 'All' })
-    const toReadButton = screen.getByRole('button', { name: 'To Read' })
+    const allButtons = screen.getAllByRole('button', { name: 'All' })
+    const toReadButtons = screen.getAllByRole('button', { name: 'To Read' })
 
-    // To Read button should be active
-    expect(toReadButton.className).toContain('bg-primary')
-    // All button should be inactive
-    expect(allButton.className).toContain('bg-background')
+    // Desktop To Read button should be active
+    expect(toReadButtons[0].className).toContain('bg-primary')
+    // Desktop All button should be inactive
+    expect(allButtons[0].className).toContain('bg-background')
   })
 
   it('updates URL when All button is clicked from toread filter', async () => {
     const user = userEvent.setup()
     const { router } = renderWithRouter('/?filter=toread&page=2')
 
-    const allButton = screen.getByRole('button', { name: 'All' })
-    await user.click(allButton)
+    const allButtons = screen.getAllByRole('button', { name: 'All' })
+    // Click the desktop button (first one)
+    await user.click(allButtons[0])
 
     // Should remove filter param and reset page
     expect(router.state.location.search).toBe('')
@@ -70,8 +72,9 @@ describe('PinFilter', () => {
     const user = userEvent.setup()
     const { router } = renderWithRouter('/?page=2')
 
-    const toReadButton = screen.getByRole('button', { name: 'To Read' })
-    await user.click(toReadButton)
+    const toReadButtons = screen.getAllByRole('button', { name: 'To Read' })
+    // Click the desktop button (first one)
+    await user.click(toReadButtons[0])
 
     // Should add filter param and reset page
     expect(router.state.location.search).toBe('?filter=toread')
@@ -81,8 +84,9 @@ describe('PinFilter', () => {
     const user = userEvent.setup()
     const { router } = renderWithRouter('/?page=5')
 
-    const toReadButton = screen.getByRole('button', { name: 'To Read' })
-    await user.click(toReadButton)
+    const toReadButtons = screen.getAllByRole('button', { name: 'To Read' })
+    // Click the desktop button (first one)
+    await user.click(toReadButtons[0])
 
     // Page parameter should be removed
     expect(router.state.location.search).toBe('?filter=toread')
@@ -92,8 +96,9 @@ describe('PinFilter', () => {
     const user = userEvent.setup()
     const { router } = renderWithRouter('/?pageSize=50&sort=date')
 
-    const toReadButton = screen.getByRole('button', { name: 'To Read' })
-    await user.click(toReadButton)
+    const toReadButtons = screen.getAllByRole('button', { name: 'To Read' })
+    // Click the desktop button (first one)
+    await user.click(toReadButtons[0])
 
     // Should preserve other params except page
     const searchParams = new URLSearchParams(router.state.location.search)
@@ -130,23 +135,27 @@ describe('PinFilter', () => {
     renderWithRouter()
 
     const buttons = screen.getAllByRole('button')
-    expect(buttons).toHaveLength(2)
+    // Should have desktop buttons (All, To Read) + mobile buttons (All disabled, ...)
+    expect(buttons).toHaveLength(4)
 
-    buttons.forEach(button => {
-      expect(button).toBeEnabled()
-    })
+    // Desktop buttons should be enabled
+    expect(buttons[0]).toBeEnabled() // Desktop All
+    expect(buttons[1]).toBeEnabled() // Desktop To Read
+    // Mobile All button shows current state (now enabled)
+    expect(buttons[2]).toBeEnabled() // Mobile All (current state)
+    expect(buttons[3]).toBeEnabled() // Mobile dropdown trigger
   })
 
   it('handles edge case with invalid filter parameter', () => {
     renderWithRouter('/?filter=invalid')
 
     // Should default to All being active (bg-primary for default variant)
-    const allButton = screen.getByRole('button', { name: 'All' })
-    const toReadButton = screen.getByRole('button', { name: 'To Read' })
+    const allButtons = screen.getAllByRole('button', { name: 'All' })
+    const toReadButtons = screen.getAllByRole('button', { name: 'To Read' })
 
-    // All button should be active (default variant)
-    expect(allButton.className).toContain('bg-primary')
-    // To Read button should be inactive (outline variant)
-    expect(toReadButton.className).toContain('bg-background')
+    // Desktop All button should be active (default variant)
+    expect(allButtons[0].className).toContain('bg-primary')
+    // Desktop To Read button should be inactive (outline variant)
+    expect(toReadButtons[0].className).toContain('bg-background')
   })
 })
