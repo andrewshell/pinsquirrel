@@ -18,3 +18,45 @@ export class UserAlreadyExistsError extends AuthenticationError {
     this.name = 'UserAlreadyExistsError'
   }
 }
+
+export class PasswordResetError extends AuthenticationError {
+  constructor(message: string) {
+    super(message)
+    this.name = 'PasswordResetError'
+  }
+}
+
+export class InvalidResetTokenError extends PasswordResetError {
+  constructor() {
+    super('Invalid or expired password reset token')
+    this.name = 'InvalidResetTokenError'
+  }
+}
+
+export class ResetTokenExpiredError extends PasswordResetError {
+  constructor() {
+    super('Password reset token has expired')
+    this.name = 'ResetTokenExpiredError'
+  }
+}
+
+export class ResetTokenNotFoundError extends PasswordResetError {
+  constructor() {
+    super('Password reset token not found')
+    this.name = 'ResetTokenNotFoundError'
+  }
+}
+
+export class TooManyResetRequestsError extends PasswordResetError {
+  constructor() {
+    super('Too many password reset requests. Please try again later.')
+    this.name = 'TooManyResetRequestsError'
+  }
+}
+
+export class EmailSendError extends PasswordResetError {
+  constructor(message: string = 'Failed to send password reset email') {
+    super(message)
+    this.name = 'EmailSendError'
+  }
+}

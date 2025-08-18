@@ -22,6 +22,13 @@
       "when": 1755267149375,
       "tag": "0002_icy_the_professor",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1755546573910,
+      "tag": "0003_pretty_darkstar",
+      "breakpoints": true
     }
   ]
 }

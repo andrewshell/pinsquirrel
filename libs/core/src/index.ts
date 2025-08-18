@@ -14,19 +14,37 @@ export type {
   CreateTagData,
   UpdateTagData
 } from './entities/tag.js'
+export type {
+  PasswordResetToken,
+  CreatePasswordResetTokenData,
+  PasswordResetRequest,
+  PasswordResetConfirmation
+} from './entities/password-reset-token.js'
 
 // Interfaces
 export type { Repository } from './interfaces/repository.js'
 export type { UserRepository } from './interfaces/user-repository.js'
 export type { PinRepository } from './interfaces/pin-repository.js'
 export type { TagRepository } from './interfaces/tag-repository.js'
+export type { PasswordResetRepository } from './interfaces/password-reset-repository.js'
+export type { EmailService } from './interfaces/email-service.js'
 
 // Services
 export { PinService } from './services/pin-service.js'
 export { HttpMetadataService, type MetadataService, type MetadataResult } from './services/metadata-service.js'
 
 // Errors
-export { AuthenticationError, InvalidCredentialsError, UserAlreadyExistsError } from './errors/auth-errors.js'
+export { 
+  AuthenticationError, 
+  InvalidCredentialsError, 
+  UserAlreadyExistsError,
+  PasswordResetError,
+  InvalidResetTokenError,
+  ResetTokenExpiredError,
+  ResetTokenNotFoundError,
+  TooManyResetRequestsError,
+  EmailSendError
+} from './errors/auth-errors.js'
 export {
   PinError,
   PinNotFoundError,
