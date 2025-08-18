@@ -10,7 +10,7 @@ import { PinsPagination } from '~/components/ui/pins-pagination'
 import { repositories } from '~/lib/services/container.server'
 import { commitSession, getSession, requireUser } from '~/lib/session.server'
 import { requireUsernameMatch } from '~/lib/auth.server'
-import type { Route } from './+types/$username.pins'
+import type { Route } from './+types/pins'
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const url = new URL(request.url)

@@ -95,7 +95,7 @@ import {
   validatePinDataUpdate,
   validateIdParam,
 } from '@pinsquirrel/core'
-import { loader, action } from './$username.pins.$id.edit'
+import { loader, action } from './pins.$id.edit'
 
 const mockRequireUser = vi.mocked(requireUser)
 // eslint-disable-next-line @typescript-eslint/unbound-method

@@ -1,4 +1,4 @@
-import type { Route } from './+types/api.metadata'
+import type { Route } from './+types/metadata'
 import { requireUser } from '~/lib/session.server'
 import { metadataService } from '~/lib/services/container.server'
 import { HttpMetadataService } from '@pinsquirrel/core'

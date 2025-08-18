@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { loader } from './api.metadata'
-import type { Route } from './+types/api.metadata'
+import { loader } from './metadata'
+import type { Route } from './+types/metadata'
 import {
   InvalidUrlError,
   FetchTimeoutError,

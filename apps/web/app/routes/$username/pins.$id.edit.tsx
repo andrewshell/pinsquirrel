@@ -5,7 +5,7 @@ import {
   useNavigate,
   data,
 } from 'react-router'
-import type { Route } from './+types/$username.pins.$id.edit'
+import type { Route } from './+types/pins.$id.edit'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
 import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
 import { pinService, repositories } from '~/lib/services/container.server'

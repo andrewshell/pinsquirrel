@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { createRoutesStub } from 'react-router'
 import type { Pin } from '@pinsquirrel/core'
-import PinsPage from './$username.pins'
+import PinsPage from './pins'
 
 // We need to mock the React Router hooks for this integration test
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */

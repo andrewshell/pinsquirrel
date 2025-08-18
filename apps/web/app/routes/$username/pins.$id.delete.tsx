@@ -1,5 +1,5 @@
 import { useLoaderData, useNavigate, data } from 'react-router'
-import type { Route } from './+types/$username.pins.$id.delete'
+import type { Route } from './+types/pins.$id.delete'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
 import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
 import { pinService } from '~/lib/services/container.server'

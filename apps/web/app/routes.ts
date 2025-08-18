@@ -5,13 +5,13 @@ export default [
   route('signin', 'routes/signin.tsx'),
   route('signup', 'routes/signup.tsx'),
   route('profile', 'routes/profile.tsx'),
-  route(':username/pins', 'routes/$username.pins.tsx', [
-    route('new', 'routes/$username.pins.new.tsx'),
-    route(':id/edit', 'routes/$username.pins.$id.edit.tsx'),
-    route(':id/delete', 'routes/$username.pins.$id.delete.tsx'),
+  route(':username/pins', 'routes/$username/pins.tsx', [
+    route('new', 'routes/$username/pins.new.tsx'),
+    route(':id/edit', 'routes/$username/pins.$id.edit.tsx'),
+    route(':id/delete', 'routes/$username/pins.$id.delete.tsx'),
   ]),
   route('logout', 'routes/logout.tsx'),
-  route('api/metadata', 'routes/api.metadata.tsx'),
+  route('api/metadata', 'routes/api/metadata.tsx'),
   route('privacy', 'routes/privacy.tsx'),
   route('terms', 'routes/terms.tsx'),
 

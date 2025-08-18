@@ -42,7 +42,7 @@ vi.mock('~/lib/logger.server', () => ({
 }))
 
 import { requireUser } from '~/lib/session.server'
-import { action, loader } from './$username.pins.new'
+import { action, loader } from './pins.new'
 
 const mockRequireUser = vi.mocked(requireUser)
 
