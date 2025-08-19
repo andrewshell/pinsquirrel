@@ -1,21 +1,13 @@
-import {
-  useLoaderData,
-  useActionData,
-  useParams,
-  useNavigate,
-  data,
-} from 'react-router'
+import { useLoaderData, useActionData, useParams, data } from 'react-router'
 import type { Route } from './+types/pins.$id.edit'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
 import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
 import { pinService, repositories } from '~/lib/services/container.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog'
+import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
+import { Button } from '~/components/ui/button'
+import { ArrowLeft } from 'lucide-react'
+import { Link } from 'react-router'
 import { validatePinDataUpdate, validateIdParam } from '@pinsquirrel/core'
 import { parseFormData, parseParams } from '~/lib/http-utils'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
@@ -28,6 +20,18 @@ export type PinCreationFormData = {
   description?: string
   readLater?: boolean
   tags?: string[]
+}
+
+export function meta(_: Route.MetaArgs) {
+  return [
+    {
+      title: 'Edit Pin - PinSquirrel',
+    },
+    {
+      name: 'description',
+      content: 'Edit your saved link, article, or bookmark on PinSquirrel.',
+    },
+  ]
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -229,7 +233,6 @@ export default function PinEditPage() {
   const { pin, userTags } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
   const params = useParams()
-  const navigate = useNavigate()
   const {
     loading: isMetadataLoading,
     error: metadataError,
@@ -246,36 +249,45 @@ export default function PinEditPage() {
     tags: pin.tags?.map(tag => tag.name) || [],
   }
 
-  const handleClose = () => {
-    void navigate('..')
-  }
-
   return (
-    <Dialog open onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Edit Pin</DialogTitle>
-        </DialogHeader>
-        <PinCreationForm
-          editMode
-          initialData={initialData}
-          actionUrl={`/${params.username}/pins/${pin.id}/edit`}
-          onMetadataFetch={fetchMetadata}
-          metadataTitle={metadata?.title}
-          metadataDescription={metadata?.description}
-          metadataError={metadataError || undefined}
-          isMetadataLoading={isMetadataLoading}
-          tagSuggestions={userTags}
-          urlParams={null}
-          errorMessage={
-            actionData && 'errors' in actionData && actionData.errors?._form
-              ? Array.isArray(actionData.errors._form)
-                ? actionData.errors._form.join(', ')
-                : actionData.errors._form
-              : undefined
-          }
-        />
-      </DialogContent>
-    </Dialog>
+    <div className="bg-background py-12">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <Button variant="ghost" size="sm" asChild>
+            <Link to={`/${params.username}/pins`}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Pins
+            </Link>
+          </Button>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Edit Pin</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PinCreationForm
+              editMode
+              initialData={initialData}
+              actionUrl={`/${params.username}/pins/${pin.id}/edit`}
+              onMetadataFetch={fetchMetadata}
+              metadataTitle={metadata?.title}
+              metadataDescription={metadata?.description}
+              metadataError={metadataError || undefined}
+              isMetadataLoading={isMetadataLoading}
+              tagSuggestions={userTags}
+              urlParams={null}
+              errorMessage={
+                actionData && 'errors' in actionData && actionData.errors?._form
+                  ? Array.isArray(actionData.errors._form)
+                    ? actionData.errors._form.join(', ')
+                    : actionData.errors._form
+                  : undefined
+              }
+            />
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   )
 }

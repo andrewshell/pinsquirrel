@@ -1,4 +1,4 @@
-import { useLoaderData, useNavigate, data } from 'react-router'
+import { useLoaderData, data } from 'react-router'
 import type { Route } from './+types/pins.$id.delete'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
 import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
@@ -7,16 +7,29 @@ import { validateIdParam } from '@pinsquirrel/core'
 import { parseParams } from '~/lib/http-utils'
 import { logger } from '~/lib/logger.server'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog'
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
-import { Form, useNavigation } from 'react-router'
+import { Form, useNavigation, Link } from 'react-router'
+import { ArrowLeft } from 'lucide-react'
 import { useEffect, useRef } from 'react'
+
+export function meta(_: Route.MetaArgs) {
+  return [
+    {
+      title: 'Delete Pin - PinSquirrel',
+    },
+    {
+      name: 'description',
+      content: 'Confirm deletion of your saved link, article, or bookmark.',
+    },
+  ]
+}
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   // Ensure user is authenticated and username matches
@@ -38,6 +51,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
     return data({
       pin,
+      username: params.username,
     })
   } catch (error) {
     logger.exception(error, 'Failed to load pin for deletion', {
@@ -115,23 +129,18 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function PinDeletePage() {
-  const { pin } = useLoaderData<typeof loader>()
-  const navigate = useNavigate()
+  const { pin, username } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
   const deleteButtonRef = useRef<HTMLButtonElement>(null)
-
-  const handleClose = () => {
-    void navigate('..')
-  }
 
   // Check if we're currently deleting
   const isDeleting =
     navigation.state === 'submitting' && navigation.formMethod === 'DELETE'
 
-  // Focus the delete button when dialog opens
+  // Focus the delete button when page loads
   useEffect(() => {
     if (deleteButtonRef.current) {
-      // Small delay to ensure the dialog is fully rendered and focus guards are set up
+      // Small delay to ensure the page is fully rendered
       const timeoutId = setTimeout(() => {
         deleteButtonRef.current?.focus()
       }, 150)
@@ -140,46 +149,59 @@ export default function PinDeletePage() {
   }, [])
 
   return (
-    <Dialog open onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Delete Pin</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to delete this pin? This action cannot be
-            undone.
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Pin details */}
-        <div className="py-4">
-          <div className="space-y-2">
-            <h4 className="font-medium text-foreground">{pin.title}</h4>
-            <p className="text-sm text-muted-foreground break-all">{pin.url}</p>
-          </div>
+    <div className="bg-background py-12">
+      <div className="max-w-lg mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <Button variant="ghost" size="sm" asChild>
+            <Link to={`/${username}/pins`}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Pins
+            </Link>
+          </Button>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={isDeleting}
-          >
-            Cancel
-          </Button>
-          <Form method="DELETE">
+        <Card>
+          <CardHeader>
+            <CardTitle>Delete Pin</CardTitle>
+            <CardDescription>
+              Are you sure you want to delete this pin? This action cannot be
+              undone.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <div className="space-y-2">
+              <h4 className="font-medium text-foreground">{pin.title}</h4>
+              <p className="text-sm text-muted-foreground break-all">
+                {pin.url}
+              </p>
+            </div>
+          </CardContent>
+
+          <CardFooter className="flex gap-2">
             <Button
-              ref={deleteButtonRef}
-              type="submit"
-              variant="destructive"
+              type="button"
+              variant="outline"
+              className="flex-1"
+              asChild
               disabled={isDeleting}
-              className="w-full"
             >
-              {isDeleting ? 'Deleting...' : 'Delete Pin'}
+              <Link to={`/${username}/pins`}>Cancel</Link>
             </Button>
-          </Form>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            <Form method="DELETE" className="flex-1">
+              <Button
+                ref={deleteButtonRef}
+                type="submit"
+                variant="destructive"
+                disabled={isDeleting}
+                className="w-full"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Pin'}
+              </Button>
+            </Form>
+          </CardFooter>
+        </Card>
+      </div>
+    </div>
   )
 }

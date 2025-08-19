@@ -16,6 +16,18 @@ import { logger } from '~/lib/logger.server'
 
 import { authService } from '~/lib/services/container.server'
 
+export function meta(_: Route.MetaArgs) {
+  return [
+    {
+      title: 'Profile Settings - PinSquirrel',
+    },
+    {
+      name: 'description',
+      content: 'Manage your PinSquirrel account settings, email, and password.',
+    },
+  ]
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request)
   return { user }

@@ -1,5 +1,5 @@
 import { MoreHorizontal } from 'lucide-react'
-import { useSearchParams } from 'react-router'
+import { useLocation, Link } from 'react-router'
 import { Button } from '~/components/ui/button'
 import {
   DropdownMenu,
@@ -16,24 +16,19 @@ interface PinFilterProps {
 }
 
 export function PinFilter({ className }: PinFilterProps) {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const filterParam = searchParams.get('filter')
-  const currentFilter: FilterType = filterParam === 'toread' ? 'toread' : 'all'
+  const location = useLocation()
 
-  const handleFilterChange = (filter: FilterType) => {
-    const newSearchParams = new URLSearchParams(searchParams)
+  // Determine current filter based on route path
+  const currentFilter: FilterType = location.pathname.endsWith('/toread')
+    ? 'toread'
+    : 'all'
 
-    if (filter === 'all') {
-      newSearchParams.delete('filter')
-    } else {
-      newSearchParams.set('filter', filter)
-    }
-
-    // Reset to first page when filter changes
-    newSearchParams.delete('page')
-
-    setSearchParams(newSearchParams)
-  }
+  // Extract the username from the current path to build filter links
+  const pathSegments = location.pathname.split('/')
+  const usernameIndex = pathSegments.findIndex(
+    segment => segment !== '' && segment !== 'pins' && segment !== 'toread'
+  )
+  const username = pathSegments[usernameIndex] || ''
 
   const getFilterLabel = (filter: FilterType) => {
     switch (filter) {
@@ -53,16 +48,16 @@ export function PinFilter({ className }: PinFilterProps) {
         <Button
           variant={currentFilter === 'all' ? 'default' : 'outline'}
           size="sm"
-          onClick={() => handleFilterChange('all')}
+          asChild
         >
-          All
+          <Link to={`/${username}/pins`}>All</Link>
         </Button>
         <Button
           variant={currentFilter === 'toread' ? 'default' : 'outline'}
           size="sm"
-          onClick={() => handleFilterChange('toread')}
+          asChild
         >
-          To Read
+          <Link to={`/${username}/toread`}>To Read</Link>
         </Button>
       </div>
 
@@ -76,11 +71,11 @@ export function PinFilter({ className }: PinFilterProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleFilterChange('all')}>
-              All
+            <DropdownMenuItem asChild>
+              <Link to={`/${username}/pins`}>All</Link>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleFilterChange('toread')}>
-              To Read
+            <DropdownMenuItem asChild>
+              <Link to={`/${username}/toread`}>To Read</Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

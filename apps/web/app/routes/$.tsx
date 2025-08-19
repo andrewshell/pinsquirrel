@@ -1,5 +1,17 @@
 import type { Route } from './+types/$'
 
+export function meta(_: Route.MetaArgs) {
+  return [
+    {
+      title: '404 - Page Not Found - PinSquirrel',
+    },
+    {
+      name: 'description',
+      content: 'The page you are looking for could not be found.',
+    },
+  ]
+}
+
 export function loader({ params }: Route.LoaderArgs) {
   const splat = params['*']
 
