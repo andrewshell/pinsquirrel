@@ -449,4 +449,105 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       expect(result.length).toBeGreaterThanOrEqual(3)
     })
   })
+
+  describe('findByUserIdWithPinCount', () => {
+    it('should return tags with pin counts', async () => {
+      // Create tags
+      const tag1 = await tagRepository.create({
+        userId: testUser.id,
+        name: 'tag1',
+      })
+      const tag2 = await tagRepository.create({
+        userId: testUser.id,
+        name: 'tag2',
+      })
+      const tag3 = await tagRepository.create({
+        userId: testUser.id,
+        name: 'tag3',
+      })
+
+      // Create pins and associate with tags
+      await testPool.query(
+        `
+        INSERT INTO pins (id, user_id, url, title, created_at, updated_at) VALUES
+        ('pin1', $1, 'https://example.com/1', 'Pin 1', NOW(), NOW()),
+        ('pin2', $1, 'https://example.com/2', 'Pin 2', NOW(), NOW()),
+        ('pin3', $1, 'https://example.com/3', 'Pin 3', NOW(), NOW()),
+        ('pin4', $1, 'https://example.com/4', 'Pin 4', NOW(), NOW())
+      `,
+        [testUser.id]
+      )
+
+      // Associate pins with tags
+      await testPool.query(
+        `
+        INSERT INTO pins_tags (pin_id, tag_id) VALUES
+        ('pin1', $1),
+        ('pin2', $1),
+        ('pin3', $1),
+        ('pin1', $2),
+        ('pin2', $2),
+        ('pin4', $3)
+      `,
+        [tag1.id, tag2.id, tag3.id]
+      )
+
+      const result = await tagRepository.findByUserIdWithPinCount(testUser.id)
+
+      expect(result).toHaveLength(3)
+
+      // Results should be sorted alphabetically
+      expect(result[0].name).toBe('tag1')
+      expect(result[1].name).toBe('tag2')
+      expect(result[2].name).toBe('tag3')
+
+      // Check pin counts
+      expect(result[0].pinCount).toBe(3) // tag1 has pins 1, 2, 3
+      expect(result[1].pinCount).toBe(2) // tag2 has pins 1, 2
+      expect(result[2].pinCount).toBe(1) // tag3 has pin 4
+    })
+
+    it('should return tags with zero pin count when no pins associated', async () => {
+      await tagRepository.create({
+        userId: testUser.id,
+        name: 'lonely-tag',
+      })
+
+      const result = await tagRepository.findByUserIdWithPinCount(testUser.id)
+
+      expect(result).toHaveLength(1)
+      expect(result[0].name).toBe('lonely-tag')
+      expect(result[0].pinCount).toBe(0)
+    })
+
+    it('should return empty array when user has no tags', async () => {
+      const result = await tagRepository.findByUserIdWithPinCount(testUser.id)
+      expect(result).toHaveLength(0)
+    })
+
+    it('should only return tags for the specified user', async () => {
+      // Create another user
+      const otherUser = await userRepository.create({
+        username: `otheruser-${crypto.randomUUID().slice(0, 8)}`,
+        passwordHash: 'hashed_password',
+        hashedEmail: 'other@example.com',
+      })
+
+      // Create tags for both users
+      await tagRepository.create({
+        userId: testUser.id,
+        name: 'user1-tag',
+      })
+      await tagRepository.create({
+        userId: otherUser.id,
+        name: 'user2-tag',
+      })
+
+      const result = await tagRepository.findByUserIdWithPinCount(testUser.id)
+
+      expect(result).toHaveLength(1)
+      expect(result[0].name).toBe('user1-tag')
+      expect(result[0].userId).toBe(testUser.id)
+    })
+  })
 })

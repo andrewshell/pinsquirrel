@@ -94,26 +94,6 @@ export function TagCloud({ tags, username }: TagCloudProps) {
     a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
   )
 
-  // Debug: Log the distribution to help diagnose
-  if (
-    typeof window !== 'undefined' &&
-    window.location.hostname === 'localhost'
-  ) {
-    console.log('Tag distribution:', {
-      minCount,
-      maxCount,
-      range: maxCount - minCount,
-      tags: sortedTags.map(t => ({
-        name: t.name,
-        count: t.pinCount,
-        normalized:
-          maxCount > minCount
-            ? (t.pinCount - minCount) / (maxCount - minCount)
-            : 0,
-      })),
-    })
-  }
-
   return (
     <div className="flex flex-wrap gap-3 items-center justify-start">
       {sortedTags.map(tag => {

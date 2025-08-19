@@ -14,3 +14,7 @@ export interface CreateTagData {
 export interface UpdateTagData {
   name?: string
 }
+
+export interface TagWithCount extends Tag {
+  pinCount: number
+}

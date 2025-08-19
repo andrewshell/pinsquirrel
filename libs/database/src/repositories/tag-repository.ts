@@ -1,12 +1,13 @@
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, count } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type {
   Tag,
   TagRepository,
   CreateTagData,
   UpdateTagData,
+  TagWithCount,
 } from '@pinsquirrel/core'
-import { tags } from '../schema/index.js'
+import { tags, pinsTags, pins } from '../schema/index.js'
 
 export class DrizzleTagRepository implements TagRepository {
   constructor(private db: PostgresJsDatabase<Record<string, unknown>>) {}
@@ -93,6 +94,52 @@ export class DrizzleTagRepository implements TagRepository {
       .filter((tag): tag is typeof tags.$inferSelect => tag !== undefined)
 
     return sortedTags.map(this.mapToTag)
+  }
+
+  async findByUserIdWithPinCount(
+    userId: string,
+    filter?: { readLater?: boolean }
+  ): Promise<TagWithCount[]> {
+    // Build the base query
+    const baseQuery = this.db
+      .select({
+        id: tags.id,
+        userId: tags.userId,
+        name: tags.name,
+        createdAt: tags.createdAt,
+        updatedAt: tags.updatedAt,
+        pinCount: count(pinsTags.pinId),
+      })
+      .from(tags)
+      .leftJoin(pinsTags, eq(tags.id, pinsTags.tagId))
+
+    // Build the query based on filter
+    const result = await (filter?.readLater !== undefined
+      ? baseQuery
+          .leftJoin(pins, eq(pinsTags.pinId, pins.id))
+          .where(
+            and(
+              eq(tags.userId, userId),
+              filter.readLater
+                ? eq(pins.readLater, true)
+                : eq(pins.readLater, false)
+            )
+          )
+          .groupBy(tags.id)
+          .orderBy(tags.name)
+      : baseQuery
+          .where(eq(tags.userId, userId))
+          .groupBy(tags.id)
+          .orderBy(tags.name))
+
+    return result.map(row => ({
+      id: row.id,
+      userId: row.userId,
+      name: row.name,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      pinCount: Number(row.pinCount),
+    }))
   }
 
   async findAll(): Promise<Tag[]> {

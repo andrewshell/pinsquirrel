@@ -12,7 +12,8 @@ export type {
 export type {
   Tag,
   CreateTagData,
-  UpdateTagData
+  UpdateTagData,
+  TagWithCount
 } from './entities/tag.js'
 export type {
   PasswordResetToken,

@@ -18,6 +18,7 @@ This is a pnpm monorepo with Turbo orchestration:
 ## Essential Commands
 
 ### Development
+
 - `pnpm dev` - Start development servers across all workspaces
 - `pnpm build` - Build all packages
 - `pnpm lint` - Run ESLint across all workspaces
@@ -26,16 +27,19 @@ This is a pnpm monorepo with Turbo orchestration:
 - `pnpm typecheck` - Run TypeScript type checking (includes React Router type generation)
 
 ### Package Management
+
 - `pnpm install` - Install dependencies for all workspaces
 - `pnpm add <pkg> --filter <workspace>` - Add dependency to specific workspace
 - `pnpm add <pkg> -w` - Add dependency to workspace root
 - `pnpm --filter <workspace> <command>` - Run command in specific workspace
 
 ### Database Management
+
 - `pnpm db:up` - Start development PostgreSQL database via Docker
 - `pnpm db:down` - Stop development database
 
 ### Workspace Operations
+
 - `pnpm -r <command>` - Run command in all workspaces
 - `pnpm --filter "./apps/*" <command>` - Run command in all apps
 - `pnpm --filter "./libs/*" <command>` - Run command in all libs
@@ -43,6 +47,7 @@ This is a pnpm monorepo with Turbo orchestration:
 ## Development Workflow
 
 ### IMPORTANT: Monorepo Command Guidelines
+
 - **ALWAYS run commands from the project root** using `pnpm --filter <workspace>`
 - **NEVER navigate to subdirectories** to run commands unless absolutely necessary
 - If you must navigate to a subdirectory, **ALWAYS return to root** immediately after
@@ -51,14 +56,17 @@ This is a pnpm monorepo with Turbo orchestration:
 - Use `pnpm --filter @pinsquirrel/database <command>` instead of `cd libs/database && pnpm <command>`
 
 ### Test-Driven Development (TDD) Workflow
+
 When developing new features or fixing bugs, **ALWAYS follow the TDD red-green-refactor cycle**:
 
 1. **RED**: Write a failing test first
+
    - `pnpm test --filter <workspace> -- --watch` to start test watcher
    - Write test that describes the expected behavior
    - Verify the test fails with the expected error
 
 2. **GREEN**: Write minimal code to make the test pass
+
    - Implement just enough code to satisfy the test
    - Keep implementation simple and focused
 
@@ -79,6 +87,7 @@ Before considering any work "done", **ALL of the following must pass**:
 4. **Format**: `pnpm format` - Code must be properly formatted
 
 **💡 Quick Quality Check Commands:**
+
 ```bash
 # Single command to run all quality checks:
 pnpm quality
@@ -88,28 +97,33 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm format
 ```
 
 **❌ If ANY check fails:**
+
 - Fix typecheck errors first
-- Then fix lint errors  
+- Then fix lint errors
 - Then fix test failures
 - Finally run format
 - Re-run all checks until 100% pass
 
 **✅ Only when ALL checks pass should you:**
+
 - Mark tasks as complete
-- Commit changes  
+- Commit changes
 - Create pull requests
 
 ### Adding New Packages
+
 1. Create directory in `apps/` or `libs/`
 2. Add `package.json` with unique name following pattern `@pinsquirrel/<name>`
 3. Update `pnpm-workspace.yaml` if needed
 4. Install dependencies with `pnpm install`
 
 ### Inter-package Dependencies
+
 - Reference workspace packages using `workspace:*` protocol
 - Example: `"@pinsquirrel/shared": "workspace:*"`
 
 ### Turbo Configuration
+
 - All scripts are orchestrated through Turbo
 - Commands automatically handle dependency order
 - Caching is enabled for builds and tests
@@ -128,12 +142,14 @@ The web app uses React Router 7 in Framework mode with SSR enabled:
 - **Testing**: Vitest with React Testing Library
 
 ### React Router 7 Specific Files
+
 - `react-router.config.ts` - Framework configuration
 - `app/routes.ts` - Route definitions
 - `app/root.tsx` - Root component with document structure
 - `.react-router/types/` - Generated TypeScript types
 
 ### Running Tests
+
 - `pnpm test --filter @pinsquirrel/web` - Run all tests once
 - `pnpm test --filter @pinsquirrel/web -- <pattern>` - Run specific test files
 - `pnpm test --filter @pinsquirrel/web -- --watch` - Run tests in watch mode for TDD
@@ -148,12 +164,14 @@ Business logic and domain entities:
 - **Testing**: Vitest for unit tests
 
 ### Core Architecture
+
 - `src/entities/` - Domain entities and interfaces (e.g., User)
 - `src/interfaces/` - Repository contracts and abstractions
 - `src/errors/` - Custom domain error classes
 - Uses clean architecture principles with dependency inversion
 
 ### Running Tests
+
 - `pnpm test --filter @pinsquirrel/core` - Run all tests once
 - `pnpm test --filter @pinsquirrel/core -- --watch` - Run tests in watch mode for TDD
 
@@ -169,6 +187,7 @@ Database layer with Drizzle ORM for PostgreSQL:
   - `pnpm --filter @pinsquirrel/database db:studio` - Open Drizzle Studio
 
 ### Database Architecture
+
 - `src/schema/` - Drizzle schema definitions (e.g., users table)
 - `src/repositories/` - Repository implementations using Drizzle
 - `src/client.ts` - Database connection configuration
@@ -176,28 +195,33 @@ Database layer with Drizzle ORM for PostgreSQL:
 - Implements repository interfaces from `@pinsquirrel/core`
 
 ### Database Configuration
+
 - Uses PostgreSQL with connection via `DATABASE_URL` environment variable
 - Default: `postgresql://localhost:5432/pinsquirrel`
 
 ### Running Tests
+
 - `pnpm test --filter @pinsquirrel/database` - Run all tests once
 - `pnpm test --filter @pinsquirrel/database -- --watch` - Run tests in watch mode for TDD
 
 ## Code Quality Tools
 
 ### ESLint Configuration
+
 - Modern flat ESLint v9 configuration
 - TypeScript ESLint with type-aware rules
 - React-specific rules for web app
 - Accessibility checks enabled
 
 ### Prettier Configuration
+
 - Single quotes
 - No semicolons
 - 2-space indentation
 - Trailing commas in multiline
 
 ### Type Checking
+
 - `pnpm typecheck` - Run TypeScript compiler across all packages
 - Strict mode enabled in all TypeScript configs
 - React Router generates types automatically
@@ -239,11 +263,13 @@ docker push your-username/pinsquirrel-web:latest
 #### Deployment Options
 
 **Option 1: Self-hosted with Dockge**
+
 - Create your own docker-compose.yml in Dockge
 - Reference your published Docker Hub image
 - Configure `DATABASE_URL` environment variable
 
 **Option 2: DigitalOcean App Platform**
+
 - Point to repository with `apps/web/Dockerfile`
 - Use managed PostgreSQL database
 - Set `DATABASE_URL` environment variable
@@ -258,6 +284,7 @@ docker push your-username/pinsquirrel-web:latest
 ### Database Connection
 
 All environments use the `DATABASE_URL` environment variable:
+
 - **Development**: `postgresql://pinsquirrel:pinsquirrel@localhost:5432/pinsquirrel`
 - **Docker deployment**: `postgresql://pinsquirrel:pinsquirrel@postgres:5432/pinsquirrel`
 - **Managed database**: `postgresql://username:password@hostname:25060/database?sslmode=require`
@@ -265,16 +292,20 @@ All environments use the `DATABASE_URL` environment variable:
 ## Agent OS Documentation
 
 ### Product Context
+
 - **Mission & Vision:** @.agent-os/product/mission.md
 - **Technical Architecture:** @.agent-os/product/tech-stack.md
 - **Development Roadmap:** @.agent-os/product/roadmap.md
 - **Decision History:** @.agent-os/product/decisions.md
+- **Notes:** @.agent-os/product/notes.md
 
 ### Development Standards
+
 - **Code Style:** @~/.agent-os/standards/code-style.md
 - **Best Practices:** @~/.agent-os/standards/best-practices.md
 
 ### Project Management
+
 - **Active Specs:** @.agent-os/specs/
 - **Spec Planning:** Use `@~/.agent-os/instructions/create-spec.md`
 - **Tasks Execution:** Use `@~/.agent-os/instructions/execute-tasks.md`
