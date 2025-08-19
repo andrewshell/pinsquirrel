@@ -191,7 +191,7 @@ export function TagInput({
         <Popover.Anchor asChild>
           <div
             className={cn(
-              'flex min-h-12 w-full flex-wrap items-center gap-2 border-4 border-foreground bg-input p-3 transition-all focus-within:neobrutalism-shadow focus-within:-translate-x-1 focus-within:-translate-y-1',
+              'flex min-h-12 w-full flex-wrap items-center gap-2 border-4 border-foreground bg-input p-3 transition-all focus-within:neobrutalism-shadow',
               disabled && 'opacity-50 cursor-not-allowed',
               validationError && 'border-destructive bg-destructive/10'
             )}

@@ -23,6 +23,7 @@ type PinCreationFormData = {
 interface PinCreationFormProps {
   onMetadataFetch?: (url: string) => void
   metadataTitle?: string
+  metadataDescription?: string
   metadataError?: string
   isMetadataLoading?: boolean
   successMessage?: string
@@ -36,6 +37,7 @@ interface PinCreationFormProps {
 export function PinCreationForm({
   onMetadataFetch,
   metadataTitle,
+  metadataDescription,
   metadataError,
   isMetadataLoading,
   successMessage,
@@ -49,6 +51,7 @@ export function PinCreationForm({
   const formRef = useRef<HTMLFormElement>(null)
   const urlRef = useRef<HTMLInputElement>(null)
   const titleRef = useRef<HTMLInputElement>(null)
+  const descriptionRef = useRef<HTMLTextAreaElement>(null)
 
   // Client-side state for dismissing flash messages and URL tracking
   const [showSuccessMessage, setShowSuccessMessage] = useState(!!successMessage)
@@ -63,12 +66,21 @@ export function PinCreationForm({
   )
   const isSubmitting = fetcher.state === 'submitting'
 
-  // Auto-populate title when metadata is fetched
+  // Auto-populate title and description when metadata is fetched
   useEffect(() => {
     if (metadataTitle && titleRef.current) {
       titleRef.current.value = metadataTitle
     }
   }, [metadataTitle])
+
+  useEffect(() => {
+    if (metadataDescription && descriptionRef.current) {
+      // Only auto-populate if the description field is currently empty
+      if (!descriptionRef.current.value.trim()) {
+        descriptionRef.current.value = metadataDescription
+      }
+    }
+  }, [metadataDescription])
 
   // Focus management for validation errors
   useEffect(() => {
@@ -105,7 +117,7 @@ export function PinCreationForm({
     <fetcher.Form
       ref={formRef}
       method="post"
-      action={actionUrl || '/pins/new'}
+      action={actionUrl}
       className="space-y-4"
       noValidate
       aria-label={editMode ? 'Edit pin' : 'Create new pin'}
@@ -216,6 +228,7 @@ export function PinCreationForm({
       <div className="space-y-2">
         <Label htmlFor="description">Description (optional)</Label>
         <Textarea
+          ref={descriptionRef}
           id="description"
           name="description"
           placeholder="Add a description..."
@@ -225,7 +238,8 @@ export function PinCreationForm({
           aria-required="false"
         />
         <FormText id="description-help" size="xs">
-          Optional notes or context about this pin
+          Optional notes or context about this pin. We&apos;ll try to auto-fill
+          this from the page.
         </FormText>
       </div>
 

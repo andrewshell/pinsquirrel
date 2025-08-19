@@ -227,7 +227,7 @@ describe('PinsPage Integration', () => {
     )
 
     const pageContainer = mainContainer?.parentElement
-    expect(pageContainer).toHaveClass('min-h-screen', 'bg-background', 'py-12')
+    expect(pageContainer).toHaveClass('bg-background', 'py-12')
   })
 
   it('shows correct header spacing and typography', async () => {

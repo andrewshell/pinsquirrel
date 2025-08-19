@@ -108,6 +108,7 @@ export default function PinsNewPage() {
         <PinCreationForm
           onMetadataFetch={fetchMetadata}
           metadataTitle={metadata?.title}
+          metadataDescription={metadata?.description}
           metadataError={metadataError || undefined}
           isMetadataLoading={isMetadataLoading}
           tagSuggestions={userTags}

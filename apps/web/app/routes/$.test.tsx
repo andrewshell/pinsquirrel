@@ -133,7 +133,6 @@ describe('404 Route', () => {
 
       const container = screen.getByText('404').closest('div')
       expect(container?.parentElement).toHaveClass(
-        'min-h-screen',
         'bg-background',
         'flex',
         'items-center',

@@ -262,6 +262,7 @@ export default function PinEditPage() {
           actionUrl={`/${params.username}/pins/${pin.id}/edit`}
           onMetadataFetch={fetchMetadata}
           metadataTitle={metadata?.title}
+          metadataDescription={metadata?.description}
           metadataError={metadataError || undefined}
           isMetadataLoading={isMetadataLoading}
           tagSuggestions={userTags}
