@@ -30,7 +30,7 @@ export function Header({ user }: HeaderProps) {
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden sm:flex items-center space-x-4">
+          <nav className="hidden md:flex items-center space-x-4">
             {user ? (
               // Logged in state
               <div className="flex items-center space-x-4">
@@ -67,7 +67,7 @@ export function Header({ user }: HeaderProps) {
 
           {/* Mobile Menu Button */}
           <button
-            className="sm:hidden p-2 text-foreground hover:bg-accent rounded-md transition-colors"
+            className="md:hidden p-2 text-foreground hover:bg-accent rounded-md transition-colors"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             aria-label="Toggle menu"
             aria-expanded={isMobileMenuOpen}
@@ -83,7 +83,7 @@ export function Header({ user }: HeaderProps) {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="sm:hidden border-t-4 border-foreground bg-background">
+        <div className="md:hidden border-t-4 border-foreground bg-background">
           <div className="px-4 py-4 space-y-3">
             {user ? (
               // Logged in mobile menu
