@@ -10,6 +10,7 @@ import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import { TagInput } from '~/components/ui/tag-input'
 import type { FieldErrors } from '@pinsquirrel/core'
 import { isValidUrl } from '@pinsquirrel/core'
+import type { UrlParams } from '~/lib/url-params.server'
 
 // Pin creation form data type
 type PinCreationFormData = {
@@ -32,6 +33,7 @@ interface PinCreationFormProps {
   initialData?: PinCreationFormData
   actionUrl?: string
   tagSuggestions?: string[]
+  urlParams?: UrlParams | null
 }
 
 export function PinCreationForm({
@@ -46,6 +48,7 @@ export function PinCreationForm({
   initialData,
   actionUrl,
   tagSuggestions = [],
+  urlParams,
 }: PinCreationFormProps) {
   const fetcher = useFetcher<{ errors?: FieldErrors }>()
   const formRef = useRef<HTMLFormElement>(null)
@@ -53,11 +56,23 @@ export function PinCreationForm({
   const titleRef = useRef<HTMLInputElement>(null)
   const descriptionRef = useRef<HTMLTextAreaElement>(null)
 
+  // Merge initial data with URL parameters (URL params take precedence for bookmarklet)
+  const mergedInitialData = useMemo(
+    () => ({
+      url: urlParams?.url || initialData?.url || '',
+      title: urlParams?.title || initialData?.title || '',
+      description: urlParams?.description || initialData?.description || '',
+      readLater: initialData?.readLater || false,
+      tags: initialData?.tags || [],
+    }),
+    [urlParams, initialData]
+  )
+
   // Client-side state for dismissing flash messages and URL tracking
   const [showSuccessMessage, setShowSuccessMessage] = useState(!!successMessage)
   const [showErrorMessage, setShowErrorMessage] = useState(!!errorMessage)
-  const [urlValue, setUrlValue] = useState(initialData?.url || '')
-  const [tags, setTags] = useState<string[]>(initialData?.tags || [])
+  const [urlValue, setUrlValue] = useState(mergedInitialData.url)
+  const [tags, setTags] = useState<string[]>(mergedInitialData.tags)
 
   // Get validation errors from fetcher or props (memoized to prevent useEffect dependencies changing)
   const errors = useMemo(
@@ -158,7 +173,7 @@ export function PinCreationForm({
           name="url"
           type="url"
           placeholder="https://example.com"
-          defaultValue={initialData?.url || ''}
+          defaultValue={mergedInitialData.url}
           onChange={handleUrlChange}
           onBlur={handleUrlBlur}
           aria-invalid={!!errors.url}
@@ -185,7 +200,7 @@ export function PinCreationForm({
             name="title"
             type="text"
             placeholder="Enter a title"
-            defaultValue={initialData?.title || ''}
+            defaultValue={mergedInitialData.title}
             aria-invalid={!!errors.title}
             aria-describedby={
               errors.title
@@ -232,7 +247,7 @@ export function PinCreationForm({
           id="description"
           name="description"
           placeholder="Add a description..."
-          defaultValue={initialData?.description || ''}
+          defaultValue={mergedInitialData.description}
           rows={4}
           aria-describedby="description-help"
           aria-required="false"
@@ -276,7 +291,7 @@ export function PinCreationForm({
           id="readLater"
           name="readLater"
           label="Read Later"
-          defaultChecked={initialData?.readLater || false}
+          defaultChecked={mergedInitialData.readLater}
         />
         <FormText id="readLater-help" size="xs">
           Mark this pin to read later

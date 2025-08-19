@@ -266,6 +266,7 @@ export default function PinEditPage() {
           metadataError={metadataError || undefined}
           isMetadataLoading={isMetadataLoading}
           tagSuggestions={userTags}
+          urlParams={null}
           errorMessage={
             actionData && 'errors' in actionData && actionData.errors?._form
               ? Array.isArray(actionData.errors._form)

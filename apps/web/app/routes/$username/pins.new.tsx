@@ -14,6 +14,7 @@ import { validateNewPinData } from '@pinsquirrel/core'
 import { parseFormData } from '~/lib/http-utils'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
 import { logger } from '~/lib/logger.server'
+import { extractUrlParams } from '~/lib/url-params.server'
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   // Ensure user is authenticated and username matches
@@ -23,8 +24,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   // Fetch user's existing tags for autocomplete
   const userTags = await repositories.tag.findByUserId(user.id)
 
+  // Extract and sanitize URL parameters (for bookmarklet integration)
+  const urlParams = extractUrlParams(request)
+
   return data({
     userTags: userTags.map(tag => tag.name),
+    urlParams,
   })
 }
 
@@ -85,7 +90,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function PinsNewPage() {
-  const { userTags } = useLoaderData<typeof loader>()
+  const { userTags, urlParams } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
   const navigate = useNavigate()
   const {
@@ -112,6 +117,7 @@ export default function PinsNewPage() {
           metadataError={metadataError || undefined}
           isMetadataLoading={isMetadataLoading}
           tagSuggestions={userTags}
+          urlParams={urlParams}
           errorMessage={
             actionData?.errors?._form
               ? Array.isArray(actionData.errors._form)

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { UpdateEmailForm } from '~/components/profile/UpdateEmailForm'
 import { ChangePasswordForm } from '~/components/profile/ChangePasswordForm'
+import { BookmarkletSection } from '~/components/profile/BookmarkletSection'
 import { parseFormData } from '~/lib/http-utils'
 import { logger } from '~/lib/logger.server'
 
@@ -205,6 +206,9 @@ export default function ProfilePage() {
 
           {/* Change Password Card */}
           <ChangePasswordForm username={user.username} />
+
+          {/* Bookmarklet Section */}
+          <BookmarkletSection user={user} />
 
           {/* Account Actions Card */}
           <Card>
