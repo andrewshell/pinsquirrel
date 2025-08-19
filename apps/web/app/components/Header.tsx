@@ -41,6 +41,12 @@ export function Header({ user }: HeaderProps) {
                   My Pins
                 </Link>
                 <Link
+                  to={`/${user.username}/tags`}
+                  className="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
+                >
+                  My Tags
+                </Link>
+                <Link
                   to="/profile"
                   className="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
                 >
@@ -94,6 +100,14 @@ export function Header({ user }: HeaderProps) {
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     My Pins
+                  </Link>
+                </Button>
+                <Button variant="ghost" className="w-full" asChild>
+                  <Link
+                    to={`/${user.username}/tags`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    My Tags
                   </Link>
                 </Button>
                 <Button variant="ghost" className="w-full" asChild>

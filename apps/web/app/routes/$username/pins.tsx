@@ -9,7 +9,8 @@ export function meta({ params }: Route.MetaArgs) {
     },
     {
       name: 'description',
-      content: 'Browse and manage your saved links, articles, and bookmarks on PinSquirrel.',
+      content:
+        'Browse and manage your saved links, articles, and bookmarks on PinSquirrel.',
     },
   ]
 }
@@ -20,7 +21,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     currentFilter: 'all',
     filter: {},
     title: `{username}'s Pins - PinSquirrel`,
-    description: 'Browse and manage your saved links, articles, and bookmarks on PinSquirrel.',
+    description:
+      'Browse and manage your saved links, articles, and bookmarks on PinSquirrel.',
   }
   return createPinsLoader(request, params, config)
 }

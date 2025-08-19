@@ -9,7 +9,8 @@ export function meta({ params }: Route.MetaArgs) {
     },
     {
       name: 'description',
-      content: 'Browse your "to read" bookmarks and articles saved for later on PinSquirrel.',
+      content:
+        'Browse your "to read" bookmarks and articles saved for later on PinSquirrel.',
     },
   ]
 }
@@ -20,7 +21,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     currentFilter: 'toread',
     filter: { readLater: true },
     title: `{username}'s To Read Pins - PinSquirrel`,
-    description: 'Browse your "to read" bookmarks and articles saved for later on PinSquirrel.',
+    description:
+      'Browse your "to read" bookmarks and articles saved for later on PinSquirrel.',
   }
   return createPinsLoader(request, params, config)
 }
