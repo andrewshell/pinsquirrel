@@ -31,6 +31,13 @@ describe('DrizzleUserRepository - Integration Tests', () => {
   beforeEach(async () => {
     // Create repository with test database
     repository = new DrizzleUserRepository(testDb)
+
+    // Clean up any existing test data (respecting foreign key constraints)
+    await testPool.query('DELETE FROM pins_tags')
+    await testPool.query('DELETE FROM pins')
+    await testPool.query('DELETE FROM password_reset_tokens')
+    await testPool.query('DELETE FROM tags')
+    await testPool.query('DELETE FROM users')
   })
 
   describe('findById', () => {

@@ -39,7 +39,7 @@ describe('MailgunEmailService', () => {
     }
 
     emailService = new MailgunEmailService(mockConfig)
-    
+
     // Mock the mailgun client
     ;(emailService as any).mailgun = mockMailgunClient
   })
@@ -56,7 +56,7 @@ describe('MailgunEmailService', () => {
         domain: 'test.com',
         fromEmail: 'test@test.com',
       }
-      
+
       const service = new MailgunEmailService(minimalConfig)
       expect(service).toBeInstanceOf(MailgunEmailService)
     })
@@ -66,7 +66,7 @@ describe('MailgunEmailService', () => {
         ...mockConfig,
         baseUrl: 'https://api.eu.mailgun.net',
       }
-      
+
       const service = new MailgunEmailService(configWithBaseUrl)
       expect(service).toBeInstanceOf(MailgunEmailService)
     })
@@ -75,7 +75,8 @@ describe('MailgunEmailService', () => {
   describe('sendPasswordResetEmail', () => {
     const testEmail = 'user@example.com'
     const testToken = 'reset-token-123'
-    const testResetUrl = 'https://app.pinsquirrel.com/reset-password/reset-token-123'
+    const testResetUrl =
+      'https://app.pinsquirrel.com/reset-password/reset-token-123'
 
     beforeEach(() => {
       mockCreateMessage.mockResolvedValue({
@@ -85,7 +86,11 @@ describe('MailgunEmailService', () => {
     })
 
     it('should send password reset email successfully', async () => {
-      await emailService.sendPasswordResetEmail(testEmail, testToken, testResetUrl)
+      await emailService.sendPasswordResetEmail(
+        testEmail,
+        testToken,
+        testResetUrl
+      )
 
       expect(mockCreateMessage).toHaveBeenCalledTimes(1)
       expect(mockCreateMessage).toHaveBeenCalledWith(
@@ -94,29 +99,39 @@ describe('MailgunEmailService', () => {
           from: `${mockConfig.fromName} <${mockConfig.fromEmail}>`,
           to: [testEmail],
           subject: 'Reset Your PinSquirrel Password',
-          html: expect.stringContaining(testResetUrl),
-          text: expect.stringContaining(testResetUrl),
+          html: expect.stringContaining(`${testResetUrl}/${testToken}`),
+          text: expect.stringContaining(`${testResetUrl}/${testToken}`),
         })
       )
     })
 
     it('should include token in email content', async () => {
-      await emailService.sendPasswordResetEmail(testEmail, testToken, testResetUrl)
+      await emailService.sendPasswordResetEmail(
+        testEmail,
+        testToken,
+        testResetUrl
+      )
 
       const call = mockCreateMessage.mock.calls[0]
       const messageData = call[1]
 
-      expect(messageData.html).toContain(testResetUrl)
-      expect(messageData.text).toContain(testResetUrl)
+      expect(messageData.html).toContain(`${testResetUrl}/${testToken}`)
+      expect(messageData.text).toContain(`${testResetUrl}/${testToken}`)
     })
 
     it('should use configured fromName when provided', async () => {
-      await emailService.sendPasswordResetEmail(testEmail, testToken, testResetUrl)
+      await emailService.sendPasswordResetEmail(
+        testEmail,
+        testToken,
+        testResetUrl
+      )
 
       const call = mockCreateMessage.mock.calls[0]
       const messageData = call[1]
 
-      expect(messageData.from).toBe(`${mockConfig.fromName} <${mockConfig.fromEmail}>`)
+      expect(messageData.from).toBe(
+        `${mockConfig.fromName} <${mockConfig.fromEmail}>`
+      )
     })
 
     it('should use email only when fromName not provided', async () => {
@@ -124,11 +139,15 @@ describe('MailgunEmailService', () => {
         ...mockConfig,
         fromName: undefined,
       }
-      
+
       const serviceWithoutName = new MailgunEmailService(configWithoutName)
       ;(serviceWithoutName as any).mailgun = mockMailgunClient
 
-      await serviceWithoutName.sendPasswordResetEmail(testEmail, testToken, testResetUrl)
+      await serviceWithoutName.sendPasswordResetEmail(
+        testEmail,
+        testToken,
+        testResetUrl
+      )
 
       const call = mockCreateMessage.mock.calls[0]
       const messageData = call[1]
@@ -137,14 +156,18 @@ describe('MailgunEmailService', () => {
     })
 
     it('should handle HTML and text content properly', async () => {
-      await emailService.sendPasswordResetEmail(testEmail, testToken, testResetUrl)
+      await emailService.sendPasswordResetEmail(
+        testEmail,
+        testToken,
+        testResetUrl
+      )
 
       const call = mockCreateMessage.mock.calls[0]
       const messageData = call[1]
 
       expect(messageData.html).toContain('<a href="')
-      expect(messageData.html).toContain(testResetUrl)
-      expect(messageData.text).toContain(testResetUrl)
+      expect(messageData.html).toContain(`${testResetUrl}/${testToken}`)
+      expect(messageData.text).toContain(`${testResetUrl}/${testToken}`)
       expect(messageData.text).not.toContain('<a href="')
     })
 
@@ -198,7 +221,7 @@ describe('MailgunEmailService', () => {
         emailService.sendPasswordResetEmail('', testToken, testResetUrl)
       ).rejects.toThrow()
 
-      // Test with empty token  
+      // Test with empty token
       await expect(
         emailService.sendPasswordResetEmail(testEmail, '', testResetUrl)
       ).rejects.toThrow()
@@ -210,7 +233,11 @@ describe('MailgunEmailService', () => {
     })
 
     it('should include proper email headers', async () => {
-      await emailService.sendPasswordResetEmail(testEmail, testToken, testResetUrl)
+      await emailService.sendPasswordResetEmail(
+        testEmail,
+        testToken,
+        testResetUrl
+      )
 
       const call = mockCreateMessage.mock.calls[0]
       const messageData = call[1]
@@ -220,7 +247,11 @@ describe('MailgunEmailService', () => {
     })
 
     it('should create message for correct domain', async () => {
-      await emailService.sendPasswordResetEmail(testEmail, testToken, testResetUrl)
+      await emailService.sendPasswordResetEmail(
+        testEmail,
+        testToken,
+        testResetUrl
+      )
 
       const domainCall = mockCreateMessage.mock.calls[0][0]
       expect(domainCall).toBe(mockConfig.domain)

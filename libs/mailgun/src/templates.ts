@@ -1,4 +1,7 @@
-export function createPasswordResetEmailTemplate(resetUrl: string): { html: string; text: string } {
+export function createPasswordResetEmailTemplate(resetUrl: string): {
+  html: string
+  text: string
+} {
   const html = `
 <!DOCTYPE html>
 <html>
@@ -44,24 +47,24 @@ export function createPasswordResetEmailTemplate(resetUrl: string): { html: stri
         <div class="header">
             <h1>Reset Your PinSquirrel Password</h1>
         </div>
-        
+
         <p>Hello,</p>
-        
-        <p>We received a request to reset your PinSquirrel password. If you made this request, click the button below to set a new password:</p>
-        
+
+        <p>I received a request to reset your PinSquirrel password. If you made this request, click the button below to set a new password:</p>
+
         <p style="text-align: center;">
             <a href="${resetUrl}" class="button">Reset Password</a>
         </p>
-        
+
         <p>Or copy and paste this link into your browser:</p>
         <p style="word-break: break-all; color: #007bff;">${resetUrl}</p>
-        
+
         <p>This link will expire in 15 minutes for security reasons.</p>
-        
+
         <p>If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
-        
+
         <div class="footer">
-            <p>Best regards,<br>The PinSquirrel Team</p>
+            <p>Best regards,<br>Andrew from PinSquirrel</p>
             <p><small>This is an automated email. Please do not reply to this message.</small></p>
         </div>
     </div>

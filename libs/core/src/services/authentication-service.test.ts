@@ -2,9 +2,15 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { AuthenticationService } from './authentication-service.js'
 import type { UserRepository } from '../interfaces/user-repository.js'
 import type { User } from '../entities/user.js'
+import type { PasswordResetRepository } from '../interfaces/password-reset-repository.js'
+import type { EmailService } from '../interfaces/email-service.js'
+import type { PasswordResetToken } from '../entities/password-reset-token.js'
 import {
   InvalidCredentialsError,
   UserAlreadyExistsError,
+  InvalidResetTokenError,
+  ResetTokenExpiredError,
+  TooManyResetRequestsError,
 } from '../errors/auth-errors.js'
 
 // Mock the server module (which contains crypto functions)
@@ -16,6 +22,8 @@ vi.mock('../server.js', () => ({
     ),
   verifyPassword: vi.fn(),
   hashEmail: vi.fn().mockImplementation((email: string) => `hashed_${email}`),
+  generateSecureToken: vi.fn().mockReturnValue('mock-token'),
+  hashToken: vi.fn().mockImplementation((token: string) => `hashed_${token}`),
 }))
 
 import { verifyPassword } from '../server.js'
@@ -23,6 +31,8 @@ import { verifyPassword } from '../server.js'
 describe('AuthenticationService', () => {
   let authService: AuthenticationService
   let mockUserRepository: UserRepository
+  let mockPasswordResetRepository: PasswordResetRepository
+  let mockEmailService: EmailService
 
   const mockUser: User = {
     id: '123e4567-e89b-12d3-a456-426614174000',
@@ -31,6 +41,14 @@ describe('AuthenticationService', () => {
     emailHash: null,
     createdAt: new Date(),
     updatedAt: new Date(),
+  }
+
+  const mockPasswordResetToken: PasswordResetToken = {
+    id: 'reset-123',
+    userId: '123e4567-e89b-12d3-a456-426614174000',
+    tokenHash: 'hashed_token',
+    expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
+    createdAt: new Date(),
   }
 
   beforeEach(() => {
@@ -43,7 +61,29 @@ describe('AuthenticationService', () => {
       delete: vi.fn(),
       list: vi.fn(),
     }
-    authService = new AuthenticationService(mockUserRepository)
+
+    mockPasswordResetRepository = {
+      findById: vi.fn(),
+      findByTokenHash: vi.fn(),
+      findByUserId: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      deleteByUserId: vi.fn(),
+      deleteExpiredTokens: vi.fn(),
+      isValidToken: vi.fn(),
+      list: vi.fn(),
+    }
+
+    mockEmailService = {
+      sendPasswordResetEmail: vi.fn(),
+    }
+
+    authService = new AuthenticationService(
+      mockUserRepository,
+      mockPasswordResetRepository,
+      mockEmailService
+    )
   })
 
   describe('register', () => {
@@ -286,6 +326,222 @@ describe('AuthenticationService', () => {
       await expect(authService.findByEmail('invalid-email')).rejects.toThrow(
         'Invalid email'
       )
+    })
+  })
+
+  describe('requestPasswordReset', () => {
+    it('should create a password reset token and send email', async () => {
+      const mockUserWithEmail = {
+        ...mockUser,
+        emailHash: 'hashed_test@example.com',
+      }
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(
+        mockUserWithEmail
+      )
+      vi.mocked(mockPasswordResetRepository.findByUserId).mockResolvedValue([])
+      vi.mocked(mockPasswordResetRepository.create).mockResolvedValue(
+        mockPasswordResetToken
+      )
+      vi.mocked(mockEmailService.sendPasswordResetEmail).mockResolvedValue()
+
+      const result = await authService.requestPasswordReset(
+        'test@example.com',
+        'https://example.com/reset'
+      )
+
+      expect(mockUserRepository.findByEmailHash).toHaveBeenCalledWith(
+        'hashed_test@example.com'
+      )
+      expect(mockPasswordResetRepository.deleteByUserId).toHaveBeenCalledWith(
+        mockUserWithEmail.id
+      )
+      expect(mockPasswordResetRepository.create).toHaveBeenCalledWith({
+        userId: mockUserWithEmail.id,
+        tokenHash: 'hashed_mock-token',
+        expiresAt: expect.any(Date),
+      })
+      expect(mockEmailService.sendPasswordResetEmail).toHaveBeenCalledWith(
+        'test@example.com',
+        'mock-token',
+        'https://example.com/reset'
+      )
+      expect(result).toBe('mock-token')
+    })
+
+    it('should not reveal if email does not exist', async () => {
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
+
+      const result = await authService.requestPasswordReset(
+        'nonexistent@example.com',
+        'https://example.com/reset'
+      )
+
+      expect(mockUserRepository.findByEmailHash).toHaveBeenCalledWith(
+        'hashed_nonexistent@example.com'
+      )
+      expect(mockPasswordResetRepository.create).not.toHaveBeenCalled()
+      expect(mockEmailService.sendPasswordResetEmail).not.toHaveBeenCalled()
+      expect(result).toBeNull()
+    })
+
+    it('should enforce rate limiting', async () => {
+      const mockUserWithEmail = {
+        ...mockUser,
+        emailHash: 'hashed_test@example.com',
+      }
+      const recentTokens = [
+        {
+          ...mockPasswordResetToken,
+          createdAt: new Date(Date.now() - 5 * 60 * 1000),
+        },
+        {
+          ...mockPasswordResetToken,
+          createdAt: new Date(Date.now() - 10 * 60 * 1000),
+        },
+        {
+          ...mockPasswordResetToken,
+          createdAt: new Date(Date.now() - 20 * 60 * 1000),
+        },
+      ]
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(
+        mockUserWithEmail
+      )
+      vi.mocked(mockPasswordResetRepository.findByUserId).mockResolvedValue(
+        recentTokens
+      )
+
+      await expect(
+        authService.requestPasswordReset(
+          'test@example.com',
+          'https://example.com/reset'
+        )
+      ).rejects.toThrow(TooManyResetRequestsError)
+
+      expect(mockPasswordResetRepository.create).not.toHaveBeenCalled()
+      expect(mockEmailService.sendPasswordResetEmail).not.toHaveBeenCalled()
+    })
+
+    it('should throw validation error for invalid email', async () => {
+      await expect(
+        authService.requestPasswordReset(
+          'invalid-email',
+          'https://example.com/reset'
+        )
+      ).rejects.toThrow('Invalid email')
+    })
+  })
+
+  describe('resetPassword', () => {
+    it('should reset password with valid token', async () => {
+      vi.mocked(mockPasswordResetRepository.findByTokenHash).mockResolvedValue(
+        mockPasswordResetToken
+      )
+      vi.mocked(mockPasswordResetRepository.isValidToken).mockResolvedValue(
+        true
+      )
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
+      vi.mocked(mockPasswordResetRepository.delete).mockResolvedValue(true)
+
+      await authService.resetPassword('mock-token', 'newpassword123')
+
+      expect(mockPasswordResetRepository.findByTokenHash).toHaveBeenCalledWith(
+        'hashed_mock-token'
+      )
+      expect(mockPasswordResetRepository.isValidToken).toHaveBeenCalledWith(
+        'hashed_mock-token'
+      )
+      expect(mockUserRepository.update).toHaveBeenCalledWith(mockUser.id, {
+        passwordHash: 'hashed_newpassword123',
+      })
+      expect(mockPasswordResetRepository.delete).toHaveBeenCalledWith(
+        mockPasswordResetToken.id
+      )
+    })
+
+    it('should throw error for invalid token', async () => {
+      vi.mocked(mockPasswordResetRepository.findByTokenHash).mockResolvedValue(
+        null
+      )
+
+      await expect(
+        authService.resetPassword('invalid-token', 'newpassword123')
+      ).rejects.toThrow(InvalidResetTokenError)
+
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('should throw error for expired token', async () => {
+      const expiredToken = {
+        ...mockPasswordResetToken,
+        expiresAt: new Date(Date.now() - 60 * 1000), // expired 1 minute ago
+      }
+      vi.mocked(mockPasswordResetRepository.findByTokenHash).mockResolvedValue(
+        expiredToken
+      )
+      vi.mocked(mockPasswordResetRepository.isValidToken).mockResolvedValue(
+        false
+      )
+
+      await expect(
+        authService.resetPassword('mock-token', 'newpassword123')
+      ).rejects.toThrow(ResetTokenExpiredError)
+
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('should throw validation error for invalid password', async () => {
+      await expect(
+        authService.resetPassword('mock-token', 'short')
+      ).rejects.toThrow('Invalid password')
+    })
+  })
+
+  describe('validateResetToken', () => {
+    it('should return true for valid token', async () => {
+      vi.mocked(mockPasswordResetRepository.findByTokenHash).mockResolvedValue(
+        mockPasswordResetToken
+      )
+      vi.mocked(mockPasswordResetRepository.isValidToken).mockResolvedValue(
+        true
+      )
+
+      const result = await authService.validateResetToken('mock-token')
+
+      expect(mockPasswordResetRepository.findByTokenHash).toHaveBeenCalledWith(
+        'hashed_mock-token'
+      )
+      expect(mockPasswordResetRepository.isValidToken).toHaveBeenCalledWith(
+        'hashed_mock-token'
+      )
+      expect(result).toBe(true)
+    })
+
+    it('should return false for invalid token', async () => {
+      vi.mocked(mockPasswordResetRepository.findByTokenHash).mockResolvedValue(
+        null
+      )
+
+      const result = await authService.validateResetToken('invalid-token')
+
+      expect(result).toBe(false)
+    })
+
+    it('should return false for expired token', async () => {
+      const expiredToken = {
+        ...mockPasswordResetToken,
+        expiresAt: new Date(Date.now() - 60 * 1000), // expired 1 minute ago
+      }
+      vi.mocked(mockPasswordResetRepository.findByTokenHash).mockResolvedValue(
+        expiredToken
+      )
+      vi.mocked(mockPasswordResetRepository.isValidToken).mockResolvedValue(
+        false
+      )
+
+      const result = await authService.validateResetToken('mock-token')
+
+      expect(result).toBe(false)
     })
   })
 })

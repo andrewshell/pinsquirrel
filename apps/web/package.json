@@ -18,6 +18,7 @@
   "dependencies": {
     "@pinsquirrel/core": "workspace:*",
     "@pinsquirrel/database": "workspace:*",
+    "@pinsquirrel/mailgun": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-popover": "^1.1.15",

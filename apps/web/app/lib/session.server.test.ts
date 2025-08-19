@@ -21,6 +21,7 @@ vi.mock('@pinsquirrel/database', () => ({
   DrizzleUserRepository: vi.fn(),
   DrizzleTagRepository: vi.fn(),
   DrizzlePinRepository: vi.fn(),
+  DrizzlePasswordResetRepository: vi.fn(),
   db: {},
 }))
 

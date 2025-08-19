@@ -39,7 +39,9 @@ export class DrizzlePasswordResetRepository implements PasswordResetRepository {
     return await this.db.select().from(passwordResetTokens)
   }
 
-  async create(data: CreatePasswordResetTokenData): Promise<PasswordResetToken> {
+  async create(
+    data: CreatePasswordResetTokenData
+  ): Promise<PasswordResetToken> {
     const id = crypto.randomUUID()
     const now = new Date()
 

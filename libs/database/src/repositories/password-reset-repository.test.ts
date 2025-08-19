@@ -33,8 +33,11 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
     // Create repository with test database
     repository = new DrizzlePasswordResetRepository(testDb)
 
-    // Clean up any existing test data
+    // Clean up any existing test data (respecting foreign key constraints)
+    await testPool.query('DELETE FROM pins_tags')
+    await testPool.query('DELETE FROM pins')
     await testPool.query('DELETE FROM password_reset_tokens')
+    await testPool.query('DELETE FROM tags')
     await testPool.query('DELETE FROM users')
   })
 
@@ -43,7 +46,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
       // First create a test user
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-      
+
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
@@ -84,7 +87,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
     it('should find password reset token by id', async () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-      
+
       // Create test user
       await testPool.query(
         `
@@ -116,7 +119,9 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
       })
       expect(result?.expiresAt).toBeInstanceOf(Date)
       // Allow for timezone differences (up to 24 hours)
-      expect(Math.abs((result?.expiresAt.getTime() || 0) - expiresAt.getTime())).toBeLessThan(86400000)
+      expect(
+        Math.abs((result?.expiresAt.getTime() || 0) - expiresAt.getTime())
+      ).toBeLessThan(86400000)
     })
 
     it('should return null for non-existent token', async () => {
@@ -129,7 +134,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
     it('should find password reset token by token hash', async () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-      
+
       // Create test user
       await testPool.query(
         `
@@ -165,7 +170,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
     it('should find all password reset tokens for a user', async () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-      
+
       // Create test user
       await testPool.query(
         `
@@ -208,7 +213,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
     it('should delete all tokens for a user', async () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-      
+
       // Create test user
       await testPool.query(
         `
@@ -247,7 +252,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
     it('should return true for valid non-expired token', async () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-      
+
       // Create test user
       await testPool.query(
         `
@@ -272,7 +277,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
     it('should return false for expired token', async () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-      
+
       // Create test user
       await testPool.query(
         `
@@ -304,7 +309,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
     it('should delete only expired tokens', async () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-      
+
       // Create test user
       await testPool.query(
         `
@@ -350,7 +355,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
     it('should delete a specific token by id', async () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-      
+
       // Create test user
       await testPool.query(
         `

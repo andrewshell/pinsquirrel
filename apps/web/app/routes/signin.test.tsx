@@ -28,7 +28,7 @@ describe('Signin route', () => {
       expect((result as Response).status).toBe(302)
     })
 
-    it('returns null when user is not logged in', async () => {
+    it('returns data with showResetSuccess when user is not logged in', async () => {
       mockGetUserId.mockResolvedValue(null)
 
       const request = new Request('http://localhost/signin')
@@ -36,7 +36,8 @@ describe('Signin route', () => {
 
       const result = await loader(args)
 
-      expect(result).toBeNull()
+      expect(result).toHaveProperty('data')
+      expect((result as any).data).toEqual({ showResetSuccess: false })
     })
   })
 

@@ -19,7 +19,7 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write src/**/*.ts",
     "format:check": "prettier --check src/**/*.ts",
-    "test": "vitest --run",
+    "test": "vitest --run --pool=forks --poolOptions.forks.singleFork=true",
     "test:watch": "vitest --watch --coverage",
     "test:coverage": "vitest --run --coverage",
     "db:generate": "drizzle-kit generate",

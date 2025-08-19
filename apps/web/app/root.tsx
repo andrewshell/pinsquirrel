@@ -44,12 +44,14 @@ export const links: Route.LinksFunction = () => [
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await getUser(request)
-  
+
   // Extend session if user is logged in and chose to keep signed in
   const sessionCookie = user ? await extendSessionIfNeeded(request) : null
-  
-  const headers = sessionCookie ? { 'Set-Cookie': sessionCookie } : {}
-  
+
+  const headers: Record<string, string> = sessionCookie
+    ? { 'Set-Cookie': sessionCookie }
+    : {}
+
   return Response.json({ user }, { headers })
 }
 

@@ -29,17 +29,17 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 3.4 Create password reset email templates
   - [x] 3.5 Verify all email service tests pass
 
-- [ ] 4. Authentication Service Extensions
-  - [ ] 4.1 Write tests for password reset methods in AuthenticationService
-  - [ ] 4.2 Add requestPasswordReset method to AuthenticationService
-  - [ ] 4.3 Add resetPassword method to AuthenticationService
-  - [ ] 4.4 Add validateResetToken method to AuthenticationService
-  - [ ] 4.5 Verify all authentication service tests pass
+- [x] 4. Authentication Service Extensions
+  - [x] 4.1 Write tests for password reset methods in AuthenticationService
+  - [x] 4.2 Add requestPasswordReset method to AuthenticationService
+  - [x] 4.3 Add resetPassword method to AuthenticationService
+  - [x] 4.4 Add validateResetToken method to AuthenticationService
+  - [x] 4.5 Verify all authentication service tests pass
 
-- [ ] 5. Web Routes and UI Components
-  - [ ] 5.1 Write tests for forgot password routes and components
-  - [ ] 5.2 Create /forgot-password route with form component
-  - [ ] 5.3 Create /reset-password/:token route with form component
-  - [ ] 5.4 Configure email service in dependency injection container
-  - [ ] 5.5 Add navigation links for forgot password functionality
-  - [ ] 5.6 Verify all web layer tests pass
+- [x] 5. Web Routes and UI Components
+  - [x] 5.1 Write tests for forgot password routes and components
+  - [x] 5.2 Create /forgot-password route with form component
+  - [x] 5.3 Create /reset-password/:token route with form component
+  - [x] 5.4 Configure email service in dependency injection container
+  - [x] 5.5 Add navigation links for forgot password functionality
+  - [x] 5.6 Verify all web layer tests pass

@@ -42,3 +42,15 @@ export function hashEmail(email: string): string {
   hash.update(normalizedEmail)
   return hash.digest('hex')
 }
+
+export function generateSecureToken(): string {
+  // Generate 32 bytes of random data and convert to URL-safe base64
+  return randomBytes(32).toString('base64url')
+}
+
+export function hashToken(token: string): string {
+  // Hash the token for secure storage in database
+  const hash = createHash('sha256')
+  hash.update(token)
+  return hash.digest('hex')
+}

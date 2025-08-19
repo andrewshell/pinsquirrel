@@ -25,7 +25,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     // Already logged in, redirect to home
     return redirect('/')
   }
-  return null
+
+  // Check for password reset success
+  const url = new URL(request.url)
+  const reset = url.searchParams.get('reset')
+  const showResetSuccess = reset === 'success'
+
+  return data({ showResetSuccess })
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -73,7 +79,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
 }
 
-export default function LoginPage() {
+export default function LoginPage({ loaderData }: Route.ComponentProps) {
   return (
     <div className="min-h-screen bg-background py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -90,6 +96,15 @@ export default function LoginPage() {
           </Link>
         </p>
       </div>
+
+      {loaderData?.showResetSuccess && (
+        <div className="mt-4 sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="p-3 text-sm text-green-600 bg-green-50 border border-green-200 rounded">
+            Your password has been reset successfully. You can now sign in with
+            your new password.
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <LoginForm />

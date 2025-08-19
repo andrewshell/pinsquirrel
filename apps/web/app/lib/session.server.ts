@@ -50,7 +50,9 @@ export async function getUser(request: Request) {
   }
 }
 
-export async function extendSessionIfNeeded(request: Request): Promise<string | null> {
+export async function extendSessionIfNeeded(
+  request: Request
+): Promise<string | null> {
   const session = await getSession(request)
   const keepSignedIn = session.get('keepSignedIn') as boolean | undefined
 
