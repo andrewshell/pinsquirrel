@@ -1,8 +1,15 @@
 import type { User } from '@pinsquirrel/core'
-import { Menu, X } from 'lucide-react'
+import { CircleUserRound, Menu, X } from 'lucide-react'
 import { useState } from 'react'
 import { Form, Link } from 'react-router'
 import { Button } from '~/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu'
 
 interface HeaderProps {
   user: User | null
@@ -38,25 +45,39 @@ export function Header({ user }: HeaderProps) {
                   to={`/${user.username}/pins`}
                   className="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
                 >
-                  My Pins
+                  Pins
                 </Link>
                 <Link
                   to={`/${user.username}/tags`}
                   className="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
                 >
-                  My Tags
+                  Tags
                 </Link>
-                <Link
-                  to="/profile"
-                  className="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
-                >
-                  {user.username}
-                </Link>
-                <Form method="post" action="/logout">
-                  <Button variant="outline" size="sm" type="submit">
-                    Sign Out
-                  </Button>
-                </Form>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      <CircleUserRound className="h-4 w-4" />
+                      {user.username}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <Link to="/profile">Profile</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Form method="post" action="/logout">
+                        <button type="submit" className="w-full text-left">
+                          Sign Out
+                        </button>
+                      </Form>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             ) : (
               // Logged out state
@@ -99,7 +120,7 @@ export function Header({ user }: HeaderProps) {
                     to={`/${user.username}/pins`}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    My Pins
+                    Pins
                   </Link>
                 </Button>
                 <Button variant="ghost" className="w-full" asChild>
@@ -107,7 +128,7 @@ export function Header({ user }: HeaderProps) {
                     to={`/${user.username}/tags`}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    My Tags
+                    Tags
                   </Link>
                 </Button>
                 <Button variant="ghost" className="w-full" asChild>

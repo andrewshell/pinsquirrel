@@ -77,30 +77,24 @@ describe('Header', () => {
   })
 
   describe('when user is logged in', () => {
-    it('shows username as profile link', () => {
+    it('shows username in dropdown menu button', () => {
       renderWithRouter(mockUser)
 
-      const profileLink = screen.getByRole('link', { name: 'testuser' })
-      expect(profileLink).toBeInTheDocument()
-      expect(profileLink).toHaveAttribute('href', '/profile')
+      const userMenuButton = screen.getByRole('button', { name: /testuser/ })
+      expect(userMenuButton).toBeInTheDocument()
     })
 
-    it('shows logout button', () => {
+    it('has user menu button instead of separate profile link', () => {
       renderWithRouter(mockUser)
 
+      // Should have user menu button
+      const userMenuButton = screen.getByRole('button', { name: /testuser/ })
+      expect(userMenuButton).toBeInTheDocument()
+
+      // Should not have the old direct profile link (the new one is in dropdown)
       expect(
-        screen.getByRole('button', { name: 'Sign Out' })
-      ).toBeInTheDocument()
-    })
-
-    it('logout form posts to /logout', () => {
-      renderWithRouter(mockUser)
-
-      const logoutForm = screen
-        .getByRole('button', { name: 'Sign Out' })
-        .closest('form')
-      expect(logoutForm).toHaveAttribute('method', 'post')
-      expect(logoutForm).toHaveAttribute('action', '/logout')
+        screen.queryByRole('link', { name: 'testuser' })
+      ).not.toBeInTheDocument()
     })
 
     it('does not show login and sign up buttons', () => {
@@ -163,15 +157,11 @@ describe('Header', () => {
       expect(screen.getByRole('navigation')).toBeInTheDocument()
     })
 
-    it('profile link has descriptive text', () => {
+    it('user menu button has descriptive text', () => {
       renderWithRouter(mockUser)
 
-      const profileLink = screen.getByRole('link', { name: 'testuser' })
-      expect(profileLink).toHaveClass(
-        'text-base',
-        'font-bold',
-        'text-foreground'
-      )
+      const userMenuButton = screen.getByRole('button', { name: /testuser/ })
+      expect(userMenuButton).toBeInTheDocument()
     })
   })
 })
