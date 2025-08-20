@@ -25,14 +25,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   // Parse filter from URL search params
   const url = new URL(request.url)
-  const filterParam = url.searchParams.get('filter') || 'all'
+  const unreadFilter = url.searchParams.get('unread') === 'true'
 
   // Create filter object based on parameter
   const filter: { readLater?: boolean } = {}
-  if (filterParam === 'toread') {
+  if (unreadFilter) {
     filter.readLater = true
   }
-  // If 'all' or any other value, no filter is applied
 
   // Fetch tags with pin counts
   const tags = await repositories.tag.findByUserIdWithPinCount(
@@ -43,7 +42,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   return {
     tags,
     username: user.username,
-    currentFilter: filterParam as TagFilterType,
+    currentFilter: unreadFilter ? 'toread' : ('all' as TagFilterType),
   }
 }
 
@@ -69,7 +68,11 @@ export default function TagsPage() {
         </div>
 
         {tags.length > 0 ? (
-          <TagCloud tags={tags} username={username} />
+          <TagCloud
+            tags={tags}
+            username={username}
+            currentFilter={currentFilter}
+          />
         ) : (
           <div className="text-center py-12">
             <p className="text-muted-foreground mb-4">

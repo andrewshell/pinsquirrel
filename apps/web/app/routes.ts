@@ -9,7 +9,6 @@ export default [
   route('profile', 'routes/profile.tsx'),
   route(':username/pins', 'routes/$username/pins.tsx'),
   route(':username/tags', 'routes/$username/tags.tsx'),
-  route(':username/toread', 'routes/$username/toread.tsx'),
   route(':username/pins/new', 'routes/$username/pins.new.tsx'),
   route(':username/pins/:id/edit', 'routes/$username/pins.$id.edit.tsx'),
   route(':username/pins/:id/delete', 'routes/$username/pins.$id.delete.tsx'),

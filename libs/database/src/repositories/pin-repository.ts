@@ -69,10 +69,53 @@ export class DrizzlePinRepository implements PinRepository {
 
   async findByUserIdWithFilter(
     userId: string,
-    filter: { readLater?: boolean },
+    filter: { readLater?: boolean; tag?: string },
     options?: { limit?: number; offset?: number }
   ): Promise<Pin[]> {
-    // Build the where conditions
+    // If filtering by tag, we need to join with tags
+    if (filter.tag) {
+      const baseQuery = this.db
+        .select({
+          id: pins.id,
+          userId: pins.userId,
+          url: pins.url,
+          title: pins.title,
+          description: pins.description,
+          readLater: pins.readLater,
+          createdAt: pins.createdAt,
+          updatedAt: pins.updatedAt,
+        })
+        .from(pins)
+        .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
+        .innerJoin(tags, eq(pinsTags.tagId, tags.id))
+        .where(
+          and(
+            eq(pins.userId, userId),
+            eq(tags.name, filter.tag),
+            filter.readLater !== undefined
+              ? eq(pins.readLater, filter.readLater)
+              : undefined
+          )
+        )
+        .orderBy(desc(pins.createdAt))
+
+      let query
+      if (options?.limit !== undefined && options?.offset !== undefined) {
+        query = baseQuery.limit(options.limit).offset(options.offset)
+      } else if (options?.limit !== undefined) {
+        query = baseQuery.limit(options.limit)
+      } else {
+        query = baseQuery
+      }
+
+      const results = await query
+      return results.map(row => ({
+        ...row,
+        tags: [],
+      }))
+    }
+
+    // Build the where conditions for non-tag filtering
     const conditions = [eq(pins.userId, userId)]
     if (filter.readLater !== undefined) {
       conditions.push(eq(pins.readLater, filter.readLater))
@@ -102,9 +145,29 @@ export class DrizzlePinRepository implements PinRepository {
 
   async countByUserIdWithFilter(
     userId: string,
-    filter: { readLater?: boolean }
+    filter: { readLater?: boolean; tag?: string }
   ): Promise<number> {
-    // Build the where conditions
+    // If filtering by tag, we need to join with tags
+    if (filter.tag) {
+      const result = await this.db
+        .select({ count: count() })
+        .from(pins)
+        .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
+        .innerJoin(tags, eq(pinsTags.tagId, tags.id))
+        .where(
+          and(
+            eq(pins.userId, userId),
+            eq(tags.name, filter.tag),
+            filter.readLater !== undefined
+              ? eq(pins.readLater, filter.readLater)
+              : undefined
+          )
+        )
+
+      return result[0]?.count ?? 0
+    }
+
+    // Build the where conditions for non-tag filtering
     const conditions = [eq(pins.userId, userId)]
     if (filter.readLater !== undefined) {
       conditions.push(eq(pins.readLater, filter.readLater))

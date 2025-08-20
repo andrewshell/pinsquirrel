@@ -9,7 +9,7 @@ export interface PinRepository
   ): Promise<Pin[]>
   findByUserIdWithFilter(
     userId: string,
-    filter: { readLater?: boolean },
+    filter: { readLater?: boolean; tag?: string },
     options?: { limit?: number; offset?: number }
   ): Promise<Pin[]>
   findByUserIdAndTag(userId: string, tagId: string): Promise<Pin[]>
@@ -18,6 +18,6 @@ export interface PinRepository
   countByUserId(userId: string): Promise<number>
   countByUserIdWithFilter(
     userId: string,
-    filter: { readLater?: boolean }
+    filter: { readLater?: boolean; tag?: string }
   ): Promise<number>
 }

@@ -4,6 +4,7 @@ import type { TagWithCount } from '@pinsquirrel/core'
 interface TagCloudProps {
   tags: TagWithCount[]
   username: string
+  currentFilter?: 'all' | 'toread'
 }
 
 const getFontSizeClass = (
@@ -79,7 +80,11 @@ const getOpacityClass = (
   return 'opacity-60'
 }
 
-export function TagCloud({ tags, username }: TagCloudProps) {
+export function TagCloud({
+  tags,
+  username,
+  currentFilter = 'all',
+}: TagCloudProps) {
   if (tags.length === 0) {
     return null
   }
@@ -100,10 +105,18 @@ export function TagCloud({ tags, username }: TagCloudProps) {
         const fontSizeClass = getFontSizeClass(tag.pinCount, maxCount, minCount)
         const opacityClass = getOpacityClass(tag.pinCount, maxCount, minCount)
 
+        // Build URL with tag and preserve current filter if it's not 'all'
+        const params = new URLSearchParams()
+        params.set('tag', tag.name)
+        if (currentFilter === 'toread') {
+          params.set('unread', 'true')
+        }
+        const tagUrl = `/${username}/pins?${params.toString()}`
+
         return (
           <Link
             key={tag.id}
-            to={`/${username}/pins?tag=${encodeURIComponent(tag.name)}`}
+            to={tagUrl}
             className={`${fontSizeClass} ${opacityClass} text-accent hover:text-accent/80 hover:underline transition-all duration-200 font-medium`}
             title={`${tag.name} (${tag.pinCount} pin${tag.pinCount === 1 ? '' : 's'})`}
             aria-label={`View pins tagged with ${tag.name} (${tag.pinCount} pin${tag.pinCount === 1 ? '' : 's'})`}

@@ -11,10 +11,6 @@ const renderWithRouter = (initialEntry = '/testuser/pins') => {
         path: '/:username/pins',
         element: <PinFilter />,
       },
-      {
-        path: '/:username/toread',
-        element: <PinFilter />,
-      },
     ],
     {
       initialEntries: [initialEntry],
@@ -47,8 +43,8 @@ describe('PinFilter', () => {
     expect(toReadLinks[0]).toHaveClass('bg-background')
   })
 
-  it('shows To Read link as active when on toread route', () => {
-    renderWithRouter('/testuser/toread')
+  it('shows To Read link as active when unread=true query param is set', () => {
+    renderWithRouter('/testuser/pins?unread=true')
 
     const allLinks = screen.getAllByRole('link', { name: 'All' })
     const toReadLinks = screen.getAllByRole('link', { name: 'To Read' })
@@ -67,24 +63,30 @@ describe('PinFilter', () => {
 
     // Check desktop links
     expect(allLinks[0]).toHaveAttribute('href', '/testuser/pins')
-    expect(toReadLinks[0]).toHaveAttribute('href', '/testuser/toread')
+    expect(toReadLinks[0]).toHaveAttribute('href', '/testuser/pins?unread=true')
 
     // Check mobile dropdown links (if they exist)
     if (allLinks.length > 1) {
       expect(allLinks[1]).toHaveAttribute('href', '/testuser/pins')
-      expect(toReadLinks[1]).toHaveAttribute('href', '/testuser/toread')
+      expect(toReadLinks[1]).toHaveAttribute(
+        'href',
+        '/testuser/pins?unread=true'
+      )
     }
   })
 
   it('extracts username correctly from different route patterns', () => {
-    renderWithRouter('/anotheruser/toread')
+    renderWithRouter('/anotheruser/pins?unread=true')
 
     const allLinks = screen.getAllByRole('link', { name: 'All' })
     const toReadLinks = screen.getAllByRole('link', { name: 'To Read' })
 
     // Links should use the correct username from the current route
     expect(allLinks[0]).toHaveAttribute('href', '/anotheruser/pins')
-    expect(toReadLinks[0]).toHaveAttribute('href', '/anotheruser/toread')
+    expect(toReadLinks[0]).toHaveAttribute(
+      'href',
+      '/anotheruser/pins?unread=true'
+    )
   })
 
   it('applies custom className when provided', () => {
@@ -114,7 +116,7 @@ describe('PinFilter', () => {
     renderWithRouter('/testuser/pins')
     expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument()
 
-    renderWithRouter('/testuser/toread')
+    renderWithRouter('/testuser/pins?unread=true')
     expect(screen.getByRole('button', { name: 'To Read' })).toBeInTheDocument()
   })
 
@@ -128,7 +130,7 @@ describe('PinFilter', () => {
     // All links should be enabled and have proper href attributes
     links.forEach(link => {
       expect(link).toBeEnabled()
-      expect(link.getAttribute('href')).toMatch(/^\/testuser\/(pins|toread)/)
+      expect(link.getAttribute('href')).toMatch(/^\/testuser\/pins/)
     })
   })
 

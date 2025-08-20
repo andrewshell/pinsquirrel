@@ -1,7 +1,11 @@
-import { useLoaderData, useActionData, data } from 'react-router'
+import { useLoaderData, useActionData, useLocation, data } from 'react-router'
 import type { Route } from './+types/pins.new'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
-import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
+import {
+  requireUsernameMatch,
+  getUserPath,
+  extractFilterParams,
+} from '~/lib/auth.server'
 import { repositories } from '~/lib/services/container.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
@@ -41,6 +45,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   return data({
     userTags: userTags.map(tag => tag.name),
     urlParams,
+    username: params.username,
   })
 }
 
@@ -75,8 +80,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       url: pin.url,
     })
 
-    // Redirect to user's pins list with success message
-    const redirectTo = getUserPath(user.username)
+    // Redirect to user's pins list with success message, preserving filter params
+    const filterParams = extractFilterParams(request)
+    const redirectTo = getUserPath(user.username, '/pins', filterParams)
     return setFlashMessage(
       request,
       'success',
@@ -101,8 +107,9 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function PinsNewPage() {
-  const { userTags, urlParams } = useLoaderData<typeof loader>()
+  const { userTags, urlParams, username } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
+  const location = useLocation()
   const {
     loading: isMetadataLoading,
     error: metadataError,
@@ -110,12 +117,15 @@ export default function PinsNewPage() {
     fetchMetadata,
   } = useMetadataFetch()
 
+  // Build back link with preserved query parameters
+  const backToPinsUrl = `/${username}/pins${location.search}`
+
   return (
     <div className="bg-background py-12">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-6">
           <Button variant="ghost" size="sm" asChild>
-            <Link to="..">
+            <Link to={backToPinsUrl}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Pins
             </Link>

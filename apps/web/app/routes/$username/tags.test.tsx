@@ -118,9 +118,7 @@ describe('TagsPage', () => {
     it('loads tags with toread filter', async () => {
       mockTagRepository.findByUserIdWithPinCount.mockResolvedValue(mockTags)
 
-      const request = new Request(
-        'http://localhost/testuser/tags?filter=toread'
-      )
+      const request = new Request('http://localhost/testuser/tags?unread=true')
       const params = { username: 'testuser' }
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
@@ -137,12 +135,10 @@ describe('TagsPage', () => {
       )
     })
 
-    it('defaults to all filter for invalid filter parameter', async () => {
+    it('defaults to all filter when no unread parameter', async () => {
       mockTagRepository.findByUserIdWithPinCount.mockResolvedValue(mockTags)
 
-      const request = new Request(
-        'http://localhost/testuser/tags?filter=invalid'
-      )
+      const request = new Request('http://localhost/testuser/tags')
       const params = { username: 'testuser' }
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
@@ -151,7 +147,7 @@ describe('TagsPage', () => {
       expect(result).toEqual({
         tags: mockTags,
         username: 'testuser',
-        currentFilter: 'invalid',
+        currentFilter: 'all',
       })
       expect(mockTagRepository.findByUserIdWithPinCount).toHaveBeenCalledWith(
         'user1',

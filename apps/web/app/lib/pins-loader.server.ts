@@ -24,6 +24,17 @@ export async function createPinsLoader(
     pageSize: url.searchParams.get('pageSize') || undefined,
   })
 
+  // Parse filter parameters from URL
+  const tagFilter = url.searchParams.get('tag') || undefined
+  const unreadFilter = url.searchParams.get('unread') === 'true'
+
+  // Build filter object combining config filter with URL parameters
+  const filter = {
+    ...config.filter,
+    ...(tagFilter && { tag: tagFilter }),
+    ...(unreadFilter && { readLater: true }),
+  }
+
   // Get authenticated user and validate username match
   const user = await requireUser(request)
   requireUsernameMatch(user, params.username)
@@ -38,7 +49,7 @@ export async function createPinsLoader(
   // Get total count for pagination calculation
   const totalCount = await repositories.pin.countByUserIdWithFilter(
     user.id,
-    config.filter
+    filter
   )
 
   // Calculate pagination details
@@ -49,14 +60,10 @@ export async function createPinsLoader(
   })
 
   // Fetch pins with pagination
-  const pins = await repositories.pin.findByUserIdWithFilter(
-    user.id,
-    config.filter,
-    {
-      limit: pagination.pageSize,
-      offset: pagination.offset,
-    }
-  )
+  const pins = await repositories.pin.findByUserIdWithFilter(user.id, filter, {
+    limit: pagination.pageSize,
+    offset: pagination.offset,
+  })
 
   // Return with updated session to clear flash messages
   return data(
@@ -65,7 +72,8 @@ export async function createPinsLoader(
       totalPages: pagination.totalPages,
       currentPage: pagination.page,
       totalCount,
-      currentFilter: config.currentFilter,
+      currentFilter: unreadFilter ? 'toread' : config.currentFilter,
+      activeTag: tagFilter,
       username: user.username,
       successMessage,
       errorMessage,

@@ -1,7 +1,11 @@
-import { useLoaderData, data } from 'react-router'
+import { useLoaderData, useLocation, data } from 'react-router'
 import type { Route } from './+types/pins.$id.delete'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
-import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
+import {
+  requireUsernameMatch,
+  getUserPath,
+  extractFilterParams,
+} from '~/lib/auth.server'
 import { pinService } from '~/lib/services/container.server'
 import { validateIdParam } from '@pinsquirrel/core'
 import { parseParams } from '~/lib/http-utils'
@@ -94,8 +98,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       userId: user.id,
     })
 
-    // Redirect to user's pins list with success message
-    const redirectTo = getUserPath(user.username)
+    // Redirect to user's pins list with success message, preserving filter params
+    const filterParams = extractFilterParams(request)
+    const redirectTo = getUserPath(user.username, '/pins', filterParams)
     return setFlashMessage(
       request,
       'success',
@@ -130,8 +135,12 @@ export async function action({ request, params }: Route.ActionArgs) {
 
 export default function PinDeletePage() {
   const { pin, username } = useLoaderData<typeof loader>()
+  const location = useLocation()
   const navigation = useNavigation()
   const deleteButtonRef = useRef<HTMLButtonElement>(null)
+
+  // Build back link with preserved query parameters
+  const backToPinsUrl = `/${username}/pins${location.search}`
 
   // Check if we're currently deleting
   const isDeleting =
@@ -153,7 +162,7 @@ export default function PinDeletePage() {
       <div className="max-w-lg mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-6">
           <Button variant="ghost" size="sm" asChild>
-            <Link to={`/${username}/pins`}>
+            <Link to={backToPinsUrl}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Pins
             </Link>
@@ -186,7 +195,7 @@ export default function PinDeletePage() {
               asChild
               disabled={isDeleting}
             >
-              <Link to={`/${username}/pins`}>Cancel</Link>
+              <Link to={backToPinsUrl}>Cancel</Link>
             </Button>
             <Form method="DELETE" className="flex-1">
               <Button

@@ -18,17 +18,31 @@ interface PinFilterProps {
 export function PinFilter({ className }: PinFilterProps) {
   const location = useLocation()
 
-  // Determine current filter based on route path
-  const currentFilter: FilterType = location.pathname.endsWith('/toread')
-    ? 'toread'
-    : 'all'
+  // Parse URL search params to determine current filter
+  const searchParams = new URLSearchParams(location.search)
+  const currentFilter: FilterType =
+    searchParams.get('unread') === 'true' ? 'toread' : 'all'
 
   // Extract the username from the current path to build filter links
   const pathSegments = location.pathname.split('/')
   const usernameIndex = pathSegments.findIndex(
-    segment => segment !== '' && segment !== 'pins' && segment !== 'toread'
+    segment => segment !== '' && segment !== 'pins'
   )
   const username = pathSegments[usernameIndex] || ''
+
+  // Preserve other query parameters when switching filters
+  const buildFilterLink = (filter: FilterType) => {
+    const params = new URLSearchParams(location.search)
+
+    if (filter === 'toread') {
+      params.set('unread', 'true')
+    } else {
+      params.delete('unread')
+    }
+
+    const queryString = params.toString()
+    return `/${username}/pins${queryString ? `?${queryString}` : ''}`
+  }
 
   const getFilterLabel = (filter: FilterType) => {
     switch (filter) {
@@ -50,14 +64,14 @@ export function PinFilter({ className }: PinFilterProps) {
           size="sm"
           asChild
         >
-          <Link to={`/${username}/pins`}>All</Link>
+          <Link to={buildFilterLink('all')}>All</Link>
         </Button>
         <Button
           variant={currentFilter === 'toread' ? 'default' : 'outline'}
           size="sm"
           asChild
         >
-          <Link to={`/${username}/toread`}>To Read</Link>
+          <Link to={buildFilterLink('toread')}>To Read</Link>
         </Button>
       </div>
 
@@ -72,10 +86,10 @@ export function PinFilter({ className }: PinFilterProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild>
-              <Link to={`/${username}/pins`}>All</Link>
+              <Link to={buildFilterLink('all')}>All</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link to={`/${username}/toread`}>To Read</Link>
+              <Link to={buildFilterLink('toread')}>To Read</Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

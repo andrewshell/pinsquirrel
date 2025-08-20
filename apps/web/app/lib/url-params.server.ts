@@ -4,6 +4,8 @@ export interface UrlParams {
   url?: string
   title?: string
   description?: string
+  tag?: string
+  unread?: boolean
 }
 
 /**
@@ -16,12 +18,16 @@ export function extractUrlParams(request: Request): UrlParams | null {
   const rawUrl = searchParams.get('url')
   const rawTitle = searchParams.get('title')
   const rawDescription = searchParams.get('description')
+  const rawTag = searchParams.get('tag')
+  const rawUnread = searchParams.get('unread')
 
   // If none of the expected parameters are in the URL, return null
   if (
     !searchParams.has('url') &&
     !searchParams.has('title') &&
-    !searchParams.has('description')
+    !searchParams.has('description') &&
+    !searchParams.has('tag') &&
+    !searchParams.has('unread')
   ) {
     return null
   }
@@ -30,6 +36,8 @@ export function extractUrlParams(request: Request): UrlParams | null {
     url: sanitizeUrl(rawUrl),
     title: sanitizeText(rawTitle, 500), // Limit title to 500 characters
     description: sanitizeText(rawDescription, 2000), // Limit description to 2000 characters
+    tag: sanitizeText(rawTag, 100), // Limit tag to 100 characters
+    unread: rawUnread === 'true',
   }
 }
 

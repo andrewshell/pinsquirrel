@@ -38,7 +38,7 @@ export function TagFilter({
     if (filter === 'all') {
       return basePath
     }
-    return `${basePath}?filter=${filter}`
+    return `${basePath}?unread=true`
   }
 
   return (

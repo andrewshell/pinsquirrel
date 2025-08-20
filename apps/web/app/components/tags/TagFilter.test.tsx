@@ -34,7 +34,7 @@ describe('TagFilter', () => {
         link => link.getAttribute('href') === '/testuser/tags'
       )
       const desktopToReadLink = toReadLinks.find(
-        link => link.getAttribute('href') === '/testuser/tags?filter=toread'
+        link => link.getAttribute('href') === '/testuser/tags?unread=true'
       )
 
       expect(desktopAllLink).toBeInTheDocument()
@@ -91,7 +91,7 @@ describe('TagFilter', () => {
         link => link.getAttribute('href') === '/customuser/tags'
       )
       const customToReadLink = toReadLinks.find(
-        link => link.getAttribute('href') === '/customuser/tags?filter=toread'
+        link => link.getAttribute('href') === '/customuser/tags?unread=true'
       )
 
       expect(customAllLink).toBeInTheDocument()

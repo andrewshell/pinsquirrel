@@ -18,6 +18,8 @@ describe('extractUrlParams', () => {
       url: 'https://example.com',
       title: 'Test Title',
       description: 'Test description',
+      tag: '',
+      unread: false,
     })
   })
 
@@ -31,6 +33,8 @@ describe('extractUrlParams', () => {
       url: 'https://example.com',
       title: 'Test Title',
       description: '',
+      tag: '',
+      unread: false,
     })
   })
 
@@ -107,6 +111,38 @@ describe('extractUrlParams', () => {
       url: '',
       title: '',
       description: '',
+      tag: '',
+      unread: false,
+    })
+  })
+
+  it('extracts tag and unread parameters correctly', () => {
+    const request = new Request(
+      'http://localhost:3000/testuser/pins/new?url=https%3A//example.com&title=Test&tag=javascript&unread=true'
+    )
+    const result = extractUrlParams(request)
+
+    expect(result).toEqual({
+      url: 'https://example.com',
+      title: 'Test',
+      description: '',
+      tag: 'javascript',
+      unread: true,
+    })
+  })
+
+  it('handles unread=false correctly', () => {
+    const request = new Request(
+      'http://localhost:3000/testuser/pins/new?url=https%3A//example.com&title=Test&unread=false'
+    )
+    const result = extractUrlParams(request)
+
+    expect(result).toEqual({
+      url: 'https://example.com',
+      title: 'Test',
+      description: '',
+      tag: '',
+      unread: false,
     })
   })
 

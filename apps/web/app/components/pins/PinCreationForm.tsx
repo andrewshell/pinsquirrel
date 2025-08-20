@@ -62,8 +62,10 @@ export function PinCreationForm({
       url: urlParams?.url || initialData?.url || '',
       title: urlParams?.title || initialData?.title || '',
       description: urlParams?.description || initialData?.description || '',
-      readLater: initialData?.readLater || false,
-      tags: initialData?.tags || [],
+      readLater: urlParams?.unread ?? initialData?.readLater ?? false,
+      tags: urlParams?.tag
+        ? [urlParams.tag, ...(initialData?.tags || [])]
+        : initialData?.tags || [],
     }),
     [urlParams, initialData]
   )

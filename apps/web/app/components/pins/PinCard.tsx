@@ -1,4 +1,4 @@
-import { Link, useFetcher } from 'react-router'
+import { Link, useFetcher, useLocation } from 'react-router'
 import type { Pin } from '@pinsquirrel/core'
 
 interface PinCardProps {
@@ -24,6 +24,15 @@ function isMarkAsReadResponse(
 
 export function PinCard({ pin, username }: PinCardProps) {
   const markAsReadFetcher = useFetcher()
+  const location = useLocation()
+
+  // Build URL with preserved query parameters for edit/delete links
+  const buildActionUrl = (action: 'edit' | 'delete') => {
+    const baseUrl = username
+      ? `/${username}/pins/${pin.id}/${action}`
+      : `${pin.id}/${action}`
+    return `${baseUrl}${location.search}`
+  }
 
   // Determine optimistic pin state
   const isMarking = markAsReadFetcher.state === 'submitting'
@@ -129,16 +138,14 @@ export function PinCard({ pin, username }: PinCardProps) {
             aria-label={`Actions for ${pin.title}`}
           >
             <Link
-              to={
-                username ? `/${username}/pins/${pin.id}/edit` : `${pin.id}/edit`
-              }
+              to={buildActionUrl('edit')}
               className="text-accent hover:text-accent/80 font-bold hover:underline"
               aria-label={`Edit ${pin.title}`}
             >
               edit
             </Link>
             <Link
-              to={`${pin.id}/delete`}
+              to={buildActionUrl('delete')}
               className="text-destructive hover:text-destructive/80 font-bold hover:underline"
               aria-label={`Delete ${pin.title}`}
             >

@@ -1,4 +1,4 @@
-import { useLoaderData } from 'react-router'
+import { useLoaderData, data } from 'react-router'
 import { PinsPageLayout } from '~/components/pins/PinsPageLayout'
 import type { Route } from './+types/pins'
 
@@ -24,16 +24,24 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     description:
       'Browse and manage your saved links, articles, and bookmarks on PinSquirrel.',
   }
-  return createPinsLoader(request, params, config)
+  const loaderData = await createPinsLoader(request, params, config)
+
+  // Build createPinPath with current query parameters
+  const url = new URL(request.url)
+  const queryString = url.search
+  const createPinPath = `/${params.username}/pins/new${queryString}`
+
+  return data(
+    {
+      ...loaderData.data,
+      createPinPath,
+    },
+    loaderData.init || undefined
+  )
 }
 
 export default function PinsPage() {
   const loaderData = useLoaderData<typeof loader>()
 
-  return (
-    <PinsPageLayout
-      {...loaderData}
-      createPinPath={`/${loaderData.username}/pins/new`}
-    />
-  )
+  return <PinsPageLayout {...loaderData} />
 }

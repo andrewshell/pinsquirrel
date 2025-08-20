@@ -1,7 +1,17 @@
-import { useLoaderData, useActionData, useParams, data } from 'react-router'
+import {
+  useLoaderData,
+  useActionData,
+  useParams,
+  useLocation,
+  data,
+} from 'react-router'
 import type { Route } from './+types/pins.$id.edit'
 import { requireUser, setFlashMessage } from '~/lib/session.server'
-import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
+import {
+  requireUsernameMatch,
+  getUserPath,
+  extractFilterParams,
+} from '~/lib/auth.server'
 import { pinService, repositories } from '~/lib/services/container.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
@@ -142,8 +152,9 @@ export async function action({ request, params }: Route.ActionArgs) {
         userId: user.id,
       })
 
-      // Redirect to user's pins list with success message
-      const redirectTo = getUserPath(user.username)
+      // Redirect to user's pins list with success message, preserving filter params
+      const filterParams = extractFilterParams(request)
+      const redirectTo = getUserPath(user.username, '/pins', filterParams)
       return setFlashMessage(
         request,
         'success',
@@ -203,8 +214,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       url: result.data.url,
     })
 
-    // Redirect to user's pins list with success message
-    const redirectTo = getUserPath(user.username)
+    // Redirect to user's pins list with success message, preserving filter params
+    const filterParams = extractFilterParams(request)
+    const redirectTo = getUserPath(user.username, '/pins', filterParams)
     return setFlashMessage(
       request,
       'success',
@@ -233,12 +245,16 @@ export default function PinEditPage() {
   const { pin, userTags } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
   const params = useParams()
+  const location = useLocation()
   const {
     loading: isMetadataLoading,
     error: metadataError,
     metadata,
     fetchMetadata,
   } = useMetadataFetch()
+
+  // Build back link with preserved query parameters
+  const backToPinsUrl = `/${params.username}/pins${location.search}`
 
   // Prepare initial data for the form
   const initialData: PinCreationFormData = {
@@ -254,7 +270,7 @@ export default function PinEditPage() {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-6">
           <Button variant="ghost" size="sm" asChild>
-            <Link to={`/${params.username}/pins`}>
+            <Link to={backToPinsUrl}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Pins
             </Link>

@@ -310,7 +310,7 @@ describe('PinCard', () => {
       const deleteLink = screen.getByRole('link', {
         name: /delete example pin/i,
       })
-      expect(deleteLink).toHaveAttribute('href', '/pin-1/delete')
+      expect(deleteLink).toHaveAttribute('href', '/testuser/pins/pin-1/delete')
     })
 
     it('should not render confirmation dialog in component', () => {
@@ -348,7 +348,10 @@ describe('PinCard', () => {
       const deleteLink = screen.getByRole('link', {
         name: /delete different pin/i,
       })
-      expect(deleteLink).toHaveAttribute('href', '/different-pin-id/delete')
+      expect(deleteLink).toHaveAttribute(
+        'href',
+        '/testuser/pins/different-pin-id/delete'
+      )
     })
 
     it('should not have dialog component state management', () => {
