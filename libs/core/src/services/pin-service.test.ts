@@ -17,14 +17,12 @@ describe('PinService', () => {
   let pinService: PinService
   let mockPinRepository: {
     findById: Mock
-    findAll: Mock
     create: Mock
     update: Mock
     delete: Mock
     findByUserId: Mock
-    findByUserIdAndTag: Mock
-    findByUserIdAndReadLater: Mock
     findByUserIdAndUrl: Mock
+    countByUserId: Mock
   }
   let mockTagRepository: {
     findById: Mock
@@ -59,14 +57,12 @@ describe('PinService', () => {
   beforeEach(() => {
     mockPinRepository = {
       findById: vi.fn(),
-      findAll: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
       findByUserId: vi.fn(),
-      findByUserIdAndTag: vi.fn(),
-      findByUserIdAndReadLater: vi.fn(),
       findByUserIdAndUrl: vi.fn(),
+      countByUserId: vi.fn(),
     }
 
     mockTagRepository = {
@@ -360,16 +356,16 @@ describe('PinService', () => {
   describe('getReadLaterPins', () => {
     it('should return read later pins for a user', async () => {
       const readLaterPin = { ...mockPin, readLater: true }
-      mockPinRepository.findByUserIdAndReadLater.mockResolvedValue([
+      mockPinRepository.findByUserId.mockResolvedValue([
         readLaterPin,
       ])
 
       const result = await pinService.getReadLaterPins('user-123')
 
       expect(result).toEqual([readLaterPin])
-      expect(mockPinRepository.findByUserIdAndReadLater).toHaveBeenCalledWith(
+      expect(mockPinRepository.findByUserId).toHaveBeenCalledWith(
         'user-123',
-        true
+        { readLater: true }
       )
     })
   })
@@ -377,15 +373,15 @@ describe('PinService', () => {
   describe('getPinsByTag', () => {
     it('should return pins for a tag owned by the user', async () => {
       mockTagRepository.findById.mockResolvedValue(mockTag)
-      mockPinRepository.findByUserIdAndTag.mockResolvedValue([mockPin])
+      mockPinRepository.findByUserId.mockResolvedValue([mockPin])
 
       const result = await pinService.getPinsByTag('user-123', 'tag-123')
 
       expect(result).toEqual([mockPin])
       expect(mockTagRepository.findById).toHaveBeenCalledWith('tag-123')
-      expect(mockPinRepository.findByUserIdAndTag).toHaveBeenCalledWith(
+      expect(mockPinRepository.findByUserId).toHaveBeenCalledWith(
         'user-123',
-        'tag-123'
+        { tagId: 'tag-123' }
       )
     })
 

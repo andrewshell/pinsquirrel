@@ -216,9 +216,9 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         [pin1Id, pin2Id, tag1.id, tag2.id]
       )
 
-      const result = await pinRepository.findByUserIdAndTag(
+      const result = await pinRepository.findByUserId(
         testUser.id,
-        tag1.id
+        { tagId: tag1.id }
       )
 
       expect(result).toHaveLength(2)
@@ -232,7 +232,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         userId: testUser.id,
         name: 'unused-tag',
       })
-      const result = await pinRepository.findByUserIdAndTag(testUser.id, tag.id)
+      const result = await pinRepository.findByUserId(testUser.id, { tagId: tag.id })
       expect(result).toEqual([])
     })
   })
@@ -262,13 +262,13 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         ]
       )
 
-      const readLaterPins = await pinRepository.findByUserIdAndReadLater(
+      const readLaterPins = await pinRepository.findByUserId(
         testUser.id,
-        true
+        { readLater: true }
       )
-      const notReadLaterPins = await pinRepository.findByUserIdAndReadLater(
+      const notReadLaterPins = await pinRepository.findByUserId(
         testUser.id,
-        false
+        { readLater: false }
       )
 
       expect(readLaterPins).toHaveLength(2)
@@ -490,75 +490,8 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     })
   })
 
-  describe('findAll', () => {
-    it('should return all pins with tags', async () => {
-      // Create pins with tags for this user
-      const uniqueTagName = `shared-tag-${crypto.randomUUID().slice(0, 8)}`
-      await tagRepository.create({ userId: testUser.id, name: uniqueTagName })
 
-      const pin1 = await pinRepository.create({
-        userId: testUser.id,
-        url: `https://example1-${crypto.randomUUID().slice(0, 8)}.com`,
-        title: 'Pin 1',
-        tagNames: [uniqueTagName],
-      })
-
-      const pin2 = await pinRepository.create({
-        userId: testUser.id,
-        url: `https://example2-${crypto.randomUUID().slice(0, 8)}.com`,
-        title: 'Pin 2',
-        tagNames: [uniqueTagName],
-      })
-
-      const result = await pinRepository.findAll()
-
-      // Find our specific pins in the results
-      const ourPin1 = result.find(p => p.id === pin1.id)
-      const ourPin2 = result.find(p => p.id === pin2.id)
-
-      expect(ourPin1).toBeDefined()
-      expect(ourPin2).toBeDefined()
-      expect(ourPin1!.tags).toHaveLength(1)
-      expect(ourPin2!.tags).toHaveLength(1)
-      expect(ourPin1!.tags[0].name).toBe(uniqueTagName)
-    })
-  })
-
-  describe('list', () => {
-    beforeEach(async () => {
-      // Create test data for pagination
-      for (let i = 1; i <= 5; i++) {
-        await pinRepository.create({
-          userId: testUser.id,
-          url: `https://example${i}.com`,
-          title: `Pin ${i}`,
-        })
-      }
-    })
-
-    it('should return pins with limit', async () => {
-      const result = await pinRepository.list(3)
-      expect(result.length).toBeLessThanOrEqual(3)
-      expect(result.length).toBeGreaterThan(0)
-    })
-
-    it('should return pins with offset', async () => {
-      const result = await pinRepository.list(undefined, 2)
-      expect(result.length).toBeGreaterThanOrEqual(3)
-    })
-
-    it('should return pins with both limit and offset', async () => {
-      const result = await pinRepository.list(2, 2)
-      expect(result.length).toBeLessThanOrEqual(2)
-    })
-
-    it('should return all pins when no limit or offset provided', async () => {
-      const result = await pinRepository.list()
-      expect(result.length).toBeGreaterThanOrEqual(5) // We create 5 pins in beforeEach
-    })
-  })
-
-  describe('findByUserIdWithFilter', () => {
+  describe('findByUserId', () => {
     beforeEach(async () => {
       // Create test pins with different readLater values
       await pinRepository.create({
@@ -584,12 +517,12 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     })
 
     it('should return all pins when no filter is applied', async () => {
-      const result = await pinRepository.findByUserIdWithFilter(testUser.id, {})
+      const result = await pinRepository.findByUserId(testUser.id, {})
       expect(result.length).toBe(3)
     })
 
     it('should return only read later pins when readLater filter is true', async () => {
-      const result = await pinRepository.findByUserIdWithFilter(testUser.id, {
+      const result = await pinRepository.findByUserId(testUser.id, {
         readLater: true,
       })
       expect(result.length).toBe(2)
@@ -597,7 +530,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     })
 
     it('should return only non-read-later pins when readLater filter is false', async () => {
-      const result = await pinRepository.findByUserIdWithFilter(testUser.id, {
+      const result = await pinRepository.findByUserId(testUser.id, {
         readLater: false,
       })
       expect(result.length).toBe(1)
@@ -605,7 +538,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     })
 
     it('should support pagination with filter', async () => {
-      const result = await pinRepository.findByUserIdWithFilter(
+      const result = await pinRepository.findByUserId(
         testUser.id,
         { readLater: true },
         { limit: 1 }
@@ -615,7 +548,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     })
 
     it('should support offset with filter', async () => {
-      const result = await pinRepository.findByUserIdWithFilter(
+      const result = await pinRepository.findByUserId(
         testUser.id,
         { readLater: true },
         { limit: 1, offset: 1 }
@@ -625,7 +558,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     })
   })
 
-  describe('countByUserIdWithFilter', () => {
+  describe('countByUserId', () => {
     beforeEach(async () => {
       // Create test pins with different readLater values
       await pinRepository.create({
@@ -651,19 +584,19 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     })
 
     it('should count all pins when no filter is applied', async () => {
-      const count = await pinRepository.countByUserIdWithFilter(testUser.id, {})
+      const count = await pinRepository.countByUserId(testUser.id, {})
       expect(count).toBe(3)
     })
 
     it('should count only read later pins when readLater filter is true', async () => {
-      const count = await pinRepository.countByUserIdWithFilter(testUser.id, {
+      const count = await pinRepository.countByUserId(testUser.id, {
         readLater: true,
       })
       expect(count).toBe(2)
     })
 
     it('should count only non-read-later pins when readLater filter is false', async () => {
-      const count = await pinRepository.countByUserIdWithFilter(testUser.id, {
+      const count = await pinRepository.countByUserId(testUser.id, {
         readLater: false,
       })
       expect(count).toBe(1)

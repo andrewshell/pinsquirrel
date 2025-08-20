@@ -1,0 +1,58 @@
+import { describe, it, expect } from 'vitest'
+import { parsePinFilters } from './filter-utils.server'
+
+describe('parsePinFilters', () => {
+  it('should return all filter when no unread parameter is present', () => {
+    const url = new URL('https://example.com/pins')
+    const result = parsePinFilters(url)
+
+    expect(result.filter).toEqual({})
+    expect(result.currentFilterType).toBe('all')
+    expect(result.activeTag).toBeUndefined()
+  })
+
+  it('should return toread filter when unread=true', () => {
+    const url = new URL('https://example.com/pins?unread=true')
+    const result = parsePinFilters(url)
+
+    expect(result.filter).toEqual({ readLater: true })
+    expect(result.currentFilterType).toBe('toread')
+    expect(result.activeTag).toBeUndefined()
+  })
+
+  it('should return read filter when unread=false', () => {
+    const url = new URL('https://example.com/pins?unread=false')
+    const result = parsePinFilters(url)
+
+    expect(result.filter).toEqual({ readLater: false })
+    expect(result.currentFilterType).toBe('read')
+    expect(result.activeTag).toBeUndefined()
+  })
+
+  it('should handle tag filtering', () => {
+    const url = new URL('https://example.com/pins?tag=work')
+    const result = parsePinFilters(url)
+
+    expect(result.filter).toEqual({ tag: 'work' })
+    expect(result.currentFilterType).toBe('all')
+    expect(result.activeTag).toBe('work')
+  })
+
+  it('should handle combined tag and unread filtering', () => {
+    const url = new URL('https://example.com/pins?tag=work&unread=false')
+    const result = parsePinFilters(url)
+
+    expect(result.filter).toEqual({ tag: 'work', readLater: false })
+    expect(result.currentFilterType).toBe('read')
+    expect(result.activeTag).toBe('work')
+  })
+
+  it('should ignore invalid unread parameter values', () => {
+    const url = new URL('https://example.com/pins?unread=invalid')
+    const result = parsePinFilters(url)
+
+    expect(result.filter).toEqual({})
+    expect(result.currentFilterType).toBe('all')
+    expect(result.activeTag).toBeUndefined()
+  })
+})

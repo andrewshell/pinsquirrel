@@ -3,6 +3,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type {
   Pin,
   PinRepository,
+  PinFilter,
   CreatePinData,
   UpdatePinData,
   TagRepository,
@@ -27,53 +28,32 @@ export class DrizzlePinRepository implements PinRepository {
     }
 
     const pin = result[0]
-    const pinTags = await this.getPinTags(pin.id)
+    const tagsByPinId = await this.getPinTags([pin.id])
+    const pinTags = tagsByPinId.get(pin.id) || []
 
     return this.mapToPin(pin, pinTags)
   }
 
   async findByUserId(
     userId: string,
+    filter?: PinFilter,
     options?: { limit?: number; offset?: number }
   ): Promise<Pin[]> {
-    const baseQuery = this.db
-      .select()
-      .from(pins)
-      .where(eq(pins.userId, userId))
-      .orderBy(desc(pins.createdAt))
-
-    let query
-    if (options?.limit !== undefined && options?.offset !== undefined) {
-      query = baseQuery.limit(options.limit).offset(options.offset)
-    } else if (options?.limit !== undefined) {
-      query = baseQuery.limit(options.limit)
-    } else if (options?.offset !== undefined) {
-      query = baseQuery.offset(options.offset)
-    } else {
-      query = baseQuery
+    // Build query conditions
+    const conditions = [eq(pins.userId, userId)]
+    
+    // Add readLater filter if specified
+    if (filter?.readLater !== undefined) {
+      conditions.push(eq(pins.readLater, filter.readLater))
+    }
+    
+    // Add URL filter if specified (for findByUserIdAndUrl functionality)
+    if (filter?.url !== undefined) {
+      conditions.push(eq(pins.url, filter.url))
     }
 
-    const result = await query
-
-    return this.mapPinsBulk(result)
-  }
-
-  async countByUserId(userId: string): Promise<number> {
-    const result = await this.db
-      .select({ count: count() })
-      .from(pins)
-      .where(eq(pins.userId, userId))
-
-    return result[0]?.count ?? 0
-  }
-
-  async findByUserIdWithFilter(
-    userId: string,
-    filter: { readLater?: boolean; tag?: string },
-    options?: { limit?: number; offset?: number }
-  ): Promise<Pin[]> {
-    // If filtering by tag, we need to join with tags
-    if (filter.tag) {
+    // If filtering by tag name, we need to join with tags
+    if (filter?.tag) {
       const baseQuery = this.db
         .select({
           id: pins.id,
@@ -90,52 +70,82 @@ export class DrizzlePinRepository implements PinRepository {
         .innerJoin(tags, eq(pinsTags.tagId, tags.id))
         .where(
           and(
-            eq(pins.userId, userId),
-            eq(tags.name, filter.tag),
-            filter.readLater !== undefined
-              ? eq(pins.readLater, filter.readLater)
-              : undefined
+            ...conditions,
+            eq(tags.name, filter.tag)
           )
         )
         .orderBy(desc(pins.createdAt))
 
-      let query
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let query = baseQuery as any
       if (options?.limit !== undefined && options?.offset !== undefined) {
         query = baseQuery.limit(options.limit).offset(options.offset)
       } else if (options?.limit !== undefined) {
         query = baseQuery.limit(options.limit)
-      } else {
-        query = baseQuery
+      } else if (options?.offset !== undefined) {
+        query = baseQuery.offset(options.offset)
       }
 
       const results = await query
-      return results.map(row => ({
-        ...row,
-        tags: [],
-      }))
+      
+      // Use mapPinsBulk to properly load tags for each pin
+      return this.mapPinsBulk(results)
     }
 
-    // Build the where conditions for non-tag filtering
-    const conditions = [eq(pins.userId, userId)]
-    if (filter.readLater !== undefined) {
-      conditions.push(eq(pins.readLater, filter.readLater))
+    // If filtering by tag ID, we need to join with pinsTags
+    if (filter?.tagId) {
+      const baseQuery = this.db
+        .select({
+          id: pins.id,
+          userId: pins.userId,
+          url: pins.url,
+          title: pins.title,
+          description: pins.description,
+          readLater: pins.readLater,
+          createdAt: pins.createdAt,
+          updatedAt: pins.updatedAt,
+        })
+        .from(pins)
+        .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
+        .where(
+          and(
+            ...conditions,
+            eq(pinsTags.tagId, filter.tagId)
+          )
+        )
+        .orderBy(desc(pins.createdAt))
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let query = baseQuery as any
+      if (options?.limit !== undefined && options?.offset !== undefined) {
+        query = baseQuery.limit(options.limit).offset(options.offset)
+      } else if (options?.limit !== undefined) {
+        query = baseQuery.limit(options.limit)
+      } else if (options?.offset !== undefined) {
+        query = baseQuery.offset(options.offset)
+      }
+
+      const results = await query
+      
+      // Use mapPinsBulk to properly load tags for each pin
+      return this.mapPinsBulk(results)
     }
 
+    // Standard query without tag filtering
     const baseQuery = this.db
       .select()
       .from(pins)
       .where(and(...conditions))
       .orderBy(desc(pins.createdAt))
 
-    let query
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query = baseQuery as any
     if (options?.limit !== undefined && options?.offset !== undefined) {
       query = baseQuery.limit(options.limit).offset(options.offset)
     } else if (options?.limit !== undefined) {
       query = baseQuery.limit(options.limit)
     } else if (options?.offset !== undefined) {
       query = baseQuery.offset(options.offset)
-    } else {
-      query = baseQuery
     }
 
     const result = await query
@@ -143,12 +153,23 @@ export class DrizzlePinRepository implements PinRepository {
     return this.mapPinsBulk(result)
   }
 
-  async countByUserIdWithFilter(
-    userId: string,
-    filter: { readLater?: boolean; tag?: string }
-  ): Promise<number> {
-    // If filtering by tag, we need to join with tags
-    if (filter.tag) {
+
+  async countByUserId(userId: string, filter?: PinFilter): Promise<number> {
+    // Build query conditions
+    const conditions = [eq(pins.userId, userId)]
+    
+    // Add readLater filter if specified
+    if (filter?.readLater !== undefined) {
+      conditions.push(eq(pins.readLater, filter.readLater))
+    }
+    
+    // Add URL filter if specified
+    if (filter?.url !== undefined) {
+      conditions.push(eq(pins.url, filter.url))
+    }
+
+    // If filtering by tag name, we need to join with tags
+    if (filter?.tag) {
       const result = await this.db
         .select({ count: count() })
         .from(pins)
@@ -156,23 +177,31 @@ export class DrizzlePinRepository implements PinRepository {
         .innerJoin(tags, eq(pinsTags.tagId, tags.id))
         .where(
           and(
-            eq(pins.userId, userId),
-            eq(tags.name, filter.tag),
-            filter.readLater !== undefined
-              ? eq(pins.readLater, filter.readLater)
-              : undefined
+            ...conditions,
+            eq(tags.name, filter.tag)
           )
         )
 
       return result[0]?.count ?? 0
     }
 
-    // Build the where conditions for non-tag filtering
-    const conditions = [eq(pins.userId, userId)]
-    if (filter.readLater !== undefined) {
-      conditions.push(eq(pins.readLater, filter.readLater))
+    // If filtering by tag ID, we need to join with pinsTags
+    if (filter?.tagId) {
+      const result = await this.db
+        .select({ count: count() })
+        .from(pins)
+        .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
+        .where(
+          and(
+            ...conditions,
+            eq(pinsTags.tagId, filter.tagId)
+          )
+        )
+
+      return result[0]?.count ?? 0
     }
 
+    // Standard count without tag filtering
     const result = await this.db
       .select({ count: count() })
       .from(pins)
@@ -181,80 +210,12 @@ export class DrizzlePinRepository implements PinRepository {
     return result[0]?.count ?? 0
   }
 
-  async findByUserIdAndTag(userId: string, tagId: string): Promise<Pin[]> {
-    const result = await this.db
-      .select({
-        pin: pins,
-      })
-      .from(pins)
-      .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
-      .where(and(eq(pins.userId, userId), eq(pinsTags.tagId, tagId)))
-      .orderBy(desc(pins.createdAt))
-
-    const uniquePins = Array.from(
-      new Map(result.map(r => [r.pin.id, r.pin])).values()
-    )
-
-    return this.mapPinsBulk(uniquePins)
-  }
-
-  async findByUserIdAndReadLater(
-    userId: string,
-    readLater: boolean
-  ): Promise<Pin[]> {
-    const result = await this.db
-      .select()
-      .from(pins)
-      .where(and(eq(pins.userId, userId), eq(pins.readLater, readLater)))
-      .orderBy(desc(pins.createdAt))
-
-    return this.mapPinsBulk(result)
-  }
 
   async findByUserIdAndUrl(userId: string, url: string): Promise<Pin | null> {
-    const result = await this.db
-      .select()
-      .from(pins)
-      .where(and(eq(pins.userId, userId), eq(pins.url, url)))
-      .limit(1)
-
-    if (result.length === 0) {
-      return null
-    }
-
-    const pin = result[0]
-    const pinTags = await this.getPinTags(pin.id)
-
-    return this.mapToPin(pin, pinTags)
+    const results = await this.findByUserId(userId, { url }, { limit: 1 })
+    return results.length > 0 ? results[0] : null
   }
 
-  async findAll(): Promise<Pin[]> {
-    const result = await this.db
-      .select()
-      .from(pins)
-      .orderBy(desc(pins.createdAt))
-
-    return this.mapPinsBulk(result)
-  }
-
-  async list(limit?: number, offset?: number): Promise<Pin[]> {
-    const baseQuery = this.db.select().from(pins).orderBy(desc(pins.createdAt))
-
-    let query
-    if (limit !== undefined && offset !== undefined) {
-      query = baseQuery.limit(limit).offset(offset)
-    } else if (limit !== undefined) {
-      query = baseQuery.limit(limit)
-    } else if (offset !== undefined) {
-      query = baseQuery.offset(offset)
-    } else {
-      query = baseQuery
-    }
-
-    const result = await query
-
-    return this.mapPinsBulk(result)
-  }
 
   async create(data: CreatePinData): Promise<Pin> {
     const id = crypto.randomUUID()
@@ -327,7 +288,8 @@ export class DrizzlePinRepository implements PinRepository {
       .returning()
 
     // Handle tag updates if provided
-    let pinTags = await this.getPinTags(id)
+    const tagsByPinId = await this.getPinTags([id])
+    let pinTags = tagsByPinId.get(id) || []
     if (data.tagNames !== undefined) {
       // Remove all existing tag associations
       await this.db.delete(pinsTags).where(eq(pinsTags.pinId, id))
@@ -366,7 +328,7 @@ export class DrizzlePinRepository implements PinRepository {
     return result.rowCount > 0
   }
 
-  private async getBulkPinTags(
+  private async getPinTags(
     pinIds: string[]
   ): Promise<Map<string, (typeof tags.$inferSelect)[]>> {
     if (pinIds.length === 0) {
@@ -401,7 +363,7 @@ export class DrizzlePinRepository implements PinRepository {
     }
 
     const pinIds = pinsData.map((pin: typeof pins.$inferSelect) => pin.id)
-    const tagsByPinId = await this.getBulkPinTags(pinIds)
+    const tagsByPinId = await this.getPinTags(pinIds)
 
     return pinsData.map((pin: typeof pins.$inferSelect) => {
       const pinTags = tagsByPinId.get(pin.id) || []
@@ -409,19 +371,6 @@ export class DrizzlePinRepository implements PinRepository {
     })
   }
 
-  private async getPinTags(
-    pinId: string
-  ): Promise<(typeof tags.$inferSelect)[]> {
-    const result = await this.db
-      .select({
-        tag: tags,
-      })
-      .from(pinsTags)
-      .innerJoin(tags, eq(pinsTags.tagId, tags.id))
-      .where(eq(pinsTags.pinId, pinId))
-
-    return result.map(r => r.tag)
-  }
 
   private mapToPin(
     pin: typeof pins.$inferSelect,

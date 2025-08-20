@@ -4,6 +4,7 @@ import { requireUser } from '~/lib/session.server'
 import { requireUsernameMatch } from '~/lib/auth.server'
 import { TagCloud } from '~/components/tags/TagCloud'
 import { TagFilter, type TagFilterType } from '~/components/tags/TagFilter'
+import { parsePinFilters } from '~/lib/filter-utils.server'
 import type { Route } from './+types/tags'
 
 export function meta({ params }: Route.MetaArgs) {
@@ -23,26 +24,22 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const user = await requireUser(request)
   requireUsernameMatch(user, params.username)
 
-  // Parse filter from URL search params
+  // Parse filter from URL search params using centralized utility
   const url = new URL(request.url)
-  const unreadFilter = url.searchParams.get('unread') === 'true'
+  const parsedFilters = parsePinFilters(url)
 
-  // Create filter object based on parameter
-  const filter: { readLater?: boolean } = {}
-  if (unreadFilter) {
-    filter.readLater = true
-  }
-
-  // Fetch tags with pin counts
+  // Fetch tags with pin counts, only pass filter if there are readLater constraints
   const tags = await repositories.tag.findByUserIdWithPinCount(
     user.id,
-    Object.keys(filter).length > 0 ? filter : undefined
+    parsedFilters.filter.readLater !== undefined
+      ? { readLater: parsedFilters.filter.readLater }
+      : undefined
   )
 
   return {
     tags,
     username: user.username,
-    currentFilter: unreadFilter ? 'toread' : ('all' as TagFilterType),
+    currentFilter: parsedFilters.currentFilterType as TagFilterType,
   }
 }
 

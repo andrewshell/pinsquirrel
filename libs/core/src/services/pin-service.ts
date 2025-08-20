@@ -140,7 +140,7 @@ export class PinService {
   }
 
   async getReadLaterPins(userId: string): Promise<Pin[]> {
-    return await this.pinRepository.findByUserIdAndReadLater(userId, true)
+    return await this.pinRepository.findByUserId(userId, { readLater: true })
   }
 
   async getPinsByTag(userId: string, tagId: string): Promise<Pin[]> {
@@ -153,7 +153,7 @@ export class PinService {
       throw new UnauthorizedTagAccessError(tagId)
     }
 
-    return await this.pinRepository.findByUserIdAndTag(userId, tagId)
+    return await this.pinRepository.findByUserId(userId, { tagId })
   }
 
   async createTag(userId: string, data: CreateTagInput): Promise<Tag> {
