@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
-import { cn } from '~/lib/utils'
+import { cn, buildPaginationUrl } from '~/lib/utils'
 import {
   Pagination,
   PaginationContent,
@@ -15,12 +15,14 @@ interface PinsPaginationProps {
   currentPage: number
   totalPages: number
   totalCount: number
+  searchParams: URLSearchParams
 }
 
 export function PinsPagination({
   currentPage,
   totalPages,
   totalCount,
+  searchParams,
 }: PinsPaginationProps) {
   const paginationRef = useRef<HTMLElement>(null)
   const shouldRender = totalPages > 1 && totalCount > 0
@@ -119,7 +121,9 @@ export function PinsPagination({
                 <span className="hidden sm:block">Previous</span>
               </span>
             ) : (
-              <PaginationPrevious to={`?page=${currentPage - 1}`} />
+              <PaginationPrevious
+                to={buildPaginationUrl(searchParams, currentPage - 1)}
+              />
             )}
           </PaginationItem>
 
@@ -131,7 +135,7 @@ export function PinsPagination({
                 <PaginationEllipsis />
               ) : (
                 <PaginationLink
-                  to={`?page=${page}`}
+                  to={buildPaginationUrl(searchParams, page)}
                   isActive={page === currentPage}
                 >
                   {page}
@@ -153,7 +157,9 @@ export function PinsPagination({
                 <ChevronRightIcon className="h-4 w-4" />
               </span>
             ) : (
-              <PaginationNext to={`?page=${currentPage + 1}`} />
+              <PaginationNext
+                to={buildPaginationUrl(searchParams, currentPage + 1)}
+              />
             )}
           </PaginationItem>
         </PaginationContent>

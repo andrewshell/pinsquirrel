@@ -19,6 +19,7 @@ interface PinsPageLayoutProps {
   errorMessage: string | null
   createPinPath: string // Path for Create Pin button
   activeTag?: string // Current tag filter
+  searchParams: URLSearchParams
 }
 
 export function PinsPageLayout({
@@ -31,6 +32,7 @@ export function PinsPageLayout({
   errorMessage,
   createPinPath,
   activeTag,
+  searchParams,
 }: PinsPageLayoutProps) {
   const navigation = useNavigation()
 
@@ -84,6 +86,7 @@ export function PinsPageLayout({
           currentPage={currentPage}
           totalPages={totalPages}
           totalCount={totalCount}
+          searchParams={searchParams}
         />
       </div>
     </div>

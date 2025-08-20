@@ -35,6 +35,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     {
       ...loaderData.data,
       createPinPath,
+      searchParamsString: url.search,
     },
     loaderData.init || undefined
   )
@@ -43,5 +44,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 export default function PinsPage() {
   const loaderData = useLoaderData<typeof loader>()
 
-  return <PinsPageLayout {...loaderData} />
+  // Convert search params string back to URLSearchParams object
+  const searchParams = new URLSearchParams(loaderData.searchParamsString || '')
+
+  return <PinsPageLayout {...loaderData} searchParams={searchParams} />
 }
