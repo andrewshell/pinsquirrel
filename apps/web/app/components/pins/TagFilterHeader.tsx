@@ -23,18 +23,23 @@ export function TagFilterHeader({
   }
 
   return (
-    <div className={`flex items-center ${className}`}>
-      <div className="inline-flex items-center gap-1 bg-secondary text-secondary-foreground px-2 py-1 text-sm font-medium border-2 border-foreground">
-        <span>{activeTag}</span>
-        <button
-          type="button"
-          className="ml-1 hover:bg-destructive hover:text-destructive-foreground rounded-sm p-0.5 transition-colors focus:outline-none focus:ring-1 focus:ring-foreground"
-          aria-label={`Remove ${activeTag} tag filter`}
-        >
-          <Link to={buildRemoveTagLink()}>
-            <X className="h-3 w-3" />
-          </Link>
-        </button>
+    <div className={`${className}`}>
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-bold text-foreground">TAGS</label>
+        <div className="border-4 border-foreground bg-input p-3">
+          <div className="inline-flex items-center gap-1 bg-secondary text-secondary-foreground px-2 py-1 text-sm font-medium border-2 border-foreground">
+            <span>{activeTag}</span>
+            <button
+              type="button"
+              className="ml-1 hover:bg-destructive hover:text-destructive-foreground rounded-sm p-0.5 transition-colors focus:outline-none focus:ring-1 focus:ring-foreground"
+              aria-label={`Remove ${activeTag} tag filter`}
+            >
+              <Link to={buildRemoveTagLink()}>
+                <X className="h-3 w-3" />
+              </Link>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )
