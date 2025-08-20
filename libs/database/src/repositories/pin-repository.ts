@@ -41,12 +41,12 @@ export class DrizzlePinRepository implements PinRepository {
   ): Promise<Pin[]> {
     // Build query conditions
     const conditions = [eq(pins.userId, userId)]
-    
+
     // Add readLater filter if specified
     if (filter?.readLater !== undefined) {
       conditions.push(eq(pins.readLater, filter.readLater))
     }
-    
+
     // Add URL filter if specified (for findByUserIdAndUrl functionality)
     if (filter?.url !== undefined) {
       conditions.push(eq(pins.url, filter.url))
@@ -68,12 +68,7 @@ export class DrizzlePinRepository implements PinRepository {
         .from(pins)
         .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
         .innerJoin(tags, eq(pinsTags.tagId, tags.id))
-        .where(
-          and(
-            ...conditions,
-            eq(tags.name, filter.tag)
-          )
-        )
+        .where(and(...conditions, eq(tags.name, filter.tag)))
         .orderBy(desc(pins.createdAt))
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -87,7 +82,7 @@ export class DrizzlePinRepository implements PinRepository {
       }
 
       const results = await query
-      
+
       // Use mapPinsBulk to properly load tags for each pin
       return this.mapPinsBulk(results)
     }
@@ -107,12 +102,7 @@ export class DrizzlePinRepository implements PinRepository {
         })
         .from(pins)
         .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
-        .where(
-          and(
-            ...conditions,
-            eq(pinsTags.tagId, filter.tagId)
-          )
-        )
+        .where(and(...conditions, eq(pinsTags.tagId, filter.tagId)))
         .orderBy(desc(pins.createdAt))
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -126,7 +116,7 @@ export class DrizzlePinRepository implements PinRepository {
       }
 
       const results = await query
-      
+
       // Use mapPinsBulk to properly load tags for each pin
       return this.mapPinsBulk(results)
     }
@@ -153,16 +143,15 @@ export class DrizzlePinRepository implements PinRepository {
     return this.mapPinsBulk(result)
   }
 
-
   async countByUserId(userId: string, filter?: PinFilter): Promise<number> {
     // Build query conditions
     const conditions = [eq(pins.userId, userId)]
-    
+
     // Add readLater filter if specified
     if (filter?.readLater !== undefined) {
       conditions.push(eq(pins.readLater, filter.readLater))
     }
-    
+
     // Add URL filter if specified
     if (filter?.url !== undefined) {
       conditions.push(eq(pins.url, filter.url))
@@ -175,12 +164,7 @@ export class DrizzlePinRepository implements PinRepository {
         .from(pins)
         .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
         .innerJoin(tags, eq(pinsTags.tagId, tags.id))
-        .where(
-          and(
-            ...conditions,
-            eq(tags.name, filter.tag)
-          )
-        )
+        .where(and(...conditions, eq(tags.name, filter.tag)))
 
       return result[0]?.count ?? 0
     }
@@ -191,12 +175,7 @@ export class DrizzlePinRepository implements PinRepository {
         .select({ count: count() })
         .from(pins)
         .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
-        .where(
-          and(
-            ...conditions,
-            eq(pinsTags.tagId, filter.tagId)
-          )
-        )
+        .where(and(...conditions, eq(pinsTags.tagId, filter.tagId)))
 
       return result[0]?.count ?? 0
     }
@@ -210,12 +189,10 @@ export class DrizzlePinRepository implements PinRepository {
     return result[0]?.count ?? 0
   }
 
-
   async findByUserIdAndUrl(userId: string, url: string): Promise<Pin | null> {
     const results = await this.findByUserId(userId, { url }, { limit: 1 })
     return results.length > 0 ? results[0] : null
   }
-
 
   async create(data: CreatePinData): Promise<Pin> {
     const id = crypto.randomUUID()
@@ -370,7 +347,6 @@ export class DrizzlePinRepository implements PinRepository {
       return this.mapToPin(pin, pinTags)
     })
   }
-
 
   private mapToPin(
     pin: typeof pins.$inferSelect,

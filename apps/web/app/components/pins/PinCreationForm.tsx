@@ -12,6 +12,19 @@ import type { FieldErrors } from '@pinsquirrel/core'
 import { isValidUrl } from '@pinsquirrel/core'
 import type { UrlParams } from '~/lib/url-params.server'
 
+// Helper to deduplicate tags while preserving original casing
+const deduplicateTags = (tags: string[]): string[] => {
+  const seen = new Set<string>()
+  return tags.filter(tag => {
+    const lowerTag = tag.toLowerCase()
+    if (seen.has(lowerTag)) {
+      return false
+    }
+    seen.add(lowerTag)
+    return true
+  })
+}
+
 // Pin creation form data type
 type PinCreationFormData = {
   url: string
@@ -64,7 +77,7 @@ export function PinCreationForm({
       description: urlParams?.description || initialData?.description || '',
       readLater: urlParams?.unread ?? initialData?.readLater ?? false,
       tags: urlParams?.tag
-        ? [urlParams.tag, ...(initialData?.tags || [])]
+        ? deduplicateTags([urlParams.tag, ...(initialData?.tags || [])])
         : initialData?.tags || [],
     }),
     [urlParams, initialData]

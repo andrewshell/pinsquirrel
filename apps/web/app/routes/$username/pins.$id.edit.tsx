@@ -22,6 +22,7 @@ import { validatePinDataUpdate, validateIdParam } from '@pinsquirrel/core'
 import { parseFormData, parseParams } from '~/lib/http-utils'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
 import { logger } from '~/lib/logger.server'
+import { extractUrlParams } from '~/lib/url-params.server'
 
 // Pin creation form data type
 export type PinCreationFormData = {
@@ -58,6 +59,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response('Invalid pin ID', { status: 404 })
   }
 
+  // Extract URL parameters for tag suggestions and other pre-filling
+  const urlParams = extractUrlParams(request)
+
   // Fetch the pin using the service and user's existing tags for autocomplete
   try {
     const [pin, userTags] = await Promise.all([
@@ -68,6 +72,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     return data({
       pin,
       userTags: userTags.map(tag => tag.name),
+      urlParams,
     })
   } catch (error) {
     logger.exception(error, 'Failed to load pin for editing', {
@@ -242,7 +247,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function PinEditPage() {
-  const { pin, userTags } = useLoaderData<typeof loader>()
+  const { pin, userTags, urlParams } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
   const params = useParams()
   const location = useLocation()
@@ -285,14 +290,14 @@ export default function PinEditPage() {
             <PinCreationForm
               editMode
               initialData={initialData}
-              actionUrl={`/${params.username}/pins/${pin.id}/edit`}
+              actionUrl={`/${params.username}/pins/${pin.id}/edit${location.search}`}
               onMetadataFetch={fetchMetadata}
               metadataTitle={metadata?.title}
               metadataDescription={metadata?.description}
               metadataError={metadataError || undefined}
               isMetadataLoading={isMetadataLoading}
               tagSuggestions={userTags}
-              urlParams={null}
+              urlParams={urlParams}
               errorMessage={
                 actionData && 'errors' in actionData && actionData.errors?._form
                   ? Array.isArray(actionData.errors._form)

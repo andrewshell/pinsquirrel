@@ -356,17 +356,14 @@ describe('PinService', () => {
   describe('getReadLaterPins', () => {
     it('should return read later pins for a user', async () => {
       const readLaterPin = { ...mockPin, readLater: true }
-      mockPinRepository.findByUserId.mockResolvedValue([
-        readLaterPin,
-      ])
+      mockPinRepository.findByUserId.mockResolvedValue([readLaterPin])
 
       const result = await pinService.getReadLaterPins('user-123')
 
       expect(result).toEqual([readLaterPin])
-      expect(mockPinRepository.findByUserId).toHaveBeenCalledWith(
-        'user-123',
-        { readLater: true }
-      )
+      expect(mockPinRepository.findByUserId).toHaveBeenCalledWith('user-123', {
+        readLater: true,
+      })
     })
   })
 
@@ -379,10 +376,9 @@ describe('PinService', () => {
 
       expect(result).toEqual([mockPin])
       expect(mockTagRepository.findById).toHaveBeenCalledWith('tag-123')
-      expect(mockPinRepository.findByUserId).toHaveBeenCalledWith(
-        'user-123',
-        { tagId: 'tag-123' }
-      )
+      expect(mockPinRepository.findByUserId).toHaveBeenCalledWith('user-123', {
+        tagId: 'tag-123',
+      })
     })
 
     it('should throw TagNotFoundError if tag does not exist', async () => {

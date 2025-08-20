@@ -13,7 +13,7 @@ export interface PinRepository {
   create(data: CreatePinData): Promise<Pin>
   update(id: string, data: UpdatePinData): Promise<Pin | null>
   delete(id: string): Promise<boolean>
-  
+
   // User-scoped queries (secure by design)
   findByUserId(
     userId: string,
@@ -21,8 +21,5 @@ export interface PinRepository {
     options?: { limit?: number; offset?: number }
   ): Promise<Pin[]>
   findByUserIdAndUrl(userId: string, url: string): Promise<Pin | null>
-  countByUserId(
-    userId: string,
-    filter?: PinFilter
-  ): Promise<number>
+  countByUserId(userId: string, filter?: PinFilter): Promise<number>
 }

@@ -4,6 +4,7 @@ import { Link, useNavigation } from 'react-router'
 import type { Pin } from '@pinsquirrel/core'
 import { PinFilter } from './PinFilter'
 import { PinList } from './PinList'
+import { TagFilterHeader } from './TagFilterHeader'
 import { Button } from '~/components/ui/button'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import { PinsPagination } from '~/components/ui/pins-pagination'
@@ -17,6 +18,7 @@ interface PinsPageLayoutProps {
   successMessage: string | null
   errorMessage: string | null
   createPinPath: string // Path for Create Pin button
+  activeTag?: string // Current tag filter
 }
 
 export function PinsPageLayout({
@@ -28,6 +30,7 @@ export function PinsPageLayout({
   successMessage,
   errorMessage,
   createPinPath,
+  activeTag,
 }: PinsPageLayoutProps) {
   const navigation = useNavigation()
 
@@ -50,6 +53,10 @@ export function PinsPageLayout({
             </Link>
           </Button>
         </div>
+
+        {activeTag && (
+          <TagFilterHeader activeTag={activeTag} className="mb-6" />
+        )}
 
         {successMessage && (
           <DismissibleAlert

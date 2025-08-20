@@ -6,12 +6,16 @@ import { PinCard } from './PinCard'
 import type { Pin } from '@pinsquirrel/core'
 
 // Helper function to render with router context
-const renderWithRouter = (component: React.ReactNode) => {
+const renderWithRouter = (component: React.ReactNode, initialPath = '/') => {
   const router = createMemoryRouter(
     [
       {
         path: '/',
         element: component,
+      },
+      {
+        path: '/:username/pins',
+        element: <div>Pins Route</div>,
       },
       {
         path: '/:username/pins/:id/edit',
@@ -32,7 +36,7 @@ const renderWithRouter = (component: React.ReactNode) => {
       },
     ],
     {
-      initialEntries: ['/'],
+      initialEntries: [initialPath],
     }
   )
   return render(<RouterProvider router={router} />)
@@ -396,6 +400,133 @@ describe('PinCard', () => {
 
       expect(deleteLink).toHaveAttribute('aria-label', 'Delete Example Pin')
       expect(deleteLink).toHaveClass('text-destructive', 'font-bold')
+    })
+  })
+
+  describe('Tag links functionality', () => {
+    it('renders tag names as clickable links', () => {
+      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
+
+      const javascriptTag = screen.getByRole('link', {
+        name: /filter by tag: javascript/i,
+      })
+      const reactTag = screen.getByRole('link', {
+        name: /filter by tag: react/i,
+      })
+
+      expect(javascriptTag).toBeInTheDocument()
+      expect(reactTag).toBeInTheDocument()
+      expect(javascriptTag).toHaveTextContent('javascript')
+      expect(reactTag).toHaveTextContent('react')
+    })
+
+    it('generates correct tag filter URLs', () => {
+      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
+
+      const javascriptTag = screen.getByRole('link', {
+        name: /filter by tag: javascript/i,
+      })
+      const reactTag = screen.getByRole('link', {
+        name: /filter by tag: react/i,
+      })
+
+      expect(javascriptTag).toHaveAttribute(
+        'href',
+        '/testuser/pins?tag=javascript'
+      )
+      expect(reactTag).toHaveAttribute('href', '/testuser/pins?tag=react')
+    })
+
+    it('preserves existing unread filter when clicking tags', () => {
+      // Render with an unread filter in the URL
+      renderWithRouter(
+        <PinCard pin={mockPin} username="testuser" />,
+        '/?unread=true'
+      )
+
+      const javascriptTag = screen.getByRole('link', {
+        name: /filter by tag: javascript/i,
+      })
+      const reactTag = screen.getByRole('link', {
+        name: /filter by tag: react/i,
+      })
+
+      expect(javascriptTag).toHaveAttribute(
+        'href',
+        '/testuser/pins?unread=true&tag=javascript'
+      )
+      expect(reactTag).toHaveAttribute(
+        'href',
+        '/testuser/pins?unread=true&tag=react'
+      )
+    })
+
+    it('preserves other query parameters when clicking tags', () => {
+      // Render with existing query parameters
+      renderWithRouter(
+        <PinCard pin={mockPin} username="testuser" />,
+        '/?unread=false&page=2'
+      )
+
+      const javascriptTag = screen.getByRole('link', {
+        name: /filter by tag: javascript/i,
+      })
+
+      expect(javascriptTag).toHaveAttribute(
+        'href',
+        '/testuser/pins?unread=false&page=2&tag=javascript'
+      )
+    })
+
+    it('has proper accessibility attributes for tag links', () => {
+      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
+
+      const javascriptTag = screen.getByRole('link', {
+        name: /filter by tag: javascript/i,
+      })
+
+      expect(javascriptTag).toHaveAttribute(
+        'aria-label',
+        'Filter by tag: javascript'
+      )
+      expect(javascriptTag).toHaveClass(
+        'text-accent',
+        'hover:text-accent/80',
+        'hover:underline'
+      )
+    })
+
+    it('handles pins without username parameter', () => {
+      renderWithRouter(<PinCard pin={mockPin} />)
+
+      const javascriptTag = screen.getByRole('link', {
+        name: /filter by tag: javascript/i,
+      })
+
+      // Without username, should use relative URL (React Router will add leading slash)
+      expect(javascriptTag).toHaveAttribute('href', '/?tag=javascript')
+    })
+
+    it('separates tags with commas correctly', () => {
+      renderWithRouter(<PinCard pin={mockPin} username="testuser" />)
+
+      const tagsContainer = screen.getByTestId('pin-tags')
+
+      // Should contain both tags and a comma separator
+      expect(tagsContainer).toHaveTextContent('javascript, react')
+
+      // Verify the comma is not part of the link
+      const javascriptTag = screen.getByRole('link', {
+        name: /filter by tag: javascript/i,
+      })
+      const reactTag = screen.getByRole('link', {
+        name: /filter by tag: react/i,
+      })
+
+      expect(javascriptTag).toHaveTextContent('javascript')
+      expect(javascriptTag).not.toHaveTextContent(',')
+      expect(reactTag).toHaveTextContent('react')
+      expect(reactTag).not.toHaveTextContent(',')
     })
   })
 })

@@ -112,17 +112,27 @@ export function PinCard({ pin, username }: PinCardProps) {
             role="list"
             aria-label={`Tags: ${pin.tags.map(t => t.name).join(', ')}`}
           >
-            {pin.tags.map((tag, index) => (
-              <span key={tag.id} role="listitem">
-                <button
-                  className="text-accent hover:text-accent/80 hover:underline cursor-pointer"
-                  aria-label={`Filter by tag: ${tag.name}`}
-                >
-                  {tag.name}
-                </button>
-                {index < pin.tags.length - 1 && <span>, </span>}
-              </span>
-            ))}
+            {pin.tags.map((tag, index) => {
+              // Build URL with tag filter and preserve current unread filter
+              const params = new URLSearchParams(location.search)
+              params.set('tag', tag.name)
+              const tagUrl = username
+                ? `/${username}/pins?${params.toString()}`
+                : `?${params.toString()}`
+
+              return (
+                <span key={tag.id} role="listitem">
+                  <Link
+                    to={tagUrl}
+                    className="text-accent hover:text-accent/80 hover:underline cursor-pointer"
+                    aria-label={`Filter by tag: ${tag.name}`}
+                  >
+                    {tag.name}
+                  </Link>
+                  {index < pin.tags.length - 1 && <span>, </span>}
+                </span>
+              )
+            })}
           </div>
         )}
 

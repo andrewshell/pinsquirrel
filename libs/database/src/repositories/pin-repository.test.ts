@@ -216,10 +216,9 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         [pin1Id, pin2Id, tag1.id, tag2.id]
       )
 
-      const result = await pinRepository.findByUserId(
-        testUser.id,
-        { tagId: tag1.id }
-      )
+      const result = await pinRepository.findByUserId(testUser.id, {
+        tagId: tag1.id,
+      })
 
       expect(result).toHaveLength(2)
       expect(result.find(p => p.url === 'https://example1.com')).toBeDefined()
@@ -232,7 +231,9 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         userId: testUser.id,
         name: 'unused-tag',
       })
-      const result = await pinRepository.findByUserId(testUser.id, { tagId: tag.id })
+      const result = await pinRepository.findByUserId(testUser.id, {
+        tagId: tag.id,
+      })
       expect(result).toEqual([])
     })
   })
@@ -262,14 +263,12 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         ]
       )
 
-      const readLaterPins = await pinRepository.findByUserId(
-        testUser.id,
-        { readLater: true }
-      )
-      const notReadLaterPins = await pinRepository.findByUserId(
-        testUser.id,
-        { readLater: false }
-      )
+      const readLaterPins = await pinRepository.findByUserId(testUser.id, {
+        readLater: true,
+      })
+      const notReadLaterPins = await pinRepository.findByUserId(testUser.id, {
+        readLater: false,
+      })
 
       expect(readLaterPins).toHaveLength(2)
       expect(
@@ -489,7 +488,6 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       expect(result).toBe(false)
     })
   })
-
 
   describe('findByUserId', () => {
     beforeEach(async () => {

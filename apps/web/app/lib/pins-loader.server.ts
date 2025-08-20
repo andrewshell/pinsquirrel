@@ -1,4 +1,8 @@
-import { calculatePagination, parsePaginationParams, type PinFilter as CorePinFilter } from '@pinsquirrel/core'
+import {
+  calculatePagination,
+  parsePaginationParams,
+  type PinFilter as CorePinFilter,
+} from '@pinsquirrel/core'
 import { data } from 'react-router'
 import { repositories } from '~/lib/services/container.server'
 import { commitSession, getSession, requireUser } from '~/lib/session.server'
@@ -46,10 +50,7 @@ export async function createPinsLoader(
   const errorMessage = session.get('flash-error') as string | null
 
   // Get total count for pagination calculation
-  const totalCount = await repositories.pin.countByUserId(
-    user.id,
-    filter
-  )
+  const totalCount = await repositories.pin.countByUserId(user.id, filter)
 
   // Calculate pagination details
   const pagination = calculatePagination(totalCount, {
