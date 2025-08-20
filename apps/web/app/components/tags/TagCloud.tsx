@@ -18,13 +18,13 @@ const getFontSizeClass = (
   }
 
   const sizeClasses = [
-    'text-xs', // level 0: smallest
-    'text-sm', // level 1
-    'text-base', // level 2
-    'text-lg', // level 3: medium
-    'text-xl', // level 4
-    'text-2xl', // level 5
-    'text-3xl', // level 6: largest
+    'text-sm', // level 0: smallest
+    'text-base', // level 1
+    'text-lg', // level 2
+    'text-xl', // level 3: medium
+    'text-2xl', // level 4
+    'text-3xl', // level 5
+    'text-4xl', // level 6: largest
   ]
 
   // Simple bucket approach based on relative position

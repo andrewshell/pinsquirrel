@@ -228,7 +228,7 @@ export function TagInput({
               placeholder={
                 isAtMaxTags ? `Maximum ${maxTags} tags` : placeholder
               }
-              className="flex-1 min-w-[120px] bg-transparent text-sm font-medium placeholder:text-muted-foreground placeholder:font-bold focus:outline-none disabled:cursor-not-allowed"
+              className="flex-1 min-w-[120px] bg-transparent text-base font-medium placeholder:text-muted-foreground placeholder:font-bold focus:outline-none disabled:cursor-not-allowed"
               role="textbox"
               aria-expanded={isOpen}
               aria-haspopup="listbox"
@@ -263,7 +263,7 @@ export function TagInput({
                   id={`${listboxId}-option-${index}`}
                   aria-selected={index === selectedIndex}
                   className={cn(
-                    'w-full px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none',
+                    'w-full px-3 py-2 text-left text-base font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none',
                     index === selectedIndex &&
                       'bg-accent text-accent-foreground'
                   )}

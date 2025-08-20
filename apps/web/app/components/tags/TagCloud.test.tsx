@@ -80,10 +80,10 @@ describe('TagCloud', () => {
     const cssLink = screen.getByRole('link', { name: /css/ })
 
     // TypeScript has the most pins (25), should have larger font size
-    expect(typescriptLink.className).toMatch(/text-(2xl|3xl)/)
+    expect(typescriptLink.className).toMatch(/text-(3xl|4xl)/)
 
     // CSS has the least pins (1), should have smaller font size
-    expect(cssLink.className).toMatch(/text-(xs|sm|base)/)
+    expect(cssLink.className).toMatch(/text-(sm|base|lg)/)
   })
 
   it('includes pin count in title attribute', () => {

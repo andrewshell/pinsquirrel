@@ -83,7 +83,7 @@ export function PinCard({ pin, username }: PinCardProps) {
         </h3>
 
         {/* URL as link */}
-        <div className="text-xs mb-1">
+        <div className="text-sm mb-1">
           <a
             href={pin.url}
             target="_blank"
@@ -137,7 +137,7 @@ export function PinCard({ pin, username }: PinCardProps) {
         )}
 
         {/* Bottom row: Timestamp and Actions */}
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           {/* Timestamp */}
           <span className="font-bold">{getRelativeTime(pin.createdAt)}</span>
 

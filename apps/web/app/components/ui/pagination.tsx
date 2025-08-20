@@ -56,7 +56,7 @@ function PaginationLink({
       data-active={isActive}
       className={cn(
         // Override button styles for a more subtle pagination
-        'inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors',
+        'inline-flex items-center justify-center whitespace-nowrap text-base font-medium transition-colors',
         'disabled:pointer-events-none disabled:opacity-50',
         'border border-transparent rounded-md',
         'hover:bg-accent hover:text-accent-foreground',
