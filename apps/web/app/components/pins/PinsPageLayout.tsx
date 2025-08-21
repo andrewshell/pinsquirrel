@@ -4,8 +4,7 @@ import { Link, useNavigation } from 'react-router'
 import type { Pin } from '@pinsquirrel/core'
 import { PinFilter } from './PinFilter'
 import { PinList } from './PinList'
-import { TagFilterHeader } from './TagFilterHeader'
-import { SearchResultsHeader } from './SearchResultsHeader'
+import { FilterHeader } from './FilterHeader'
 import { Button } from '~/components/ui/button'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import { PinsPagination } from '~/components/ui/pins-pagination'
@@ -60,17 +59,12 @@ export function PinsPageLayout({
           </Button>
         </div>
 
-        {activeTag && (
-          <TagFilterHeader activeTag={activeTag} className="mb-6" />
-        )}
-
-        {currentSearch && (
-          <SearchResultsHeader
-            searchQuery={currentSearch}
-            resultCount={totalCount}
-            className="mb-6"
-          />
-        )}
+        <FilterHeader
+          activeTag={activeTag}
+          searchQuery={currentSearch}
+          resultCount={totalCount}
+          className="mb-6"
+        />
 
         {successMessage && (
           <DismissibleAlert
