@@ -1,13 +1,13 @@
-import { eq, and, count, desc, inArray } from 'drizzle-orm'
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type {
-  Pin,
-  PinRepository,
-  PinFilter,
   CreatePinData,
-  UpdatePinData,
+  Pin,
+  PinFilter,
+  PinRepository,
   TagRepository,
+  UpdatePinData,
 } from '@pinsquirrel/core'
+import { and, count, desc, eq, ilike, inArray, or } from 'drizzle-orm'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { pins, pinsTags, tags } from '../schema/index.js'
 
 export class DrizzlePinRepository implements PinRepository {
@@ -50,6 +50,19 @@ export class DrizzlePinRepository implements PinRepository {
     // Add URL filter if specified (for findByUserIdAndUrl functionality)
     if (filter?.url !== undefined) {
       conditions.push(eq(pins.url, filter.url))
+    }
+
+    // Add search filter if specified
+    if (filter?.search !== undefined && filter.search.trim() !== '') {
+      const searchTerm = `%${filter.search}%`
+      const searchCondition = or(
+        ilike(pins.url, searchTerm),
+        ilike(pins.title, searchTerm),
+        ilike(pins.description, searchTerm)
+      )
+      if (searchCondition) {
+        conditions.push(searchCondition)
+      }
     }
 
     // If filtering by tag name, we need to join with tags
@@ -155,6 +168,19 @@ export class DrizzlePinRepository implements PinRepository {
     // Add URL filter if specified
     if (filter?.url !== undefined) {
       conditions.push(eq(pins.url, filter.url))
+    }
+
+    // Add search filter if specified
+    if (filter?.search !== undefined && filter.search.trim() !== '') {
+      const searchTerm = `%${filter.search}%`
+      const searchCondition = or(
+        ilike(pins.url, searchTerm),
+        ilike(pins.title, searchTerm),
+        ilike(pins.description, searchTerm)
+      )
+      if (searchCondition) {
+        conditions.push(searchCondition)
+      }
     }
 
     // If filtering by tag name, we need to join with tags

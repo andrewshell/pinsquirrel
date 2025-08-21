@@ -1,7 +1,4 @@
-export interface PinFilter {
-  readLater?: boolean
-  tag?: string
-}
+import type { PinFilter } from '@pinsquirrel/core'
 
 export interface ParsedFilters {
   filter: PinFilter
@@ -15,6 +12,7 @@ export interface ParsedFilters {
 export function parsePinFilters(url: URL): ParsedFilters {
   const tagFilter = url.searchParams.get('tag') || undefined
   const unreadParam = url.searchParams.get('unread')
+  const searchParam = url.searchParams.get('search') || undefined
 
   const filter: PinFilter = {}
   let currentFilterType: 'all' | 'toread' | 'read' = 'all'
@@ -22,6 +20,11 @@ export function parsePinFilters(url: URL): ParsedFilters {
   // Add tag filter if present
   if (tagFilter) {
     filter.tag = tagFilter
+  }
+
+  // Add search filter if present
+  if (searchParam) {
+    filter.search = searchParam
   }
 
   // Handle unread parameter logic:

@@ -5,6 +5,7 @@ import type { Pin } from '@pinsquirrel/core'
 import { PinFilter } from './PinFilter'
 import { PinList } from './PinList'
 import { TagFilterHeader } from './TagFilterHeader'
+import { SearchResultsHeader } from './SearchResultsHeader'
 import { Button } from '~/components/ui/button'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import { PinsPagination } from '~/components/ui/pins-pagination'
@@ -43,6 +44,9 @@ export function PinsPageLayout({
   // Check if we're loading (navigating or submitting)
   const isLoading = navigation.state === 'loading'
 
+  // Get current search query
+  const currentSearch = searchParams.get('search') || ''
+
   return (
     <div className="bg-background py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -58,6 +62,14 @@ export function PinsPageLayout({
 
         {activeTag && (
           <TagFilterHeader activeTag={activeTag} className="mb-6" />
+        )}
+
+        {currentSearch && (
+          <SearchResultsHeader
+            searchQuery={currentSearch}
+            resultCount={totalCount}
+            className="mb-6"
+          />
         )}
 
         {successMessage && (

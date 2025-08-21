@@ -1,17 +1,17 @@
 import {
   calculatePagination,
   parsePaginationParams,
-  type PinFilter as CorePinFilter,
+  type PinFilter,
 } from '@pinsquirrel/core'
 import { data } from 'react-router'
-import { repositories } from '~/lib/services/container.server'
-import { commitSession, getSession, requireUser } from '~/lib/session.server'
 import { requireUsernameMatch } from '~/lib/auth.server'
 import { parsePinFilters } from '~/lib/filter-utils.server'
+import { repositories } from '~/lib/services/container.server'
+import { commitSession, getSession, requireUser } from '~/lib/session.server'
 
 export interface PinsLoaderConfig {
   currentFilter: string
-  filter: CorePinFilter
+  filter: PinFilter
   title: string
   description: string
 }
@@ -33,7 +33,7 @@ export async function createPinsLoader(
   const parsedFilters = parsePinFilters(url)
 
   // Build filter object combining config filter with URL parameters
-  const filter: CorePinFilter = {
+  const filter: PinFilter = {
     ...config.filter,
     ...parsedFilters.filter,
   }

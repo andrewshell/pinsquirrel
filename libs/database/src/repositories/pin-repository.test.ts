@@ -600,4 +600,189 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       expect(count).toBe(1)
     })
   })
+
+  describe('searchPins', () => {
+    beforeEach(async () => {
+      // Create test pins with different URLs, titles, and descriptions
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://example.com/react-tutorial',
+        title: 'React Tutorial for Beginners',
+        description: 'Learn the basics of React JavaScript library',
+        readLater: false,
+      })
+
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://github.com/facebook/react',
+        title: 'React GitHub Repository',
+        description: 'Official React repository on GitHub',
+        readLater: true,
+      })
+
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://vue.js.org/guide/',
+        title: 'Vue.js Guide',
+        description: 'Complete guide for Vue.js framework',
+        readLater: false,
+      })
+
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://angular.io/docs',
+        title: 'Angular Documentation',
+        description: 'Official Angular framework documentation',
+        readLater: true,
+      })
+    })
+
+    it('should find pins by URL search', async () => {
+      const result = await pinRepository.findByUserId(testUser.id, {
+        search: 'github',
+      })
+      expect(result).toHaveLength(1)
+      expect(result[0].url).toBe('https://github.com/facebook/react')
+    })
+
+    it('should find pins by title search', async () => {
+      const result = await pinRepository.findByUserId(testUser.id, {
+        search: 'react',
+      })
+      expect(result).toHaveLength(2)
+      expect(
+        result.find(p => p.title === 'React Tutorial for Beginners')
+      ).toBeDefined()
+      expect(
+        result.find(p => p.title === 'React GitHub Repository')
+      ).toBeDefined()
+    })
+
+    it('should find pins by description search', async () => {
+      const result = await pinRepository.findByUserId(testUser.id, {
+        search: 'framework',
+      })
+      expect(result).toHaveLength(2)
+      expect(result.find(p => p.title === 'Vue.js Guide')).toBeDefined()
+      expect(
+        result.find(p => p.title === 'Angular Documentation')
+      ).toBeDefined()
+    })
+
+    it('should perform case-insensitive search', async () => {
+      const lowerResult = await pinRepository.findByUserId(testUser.id, {
+        search: 'react',
+      })
+      const upperResult = await pinRepository.findByUserId(testUser.id, {
+        search: 'REACT',
+      })
+      const mixedResult = await pinRepository.findByUserId(testUser.id, {
+        search: 'ReAcT',
+      })
+
+      expect(lowerResult).toHaveLength(2)
+      expect(upperResult).toHaveLength(2)
+      expect(mixedResult).toHaveLength(2)
+      expect(lowerResult[0].id).toBe(upperResult[0].id)
+      expect(lowerResult[0].id).toBe(mixedResult[0].id)
+    })
+
+    it('should return empty array when no matches found', async () => {
+      const result = await pinRepository.findByUserId(testUser.id, {
+        search: 'nonexistent',
+      })
+      expect(result).toEqual([])
+    })
+
+    it('should handle pagination with search results', async () => {
+      const firstPage = await pinRepository.findByUserId(
+        testUser.id,
+        { search: 'framework' },
+        { limit: 1 }
+      )
+      const secondPage = await pinRepository.findByUserId(
+        testUser.id,
+        { search: 'framework' },
+        { limit: 1, offset: 1 }
+      )
+
+      expect(firstPage).toHaveLength(1)
+      expect(secondPage).toHaveLength(1)
+      expect(firstPage[0].id).not.toBe(secondPage[0].id)
+    })
+
+    it('should handle empty search query gracefully', async () => {
+      const result = await pinRepository.findByUserId(testUser.id, {
+        search: '',
+      })
+      expect(result).toHaveLength(4) // Should return all pins when search is empty
+    })
+
+    it('should handle null search query gracefully', async () => {
+      const result = await pinRepository.findByUserId(testUser.id, {
+        search: undefined,
+      })
+      expect(result).toHaveLength(4) // Should return all pins when search is undefined
+    })
+
+    it('should combine search with other filters', async () => {
+      const result = await pinRepository.findByUserId(testUser.id, {
+        search: 'documentation',
+        readLater: true,
+      })
+      expect(result).toHaveLength(1)
+      expect(result[0].title).toBe('Angular Documentation')
+      expect(result[0].readLater).toBe(true)
+    })
+  })
+
+  describe('countByUserId with search', () => {
+    beforeEach(async () => {
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://example.com/react-tutorial',
+        title: 'React Tutorial for Beginners',
+        description: 'Learn the basics of React JavaScript library',
+        readLater: false,
+      })
+
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://github.com/facebook/react',
+        title: 'React GitHub Repository',
+        description: 'Official React repository on GitHub',
+        readLater: true,
+      })
+
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://vue.js.org/guide/',
+        title: 'Vue.js Guide',
+        description: 'Complete guide for Vue.js framework',
+        readLater: false,
+      })
+    })
+
+    it('should count search results correctly', async () => {
+      const count = await pinRepository.countByUserId(testUser.id, {
+        search: 'react',
+      })
+      expect(count).toBe(2)
+    })
+
+    it('should count empty search results correctly', async () => {
+      const count = await pinRepository.countByUserId(testUser.id, {
+        search: 'nonexistent',
+      })
+      expect(count).toBe(0)
+    })
+
+    it('should count with combined search and filters', async () => {
+      const count = await pinRepository.countByUserId(testUser.id, {
+        search: 'react',
+        readLater: true,
+      })
+      expect(count).toBe(1)
+    })
+  })
 })

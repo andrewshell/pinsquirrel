@@ -5,6 +5,7 @@ export interface PinFilter {
   tag?: string
   tagId?: string
   url?: string
+  search?: string
 }
 
 export interface PinRepository {

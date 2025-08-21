@@ -1,7 +1,7 @@
 import type { User } from '@pinsquirrel/core'
 import { CircleUserRound, Menu, X } from 'lucide-react'
 import { useState } from 'react'
-import { Form, Link } from 'react-router'
+import { Form, Link, useNavigate, useSearchParams } from 'react-router'
 import { Button } from '~/components/ui/button'
 import {
   DropdownMenu,
@@ -10,6 +10,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
+import { SearchIcon } from '~/components/search/SearchIcon'
+import { SearchInput } from '~/components/search/SearchInput'
 
 interface HeaderProps {
   user: User | null
@@ -17,6 +19,34 @@ interface HeaderProps {
 
 export function Header({ user }: HeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isSearchVisible, setIsSearchVisible] = useState(false)
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
+  const currentSearch = searchParams.get('search') || ''
+
+  const handleSearchToggle = () => {
+    setIsSearchVisible(!isSearchVisible)
+  }
+
+  const handleSearch = (query: string) => {
+    if (!user) return
+
+    const params = new URLSearchParams()
+    if (query.trim()) {
+      params.set('search', query.trim())
+    }
+
+    // Navigate to user's pins page with search parameter
+    const searchString = params.toString()
+    const url = `/${user.username}/pins${searchString ? `?${searchString}` : ''}`
+    void navigate(url)
+    setIsSearchVisible(false)
+  }
+
+  const handleSearchClose = () => {
+    setIsSearchVisible(false)
+  }
 
   return (
     <header className="w-full bg-background border-b-4 border-foreground">
@@ -53,6 +83,15 @@ export function Header({ user }: HeaderProps) {
                 >
                   Tags
                 </Link>
+                <div className="flex items-center space-x-2">
+                  <SearchInput
+                    isVisible={isSearchVisible}
+                    onSearch={handleSearch}
+                    onClose={handleSearchClose}
+                    initialValue={currentSearch}
+                  />
+                  <SearchIcon onClick={handleSearchToggle} />
+                </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -115,6 +154,17 @@ export function Header({ user }: HeaderProps) {
             {user ? (
               // Logged in mobile menu
               <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <SearchInput
+                    isVisible={true}
+                    onSearch={query => {
+                      handleSearch(query)
+                      setIsMobileMenuOpen(false)
+                    }}
+                    onClose={() => setIsMobileMenuOpen(false)}
+                    initialValue={currentSearch}
+                  />
+                </div>
                 <Button variant="ghost" className="w-full" asChild>
                   <Link
                     to={`/${user.username}/pins`}

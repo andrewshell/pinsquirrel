@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { createRoutesStub } from 'react-router'
 import { Header } from './Header'
 import type { User } from '@pinsquirrel/core'
@@ -162,6 +162,87 @@ describe('Header', () => {
 
       const userMenuButton = screen.getByRole('button', { name: /testuser/ })
       expect(userMenuButton).toBeInTheDocument()
+    })
+  })
+
+  describe('search functionality', () => {
+    it('shows search icon when user is logged in', () => {
+      renderWithRouter(mockUser)
+
+      const searchIcon = screen.getByRole('button', { name: /search pins/i })
+      expect(searchIcon).toBeInTheDocument()
+    })
+
+    it('does not show search icon when user is logged out', () => {
+      renderWithRouter(null)
+
+      const searchIcon = screen.queryByRole('button', { name: /search pins/i })
+      expect(searchIcon).not.toBeInTheDocument()
+    })
+
+    it('shows search input when search icon is clicked', () => {
+      renderWithRouter(mockUser)
+
+      const searchIcon = screen.getByRole('button', { name: /search pins/i })
+      fireEvent.click(searchIcon)
+
+      const searchInput = screen.getByRole('textbox', { name: /search pins/i })
+      expect(searchInput).toBeInTheDocument()
+    })
+
+    it('hides search input when search icon is clicked again', () => {
+      renderWithRouter(mockUser)
+
+      const searchIcon = screen.getByRole('button', { name: /search pins/i })
+
+      // Show search
+      fireEvent.click(searchIcon)
+      expect(
+        screen.getByRole('textbox', { name: /search pins/i })
+      ).toBeInTheDocument()
+
+      // Hide search
+      fireEvent.click(searchIcon)
+      expect(
+        screen.queryByRole('textbox', { name: /search pins/i })
+      ).not.toBeInTheDocument()
+    })
+
+    it('shows search input in mobile menu for logged in users', () => {
+      renderWithRouter(mockUser)
+
+      // Open mobile menu
+      const mobileMenuButton = screen.getByRole('button', {
+        name: /toggle menu/i,
+      })
+      fireEvent.click(mobileMenuButton)
+
+      const searchInput = screen.getByRole('textbox', { name: /search pins/i })
+      expect(searchInput).toBeInTheDocument()
+    })
+
+    it('displays current search value in input', () => {
+      const createHeaderStubWithSearch = (
+        user: User | null,
+        _searchParam: string
+      ) => {
+        return createRoutesStub([
+          {
+            path: '/',
+            Component: () => <Header user={user} />,
+            action: () => null,
+          },
+        ])
+      }
+
+      const Stub = createHeaderStubWithSearch(mockUser, 'test search')
+      render(<Stub initialEntries={['/?search=test%20search']} />)
+
+      const searchIcon = screen.getByRole('button', { name: /search pins/i })
+      fireEvent.click(searchIcon)
+
+      const searchInput = screen.getByRole('textbox', { name: /search pins/i })
+      expect(searchInput).toHaveValue('test search')
     })
   })
 })
