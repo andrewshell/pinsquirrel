@@ -194,6 +194,9 @@ importers:
       dotenv:
         specifier: ^17.2.1
         version: 17.2.1
+      drizzle-kit:
+        specifier: ^0.29.0
+        version: 0.29.1
       drizzle-orm:
         specifier: ^0.37.0
         version: 0.37.0(@types/pg@8.15.4)(@types/react@19.1.8)(pg@8.16.3)(react@19.1.0)
@@ -216,9 +219,6 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^3.2.4
         version: 3.2.4(vitest@3.2.4)
-      drizzle-kit:
-        specifier: ^0.29.0
-        version: 0.29.1
       eslint:
         specifier: ^9.30.1
         version: 9.30.1(jiti@2.4.2)

@@ -151,31 +151,39 @@ build_image() {
         return 0
     fi
     
-    # Build image with version tag
-    log_info "Building image with tag: ${DOCKER_REPO}:${version}"
-    if ! docker build -f "$DOCKERFILE_PATH" -t "${DOCKER_REPO}:${version}" .; then
-        log_error "Docker build failed"
-        exit 1
+    # Build multi-platform image with version tag
+    log_info "Building multi-platform image with tag: ${DOCKER_REPO}:${version}"
+    log_info "Building for platforms: linux/amd64,linux/arm64"
+    
+    # Create buildx builder if it doesn't exist
+    if ! docker buildx ls | grep -q multiplatform; then
+        log_info "Creating multiplatform buildx builder..."
+        docker buildx create --name multiplatform --use
+    else
+        docker buildx use multiplatform
     fi
     
-    # Tag as latest
-    log_info "Tagging as latest..."
-    docker tag "${DOCKER_REPO}:${version}" "${DOCKER_REPO}:latest"
-    
-    # Tag with custom tag if provided
+    # Build all tags at once
+    local tags="-t ${DOCKER_REPO}:${version} -t ${DOCKER_REPO}:latest"
     if [ -n "$CUSTOM_TAG" ]; then
-        log_info "Tagging with custom tag: ${CUSTOM_TAG}"
-        docker tag "${DOCKER_REPO}:${version}" "${DOCKER_REPO}:${CUSTOM_TAG}"
+        tags="$tags -t ${DOCKER_REPO}:${CUSTOM_TAG}"
+    fi
+    
+    # Build and push multi-platform image with all tags
+    if ! docker buildx build -f "$DOCKERFILE_PATH" \
+        --platform linux/amd64,linux/arm64 \
+        $tags \
+        --push .; then
+        log_error "Docker multi-platform build failed"
+        exit 1
     fi
     
     log_success "Docker image built successfully"
 }
 
-# Function to push Docker image
+# Function to push Docker image (now handled in build step for multi-platform)
 push_image() {
     local version=$(get_version)
-    
-    log_info "Pushing Docker image to Docker Hub..."
     
     if [ "$DRY_RUN" = true ]; then
         log_info "[DRY RUN] Would push ${DOCKER_REPO}:${version}"
@@ -187,30 +195,8 @@ push_image() {
         return 0
     fi
     
-    # Push version tag
-    log_info "Pushing ${DOCKER_REPO}:${version}..."
-    if ! docker push "${DOCKER_REPO}:${version}"; then
-        log_error "Failed to push version tag"
-        exit 1
-    fi
-    
-    # Push latest tag
-    log_info "Pushing ${DOCKER_REPO}:latest..."
-    if ! docker push "${DOCKER_REPO}:latest"; then
-        log_error "Failed to push latest tag"
-        exit 1
-    fi
-    
-    # Push custom tag if provided
-    if [ -n "$CUSTOM_TAG" ]; then
-        log_info "Pushing ${DOCKER_REPO}:${CUSTOM_TAG}..."
-        if ! docker push "${DOCKER_REPO}:${CUSTOM_TAG}"; then
-            log_error "Failed to push custom tag"
-            exit 1
-        fi
-    fi
-    
-    log_success "All tags pushed successfully"
+    # Multi-platform images are pushed during build step
+    log_success "Multi-platform images already pushed to Docker Hub during build"
 }
 
 

@@ -1,0 +1,39 @@
+# Dependencies
+node_modules
+*/node_modules
+
+# Build outputs
+dist
+build
+.next
+.react-router
+
+# Development files
+.env*
+!.env.example
+
+# Version control
+.git
+.gitignore
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs
+
+# Runtime data
+*.pid
+*.seed
+
+# Documentation
+README.md
+docs/

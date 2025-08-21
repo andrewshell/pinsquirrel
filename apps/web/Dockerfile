@@ -36,12 +36,22 @@ WORKDIR /app
 # Copy production dependencies
 COPY --from=production-deps /app/node_modules ./node_modules
 COPY --from=production-deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY --from=production-deps /app/libs/database/node_modules ./libs/database/node_modules
 
 # Copy built application and workspace structure
 COPY --from=web-build /app/apps/web/build ./apps/web/build
 COPY --from=web-build /app/apps/web/package.json ./apps/web/package.json
 COPY --from=production-deps /app/package.json ./package.json
 COPY --from=production-deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+
+# Copy database package for migrations
+COPY --from=web-build /app/libs/database/package.json ./libs/database/package.json
+COPY --from=web-build /app/libs/database/src/migrations ./libs/database/src/migrations
+COPY --from=web-build /app/libs/database/drizzle.config.ts ./libs/database/drizzle.config.ts
+
+# Copy migration script
+COPY --from=web-build /app/apps/web/migrate-and-start.sh ./apps/web/migrate-and-start.sh
+RUN chmod +x ./apps/web/migrate-and-start.sh
 
 # Note: Workspace package code is bundled in the build output,
 # so we don't need to copy dist folders from libs
@@ -51,4 +61,4 @@ COPY --from=production-deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 ENV PORT=3000
 EXPOSE 3000
 
-CMD ["pnpm", "--filter", "@pinsquirrel/web", "start"]
+CMD ["./apps/web/migrate-and-start.sh"]
