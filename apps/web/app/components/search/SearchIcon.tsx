@@ -1,10 +1,14 @@
-import { Search } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 
 interface SearchIconProps {
   onClick: () => void
+  isSearchVisible?: boolean
 }
 
-export function SearchIcon({ onClick }: SearchIconProps) {
+export function SearchIcon({
+  onClick,
+  isSearchVisible = false,
+}: SearchIconProps) {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
@@ -17,10 +21,14 @@ export function SearchIcon({ onClick }: SearchIconProps) {
       type="button"
       onClick={onClick}
       onKeyDown={handleKeyDown}
-      aria-label="Search pins"
+      aria-label={isSearchVisible ? 'Close search' : 'Search pins'}
       className="p-2 text-foreground hover:bg-accent rounded-md transition-colors"
     >
-      <Search className="h-5 w-5" />
+      {isSearchVisible ? (
+        <X className="h-5 w-5" />
+      ) : (
+        <Search className="h-5 w-5" />
+      )}
     </button>
   )
 }

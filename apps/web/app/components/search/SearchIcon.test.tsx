@@ -63,4 +63,28 @@ describe('SearchIcon', () => {
 
     expect(mockOnClick).toHaveBeenCalledTimes(1)
   })
+
+  it('should show close icon when search is visible', () => {
+    render(<SearchIcon onClick={mockOnClick} isSearchVisible={true} />)
+
+    const button = screen.getByRole('button', { name: /close search/i })
+    expect(button).toBeInTheDocument()
+    expect(button).toHaveAttribute('aria-label', 'Close search')
+  })
+
+  it('should show search icon when search is not visible', () => {
+    render(<SearchIcon onClick={mockOnClick} isSearchVisible={false} />)
+
+    const button = screen.getByRole('button', { name: /search pins/i })
+    expect(button).toBeInTheDocument()
+    expect(button).toHaveAttribute('aria-label', 'Search pins')
+  })
+
+  it('should default to search icon when isSearchVisible prop is not provided', () => {
+    render(<SearchIcon onClick={mockOnClick} />)
+
+    const button = screen.getByRole('button', { name: /search pins/i })
+    expect(button).toBeInTheDocument()
+    expect(button).toHaveAttribute('aria-label', 'Search pins')
+  })
 })

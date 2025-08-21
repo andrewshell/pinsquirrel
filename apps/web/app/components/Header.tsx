@@ -90,7 +90,10 @@ export function Header({ user }: HeaderProps) {
                     onClose={handleSearchClose}
                     initialValue={currentSearch}
                   />
-                  <SearchIcon onClick={handleSearchToggle} />
+                  <SearchIcon
+                    onClick={handleSearchToggle}
+                    isSearchVisible={isSearchVisible}
+                  />
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
