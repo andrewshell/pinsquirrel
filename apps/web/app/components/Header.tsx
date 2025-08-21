@@ -1,7 +1,13 @@
 import type { User } from '@pinsquirrel/core'
 import { CircleUserRound, Menu, X } from 'lucide-react'
 import { useState } from 'react'
-import { Form, Link, useNavigate, useSearchParams } from 'react-router'
+import {
+  Form,
+  Link,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from 'react-router'
 import { Button } from '~/components/ui/button'
 import {
   DropdownMenu,
@@ -20,6 +26,7 @@ interface HeaderProps {
 export function Header({ user }: HeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSearchVisible, setIsSearchVisible] = useState(false)
+  const location = useLocation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
@@ -32,12 +39,17 @@ export function Header({ user }: HeaderProps) {
   const handleSearch = (query: string) => {
     if (!user) return
 
-    const params = new URLSearchParams()
+    // Preserve existing search params (like tag and unread filters)
+    const params = new URLSearchParams(location.search)
+
     if (query.trim()) {
       params.set('search', query.trim())
+    } else {
+      // If search is empty, remove the search param
+      params.delete('search')
     }
 
-    // Navigate to user's pins page with search parameter
+    // Navigate to user's pins page with updated search parameter
     const searchString = params.toString()
     const url = `/${user.username}/pins${searchString ? `?${searchString}` : ''}`
     void navigate(url)
