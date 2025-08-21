@@ -9,17 +9,14 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
 COPY libs/core/package.json ./libs/core/
 COPY libs/database/package.json ./libs/database/
+COPY libs/mailgun/package.json ./libs/mailgun/
 RUN pnpm install --frozen-lockfile
 
-# Build shared libraries
-FROM dependencies AS libs-build
+# Build web application (Turbo will build dependencies automatically)
+FROM dependencies AS web-build
+COPY apps/web/ ./apps/web/
 COPY libs/ ./libs/
 COPY turbo.json ./
-RUN pnpm build --filter="./libs/*"
-
-# Build web application
-FROM libs-build AS web-build
-COPY apps/web/ ./apps/web/
 RUN pnpm build --filter="@pinsquirrel/web"
 
 # Production dependencies only
@@ -28,6 +25,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
 COPY libs/core/package.json ./libs/core/
 COPY libs/database/package.json ./libs/database/
+COPY libs/mailgun/package.json ./libs/mailgun/
 RUN pnpm install --frozen-lockfile --prod
 
 # Final runtime image
@@ -39,14 +37,18 @@ WORKDIR /app
 COPY --from=production-deps /app/node_modules ./node_modules
 COPY --from=production-deps /app/apps/web/node_modules ./apps/web/node_modules
 
-# Copy built application and required files
+# Copy built application and workspace structure
 COPY --from=web-build /app/apps/web/build ./apps/web/build
-COPY --from=libs-build /app/libs/core/dist ./libs/core/dist
-COPY --from=libs-build /app/libs/database/dist ./libs/database/dist
-COPY apps/web/package.json ./apps/web/
-COPY package.json pnpm-workspace.yaml ./
+COPY --from=web-build /app/apps/web/package.json ./apps/web/package.json
+COPY --from=production-deps /app/package.json ./package.json
+COPY --from=production-deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
-WORKDIR /app/apps/web
+# Note: Workspace package code is bundled in the build output,
+# so we don't need to copy dist folders from libs
+
+# Default port for react-router-serve (override with PORT env variable)
+# Development uses 8100 (vite), production defaults to 3000
+ENV PORT=3000
 EXPOSE 3000
 
-CMD ["pnpm", "start"]
+CMD ["pnpm", "--filter", "@pinsquirrel/web", "start"]

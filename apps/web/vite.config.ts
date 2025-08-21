@@ -15,7 +15,7 @@ export default defineConfig({
   ],
   build: {
     rollupOptions: {
-      external: ['node:crypto', 'node:util'],
+      external: ['node:crypto', 'node:util', 'node:sqlite'],
     },
   },
   test: {

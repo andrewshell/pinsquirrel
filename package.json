@@ -1,6 +1,6 @@
 {
   "name": "pinsquirrel",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A pnpm monorepo",
   "private": true,
   "scripts": {
@@ -12,7 +12,10 @@
     "test": "turbo test",
     "quality": "turbo typecheck && turbo lint && turbo test && turbo format",
     "db:up": "docker compose -f docker-compose.dev.yml down && docker compose -f docker-compose.dev.yml up -d postgres",
-    "db:down": "docker compose -f docker-compose.dev.yml down"
+    "db:down": "docker compose -f docker-compose.dev.yml down",
+    "docker:build-push": "./scripts/docker-build-push.sh",
+    "docker:build-push-skip-quality": "./scripts/docker-build-push.sh --skip-quality",
+    "docker:dry-run": "./scripts/docker-build-push.sh --dry-run --skip-quality"
   },
   "devDependencies": {
     "turbo": "latest"
