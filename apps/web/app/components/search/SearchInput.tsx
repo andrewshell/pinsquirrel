@@ -8,6 +8,7 @@ interface SearchInputProps {
   onSearch: (query: string) => void
   onClose: () => void
   initialValue: string
+  fullWidth?: boolean
 }
 
 export function SearchInput({
@@ -15,6 +16,7 @@ export function SearchInput({
   onSearch,
   onClose,
   initialValue,
+  fullWidth = false,
 }: SearchInputProps) {
   const [query, setQuery] = useState(initialValue)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -48,7 +50,9 @@ export function SearchInput({
   }
 
   return (
-    <div className="flex items-center gap-2 animate-in slide-in-from-right-2 duration-200">
+    <div
+      className={`flex items-center gap-2 ${fullWidth ? 'w-full' : 'animate-in slide-in-from-right-2 duration-200'}`}
+    >
       <Input
         ref={inputRef}
         type="text"
@@ -57,7 +61,7 @@ export function SearchInput({
         onKeyDown={handleKeyDown}
         placeholder="Search pins..."
         aria-label="Search pins"
-        className="w-64 h-9"
+        className={`h-9 ${fullWidth ? 'flex-1' : 'w-64'}`}
       />
       <Button
         type="button"

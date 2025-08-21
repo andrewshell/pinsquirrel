@@ -194,4 +194,54 @@ describe('SearchInput', () => {
 
     expect(mockOnSearch).toHaveBeenCalledWith('')
   })
+
+  it('should apply full width styling when fullWidth prop is true', () => {
+    const { container } = render(
+      <SearchInput
+        isVisible={true}
+        onSearch={mockOnSearch}
+        onClose={mockOnClose}
+        initialValue=""
+        fullWidth={true}
+      />
+    )
+
+    const wrapper = container.querySelector('.w-full')
+    expect(wrapper).toBeInTheDocument()
+
+    const input = screen.getByRole('textbox', { name: /search pins/i })
+    expect(input).toHaveClass('flex-1')
+    expect(input).not.toHaveClass('w-64')
+  })
+
+  it('should apply fixed width styling when fullWidth prop is false', () => {
+    render(
+      <SearchInput
+        isVisible={true}
+        onSearch={mockOnSearch}
+        onClose={mockOnClose}
+        initialValue=""
+        fullWidth={false}
+      />
+    )
+
+    const input = screen.getByRole('textbox', { name: /search pins/i })
+    expect(input).toHaveClass('w-64')
+    expect(input).not.toHaveClass('flex-1')
+  })
+
+  it('should apply default fixed width when fullWidth prop is not provided', () => {
+    render(
+      <SearchInput
+        isVisible={true}
+        onSearch={mockOnSearch}
+        onClose={mockOnClose}
+        initialValue=""
+      />
+    )
+
+    const input = screen.getByRole('textbox', { name: /search pins/i })
+    expect(input).toHaveClass('w-64')
+    expect(input).not.toHaveClass('flex-1')
+  })
 })

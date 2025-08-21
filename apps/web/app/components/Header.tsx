@@ -161,17 +161,16 @@ export function Header({ user }: HeaderProps) {
             {user ? (
               // Logged in mobile menu
               <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <SearchInput
-                    isVisible={true}
-                    onSearch={query => {
-                      handleSearch(query)
-                      setIsMobileMenuOpen(false)
-                    }}
-                    onClose={() => setIsMobileMenuOpen(false)}
-                    initialValue={currentSearch}
-                  />
-                </div>
+                <SearchInput
+                  isVisible={true}
+                  onSearch={query => {
+                    handleSearch(query)
+                    setIsMobileMenuOpen(false)
+                  }}
+                  onClose={() => setIsMobileMenuOpen(false)}
+                  initialValue={currentSearch}
+                  fullWidth={true}
+                />
                 <Button variant="ghost" className="w-full" asChild>
                   <Link
                     to={`/${user.username}/pins`}
