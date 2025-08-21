@@ -244,5 +244,54 @@ describe('Header', () => {
       const searchInput = screen.getByRole('textbox', { name: /search pins/i })
       expect(searchInput).toHaveValue('test search')
     })
+
+    it('hides Pins and Tags links when search is visible', () => {
+      renderWithRouter(mockUser)
+
+      // Initially, Pins and Tags links should be visible
+      expect(screen.getByRole('link', { name: /^Pins$/i })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /^Tags$/i })).toBeInTheDocument()
+
+      // Click search icon to show search input
+      const searchIcon = screen.getByRole('button', { name: /search pins/i })
+      fireEvent.click(searchIcon)
+
+      // Now Pins and Tags links should be hidden
+      expect(
+        screen.queryByRole('link', { name: /^Pins$/i })
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('link', { name: /^Tags$/i })
+      ).not.toBeInTheDocument()
+
+      // Search input should be visible
+      expect(
+        screen.getByRole('textbox', { name: /search pins/i })
+      ).toBeInTheDocument()
+    })
+
+    it('shows Pins and Tags links when search is closed', () => {
+      renderWithRouter(mockUser)
+
+      // Click search icon to show search input
+      const searchIcon = screen.getByRole('button', { name: /search pins/i })
+      fireEvent.click(searchIcon)
+
+      // Pins and Tags should be hidden
+      expect(
+        screen.queryByRole('link', { name: /^Pins$/i })
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('link', { name: /^Tags$/i })
+      ).not.toBeInTheDocument()
+
+      // Click close icon to hide search input
+      const closeIcon = screen.getByRole('button', { name: /close search/i })
+      fireEvent.click(closeIcon)
+
+      // Now Pins and Tags links should be visible again
+      expect(screen.getByRole('link', { name: /^Pins$/i })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /^Tags$/i })).toBeInTheDocument()
+    })
   })
 })

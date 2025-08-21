@@ -71,18 +71,22 @@ export function Header({ user }: HeaderProps) {
             {user ? (
               // Logged in state
               <div className="flex items-center space-x-4">
-                <Link
-                  to={`/${user.username}/pins`}
-                  className="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
-                >
-                  Pins
-                </Link>
-                <Link
-                  to={`/${user.username}/tags`}
-                  className="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
-                >
-                  Tags
-                </Link>
+                {!isSearchVisible && (
+                  <>
+                    <Link
+                      to={`/${user.username}/pins`}
+                      className="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
+                    >
+                      Pins
+                    </Link>
+                    <Link
+                      to={`/${user.username}/tags`}
+                      className="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
+                    >
+                      Tags
+                    </Link>
+                  </>
+                )}
                 <div className="flex items-center space-x-2">
                   <SearchInput
                     isVisible={isSearchVisible}
