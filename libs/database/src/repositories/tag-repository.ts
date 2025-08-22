@@ -1,4 +1,4 @@
-import { eq, and, inArray, count } from 'drizzle-orm'
+import { eq, and, inArray, count, isNull } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type {
   Tag,
@@ -208,6 +208,113 @@ export class DrizzleTagRepository implements TagRepository {
   async delete(id: string): Promise<boolean> {
     const result = await this.db.delete(tags).where(eq(tags.id, id))
     return result.rowCount > 0
+  }
+
+  async mergeTags(
+    userId: string,
+    sourceTagIds: string[],
+    destinationTagId: string
+  ): Promise<void> {
+    if (sourceTagIds.length === 0) {
+      throw new Error('Source tag IDs cannot be empty')
+    }
+
+    // Verify all tags belong to the user and exist
+    const allTagIds = [...sourceTagIds, destinationTagId]
+    const existingTags = await this.db
+      .select({ id: tags.id })
+      .from(tags)
+      .where(and(eq(tags.userId, userId), inArray(tags.id, allTagIds)))
+
+    const existingTagIds = new Set(existingTags.map(t => t.id))
+
+    // Check if all required tags exist and belong to the user
+    for (const tagId of allTagIds) {
+      if (!existingTagIds.has(tagId)) {
+        throw new Error(
+          `Tag with ID ${tagId} not found or does not belong to user`
+        )
+      }
+    }
+
+    // Check if destination tag is in source tags
+    if (sourceTagIds.includes(destinationTagId)) {
+      throw new Error('Destination tag cannot be one of the source tags')
+    }
+
+    // Perform merge operation in a transaction
+    await this.db.transaction(async tx => {
+      // Get all pins associated with source tags
+      const pinsWithSourceTags = await tx
+        .select({ pinId: pinsTags.pinId })
+        .from(pinsTags)
+        .where(inArray(pinsTags.tagId, sourceTagIds))
+
+      const uniquePinIds = [...new Set(pinsWithSourceTags.map(p => p.pinId))]
+
+      // For each pin, check if it already has the destination tag
+      // If not, add the destination tag association
+      for (const pinId of uniquePinIds) {
+        const existingAssociation = await tx
+          .select({ pinId: pinsTags.pinId })
+          .from(pinsTags)
+          .where(
+            and(eq(pinsTags.pinId, pinId), eq(pinsTags.tagId, destinationTagId))
+          )
+          .limit(1)
+
+        // If the pin doesn't already have the destination tag, add it
+        if (existingAssociation.length === 0) {
+          await tx.insert(pinsTags).values({
+            pinId,
+            tagId: destinationTagId,
+          })
+        }
+      }
+
+      // Remove all associations with source tags
+      await tx.delete(pinsTags).where(inArray(pinsTags.tagId, sourceTagIds))
+
+      // Delete source tags that have no remaining pin associations
+      // (This query will only delete tags that have zero associations after the above deletion)
+      for (const sourceTagId of sourceTagIds) {
+        const remainingAssociations = await tx
+          .select({ tagId: pinsTags.tagId })
+          .from(pinsTags)
+          .where(eq(pinsTags.tagId, sourceTagId))
+          .limit(1)
+
+        // If no associations remain, delete the tag
+        if (remainingAssociations.length === 0) {
+          await tx.delete(tags).where(eq(tags.id, sourceTagId))
+        }
+      }
+    })
+  }
+
+  async deleteTagsWithNoPins(userId: string): Promise<number> {
+    return await this.db.transaction(async tx => {
+      // Find all tags for the user that have no pin associations
+      const tagsWithNoPins = await tx
+        .select({ id: tags.id })
+        .from(tags)
+        .leftJoin(pinsTags, eq(tags.id, pinsTags.tagId))
+        .where(and(eq(tags.userId, userId), isNull(pinsTags.tagId)))
+        .groupBy(tags.id)
+
+      if (tagsWithNoPins.length === 0) {
+        return 0
+      }
+
+      const tagIdsToDelete = tagsWithNoPins.map(tag => tag.id)
+
+      // Delete the tags
+      const result = await tx
+        .delete(tags)
+        .where(and(eq(tags.userId, userId), inArray(tags.id, tagIdsToDelete)))
+
+      return result.rowCount
+    })
   }
 
   private mapToTag(tag: typeof tags.$inferSelect): Tag {

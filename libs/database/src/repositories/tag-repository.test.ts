@@ -550,4 +550,432 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       expect(result[0].userId).toBe(testUser.id)
     })
   })
+
+  describe('mergeTags', () => {
+    it('should merge multiple tags into destination tag', async () => {
+      // Create test tags
+      const sourceTag1 = await tagRepository.create({
+        userId: testUser.id,
+        name: 'source-tag-1',
+      })
+      const sourceTag2 = await tagRepository.create({
+        userId: testUser.id,
+        name: 'source-tag-2',
+      })
+      const destinationTag = await tagRepository.create({
+        userId: testUser.id,
+        name: 'destination-tag',
+      })
+
+      // Create test pins and associate them with source tags
+      const pin1Id = crypto.randomUUID()
+      const pin2Id = crypto.randomUUID()
+      const pin3Id = crypto.randomUUID()
+
+      await testPool.query(
+        `
+        INSERT INTO pins (id, user_id, url, title, description, read_later, created_at, updated_at) VALUES
+        ($1, $2, 'https://example1.com', 'Pin 1', 'Description 1', false, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z'),
+        ($3, $2, 'https://example2.com', 'Pin 2', 'Description 2', false, '2023-01-02T00:00:00Z', '2023-01-02T00:00:00Z'),
+        ($4, $2, 'https://example3.com', 'Pin 3', 'Description 3', false, '2023-01-03T00:00:00Z', '2023-01-03T00:00:00Z')
+      `,
+        [pin1Id, testUser.id, pin2Id, pin3Id]
+      )
+
+      // Associate pins with source tags
+      await testPool.query(
+        `
+        INSERT INTO pins_tags (pin_id, tag_id) VALUES
+        ($1, $2),
+        ($1, $3),
+        ($4, $2),
+        ($5, $3)
+      `,
+        [pin1Id, sourceTag1.id, sourceTag2.id, pin2Id, pin3Id]
+      )
+
+      // Perform merge
+      await tagRepository.mergeTags(
+        testUser.id,
+        [sourceTag1.id, sourceTag2.id],
+        destinationTag.id
+      )
+
+      // Verify pins now have destination tag
+      const pinTagAssociations = await testPool.query(
+        'SELECT pin_id, tag_id FROM pins_tags WHERE tag_id = $1 ORDER BY pin_id',
+        [destinationTag.id]
+      )
+
+      expect(pinTagAssociations.rows).toHaveLength(3)
+      expect(
+        pinTagAssociations.rows.map((r: { pin_id: string }) => r.pin_id)
+      ).toEqual(expect.arrayContaining([pin1Id, pin2Id, pin3Id]))
+
+      // Verify source tags no longer have pin associations
+      const sourceTagAssociations = await testPool.query(
+        'SELECT pin_id FROM pins_tags WHERE tag_id = ANY($1)',
+        [[sourceTag1.id, sourceTag2.id]]
+      )
+
+      expect(sourceTagAssociations.rows).toHaveLength(0)
+
+      // Verify source tags are deleted (they had no remaining associations)
+      const remainingTags = await tagRepository.findByUserId(testUser.id)
+      expect(remainingTags).toHaveLength(1)
+      expect(remainingTags[0].id).toBe(destinationTag.id)
+    })
+
+    it('should handle pins that already have destination tag', async () => {
+      // Create test tags
+      const sourceTag = await tagRepository.create({
+        userId: testUser.id,
+        name: 'source-tag',
+      })
+      const destinationTag = await tagRepository.create({
+        userId: testUser.id,
+        name: 'destination-tag',
+      })
+
+      // Create test pin
+      const pinId = crypto.randomUUID()
+
+      await testPool.query(
+        `
+        INSERT INTO pins (id, user_id, url, title, description, read_later, created_at, updated_at) VALUES
+        ($1, $2, 'https://example.com', 'Pin 1', 'Description 1', false, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+      `,
+        [pinId, testUser.id]
+      )
+
+      // Associate pin with both source and destination tags
+      await testPool.query(
+        `
+        INSERT INTO pins_tags (pin_id, tag_id) VALUES
+        ($1, $2),
+        ($1, $3)
+      `,
+        [pinId, sourceTag.id, destinationTag.id]
+      )
+
+      // Perform merge
+      await tagRepository.mergeTags(
+        testUser.id,
+        [sourceTag.id],
+        destinationTag.id
+      )
+
+      // Verify pin still has only one association with destination tag (no duplicates)
+      const pinTagAssociations = await testPool.query(
+        'SELECT tag_id FROM pins_tags WHERE pin_id = $1',
+        [pinId]
+      )
+
+      expect(pinTagAssociations.rows).toHaveLength(1)
+      expect(pinTagAssociations.rows[0].tag_id).toBe(destinationTag.id)
+
+      // Verify source tag is deleted
+      const remainingTags = await tagRepository.findByUserId(testUser.id)
+      expect(remainingTags).toHaveLength(1)
+      expect(remainingTags[0].id).toBe(destinationTag.id)
+    })
+
+    it('should throw error if source tags are empty', async () => {
+      const destinationTag = await tagRepository.create({
+        userId: testUser.id,
+        name: 'destination-tag',
+      })
+
+      await expect(
+        tagRepository.mergeTags(testUser.id, [], destinationTag.id)
+      ).rejects.toThrow('Source tag IDs cannot be empty')
+    })
+
+    it('should throw error if destination tag is in source tags', async () => {
+      const tag1 = await tagRepository.create({
+        userId: testUser.id,
+        name: 'tag-1',
+      })
+      const tag2 = await tagRepository.create({
+        userId: testUser.id,
+        name: 'tag-2',
+      })
+
+      await expect(
+        tagRepository.mergeTags(testUser.id, [tag1.id, tag2.id], tag1.id)
+      ).rejects.toThrow('Destination tag cannot be one of the source tags')
+    })
+
+    it('should throw error if tag does not exist or does not belong to user', async () => {
+      // Create another user
+      const otherUser = await userRepository.create({
+        username: `otheruser-${crypto.randomUUID().slice(0, 8)}`,
+        passwordHash: 'hashed_password',
+        hashedEmail: 'other@example.com',
+      })
+
+      const otherUserTag = await tagRepository.create({
+        userId: otherUser.id,
+        name: 'other-user-tag',
+      })
+
+      const testUserTag = await tagRepository.create({
+        userId: testUser.id,
+        name: 'test-user-tag',
+      })
+
+      // Try to merge with tag from another user
+      await expect(
+        tagRepository.mergeTags(testUser.id, [otherUserTag.id], testUserTag.id)
+      ).rejects.toThrow(
+        `Tag with ID ${otherUserTag.id} not found or does not belong to user`
+      )
+
+      // Try to merge with nonexistent tag
+      const nonexistentTagId = crypto.randomUUID()
+      await expect(
+        tagRepository.mergeTags(testUser.id, [testUserTag.id], nonexistentTagId)
+      ).rejects.toThrow(
+        `Tag with ID ${nonexistentTagId} not found or does not belong to user`
+      )
+    })
+
+    it('should keep source tag if it has other pin associations not being merged', async () => {
+      // This test creates a more complex scenario where some pins have multiple tags
+      // and source tags might have pins that also have other tags not involved in the merge
+
+      const sourceTag = await tagRepository.create({
+        userId: testUser.id,
+        name: 'source-tag',
+      })
+      const destinationTag = await tagRepository.create({
+        userId: testUser.id,
+        name: 'destination-tag',
+      })
+      const unrelatedTag = await tagRepository.create({
+        userId: testUser.id,
+        name: 'unrelated-tag',
+      })
+
+      // Create test pins
+      const pin1Id = crypto.randomUUID() // Has sourceTag only
+      const pin2Id = crypto.randomUUID() // Has sourceTag + unrelatedTag (sourceTag should be deleted)
+
+      await testPool.query(
+        `
+        INSERT INTO pins (id, user_id, url, title, description, read_later, created_at, updated_at) VALUES
+        ($1, $2, 'https://example1.com', 'Pin 1', 'Description 1', false, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z'),
+        ($3, $2, 'https://example2.com', 'Pin 2', 'Description 2', false, '2023-01-02T00:00:00Z', '2023-01-02T00:00:00Z')
+      `,
+        [pin1Id, testUser.id, pin2Id]
+      )
+
+      // Associate pins with tags
+      await testPool.query(
+        `
+        INSERT INTO pins_tags (pin_id, tag_id) VALUES
+        ($1, $2),
+        ($3, $2),
+        ($3, $4)
+      `,
+        [pin1Id, sourceTag.id, pin2Id, unrelatedTag.id]
+      )
+
+      // Perform merge
+      await tagRepository.mergeTags(
+        testUser.id,
+        [sourceTag.id],
+        destinationTag.id
+      )
+
+      // Verify all pins now have destination tag
+      const destinationTagAssociations = await testPool.query(
+        'SELECT pin_id FROM pins_tags WHERE tag_id = $1 ORDER BY pin_id',
+        [destinationTag.id]
+      )
+
+      expect(destinationTagAssociations.rows).toHaveLength(2)
+      expect(
+        destinationTagAssociations.rows.map((r: { pin_id: string }) => r.pin_id)
+      ).toEqual(expect.arrayContaining([pin1Id, pin2Id]))
+
+      // Verify source tag is deleted since it has no remaining associations
+      const remainingTags = await tagRepository.findByUserId(testUser.id)
+      expect(remainingTags).toHaveLength(2) // destinationTag + unrelatedTag
+      expect(remainingTags.find(t => t.id === destinationTag.id)).toBeDefined()
+      expect(remainingTags.find(t => t.id === unrelatedTag.id)).toBeDefined()
+      expect(remainingTags.find(t => t.id === sourceTag.id)).toBeUndefined()
+
+      // Verify pin2 still has unrelatedTag
+      const pin2Associations = await testPool.query(
+        'SELECT tag_id FROM pins_tags WHERE pin_id = $1',
+        [pin2Id]
+      )
+
+      expect(pin2Associations.rows).toHaveLength(2)
+      expect(
+        pin2Associations.rows.map((r: { tag_id: string }) => r.tag_id)
+      ).toEqual(expect.arrayContaining([destinationTag.id, unrelatedTag.id]))
+    })
+  })
+
+  describe('deleteTagsWithNoPins', () => {
+    it('should delete tags with no pin associations', async () => {
+      // Create tags - some with pins, some without
+      const tagWithPins = await tagRepository.create({
+        userId: testUser.id,
+        name: 'tag-with-pins',
+      })
+      await tagRepository.create({
+        userId: testUser.id,
+        name: 'empty-tag-1',
+      })
+      await tagRepository.create({
+        userId: testUser.id,
+        name: 'empty-tag-2',
+      })
+
+      // Create a pin and associate it with tagWithPins
+      const pinId = crypto.randomUUID()
+      await testPool.query(
+        `
+        INSERT INTO pins (id, user_id, url, title, description, read_later, created_at, updated_at) VALUES
+        ($1, $2, 'https://example.com', 'Test Pin', 'Description', false, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+      `,
+        [pinId, testUser.id]
+      )
+
+      await testPool.query(
+        `
+        INSERT INTO pins_tags (pin_id, tag_id) VALUES ($1, $2)
+      `,
+        [pinId, tagWithPins.id]
+      )
+
+      // Verify initial state
+      const allTagsBefore = await tagRepository.findByUserId(testUser.id)
+      expect(allTagsBefore).toHaveLength(3)
+
+      // Delete tags with no pins
+      const deletedCount = await tagRepository.deleteTagsWithNoPins(testUser.id)
+
+      expect(deletedCount).toBe(2)
+
+      // Verify only tag with pins remains
+      const remainingTags = await tagRepository.findByUserId(testUser.id)
+      expect(remainingTags).toHaveLength(1)
+      expect(remainingTags[0].id).toBe(tagWithPins.id)
+      expect(remainingTags[0].name).toBe('tag-with-pins')
+    })
+
+    it('should return 0 when no tags need deletion', async () => {
+      // Create tag with pins
+      const tag = await tagRepository.create({
+        userId: testUser.id,
+        name: 'tag-with-pins',
+      })
+
+      // Create a pin and associate it with tag
+      const pinId = crypto.randomUUID()
+      await testPool.query(
+        `
+        INSERT INTO pins (id, user_id, url, title, description, read_later, created_at, updated_at) VALUES
+        ($1, $2, 'https://example.com', 'Test Pin', 'Description', false, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+      `,
+        [pinId, testUser.id]
+      )
+
+      await testPool.query(
+        `
+        INSERT INTO pins_tags (pin_id, tag_id) VALUES ($1, $2)
+      `,
+        [pinId, tag.id]
+      )
+
+      // Delete tags with no pins - should be 0
+      const deletedCount = await tagRepository.deleteTagsWithNoPins(testUser.id)
+
+      expect(deletedCount).toBe(0)
+
+      // Verify tag still exists
+      const remainingTags = await tagRepository.findByUserId(testUser.id)
+      expect(remainingTags).toHaveLength(1)
+      expect(remainingTags[0].id).toBe(tag.id)
+    })
+
+    it('should return 0 when user has no tags', async () => {
+      const deletedCount = await tagRepository.deleteTagsWithNoPins(testUser.id)
+      expect(deletedCount).toBe(0)
+    })
+
+    it('should only delete tags belonging to specified user', async () => {
+      // Create another user
+      const otherUser = await userRepository.create({
+        username: `otheruser-${crypto.randomUUID().slice(0, 8)}`,
+        passwordHash: 'hashed_password',
+        hashedEmail: 'other@example.com',
+      })
+
+      // Create empty tags for both users
+      await tagRepository.create({
+        userId: testUser.id,
+        name: 'test-user-empty-tag',
+      })
+      const otherUserEmptyTag = await tagRepository.create({
+        userId: otherUser.id,
+        name: 'other-user-empty-tag',
+      })
+
+      // Delete empty tags for test user only
+      const deletedCount = await tagRepository.deleteTagsWithNoPins(testUser.id)
+
+      expect(deletedCount).toBe(1)
+
+      // Verify test user's empty tag is deleted
+      const testUserTags = await tagRepository.findByUserId(testUser.id)
+      expect(testUserTags).toHaveLength(0)
+
+      // Verify other user's empty tag still exists
+      const otherUserTags = await tagRepository.findByUserId(otherUser.id)
+      expect(otherUserTags).toHaveLength(1)
+      expect(otherUserTags[0].id).toBe(otherUserEmptyTag.id)
+    })
+
+    it('should handle tags that lose all pins during transaction', async () => {
+      // Create tag with pin
+      const tag = await tagRepository.create({
+        userId: testUser.id,
+        name: 'tag-that-will-be-emptied',
+      })
+
+      // Create pin and associate with tag
+      const pinId = crypto.randomUUID()
+      await testPool.query(
+        `
+        INSERT INTO pins (id, user_id, url, title, description, read_later, created_at, updated_at) VALUES
+        ($1, $2, 'https://example.com', 'Test Pin', 'Description', false, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+      `,
+        [pinId, testUser.id]
+      )
+
+      await testPool.query(
+        `
+        INSERT INTO pins_tags (pin_id, tag_id) VALUES ($1, $2)
+      `,
+        [pinId, tag.id]
+      )
+
+      // Manually remove the pin association to simulate it becoming empty
+      await testPool.query('DELETE FROM pins_tags WHERE tag_id = $1', [tag.id])
+
+      // Now delete tags with no pins
+      const deletedCount = await tagRepository.deleteTagsWithNoPins(testUser.id)
+
+      expect(deletedCount).toBe(1)
+
+      // Verify tag is deleted
+      const remainingTags = await tagRepository.findByUserId(testUser.id)
+      expect(remainingTags).toHaveLength(0)
+    })
+  })
 })

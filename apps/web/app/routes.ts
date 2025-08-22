@@ -10,6 +10,7 @@ export default [
   route('import', 'routes/import.tsx'),
   route(':username/pins', 'routes/$username/pins.tsx'),
   route(':username/tags', 'routes/$username/tags.tsx'),
+  route(':username/tags/merge', 'routes/$username/tags.merge.tsx'),
   route(':username/pins/new', 'routes/$username/pins.new.tsx'),
   route(':username/pins/:id/edit', 'routes/$username/pins.$id.edit.tsx'),
   route(':username/pins/:id/delete', 'routes/$username/pins.$id.delete.tsx'),

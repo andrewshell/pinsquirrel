@@ -15,4 +15,10 @@ export interface TagRepository
     userId: string,
     filter?: { readLater?: boolean }
   ): Promise<TagWithCount[]>
+  mergeTags(
+    userId: string,
+    sourceTagIds: string[],
+    destinationTagId: string
+  ): Promise<void>
+  deleteTagsWithNoPins(userId: string): Promise<number>
 }

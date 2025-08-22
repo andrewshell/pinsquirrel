@@ -5,6 +5,9 @@ import { requireUsernameMatch } from '~/lib/auth.server'
 import { TagCloud } from '~/components/tags/TagCloud'
 import { TagFilter, type TagFilterType } from '~/components/tags/TagFilter'
 import { parsePinFilters } from '~/lib/filter-utils.server'
+import { Button } from '~/components/ui/button'
+import { Merge } from 'lucide-react'
+import { Link } from 'react-router'
 import type { Route } from './+types/tags'
 
 export function meta({ params }: Route.MetaArgs) {
@@ -27,6 +30,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   // Parse filter from URL search params using centralized utility
   const url = new URL(request.url)
   const parsedFilters = parsePinFilters(url)
+
+  // Clean up any tags with no pins before displaying
+  await repositories.tag.deleteTagsWithNoPins(user.id)
 
   // Fetch tags with pin counts, only pass filter if there are readLater constraints
   const tags = await repositories.tag.findByUserIdWithPinCount(
@@ -51,6 +57,14 @@ export default function TagsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8 flex justify-between items-center">
           <TagFilter currentFilter={currentFilter} username={username} />
+          {tags.length > 1 && (
+            <Button size="sm" asChild>
+              <Link to={`/${username}/tags/merge`}>
+                <Merge className="h-4 w-4 mr-2" />
+                Merge Tags
+              </Link>
+            </Button>
+          )}
         </div>
 
         <div className="mb-8">

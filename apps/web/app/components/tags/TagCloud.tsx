@@ -1,5 +1,5 @@
-import { Link } from 'react-router'
 import type { TagWithCount } from '@pinsquirrel/core'
+import { Link } from 'react-router'
 
 interface TagCloudProps {
   tags: TagWithCount[]
@@ -63,6 +63,10 @@ const getOpacityClass = (
   maxCount: number,
   minCount: number
 ): string => {
+  if (pinCount === 1) {
+    return 'opacity-40'
+  }
+
   if (maxCount === minCount) {
     return 'opacity-100'
   }

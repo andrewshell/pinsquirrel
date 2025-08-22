@@ -27,6 +27,7 @@ vi.mock('~/lib/services/container.server', () => ({
   repositories: {
     tag: {
       findByUserIdWithPinCount: vi.fn(),
+      deleteTagsWithNoPins: vi.fn().mockResolvedValue(0),
     },
   },
 }))
