@@ -8,10 +8,12 @@ let mockLoaderData: {
   tags: TagWithCount[]
   username: string
   currentFilter: string
+  untaggedPinsCount: number
 } = {
   tags: [],
   username: '',
   currentFilter: 'all',
+  untaggedPinsCount: 0,
 }
 
 // Vitest hoists vi.mock calls, so we need to define mocks inline
@@ -28,6 +30,9 @@ vi.mock('~/lib/services/container.server', () => ({
     tag: {
       findByUserIdWithPinCount: vi.fn(),
       deleteTagsWithNoPins: vi.fn().mockResolvedValue(0),
+    },
+    pin: {
+      countByUserId: vi.fn().mockResolvedValue(0),
     },
   },
 }))
@@ -109,6 +114,7 @@ describe('TagsPage', () => {
         tags: mockTags,
         username: 'testuser',
         currentFilter: 'all',
+        untaggedPinsCount: 0,
       })
       expect(mockTagRepository.findByUserIdWithPinCount).toHaveBeenCalledWith(
         'user1',
@@ -129,6 +135,7 @@ describe('TagsPage', () => {
         tags: mockTags,
         username: 'testuser',
         currentFilter: 'toread',
+        untaggedPinsCount: 0,
       })
       expect(mockTagRepository.findByUserIdWithPinCount).toHaveBeenCalledWith(
         'user1',
@@ -149,6 +156,7 @@ describe('TagsPage', () => {
         tags: mockTags,
         username: 'testuser',
         currentFilter: 'all',
+        untaggedPinsCount: 0,
       })
       expect(mockTagRepository.findByUserIdWithPinCount).toHaveBeenCalledWith(
         'user1',
@@ -163,6 +171,7 @@ describe('TagsPage', () => {
         tags: mockTags,
         username: 'testuser',
         currentFilter: 'all',
+        untaggedPinsCount: 0,
       }
 
       render(
@@ -182,6 +191,7 @@ describe('TagsPage', () => {
         tags: [],
         username: 'testuser',
         currentFilter: 'all',
+        untaggedPinsCount: 0,
       }
 
       render(
@@ -206,6 +216,7 @@ describe('TagsPage', () => {
         tags: [mockTags[0]],
         username: 'testuser',
         currentFilter: 'all',
+        untaggedPinsCount: 0,
       }
 
       render(

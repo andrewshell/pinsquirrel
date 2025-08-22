@@ -13,6 +13,7 @@ export function parsePinFilters(url: URL): ParsedFilters {
   const tagFilter = url.searchParams.get('tag') || undefined
   const unreadParam = url.searchParams.get('unread')
   const searchParam = url.searchParams.get('search') || undefined
+  const noTagsParam = url.searchParams.get('notags')
 
   const filter: PinFilter = {}
   let currentFilterType: 'all' | 'toread' | 'read' = 'all'
@@ -25,6 +26,11 @@ export function parsePinFilters(url: URL): ParsedFilters {
   // Add search filter if present
   if (searchParam) {
     filter.search = searchParam
+  }
+
+  // Add noTags filter if present
+  if (noTagsParam === 'true') {
+    filter.noTags = true
   }
 
   // Handle unread parameter logic:

@@ -5,6 +5,7 @@ interface TagCloudProps {
   tags: TagWithCount[]
   username: string
   currentFilter?: 'all' | 'toread'
+  untaggedPinsCount?: number
 }
 
 const getFontSizeClass = (
@@ -88,13 +89,17 @@ export function TagCloud({
   tags,
   username,
   currentFilter = 'all',
+  untaggedPinsCount = 0,
 }: TagCloudProps) {
-  if (tags.length === 0) {
+  if (tags.length === 0 && untaggedPinsCount === 0) {
     return null
   }
 
-  // Calculate min and max pin counts for scaling
+  // Calculate min and max pin counts for scaling (including untagged count)
   const pinCounts = tags.map(tag => tag.pinCount)
+  if (untaggedPinsCount > 0) {
+    pinCounts.push(untaggedPinsCount)
+  }
   const minCount = Math.min(...pinCounts)
   const maxCount = Math.max(...pinCounts)
 
@@ -105,6 +110,42 @@ export function TagCloud({
 
   return (
     <div className="flex flex-wrap gap-3 items-center justify-start">
+      {/* Untagged pins link - shown first and in italics */}
+      {untaggedPinsCount > 0 && (
+        <>
+          {(() => {
+            const fontSizeClass = getFontSizeClass(
+              untaggedPinsCount,
+              maxCount,
+              minCount
+            )
+            const opacityClass = getOpacityClass(
+              untaggedPinsCount,
+              maxCount,
+              minCount
+            )
+
+            // Build URL for untagged pins and preserve current filter if it's not 'all'
+            const params = new URLSearchParams()
+            params.set('notags', 'true')
+            if (currentFilter === 'toread') {
+              params.set('unread', 'true')
+            }
+            const untaggedUrl = `/${username}/pins?${params.toString()}`
+
+            return (
+              <Link
+                to={untaggedUrl}
+                className={`${fontSizeClass} ${opacityClass} text-accent hover:text-accent/80 hover:underline transition-all duration-200 font-medium italic`}
+                title={`Untagged pins (${untaggedPinsCount} pin${untaggedPinsCount === 1 ? '' : 's'})`}
+                aria-label={`View untagged pins (${untaggedPinsCount} pin${untaggedPinsCount === 1 ? '' : 's'})`}
+              >
+                Untagged
+              </Link>
+            )
+          })()}
+        </>
+      )}
       {sortedTags.map(tag => {
         const fontSizeClass = getFontSizeClass(tag.pinCount, maxCount, minCount)
         const opacityClass = getOpacityClass(tag.pinCount, maxCount, minCount)

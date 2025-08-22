@@ -6,6 +6,7 @@ export interface PinFilter {
   tagId?: string
   url?: string
   search?: string
+  noTags?: boolean
 }
 
 export interface PinRepository {

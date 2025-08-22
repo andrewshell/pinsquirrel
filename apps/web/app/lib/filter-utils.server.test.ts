@@ -55,4 +55,48 @@ describe('parsePinFilters', () => {
     expect(result.currentFilterType).toBe('all')
     expect(result.activeTag).toBeUndefined()
   })
+
+  describe('noTags parameter', () => {
+    it('should set noTags filter when notags=true', () => {
+      const url = new URL('https://example.com/pins?notags=true')
+      const result = parsePinFilters(url)
+
+      expect(result.filter).toEqual({ noTags: true })
+      expect(result.currentFilterType).toBe('all')
+      expect(result.activeTag).toBeUndefined()
+    })
+
+    it('should ignore noTags filter when notags=false', () => {
+      const url = new URL('https://example.com/pins?notags=false')
+      const result = parsePinFilters(url)
+
+      expect(result.filter).toEqual({})
+      expect(result.currentFilterType).toBe('all')
+      expect(result.activeTag).toBeUndefined()
+    })
+
+    it('should ignore noTags filter when notags parameter is invalid', () => {
+      const url = new URL('https://example.com/pins?notags=invalid')
+      const result = parsePinFilters(url)
+
+      expect(result.filter).toEqual({})
+      expect(result.currentFilterType).toBe('all')
+      expect(result.activeTag).toBeUndefined()
+    })
+
+    it('should combine noTags with other filters', () => {
+      const url = new URL(
+        'https://example.com/pins?notags=true&unread=true&search=test'
+      )
+      const result = parsePinFilters(url)
+
+      expect(result.filter).toEqual({
+        noTags: true,
+        readLater: true,
+        search: 'test',
+      })
+      expect(result.currentFilterType).toBe('toread')
+      expect(result.activeTag).toBeUndefined()
+    })
+  })
 })

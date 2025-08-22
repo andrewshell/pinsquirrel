@@ -785,4 +785,130 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       expect(count).toBe(1)
     })
   })
+
+  describe('noTags filtering', () => {
+    beforeEach(async () => {
+      // Create some pins with and without tags
+      await tagRepository.create({
+        userId: testUser.id,
+        name: 'tag1',
+      })
+
+      // Pin with tags
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://tagged.com',
+        title: 'Tagged Pin',
+        tagNames: ['tag1'],
+      })
+
+      // Pins without tags
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://untagged1.com',
+        title: 'Untagged Pin 1',
+        readLater: false,
+      })
+
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://untagged2.com',
+        title: 'Untagged Pin 2',
+        readLater: true,
+      })
+    })
+
+    it('should find only pins with no tags when noTags filter is true', async () => {
+      const result = await pinRepository.findByUserId(testUser.id, {
+        noTags: true,
+      })
+
+      expect(result).toHaveLength(2)
+      expect(result.find(p => p.url === 'https://untagged1.com')).toBeDefined()
+      expect(result.find(p => p.url === 'https://untagged2.com')).toBeDefined()
+      expect(result.find(p => p.url === 'https://tagged.com')).toBeUndefined()
+
+      // Verify that untagged pins have empty tags arrays
+      result.forEach(pin => {
+        expect(pin.tags).toEqual([])
+      })
+    })
+
+    it('should count only pins with no tags when noTags filter is true', async () => {
+      const count = await pinRepository.countByUserId(testUser.id, {
+        noTags: true,
+      })
+
+      expect(count).toBe(2)
+    })
+
+    it('should combine noTags filter with other filters', async () => {
+      // Find untagged pins that are also marked as read later
+      const result = await pinRepository.findByUserId(testUser.id, {
+        noTags: true,
+        readLater: true,
+      })
+
+      expect(result).toHaveLength(1)
+      expect(result[0].url).toBe('https://untagged2.com')
+      expect(result[0].readLater).toBe(true)
+      expect(result[0].tags).toEqual([])
+    })
+
+    it('should count untagged pins with combined filters', async () => {
+      const count = await pinRepository.countByUserId(testUser.id, {
+        noTags: true,
+        readLater: true,
+      })
+
+      expect(count).toBe(1)
+    })
+
+    it('should support pagination with noTags filter', async () => {
+      const result = await pinRepository.findByUserId(
+        testUser.id,
+        { noTags: true },
+        { limit: 1, offset: 0 }
+      )
+
+      expect(result).toHaveLength(1)
+      expect(result[0].tags).toEqual([])
+    })
+
+    it('should return empty array when no untagged pins exist', async () => {
+      // Add tags to all existing pins
+      const pins = await pinRepository.findByUserId(testUser.id, {})
+      for (const pin of pins) {
+        if (pin.tags.length === 0) {
+          await pinRepository.update(pin.id, {
+            tagNames: ['some-tag'],
+          })
+        }
+      }
+
+      const result = await pinRepository.findByUserId(testUser.id, {
+        noTags: true,
+      })
+
+      expect(result).toEqual([])
+    })
+
+    it('should return 0 count when no untagged pins exist', async () => {
+      // Add tags to all existing pins
+      const pins = await pinRepository.findByUserId(testUser.id, {})
+      for (const pin of pins) {
+        if (pin.tags.length === 0) {
+          await pinRepository.update(pin.id, {
+            tagNames: ['some-tag'],
+          })
+        }
+      }
+
+      const count = await pinRepository.countByUserId(testUser.id, {
+        noTags: true,
+      })
+
+      expect(count).toBe(0)
+    })
+  })
 })

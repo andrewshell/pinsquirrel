@@ -42,15 +42,25 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       : undefined
   )
 
+  // Get count of untagged pins
+  const untaggedPinsCount = await repositories.pin.countByUserId(
+    user.id,
+    parsedFilters.filter.readLater !== undefined
+      ? { readLater: parsedFilters.filter.readLater, noTags: true }
+      : { noTags: true }
+  )
+
   return {
     tags,
     username: user.username,
     currentFilter: parsedFilters.currentFilterType as TagFilterType,
+    untaggedPinsCount,
   }
 }
 
 export default function TagsPage() {
-  const { tags, username, currentFilter } = useLoaderData<typeof loader>()
+  const { tags, username, currentFilter, untaggedPinsCount } =
+    useLoaderData<typeof loader>()
 
   return (
     <div className="bg-background py-12">
@@ -78,11 +88,12 @@ export default function TagsPage() {
           </p>
         </div>
 
-        {tags.length > 0 ? (
+        {tags.length > 0 || untaggedPinsCount > 0 ? (
           <TagCloud
             tags={tags}
             username={username}
             currentFilter={currentFilter}
+            untaggedPinsCount={untaggedPinsCount}
           />
         ) : (
           <div className="text-center py-12">

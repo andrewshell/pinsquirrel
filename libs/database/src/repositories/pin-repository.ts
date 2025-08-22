@@ -6,7 +6,7 @@ import type {
   TagRepository,
   UpdatePinData,
 } from '@pinsquirrel/core'
-import { and, count, desc, eq, ilike, inArray, or } from 'drizzle-orm'
+import { and, count, desc, eq, ilike, inArray, isNull, or } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { pins, pinsTags, tags } from '../schema/index.js'
 
@@ -134,6 +134,40 @@ export class DrizzlePinRepository implements PinRepository {
       return this.mapPinsBulk(results)
     }
 
+    // If filtering for pins with no tags, use LEFT JOIN to find pins without tag associations
+    if (filter?.noTags) {
+      const baseQuery = this.db
+        .select({
+          id: pins.id,
+          userId: pins.userId,
+          url: pins.url,
+          title: pins.title,
+          description: pins.description,
+          readLater: pins.readLater,
+          createdAt: pins.createdAt,
+          updatedAt: pins.updatedAt,
+        })
+        .from(pins)
+        .leftJoin(pinsTags, eq(pins.id, pinsTags.pinId))
+        .where(and(...conditions, isNull(pinsTags.pinId)))
+        .orderBy(desc(pins.createdAt))
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let query = baseQuery as any
+      if (options?.limit !== undefined && options?.offset !== undefined) {
+        query = baseQuery.limit(options.limit).offset(options.offset)
+      } else if (options?.limit !== undefined) {
+        query = baseQuery.limit(options.limit)
+      } else if (options?.offset !== undefined) {
+        query = baseQuery.offset(options.offset)
+      }
+
+      const results = await query
+
+      // Use mapPinsBulk to properly load tags for each pin
+      return this.mapPinsBulk(results)
+    }
+
     // Standard query without tag filtering
     const baseQuery = this.db
       .select()
@@ -202,6 +236,17 @@ export class DrizzlePinRepository implements PinRepository {
         .from(pins)
         .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
         .where(and(...conditions, eq(pinsTags.tagId, filter.tagId)))
+
+      return result[0]?.count ?? 0
+    }
+
+    // If filtering for pins with no tags, use LEFT JOIN to count pins without tag associations
+    if (filter?.noTags) {
+      const result = await this.db
+        .select({ count: count() })
+        .from(pins)
+        .leftJoin(pinsTags, eq(pins.id, pinsTags.pinId))
+        .where(and(...conditions, isNull(pinsTags.pinId)))
 
       return result[0]?.count ?? 0
     }
