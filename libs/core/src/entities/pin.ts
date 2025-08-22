@@ -19,6 +19,8 @@ export interface CreatePinData {
   description?: string | null
   readLater?: boolean
   tagNames?: string[]
+  createdAt?: Date
+  updatedAt?: Date
 }
 
 export interface UpdatePinData {

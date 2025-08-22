@@ -19,9 +19,7 @@
     "test:coverage": "vitest --run --coverage",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio",
-    "seed:pins": "tsx src/scripts/seed-pins.ts",
-    "import:pinboard": "tsx src/scripts/import-pinboard.ts"
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@pinsquirrel/core": "workspace:*",

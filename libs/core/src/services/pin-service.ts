@@ -58,6 +58,8 @@ export class PinService {
       description: data.description,
       readLater: data.readLater ?? false,
       tagNames: data.tagNames,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
     })
 
     return pin

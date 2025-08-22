@@ -126,6 +126,9 @@ export function Header({ user }: HeaderProps) {
                     <DropdownMenuItem asChild>
                       <Link to="/profile">Profile</Link>
                     </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/import">Import</Link>
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
                       <Form method="post" action="/logout">
@@ -205,6 +208,11 @@ export function Header({ user }: HeaderProps) {
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     {user.username}
+                  </Link>
+                </Button>
+                <Button variant="ghost" className="w-full" asChild>
+                  <Link to="/import" onClick={() => setIsMobileMenuOpen(false)}>
+                    Import
                   </Link>
                 </Button>
                 <Form method="post" action="/logout">

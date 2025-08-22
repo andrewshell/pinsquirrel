@@ -42,6 +42,8 @@ export const createPinDataSchema = z.object({
   description: pinDescriptionSchema,
   readLater: readLaterSchema,
   tagNames: tagNamesSchema,
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional(),
 })
 
 export const updatePinDataSchema = z.object({

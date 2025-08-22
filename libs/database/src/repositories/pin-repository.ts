@@ -223,6 +223,8 @@ export class DrizzlePinRepository implements PinRepository {
   async create(data: CreatePinData): Promise<Pin> {
     const id = crypto.randomUUID()
     const now = new Date()
+    const createdAt = data.createdAt ?? now
+    const updatedAt = data.updatedAt ?? now
 
     const [newPin] = await this.db
       .insert(pins)
@@ -233,8 +235,8 @@ export class DrizzlePinRepository implements PinRepository {
         title: data.title,
         description: data.description ?? null,
         readLater: data.readLater ?? false,
-        createdAt: now,
-        updatedAt: now,
+        createdAt,
+        updatedAt,
       })
       .returning()
 
