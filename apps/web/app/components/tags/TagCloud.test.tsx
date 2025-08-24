@@ -73,17 +73,16 @@ describe('TagCloud', () => {
     expect(linkTexts).toEqual(['css', 'javascript', 'react', 'typescript'])
   })
 
-  it('applies different font sizes based on pin count', () => {
+  it('applies font sizes based on pin count distribution', () => {
     renderWithRouter(<TagCloud tags={mockTags} username="testuser" />)
 
     const typescriptLink = screen.getByRole('link', { name: /typescript/ })
     const cssLink = screen.getByRole('link', { name: /css/ })
 
-    // TypeScript has the most pins (25), should have larger font size
-    expect(typescriptLink.className).toMatch(/text-(3xl|4xl)/)
-
-    // CSS has the least pins (1), should have smaller font size
-    expect(cssLink.className).toMatch(/text-(sm|base|lg)/)
+    // With only 4 unique pin counts (1, 5, 15, 25), there aren't enough to distribute
+    // across all 7 size classes, so all tags get the default text-base size
+    expect(typescriptLink.className).toMatch(/text-base/)
+    expect(cssLink.className).toMatch(/text-base/)
   })
 
   it('includes pin count in title attribute', () => {
@@ -102,8 +101,8 @@ describe('TagCloud', () => {
 
     const link = screen.getByRole('link', { name: /typescript/ })
     expect(link).toBeInTheDocument()
-    // Single tag should get medium size since there's no distribution
-    expect(link.className).toMatch(/text-lg/)
+    // Single tag gets default size since there's no distribution
+    expect(link.className).toMatch(/text-base/)
   })
 
   it('handles tags with same pin count', () => {
@@ -117,8 +116,8 @@ describe('TagCloud', () => {
 
     const links = screen.getAllByRole('link')
     links.forEach(link => {
-      // All tags should have the same font size when counts are equal
-      expect(link.className).toMatch(/text-lg/)
+      // All tags should have the default font size when counts are equal
+      expect(link.className).toMatch(/text-base/)
     })
   })
 

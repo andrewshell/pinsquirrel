@@ -8,16 +8,7 @@ interface TagCloudProps {
   untaggedPinsCount?: number
 }
 
-const getFontSizeClass = (
-  pinCount: number,
-  maxCount: number,
-  minCount: number
-): string => {
-  // If all tags have the same count, use medium size
-  if (maxCount === minCount) {
-    return 'text-lg'
-  }
-
+function getFontSizeClass(pinCount: number, pinCounts: number[]): string {
   const sizeClasses = [
     'text-sm', // level 0: smallest
     'text-base', // level 1
@@ -28,61 +19,36 @@ const getFontSizeClass = (
     'text-4xl', // level 6: largest
   ]
 
-  // Simple bucket approach based on relative position
-  const range = maxCount - minCount
+  const pinCountsCopy = [...new Set(pinCounts)].sort((a, b) => a - b)
 
-  if (range === 0) {
-    return sizeClasses[3] // medium
+  if (pinCountsCopy.length < sizeClasses.length) {
+    return 'text-base'
   }
 
-  // Calculate percentage position in range
-  const percentage = ((pinCount - minCount) / range) * 100
+  const sizeStep = Math.floor(pinCountsCopy.length / sizeClasses.length)
+  const sizeMin = []
+  for (let i = 0; i < sizeClasses.length; i++) {
+    sizeMin[i] = pinCountsCopy[sizeStep * i]
+  }
 
-  // Create buckets with better distribution
-  let sizeIndex: number
-  if (percentage === 0) {
-    sizeIndex = 0 // Smallest for minimum
-  } else if (percentage <= 15) {
-    sizeIndex = 1
-  } else if (percentage <= 30) {
-    sizeIndex = 2
-  } else if (percentage <= 50) {
-    sizeIndex = 3
-  } else if (percentage <= 70) {
-    sizeIndex = 4
-  } else if (percentage <= 85) {
-    sizeIndex = 5
+  const i = sizeMin.findIndex(size => size > pinCount)
+  if (i === -1) {
+    return sizeClasses[sizeClasses.length - 1]
   } else {
-    sizeIndex = 6 // Largest for top 15%
+    return sizeClasses[i - 1]
   }
-
-  return sizeClasses[sizeIndex]
 }
 
-const getOpacityClass = (
-  pinCount: number,
-  maxCount: number,
-  minCount: number
-): string => {
+function getOpacityClass(pinCount: number): string {
   if (pinCount === 1) {
-    return 'opacity-40'
+    return 'opacity-50'
   }
 
-  if (maxCount === minCount) {
-    return 'opacity-100'
+  if (pinCount <= 5) {
+    return 'opacity-75'
   }
 
-  // Normalize the count to a 0-1 range
-  const normalized = (pinCount - minCount) / (maxCount - minCount)
-
-  // Map to opacity levels (60% to 100%)
-  const opacity = 60 + normalized * 40
-
-  if (opacity >= 95) return 'opacity-100'
-  if (opacity >= 85) return 'opacity-90'
-  if (opacity >= 75) return 'opacity-80'
-  if (opacity >= 65) return 'opacity-70'
-  return 'opacity-60'
+  return 'opacity-100'
 }
 
 export function TagCloud({
@@ -97,11 +63,6 @@ export function TagCloud({
 
   // Calculate min and max pin counts for scaling (including untagged count)
   const pinCounts = tags.map(tag => tag.pinCount)
-  if (untaggedPinsCount > 0) {
-    pinCounts.push(untaggedPinsCount)
-  }
-  const minCount = Math.min(...pinCounts)
-  const maxCount = Math.max(...pinCounts)
 
   // Sort tags alphabetically by name
   const sortedTags = [...tags].sort((a, b) =>
@@ -114,16 +75,8 @@ export function TagCloud({
       {untaggedPinsCount > 0 && (
         <>
           {(() => {
-            const fontSizeClass = getFontSizeClass(
-              untaggedPinsCount,
-              maxCount,
-              minCount
-            )
-            const opacityClass = getOpacityClass(
-              untaggedPinsCount,
-              maxCount,
-              minCount
-            )
+            const fontSizeClass = getFontSizeClass(untaggedPinsCount, pinCounts)
+            const opacityClass = getOpacityClass(untaggedPinsCount)
 
             // Build URL for untagged pins and preserve current filter if it's not 'all'
             const params = new URLSearchParams()
@@ -147,8 +100,8 @@ export function TagCloud({
         </>
       )}
       {sortedTags.map(tag => {
-        const fontSizeClass = getFontSizeClass(tag.pinCount, maxCount, minCount)
-        const opacityClass = getOpacityClass(tag.pinCount, maxCount, minCount)
+        const fontSizeClass = getFontSizeClass(tag.pinCount, pinCounts)
+        const opacityClass = getOpacityClass(tag.pinCount)
 
         // Build URL with tag and preserve current filter if it's not 'all'
         const params = new URLSearchParams()
