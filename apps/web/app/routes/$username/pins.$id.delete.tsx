@@ -158,59 +158,55 @@ export default function PinDeletePage() {
   }, [])
 
   return (
-    <div className="bg-background py-12">
-      <div className="max-w-lg mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to={backToPinsUrl}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Pins
-            </Link>
-          </Button>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Delete Pin</CardTitle>
-            <CardDescription>
-              Are you sure you want to delete this pin? This action cannot be
-              undone.
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent>
-            <div className="space-y-2">
-              <h4 className="font-medium text-foreground">{pin.title}</h4>
-              <p className="text-sm text-muted-foreground break-all">
-                {pin.url}
-              </p>
-            </div>
-          </CardContent>
-
-          <CardFooter className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1"
-              asChild
-              disabled={isDeleting}
-            >
-              <Link to={backToPinsUrl}>Cancel</Link>
-            </Button>
-            <Form method="DELETE" className="flex-1">
-              <Button
-                ref={deleteButtonRef}
-                type="submit"
-                variant="destructive"
-                disabled={isDeleting}
-                className="w-full"
-              >
-                {isDeleting ? 'Deleting...' : 'Delete Pin'}
-              </Button>
-            </Form>
-          </CardFooter>
-        </Card>
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-6">
+        <Button variant="ghost" size="sm" asChild>
+          <Link to={backToPinsUrl}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Pins
+          </Link>
+        </Button>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Delete Pin</CardTitle>
+          <CardDescription>
+            Are you sure you want to delete this pin? This action cannot be
+            undone.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          <div className="space-y-2">
+            <h4 className="font-medium text-foreground">{pin.title}</h4>
+            <p className="text-sm text-muted-foreground break-all">{pin.url}</p>
+          </div>
+        </CardContent>
+
+        <CardFooter className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="flex-1"
+            asChild
+            disabled={isDeleting}
+          >
+            <Link to={backToPinsUrl}>Cancel</Link>
+          </Button>
+          <Form method="DELETE" className="flex-1">
+            <Button
+              ref={deleteButtonRef}
+              type="submit"
+              variant="destructive"
+              disabled={isDeleting}
+              className="w-full"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Pin'}
+            </Button>
+          </Form>
+        </CardFooter>
+      </Card>
     </div>
   )
 }

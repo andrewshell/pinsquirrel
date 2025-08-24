@@ -1,10 +1,8 @@
-import { Plus } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigation } from 'react-router'
+import { useNavigation } from 'react-router'
 import type { Pin } from '@pinsquirrel/core'
 import { PinList } from './PinList'
 import { FilterHeader, type ReadFilterType } from './FilterHeader'
-import { Button } from '~/components/ui/button'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import { PinsPagination } from '~/components/ui/pins-pagination'
 
@@ -16,9 +14,9 @@ interface PinsPageLayoutProps {
   username: string
   successMessage: string | null
   errorMessage: string | null
-  createPinPath: string // Path for Create Pin button
   activeTag?: string // Current tag filter
   currentFilter?: ReadFilterType // Current read filter
+  noTags?: boolean // No tags filter
   searchParams: URLSearchParams
 }
 
@@ -30,9 +28,9 @@ export function PinsPageLayout({
   username,
   successMessage,
   errorMessage,
-  createPinPath,
   activeTag,
   currentFilter = 'all',
+  noTags = false,
   searchParams,
 }: PinsPageLayoutProps) {
   const navigation = useNavigation()
@@ -48,54 +46,44 @@ export function PinsPageLayout({
   const currentSearch = searchParams.get('search') || ''
 
   return (
-    <div className="bg-background py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8 flex justify-end">
-          <Button size="sm" asChild>
-            <Link to={createPinPath}>
-              <Plus className="h-4 w-4 md:mr-2" />
-              <span className="hidden md:inline">Create Pin</span>
-            </Link>
-          </Button>
-        </div>
+    <>
+      <FilterHeader
+        activeTag={activeTag}
+        searchQuery={currentSearch}
+        resultCount={totalCount}
+        currentFilter={currentFilter}
+        noTags={noTags}
+        className="mb-6"
+      />
 
-        <FilterHeader
-          activeTag={activeTag}
-          searchQuery={currentSearch}
-          resultCount={totalCount}
-          currentFilter={currentFilter}
+      {successMessage && (
+        <DismissibleAlert
+          message={successMessage}
+          type="success"
+          show={showSuccessMessage}
+          onDismiss={() => setShowSuccessMessage(false)}
           className="mb-6"
         />
+      )}
 
-        {successMessage && (
-          <DismissibleAlert
-            message={successMessage}
-            type="success"
-            show={showSuccessMessage}
-            onDismiss={() => setShowSuccessMessage(false)}
-            className="mb-6"
-          />
-        )}
-
-        {errorMessage && (
-          <DismissibleAlert
-            message={errorMessage}
-            type="error"
-            show={showErrorMessage}
-            onDismiss={() => setShowErrorMessage(false)}
-            className="mb-6"
-          />
-        )}
-
-        <PinList pins={pins} isLoading={isLoading} username={username} />
-
-        <PinsPagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalCount={totalCount}
-          searchParams={searchParams}
+      {errorMessage && (
+        <DismissibleAlert
+          message={errorMessage}
+          type="error"
+          show={showErrorMessage}
+          onDismiss={() => setShowErrorMessage(false)}
+          className="mb-6"
         />
-      </div>
-    </div>
+      )}
+
+      <PinList pins={pins} isLoading={isLoading} username={username} />
+
+      <PinsPagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        searchParams={searchParams}
+      />
+    </>
   )
 }

@@ -1,4 +1,4 @@
-import { useLoaderData, data, Form } from 'react-router'
+import { useLoaderData, data } from 'react-router'
 import type { Route } from './+types/profile'
 import { requireUser } from '~/lib/session.server'
 import {
@@ -7,7 +7,6 @@ import {
   validatePasswordChange,
 } from '@pinsquirrel/core'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
-import { Button } from '~/components/ui/button'
 import { UpdateEmailForm } from '~/components/profile/UpdateEmailForm'
 import { ChangePasswordForm } from '~/components/profile/ChangePasswordForm'
 import { BookmarkletSection } from '~/components/profile/BookmarkletSection'
@@ -159,88 +158,67 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="bg-background py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Profile</h1>
-          <p className="mt-2 text-muted-foreground">
-            Manage your account information
-          </p>
-        </div>
+    <div className="max-w-4xl mx-auto">
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-bold text-foreground">Profile</h1>
+        <p className="mt-2 text-muted-foreground">
+          Manage your account information
+        </p>
+      </div>
 
-        <div className="space-y-6">
-          {/* User Information Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Account Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground">
-                  Username
-                </label>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  {user.username}
-                </div>
+      <div className="space-y-6">
+        {/* User Information Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Account Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground">
+                Username
+              </label>
+              <div className="mt-1 text-sm text-muted-foreground">
+                {user.username}
               </div>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-foreground">
-                  User ID
-                </label>
-                <div className="mt-1 text-sm text-muted-foreground font-mono">
-                  {user.id}
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground">
+                User ID
+              </label>
+              <div className="mt-1 text-sm text-muted-foreground font-mono">
+                {user.id}
               </div>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-foreground">
-                  Account Created
-                </label>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  {formatDate(user.createdAt)}
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground">
+                Account Created
+              </label>
+              <div className="mt-1 text-sm text-muted-foreground">
+                {formatDate(user.createdAt)}
               </div>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-foreground">
-                  Last Updated
-                </label>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  {formatDate(user.updatedAt)}
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground">
+                Last Updated
+              </label>
+              <div className="mt-1 text-sm text-muted-foreground">
+                {formatDate(user.updatedAt)}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Update Email Card */}
-          <UpdateEmailForm />
+        {/* Update Email Card */}
+        <UpdateEmailForm />
 
-          {/* Change Password Card */}
-          <ChangePasswordForm username={user.username} />
+        {/* Change Password Card */}
+        <ChangePasswordForm username={user.username} />
 
-          {/* Bookmarklet Section */}
-          <BookmarkletSection user={user} />
-
-          {/* Account Actions Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Account Actions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex space-x-4">
-                <Button variant="outline" asChild>
-                  <a href="/">Back to Home</a>
-                </Button>
-                <Form method="post" action="/logout">
-                  <Button variant="destructive" type="submit">
-                    Sign Out
-                  </Button>
-                </Form>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Bookmarklet Section */}
+        <BookmarkletSection user={user} />
       </div>
     </div>
   )

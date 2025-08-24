@@ -26,15 +26,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   }
   const loaderData = await createPinsLoader(request, params, config)
 
-  // Build createPinPath with current query parameters
   const url = new URL(request.url)
-  const queryString = url.search
-  const createPinPath = `/${params.username}/pins/new${queryString}`
 
   return data(
     {
       ...loaderData.data,
-      createPinPath,
       searchParamsString: url.search,
     },
     loaderData.init || undefined

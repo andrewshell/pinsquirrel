@@ -79,6 +79,7 @@ export async function createPinsLoader(
           ? parsedFilters.currentFilterType
           : config.currentFilter,
       activeTag: parsedFilters.activeTag,
+      noTags: filter.noTags || false,
       username: user.username,
       successMessage,
       errorMessage,

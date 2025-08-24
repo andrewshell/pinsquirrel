@@ -326,4 +326,51 @@ describe('Header', () => {
       expect(container).toBeInTheDocument()
     })
   })
+
+  describe('Create Pin button', () => {
+    it('shows create pin button when user is logged in', () => {
+      const expectedPath = '/testuser/pins/new'
+      renderWithRouter(mockUser)
+
+      // Should show create pin buttons (desktop and mobile)
+      const createButtons = screen.getAllByRole('link', { name: /create pin/i })
+      expect(createButtons.length).toBeGreaterThan(0)
+
+      // All buttons should link to the correct path and contain Plus icon
+      createButtons.forEach(button => {
+        expect(button).toHaveAttribute('href', expectedPath)
+        expect(button.querySelector('svg')).toBeInTheDocument()
+      })
+    })
+
+    it('hides create pin button when user is not logged in', () => {
+      renderWithRouter(null)
+
+      expect(
+        screen.queryByRole('link', { name: /create pin/i })
+      ).not.toBeInTheDocument()
+    })
+
+    it('shows create pin button on mobile when user is logged in', () => {
+      const expectedPath = '/testuser/pins/new'
+
+      // Create a mobile-sized viewport
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: 600,
+      })
+
+      renderWithRouter(mockUser)
+
+      // Should show create pin button in mobile view
+      const createButtons = screen.getAllByRole('link', { name: /create pin/i })
+      expect(createButtons.length).toBeGreaterThan(0)
+
+      // All buttons should link to the correct path
+      createButtons.forEach(button => {
+        expect(button).toHaveAttribute('href', expectedPath)
+      })
+    })
+  })
 })

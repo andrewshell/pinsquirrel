@@ -1,5 +1,5 @@
 import type { User } from '@pinsquirrel/core'
-import { CircleUserRound, Menu, X } from 'lucide-react'
+import { CircleUserRound, Menu, Plus, X } from 'lucide-react'
 import { useState } from 'react'
 import {
   Form,
@@ -31,6 +31,11 @@ export function Header({ user }: HeaderProps) {
   const [searchParams] = useSearchParams()
 
   const currentSearch = searchParams.get('search') || ''
+
+  // Generate create pin path if user is logged in
+  const createPinPath = user?.username
+    ? `/${user.username}/pins/new`
+    : undefined
 
   const handleSearchToggle = () => {
     setIsSearchVisible(!isSearchVisible)
@@ -110,6 +115,13 @@ export function Header({ user }: HeaderProps) {
                     onClick={handleSearchToggle}
                     isSearchVisible={isSearchVisible}
                   />
+                  {createPinPath && (
+                    <Button size="sm" asChild aria-label="Create Pin">
+                      <Link to={createPinPath}>
+                        <Plus className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  )}
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -153,19 +165,28 @@ export function Header({ user }: HeaderProps) {
             )}
           </nav>
 
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden p-2 text-foreground hover:bg-accent rounded-md transition-colors"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label="Toggle menu"
-            aria-expanded={isMobileMenuOpen}
-          >
-            {isMobileMenuOpen ? (
-              <X className="h-6 w-6" />
-            ) : (
-              <Menu className="h-6 w-6" />
+          {/* Mobile buttons */}
+          <div className="md:hidden flex items-center space-x-2">
+            {user && createPinPath && (
+              <Button size="sm" asChild aria-label="Create Pin">
+                <Link to={createPinPath}>
+                  <Plus className="h-4 w-4" />
+                </Link>
+              </Button>
             )}
-          </button>
+            <button
+              className="p-2 text-foreground hover:bg-accent rounded-md transition-colors"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Toggle menu"
+              aria-expanded={isMobileMenuOpen}
+            >
+              {isMobileMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
 

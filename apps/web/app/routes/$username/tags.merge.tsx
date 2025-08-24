@@ -170,50 +170,48 @@ export default function TagsMergePage() {
   const backToTagsUrl = `/${username}/tags`
 
   return (
-    <div className="bg-background py-12">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to={backToTagsUrl}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Tags
-            </Link>
-          </Button>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Merge Tags</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Merge multiple tags into a single tag. All pins associated with
-              the source tags will be moved to the destination tag.
-            </p>
-          </CardHeader>
-          <CardContent>
-            {tags.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">
-                  No tags with pins available to merge.
-                </p>
-                <Button variant="outline" size="sm" asChild className="mt-4">
-                  <Link to={backToTagsUrl}>Back to Tags</Link>
-                </Button>
-              </div>
-            ) : (
-              <TagMergeForm
-                tags={tags}
-                errorMessage={
-                  actionData?.errors?._form
-                    ? Array.isArray(actionData.errors._form)
-                      ? actionData.errors._form.join(', ')
-                      : actionData.errors._form
-                    : undefined
-                }
-              />
-            )}
-          </CardContent>
-        </Card>
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-6">
+        <Button variant="ghost" size="sm" asChild>
+          <Link to={backToTagsUrl}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Tags
+          </Link>
+        </Button>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Merge Tags</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Merge multiple tags into a single tag. All pins associated with the
+            source tags will be moved to the destination tag.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {tags.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">
+                No tags with pins available to merge.
+              </p>
+              <Button variant="outline" size="sm" asChild className="mt-4">
+                <Link to={backToTagsUrl}>Back to Tags</Link>
+              </Button>
+            </div>
+          ) : (
+            <TagMergeForm
+              tags={tags}
+              errorMessage={
+                actionData?.errors?._form
+                  ? Array.isArray(actionData.errors._form)
+                    ? actionData.errors._form.join(', ')
+                    : actionData.errors._form
+                  : undefined
+              }
+            />
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

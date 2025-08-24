@@ -9,6 +9,7 @@ import {
 } from 'react-router'
 
 import type { Route } from './+types/root'
+import type { User } from '@pinsquirrel/core'
 import { getUser, extendSessionIfNeeded } from '~/lib/session.server'
 import { Header } from '~/components/Header'
 import { Footer } from '~/components/Footer'
@@ -75,13 +76,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const { user } = useLoaderData<typeof loader>()
+  const { user }: { user: User | null } = useLoaderData<typeof loader>()
 
   return (
     <div className="min-h-screen flex flex-col">
       <Header user={user} />
-      <main className="flex-1">
-        <Outlet />
+      <main className="flex-1 bg-background py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Outlet />
+        </div>
       </main>
       <Footer />
     </div>

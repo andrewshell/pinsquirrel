@@ -14,6 +14,7 @@ interface FilterHeaderProps {
   searchQuery?: string
   resultCount: number
   currentFilter?: ReadFilterType
+  noTags?: boolean
   className?: string
 }
 
@@ -22,6 +23,7 @@ export function FilterHeader({
   searchQuery,
   resultCount,
   currentFilter = 'all',
+  noTags = false,
   className,
 }: FilterHeaderProps) {
   const location = useLocation()
@@ -46,6 +48,16 @@ export function FilterHeader({
   const buildClearSearchLink = () => {
     const params = new URLSearchParams(location.search)
     params.delete('search')
+
+    const queryString = params.toString()
+    const basePath = location.pathname
+    return `${basePath}${queryString ? `?${queryString}` : ''}`
+  }
+
+  // Build URL to remove notags filter while preserving other parameters
+  const buildRemoveNoTagsLink = () => {
+    const params = new URLSearchParams(location.search)
+    params.delete('notags')
 
     const queryString = params.toString()
     const basePath = location.pathname
@@ -154,6 +166,22 @@ export function FilterHeader({
                     aria-label="Clear search"
                   >
                     <Link to={buildClearSearchLink()}>
+                      <X className="h-3 w-3" />
+                    </Link>
+                  </button>
+                </div>
+              )}
+
+              {noTags && (
+                <div className="inline-flex items-center gap-1 bg-secondary text-secondary-foreground px-2 py-1 text-sm font-medium border-2 border-foreground">
+                  <Tag className="h-3 w-3" />
+                  <span>Untagged</span>
+                  <button
+                    type="button"
+                    className="ml-1 hover:bg-destructive hover:text-destructive-foreground rounded-sm p-0.5 transition-colors focus:outline-none focus:ring-1 focus:ring-foreground"
+                    aria-label="Clear untagged filter"
+                  >
+                    <Link to={buildRemoveNoTagsLink()}>
                       <X className="h-3 w-3" />
                     </Link>
                   </button>

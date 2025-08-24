@@ -265,13 +265,10 @@ export default function ImportRoute() {
               </p>
             </div>
 
-            <div className="flex gap-4">
+            <div>
               <Button type="submit" className="flex items-center gap-2">
                 <Upload className="h-4 w-4" />
                 Import Bookmarks
-              </Button>
-              <Button type="button" variant="outline" asChild>
-                <Link to={`/${username}/pins`}>Cancel</Link>
               </Button>
             </div>
           </Form>

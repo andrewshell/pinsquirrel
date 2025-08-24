@@ -271,44 +271,42 @@ export default function PinEditPage() {
   }
 
   return (
-    <div className="bg-background py-12">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to={backToPinsUrl}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Pins
-            </Link>
-          </Button>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Edit Pin</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PinCreationForm
-              editMode
-              initialData={initialData}
-              actionUrl={`/${params.username}/pins/${pin.id}/edit${location.search}`}
-              onMetadataFetch={fetchMetadata}
-              metadataTitle={metadata?.title}
-              metadataDescription={metadata?.description}
-              metadataError={metadataError || undefined}
-              isMetadataLoading={isMetadataLoading}
-              tagSuggestions={userTags}
-              urlParams={urlParams}
-              errorMessage={
-                actionData && 'errors' in actionData && actionData.errors?._form
-                  ? Array.isArray(actionData.errors._form)
-                    ? actionData.errors._form.join(', ')
-                    : actionData.errors._form
-                  : undefined
-              }
-            />
-          </CardContent>
-        </Card>
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-6">
+        <Button variant="ghost" size="sm" asChild>
+          <Link to={backToPinsUrl}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Pins
+          </Link>
+        </Button>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Edit Pin</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PinCreationForm
+            editMode
+            initialData={initialData}
+            actionUrl={`/${params.username}/pins/${pin.id}/edit${location.search}`}
+            onMetadataFetch={fetchMetadata}
+            metadataTitle={metadata?.title}
+            metadataDescription={metadata?.description}
+            metadataError={metadataError || undefined}
+            isMetadataLoading={isMetadataLoading}
+            tagSuggestions={userTags}
+            urlParams={urlParams}
+            errorMessage={
+              actionData && 'errors' in actionData && actionData.errors?._form
+                ? Array.isArray(actionData.errors._form)
+                  ? actionData.errors._form.join(', ')
+                  : actionData.errors._form
+                : undefined
+            }
+          />
+        </CardContent>
+      </Card>
     </div>
   )
 }
