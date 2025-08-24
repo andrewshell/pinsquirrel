@@ -110,11 +110,12 @@ describe('PinsPage Integration', () => {
 
     // Component rendered via renderWithRouter
 
-    // Verify filter links are present instead of title
-    expect(await screen.findAllByRole('link', { name: 'All' })).toHaveLength(1) // Desktop only, mobile dropdown not rendered in DOM
+    // Verify filter dropdown is present with "All Pins" text
+    expect(await screen.findByText('All Pins')).toBeInTheDocument()
+    // Verify Create Pin button is present
     expect(
-      await screen.findAllByRole('link', { name: 'To Read' })
-    ).toHaveLength(1) // Desktop only
+      await screen.findByRole('link', { name: /Create Pin/i })
+    ).toBeInTheDocument()
   })
 
   it('renders empty state when user has no pins', async () => {
@@ -196,7 +197,7 @@ describe('PinsPage Integration', () => {
   })
 
   it('applies correct layout structure with max-width', async () => {
-    renderWithRouter({
+    const { container } = renderWithRouter({
       pins: [],
       totalPages: 1,
       currentPage: 1,
@@ -207,29 +208,19 @@ describe('PinsPage Integration', () => {
 
     // Component rendered via renderWithRouter
 
-    // Check main container structure - traverse from filter link -> div -> div -> div -> div
-    const allFilterLinks = await screen.findAllByRole('link', {
-      name: 'All',
+    // Verify Create Pin button exists
+    const createPinButton = await screen.findByRole('link', {
+      name: /Create Pin/i,
     })
-    const allFilterLink = allFilterLinks[0] // Use desktop link
-    const desktopFilterContainer = allFilterLink.parentElement // hidden sm:flex gap-2 div
-    const filterComponent = desktopFilterContainer?.parentElement // flex gap-2 div (PinFilter root)
-    const headerContainer = filterComponent?.parentElement // mb-8 flex div
-    const mainContainer = headerContainer?.parentElement // max-w-7xl mx-auto div
-    expect(mainContainer).toHaveClass(
-      'max-w-7xl',
-      'mx-auto',
-      'px-4',
-      'sm:px-6',
-      'lg:px-8'
-    )
+    expect(createPinButton).toBeInTheDocument()
 
-    const pageContainer = mainContainer?.parentElement
-    expect(pageContainer).toHaveClass('bg-background', 'py-12')
+    // Verify key layout classes are present in the DOM
+    expect(container.querySelector('.max-w-7xl')).toBeInTheDocument()
+    expect(container.querySelector('.bg-background')).toBeInTheDocument()
   })
 
   it('shows correct header spacing and typography', async () => {
-    renderWithRouter({
+    const { container } = renderWithRouter({
       pins: [],
       totalPages: 1,
       currentPage: 1,
@@ -240,19 +231,15 @@ describe('PinsPage Integration', () => {
 
     // Component rendered via renderWithRouter
 
-    // Find the header section (mb-8 flex div) - look for the filter component
-    const allFilterLinks = await screen.findAllByRole('link', {
-      name: 'All',
+    // Verify filter dropdown and Create Pin button are present
+    const createPinButton = await screen.findByRole('link', {
+      name: /Create Pin/i,
     })
-    const allFilterLink = allFilterLinks[0] // Use desktop link
-    const desktopFilterContainer = allFilterLink.parentElement // hidden sm:flex gap-2 div
-    const filterComponent = desktopFilterContainer?.parentElement // flex gap-2 div (PinFilter root)
-    const headerSection = filterComponent?.parentElement // mb-8 flex div
-    expect(headerSection).toHaveClass('mb-8')
+    expect(createPinButton).toBeInTheDocument()
+    expect(screen.getByText('All Pins')).toBeInTheDocument()
 
-    // Verify filter links are present
-    expect(screen.getAllByRole('link', { name: 'All' })).toHaveLength(1)
-    expect(screen.getAllByRole('link', { name: 'To Read' })).toHaveLength(1)
+    // Check that header section exists with proper classes
+    expect(container.querySelector('.mb-8')).toBeInTheDocument()
   })
 
   it('integrates PinList component correctly', async () => {

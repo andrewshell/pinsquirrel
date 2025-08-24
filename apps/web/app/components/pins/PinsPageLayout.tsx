@@ -2,9 +2,8 @@ import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigation } from 'react-router'
 import type { Pin } from '@pinsquirrel/core'
-import { PinFilter } from './PinFilter'
 import { PinList } from './PinList'
-import { FilterHeader } from './FilterHeader'
+import { FilterHeader, type ReadFilterType } from './FilterHeader'
 import { Button } from '~/components/ui/button'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import { PinsPagination } from '~/components/ui/pins-pagination'
@@ -19,6 +18,7 @@ interface PinsPageLayoutProps {
   errorMessage: string | null
   createPinPath: string // Path for Create Pin button
   activeTag?: string // Current tag filter
+  currentFilter?: ReadFilterType // Current read filter
   searchParams: URLSearchParams
 }
 
@@ -32,6 +32,7 @@ export function PinsPageLayout({
   errorMessage,
   createPinPath,
   activeTag,
+  currentFilter = 'all',
   searchParams,
 }: PinsPageLayoutProps) {
   const navigation = useNavigation()
@@ -49,8 +50,7 @@ export function PinsPageLayout({
   return (
     <div className="bg-background py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8 flex justify-between items-center">
-          <PinFilter />
+        <div className="mb-8 flex justify-end">
           <Button size="sm" asChild>
             <Link to={createPinPath}>
               <Plus className="h-4 w-4 md:mr-2" />
@@ -63,6 +63,7 @@ export function PinsPageLayout({
           activeTag={activeTag}
           searchQuery={currentSearch}
           resultCount={totalCount}
+          currentFilter={currentFilter}
           className="mb-6"
         />
 

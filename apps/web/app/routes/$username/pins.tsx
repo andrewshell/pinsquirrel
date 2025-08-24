@@ -18,7 +18,7 @@ export function meta({ params }: Route.MetaArgs) {
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { createPinsLoader } = await import('~/lib/pins-loader.server')
   const config = {
-    currentFilter: 'all',
+    currentFilter: 'all' as const,
     filter: {},
     title: `{username}'s Pins - PinSquirrel`,
     description:

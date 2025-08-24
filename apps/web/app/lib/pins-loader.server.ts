@@ -9,8 +9,10 @@ import { parsePinFilters } from '~/lib/filter-utils.server'
 import { repositories } from '~/lib/services/container.server'
 import { commitSession, getSession, requireUser } from '~/lib/session.server'
 
+export type ReadFilterType = 'all' | 'toread' | 'read'
+
 export interface PinsLoaderConfig {
-  currentFilter: string
+  currentFilter: ReadFilterType
   filter: PinFilter
   title: string
   description: string

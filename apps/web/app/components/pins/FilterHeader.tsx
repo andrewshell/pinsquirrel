@@ -1,10 +1,19 @@
-import { X, Search, Tag } from 'lucide-react'
+import { X, Search, Tag, ChevronDown, Filter } from 'lucide-react'
 import { useLocation, Link } from 'react-router'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu'
+
+export type ReadFilterType = 'all' | 'toread' | 'read'
 
 interface FilterHeaderProps {
   activeTag?: string
   searchQuery?: string
   resultCount: number
+  currentFilter?: ReadFilterType
   className?: string
 }
 
@@ -12,17 +21,16 @@ export function FilterHeader({
   activeTag,
   searchQuery,
   resultCount,
+  currentFilter = 'all',
   className,
 }: FilterHeaderProps) {
   const location = useLocation()
 
-  // Don't render if no filters are active
+  // Check which filters are active
   const hasActiveTag = activeTag && activeTag.trim()
   const hasActiveSearch = searchQuery && searchQuery.trim()
-
-  if (!hasActiveTag && !hasActiveSearch) {
-    return null
-  }
+  // Always show the filter header since we always want to show the read status filter
+  const hasActiveFilters = true
 
   // Build URL to remove tag filter while preserving other parameters
   const buildRemoveTagLink = () => {
@@ -44,12 +52,48 @@ export function FilterHeader({
     return `${basePath}${queryString ? `?${queryString}` : ''}`
   }
 
+  // Build URL for read filter options
+  const buildReadFilterLink = (filter: ReadFilterType) => {
+    const params = new URLSearchParams(location.search)
+
+    if (filter === 'toread') {
+      params.set('unread', 'true')
+    } else if (filter === 'read') {
+      params.set('unread', 'false')
+    } else {
+      params.delete('unread')
+    }
+
+    const queryString = params.toString()
+    const basePath = location.pathname
+    return `${basePath}${queryString ? `?${queryString}` : ''}`
+  }
+
+  // Get label for read filter
+  const getReadFilterLabel = (filter: ReadFilterType) => {
+    switch (filter) {
+      case 'all':
+        return 'All Pins'
+      case 'toread':
+        return 'To Read'
+      case 'read':
+        return 'Read'
+      default:
+        return 'All Pins'
+    }
+  }
+
   // Format result count text
   const getResultText = () => {
     if (resultCount === 0) {
       return 'No pins found'
     }
     return `${resultCount} ${resultCount === 1 ? 'pin' : 'pins'} found`
+  }
+
+  // Don't render if no filters are active
+  if (!hasActiveFilters) {
+    return null
   }
 
   return (
@@ -59,6 +103,31 @@ export function FilterHeader({
         <div className="border-4 border-foreground bg-input p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Read Status Filter - Always visible */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 bg-secondary text-secondary-foreground px-2 py-1 text-sm font-medium border-2 border-foreground hover:bg-secondary/80 transition-colors focus:outline-none focus:ring-1 focus:ring-foreground"
+                  >
+                    <Filter className="h-3 w-3" />
+                    <span>{getReadFilterLabel(currentFilter)}</span>
+                    <ChevronDown className="h-3 w-3 ml-1" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem asChild>
+                    <Link to={buildReadFilterLink('all')}>All Pins</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to={buildReadFilterLink('toread')}>To Read</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to={buildReadFilterLink('read')}>Read</Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               {hasActiveTag && (
                 <div className="inline-flex items-center gap-1 bg-secondary text-secondary-foreground px-2 py-1 text-sm font-medium border-2 border-foreground">
                   <Tag className="h-3 w-3" />

@@ -144,28 +144,34 @@ describe('FilterHeader', () => {
     expect(xIcons).toHaveLength(2)
   })
 
-  it('should not render when no filters are active', () => {
+  it('should always render filter header with read status filter', () => {
     renderWithRouter(<FilterHeader resultCount={0} />)
 
-    expect(screen.queryByText('FILTERS')).not.toBeInTheDocument()
+    // Should show FILTERS label
+    expect(screen.queryByText('FILTERS')).toBeInTheDocument()
+    // Should show "All Pins" as default read filter
+    expect(screen.queryByText('All Pins')).toBeInTheDocument()
   })
 
-  it('should not render when tag is empty string', () => {
+  it('should show read filter even when tag is empty string', () => {
     renderWithRouter(<FilterHeader activeTag="" resultCount={0} />)
 
-    expect(screen.queryByText('FILTERS')).not.toBeInTheDocument()
+    expect(screen.queryByText('FILTERS')).toBeInTheDocument()
+    expect(screen.queryByText('All Pins')).toBeInTheDocument()
   })
 
-  it('should not render when search query is empty', () => {
+  it('should show read filter even when search query is empty', () => {
     renderWithRouter(<FilterHeader searchQuery="" resultCount={0} />)
 
-    expect(screen.queryByText('FILTERS')).not.toBeInTheDocument()
+    expect(screen.queryByText('FILTERS')).toBeInTheDocument()
+    expect(screen.queryByText('All Pins')).toBeInTheDocument()
   })
 
-  it('should not render when search query is only whitespace', () => {
+  it('should show read filter even when search query is only whitespace', () => {
     renderWithRouter(<FilterHeader searchQuery="   " resultCount={0} />)
 
-    expect(screen.queryByText('FILTERS')).not.toBeInTheDocument()
+    expect(screen.queryByText('FILTERS')).toBeInTheDocument()
+    expect(screen.queryByText('All Pins')).toBeInTheDocument()
   })
 
   it('should apply custom className', () => {
