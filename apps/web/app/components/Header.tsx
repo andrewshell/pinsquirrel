@@ -8,6 +8,8 @@ import {
   useNavigate,
   useSearchParams,
 } from 'react-router'
+import { SearchIcon } from '~/components/search/SearchIcon'
+import { SearchInput } from '~/components/search/SearchInput'
 import { Button } from '~/components/ui/button'
 import {
   DropdownMenu,
@@ -16,8 +18,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
-import { SearchIcon } from '~/components/search/SearchIcon'
-import { SearchInput } from '~/components/search/SearchInput'
 
 interface HeaderProps {
   user: User | null
@@ -236,13 +236,12 @@ export function Header({ user }: HeaderProps) {
                     Import
                   </Link>
                 </Button>
-                <Form method="post" action="/logout">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    type="submit"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
+                <Form
+                  method="post"
+                  action="/logout"
+                  onSubmit={() => setIsMobileMenuOpen(false)}
+                >
+                  <Button variant="outline" className="w-full" type="submit">
                     Sign Out
                   </Button>
                 </Form>
