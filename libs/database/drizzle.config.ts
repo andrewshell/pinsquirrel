@@ -4,23 +4,12 @@ if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL is required')
 }
 
-// SSL configuration
-const getSSLConfig = () => {
-  // Explicitly disable SSL if requested
-  if (process.env.DATABASE_SSL === 'false') {
-    return false
-  }
-  
-  // In production, enable SSL by default
-  // In development, disable SSL by default
-  if (process.env.NODE_ENV === 'production') {
-    // Note: For managed databases with self-signed certificates,
-    // set DATABASE_SSL_MODE=no-verify in your environment
-    return true
-  }
-  
-  return false
-}
+// SSL configuration is handled via DATABASE_URL parameters:
+// - Development: postgresql://user:pass@localhost:5432/db (no SSL)
+// - Production: postgresql://user:pass@host:port/db?sslmode=require (SSL required)
+// 
+// For self-signed certificates in production, set:
+// NODE_TLS_REJECT_UNAUTHORIZED=0
 
 export default defineConfig({
   schema: './src/schema/*.ts',
@@ -30,6 +19,5 @@ export default defineConfig({
     url:
       process.env.DATABASE_URL ||
       'postgresql://pinsquirrel:pinsquirrel@localhost:5432/pinsquirrel',
-    ssl: getSSLConfig(),
   },
 })
