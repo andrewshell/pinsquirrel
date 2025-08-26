@@ -76,8 +76,8 @@ export class AuthenticationService {
       }
     }
 
-    // Validate email format if provided
-    if (email && typeof email === 'string') {
+    // Validate email format if provided (treat empty string as undefined)
+    if (email && typeof email === 'string' && email.trim() !== '') {
       const emailResult = emailSchema.safeParse(email)
       if (!emailResult.success) {
         errors.email = errors.email || []
@@ -94,7 +94,9 @@ export class AuthenticationService {
     return this.register(
       username as string,
       password as string,
-      email as string | undefined
+      email && typeof email === 'string' && email.trim() !== ''
+        ? email
+        : undefined
     )
   }
 
@@ -249,7 +251,7 @@ export class AuthenticationService {
       ]
     }
 
-    if (email !== null && email !== undefined) {
+    if (email !== null && email !== undefined && email.trim() !== '') {
       const emailResult = emailSchema.safeParse(email)
       if (!emailResult.success) {
         errors.email = [emailResult.error.issues[0]?.message || 'Invalid email']
@@ -268,7 +270,7 @@ export class AuthenticationService {
 
     // Hash password and email in the business logic layer
     const passwordHash = await hashPassword(password)
-    const emailHash = email ? hashEmail(email) : null
+    const emailHash = email && email.trim() !== '' ? hashEmail(email) : null
 
     // Create user with already hashed data
     const user = await this.userRepository.create({

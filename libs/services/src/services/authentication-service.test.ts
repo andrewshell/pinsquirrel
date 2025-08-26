@@ -168,10 +168,112 @@ describe('AuthenticationService', () => {
       expect(result).toEqual(mockUser)
     })
 
-    it('should throw validation error for empty string email', async () => {
-      await expect(
-        authService.register('testuser', 'password123', '') // empty string is invalid
-      ).rejects.toThrow('Invalid email address')
+    it('should register user with empty string email (treated as undefined)', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+
+      const result = await authService.register('testuser', 'password123', '')
+
+      expect(mockUserRepository.create).toHaveBeenCalledWith({
+        username: 'testuser',
+        passwordHash: 'hashed_password123',
+        emailHash: null,
+      })
+      expect(result).toEqual(mockUser)
+    })
+  })
+
+  describe('registerFromFormData', () => {
+    it('should register a new user with valid form data', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+
+      const formData = {
+        username: 'testuser',
+        password: 'password123',
+        email: 'test@example.com',
+      }
+
+      const result = await authService.registerFromFormData(formData)
+
+      expect(mockUserRepository.create).toHaveBeenCalledWith({
+        username: 'testuser',
+        passwordHash: 'hashed_password123',
+        emailHash: 'hashed_test@example.com',
+      })
+      expect(result).toEqual(mockUser)
+    })
+
+    it('should register a new user with empty string email', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+
+      const formData = {
+        username: 'testuser',
+        password: 'password123',
+        email: '', // empty string should be treated as undefined
+      }
+
+      const result = await authService.registerFromFormData(formData)
+
+      expect(mockUserRepository.create).toHaveBeenCalledWith({
+        username: 'testuser',
+        passwordHash: 'hashed_password123',
+        emailHash: null,
+      })
+      expect(result).toEqual(mockUser)
+    })
+
+    it('should register a new user with whitespace-only email', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+
+      const formData = {
+        username: 'testuser',
+        password: 'password123',
+        email: '   ', // whitespace-only string should be treated as undefined
+      }
+
+      const result = await authService.registerFromFormData(formData)
+
+      expect(mockUserRepository.create).toHaveBeenCalledWith({
+        username: 'testuser',
+        passwordHash: 'hashed_password123',
+        emailHash: null,
+      })
+      expect(result).toEqual(mockUser)
+    })
+
+    it('should register a new user without email field', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+
+      const formData = {
+        username: 'testuser',
+        password: 'password123',
+        // no email field
+      }
+
+      const result = await authService.registerFromFormData(formData)
+
+      expect(mockUserRepository.create).toHaveBeenCalledWith({
+        username: 'testuser',
+        passwordHash: 'hashed_password123',
+        emailHash: null,
+      })
+      expect(result).toEqual(mockUser)
+    })
+
+    it('should throw validation error for invalid email', async () => {
+      const formData = {
+        username: 'testuser',
+        password: 'password123',
+        email: 'invalid-email',
+      }
+
+      await expect(authService.registerFromFormData(formData)).rejects.toThrow(
+        'Invalid email address'
+      )
     })
   })
 
