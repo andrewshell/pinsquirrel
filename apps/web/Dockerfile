@@ -7,9 +7,11 @@ WORKDIR /app
 FROM base AS dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
-COPY libs/core/package.json ./libs/core/
+COPY libs/adapters/package.json ./libs/adapters/
 COPY libs/database/package.json ./libs/database/
+COPY libs/domain/package.json ./libs/domain/
 COPY libs/mailgun/package.json ./libs/mailgun/
+COPY libs/services/package.json ./libs/services/
 RUN pnpm install --frozen-lockfile
 
 # Build web application (Turbo will build dependencies automatically)
@@ -23,9 +25,11 @@ RUN pnpm build --filter="@pinsquirrel/web"
 FROM base AS production-deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
-COPY libs/core/package.json ./libs/core/
+COPY libs/adapters/package.json ./libs/adapters/
 COPY libs/database/package.json ./libs/database/
+COPY libs/domain/package.json ./libs/domain/
 COPY libs/mailgun/package.json ./libs/mailgun/
+COPY libs/services/package.json ./libs/services/
 RUN pnpm install --frozen-lockfile --prod
 
 # Final runtime image
