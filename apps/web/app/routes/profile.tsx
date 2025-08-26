@@ -1,11 +1,7 @@
 import { useLoaderData, data } from 'react-router'
 import type { Route } from './+types/profile'
 import { requireUser } from '~/lib/session.server'
-import {
-  InvalidCredentialsError,
-  validateEmailUpdate,
-  validatePasswordChange,
-} from '@pinsquirrel/core'
+import { InvalidCredentialsError, ValidationError } from '@pinsquirrel/domain'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { UpdateEmailForm } from '~/components/profile/UpdateEmailForm'
 import { ChangePasswordForm } from '~/components/profile/ChangePasswordForm'
@@ -45,17 +41,11 @@ export async function action({ request }: Route.ActionArgs) {
 
   try {
     if (intent === 'update-email') {
-      const result = validateEmailUpdate(formData)
-
-      if (!result.success) {
-        return data({ errors: result.errors }, { status: 400 })
-      }
-
-      await authService.updateEmail(user.id, result.data.email)
+      await authService.updateEmailFromFormData(user.id, formData)
 
       logger.info('User email updated', {
         userId: user.id,
-        hasEmail: true,
+        hasEmail: !!formData.email,
       })
 
       return data({
@@ -65,58 +55,16 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     if (intent === 'change-password') {
-      const result = validatePasswordChange(formData)
+      await authService.changePasswordFromFormData(user.id, formData)
 
-      if (!result.success) {
-        return data({ errors: result.errors }, { status: 400 })
-      }
+      logger.info('User password changed', {
+        userId: user.id,
+      })
 
-      try {
-        await authService.changePassword(
-          user.id,
-          result.data.currentPassword,
-          result.data.newPassword
-        )
-
-        logger.info('User password changed', {
-          userId: user.id,
-        })
-
-        return data({
-          success: 'Password changed successfully',
-          field: 'password',
-        })
-      } catch (error) {
-        // Handle specific authentication errors
-        if (error instanceof InvalidCredentialsError) {
-          return data(
-            {
-              errors: {
-                currentPassword: 'Current password is incorrect',
-              },
-            },
-            { status: 400 }
-          )
-        }
-
-        // Handle validation errors from the service
-        if (
-          error instanceof Error &&
-          error.message.includes('Invalid new password')
-        ) {
-          return data(
-            {
-              errors: {
-                newPassword: 'Password must be at least 8 characters',
-              },
-            },
-            { status: 400 }
-          )
-        }
-
-        // Re-throw to be caught by outer catch block
-        throw error
-      }
+      return data({
+        success: 'Password changed successfully',
+        field: 'password',
+      })
     }
 
     return data(
@@ -128,18 +76,35 @@ export async function action({ request }: Route.ActionArgs) {
       { status: 400 }
     )
   } catch (error) {
+    if (error instanceof ValidationError) {
+      logger.debug('Profile update validation failed', { errors: error.fields })
+      return data({ errors: error.fields }, { status: 400 })
+    }
+
+    if (error instanceof InvalidCredentialsError) {
+      logger.debug('Invalid credentials during profile update')
+      return data(
+        {
+          errors: {
+            currentPassword: 'Current password is incorrect',
+          },
+        },
+        { status: 400 }
+      )
+    }
+
     logger.exception(error, 'Profile update failed', {
       userId: user.id,
       intent,
     })
-    const message = error instanceof Error ? error.message : 'Update failed'
+
     return data(
       {
         errors: {
-          _form: message,
+          _form: 'An unexpected error occurred. Please try again.',
         },
       },
-      { status: 400 }
+      { status: 500 }
     )
   }
 }

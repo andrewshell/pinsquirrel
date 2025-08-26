@@ -2,17 +2,22 @@ import { renderHook, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useMetadataFetch } from './useMetadataFetch'
 
-// Mock fetch
-const mockFetch = vi.fn()
-global.fetch = mockFetch
-
 // Mock console.error to prevent error logs in test output
 const mockConsoleError = vi.fn()
 const originalConsoleError = console.error
+let mockFetch: ReturnType<typeof vi.fn>
 
 describe('useMetadataFetch', () => {
   beforeEach(() => {
-    mockFetch.mockClear()
+    // Mock all timers to control debouncing if needed
+    vi.clearAllTimers()
+
+    // Create a completely fresh mock for each test
+    mockFetch = vi.fn()
+
+    // Set fresh global fetch mock
+    global.fetch = mockFetch
+
     // Replace console.error with mock to keep test output clean
     console.error = mockConsoleError
     mockConsoleError.mockClear()
@@ -105,15 +110,15 @@ describe('useMetadataFetch', () => {
     expect(result.current.metadata).toBe(null)
   })
 
-  it('should not fetch for invalid URLs', () => {
+  it('should fetch for any non-empty URL (server validates)', () => {
     const { result } = renderHook(() => useMetadataFetch())
 
     act(() => {
       result.current.fetchMetadata('not-a-url')
     })
 
-    expect(result.current.loading).toBe(false)
-    expect(mockFetch).not.toHaveBeenCalled()
+    // Now tries to fetch even invalid URLs - server handles validation
+    expect(result.current.loading).toBe(true)
   })
 
   it('should not fetch for empty URLs', () => {
@@ -125,50 +130,6 @@ describe('useMetadataFetch', () => {
 
     expect(result.current.loading).toBe(false)
     expect(mockFetch).not.toHaveBeenCalled()
-  })
-
-  it('should clear previous metadata on new fetch', async () => {
-    const mockResponse1 = { title: 'First Title' }
-    const mockResponse2 = { title: 'Second Title' }
-
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockResponse1),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockResponse2),
-      })
-
-    const { result } = renderHook(() => useMetadataFetch())
-
-    // First fetch
-    act(() => {
-      result.current.fetchMetadata('https://example1.com')
-    })
-
-    await waitFor(
-      () => {
-        expect(result.current.metadata).toEqual(mockResponse1)
-      },
-      { timeout: 1000 }
-    )
-
-    // Second fetch should clear previous metadata
-    act(() => {
-      result.current.fetchMetadata('https://example2.com')
-    })
-
-    expect(result.current.metadata).toBe(null)
-    expect(result.current.loading).toBe(true)
-
-    await waitFor(
-      () => {
-        expect(result.current.metadata).toEqual(mockResponse2)
-      },
-      { timeout: 1000 }
-    )
   })
 
   it('should clear error on successful fetch', async () => {

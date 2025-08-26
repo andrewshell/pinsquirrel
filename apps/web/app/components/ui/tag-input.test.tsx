@@ -276,7 +276,9 @@ describe('TagInput', () => {
       await user.keyboard('{Enter}')
 
       expect(
-        screen.getByText(/tag name cannot contain control characters/i)
+        screen.getByText(
+          /tag must contain only lowercase letters, numbers, hyphens, and underscores/i
+        )
       ).toBeInTheDocument()
       expect(mockOnTagsChange).not.toHaveBeenCalled()
     })
@@ -290,7 +292,9 @@ describe('TagInput', () => {
       await user.keyboard('{Enter}')
 
       expect(
-        screen.getByText(/tag name cannot contain control characters/i)
+        screen.getByText(
+          /tag must contain only lowercase letters, numbers, hyphens, and underscores/i
+        )
       ).toBeInTheDocument()
 
       await user.clear(input)
@@ -298,7 +302,9 @@ describe('TagInput', () => {
 
       await waitFor(() => {
         expect(
-          screen.queryByText(/tag name cannot contain control characters/i)
+          screen.queryByText(
+            /tag must contain only lowercase letters, numbers, hyphens, and underscores/i
+          )
         ).not.toBeInTheDocument()
       })
     })

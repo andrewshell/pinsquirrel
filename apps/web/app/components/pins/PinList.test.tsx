@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import type { Pin } from '@pinsquirrel/core'
+import type { Pin } from '@pinsquirrel/domain'
 import { PinList } from './PinList'
 
 // Mock the PinCard component

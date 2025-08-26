@@ -1,4 +1,4 @@
-import type { User } from '@pinsquirrel/core'
+import type { User } from '@pinsquirrel/domain'
 
 /**
  * Validates that the username in the URL matches the authenticated user

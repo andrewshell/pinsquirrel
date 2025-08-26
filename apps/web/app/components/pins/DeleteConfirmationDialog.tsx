@@ -1,4 +1,4 @@
-import type { Pin } from '@pinsquirrel/core'
+import type { Pin } from '@pinsquirrel/domain'
 import { useEffect, useRef } from 'react'
 import { Form, useNavigation } from 'react-router'
 import { Button } from '~/components/ui/button'

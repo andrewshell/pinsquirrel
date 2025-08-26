@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { User } from '@pinsquirrel/core'
+import type { User } from '@pinsquirrel/domain'
 
 // Create mock functions in hoisted scope
-const mockCreate = vi.hoisted(() => vi.fn())
+const mockCreatePinFromFormData = vi.hoisted(() => vi.fn())
 const mockFindByUserId = vi.hoisted(() => vi.fn())
 
 // Mock the session.server module
@@ -18,17 +18,16 @@ vi.mock('~/lib/session.server', () => ({
   ),
 }))
 
-// Mock the database repositories
-vi.mock('@pinsquirrel/database', () => ({
-  DrizzlePinRepository: vi.fn().mockImplementation(() => ({
-    create: mockCreate,
-  })),
-  DrizzleTagRepository: vi.fn().mockImplementation(() => ({
-    findByUserId: mockFindByUserId,
-  })),
-  DrizzleUserRepository: vi.fn().mockImplementation(() => ({})),
-  DrizzlePasswordResetRepository: vi.fn(),
-  db: {},
+// Mock the services container
+vi.mock('~/lib/services/container.server', () => ({
+  repositories: {
+    tag: {
+      findByUserId: mockFindByUserId,
+    },
+  },
+  pinService: {
+    createPinFromFormData: mockCreatePinFromFormData,
+  },
 }))
 
 // No need to mock react-router for server-side loader/action functions
@@ -169,7 +168,7 @@ describe('pins/new route', () => {
         updatedAt: new Date(),
       }
 
-      mockCreate.mockResolvedValue(mockPin)
+      mockCreatePinFromFormData.mockResolvedValue(mockPin)
 
       const formData = new FormData()
       formData.append('url', 'https://example.com')
@@ -186,13 +185,10 @@ describe('pins/new route', () => {
         typeof action
       >[0])
 
-      expect(mockCreate).toHaveBeenCalledWith({
-        userId: 'user-1',
+      expect(mockCreatePinFromFormData).toHaveBeenCalledWith('user-1', {
         url: 'https://example.com',
         title: 'Test Pin',
         description: 'Test description',
-        readLater: false,
-        tagNames: [],
       })
 
       expect(response).toEqual(
@@ -217,7 +213,7 @@ describe('pins/new route', () => {
         updatedAt: new Date(),
       }
 
-      mockCreate.mockResolvedValue(mockPin)
+      mockCreatePinFromFormData.mockResolvedValue(mockPin)
 
       const formData = new FormData()
       formData.append('url', 'https://example.com')
@@ -231,17 +227,22 @@ describe('pins/new route', () => {
       const params = { username: 'testuser' }
       await action({ request, params } as Parameters<typeof action>[0])
 
-      expect(mockCreate).toHaveBeenCalledWith({
-        userId: 'user-1',
+      expect(mockCreatePinFromFormData).toHaveBeenCalledWith('user-1', {
         url: 'https://example.com',
         title: 'Test Pin',
-        description: '',
-        readLater: false,
-        tagNames: [],
       })
     })
 
     it('returns validation errors when core validation fails', async () => {
+      const { ValidationError } = await import('@pinsquirrel/domain')
+
+      mockCreatePinFromFormData.mockRejectedValue(
+        new ValidationError({
+          url: ['Invalid URL format'],
+          title: ['Title is required'],
+        })
+      )
+
       const formData = new FormData()
       formData.append('url', 'invalid-url')
       formData.append('title', '')
@@ -256,14 +257,14 @@ describe('pins/new route', () => {
         typeof action
       >[0])
 
-      // Should return validation errors (actual validation is tested in core)
+      // Should return validation errors from service
       expect(result).toHaveProperty('data.errors')
       expect(result).toHaveProperty('init.status', 400)
-      expect(mockCreate).not.toHaveBeenCalled()
+      expect(mockCreatePinFromFormData).toHaveBeenCalled()
     })
 
-    it('handles repository errors gracefully', async () => {
-      mockCreate.mockRejectedValue(new Error('Database error'))
+    it('handles service errors gracefully', async () => {
+      mockCreatePinFromFormData.mockRejectedValue(new Error('Database error'))
 
       const formData = new FormData()
       formData.append('url', 'https://example.com')
@@ -286,7 +287,7 @@ describe('pins/new route', () => {
           },
         },
         init: {
-          status: 400,
+          status: 500,
         },
       })
     })

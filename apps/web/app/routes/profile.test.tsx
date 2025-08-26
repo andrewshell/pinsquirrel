@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-import type { User } from '@pinsquirrel/core'
+import type { User } from '@pinsquirrel/domain'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Route } from './+types/profile'
 

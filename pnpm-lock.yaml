@@ -18,15 +18,21 @@ importers:
 
   apps/web:
     dependencies:
-      '@pinsquirrel/core':
+      '@pinsquirrel/adapters':
         specifier: workspace:*
-        version: link:../../libs/core
+        version: link:../../libs/adapters
       '@pinsquirrel/database':
         specifier: workspace:*
         version: link:../../libs/database
+      '@pinsquirrel/domain':
+        specifier: workspace:*
+        version: link:../../libs/domain
       '@pinsquirrel/mailgun':
         specifier: workspace:*
         version: link:../../libs/mailgun
+      '@pinsquirrel/services':
+        specifier: workspace:*
+        version: link:../../libs/services
       '@radix-ui/react-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.1.6(@types/react@19.1.8))(@types/react@19.1.8)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -149,14 +155,14 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@22.16.5)(@vitest/ui@3.2.4)(happy-dom@18.0.1)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)
 
-  libs/core:
+  libs/adapters:
     dependencies:
+      '@pinsquirrel/domain':
+        specifier: workspace:*
+        version: link:../domain
       cheerio:
         specifier: ^1.1.2
         version: 1.1.2
-      zod:
-        specifier: ^4.0.5
-        version: 4.0.5
     devDependencies:
       '@eslint/js':
         specifier: ^9.30.1
@@ -186,11 +192,45 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@22.16.5)(@vitest/ui@3.2.4)(happy-dom@18.0.1)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)
 
+  libs/core:
+    dependencies:
+      '@pinsquirrel/domain':
+        specifier: workspace:*
+        version: link:../domain
+      zod:
+        specifier: ^4.0.5
+        version: 4.0.5
+    devDependencies:
+      '@eslint/js':
+        specifier: ^9.30.1
+        version: 9.30.1
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.16.5
+      '@vitest/coverage-v8':
+        specifier: ^3.2.4
+        version: 3.2.4(vitest@3.2.4)
+      eslint:
+        specifier: ^9.30.1
+        version: 9.30.1(jiti@2.4.2)
+      prettier:
+        specifier: ^3.6.2
+        version: 3.6.2
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
+      typescript-eslint:
+        specifier: ^8.35.1
+        version: 8.35.1(eslint@9.30.1(jiti@2.4.2))(typescript@5.8.3)
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@22.16.5)(@vitest/ui@3.2.4)(happy-dom@18.0.1)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)
+
   libs/database:
     dependencies:
-      '@pinsquirrel/core':
+      '@pinsquirrel/domain':
         specifier: workspace:*
-        version: link:../core
+        version: link:../domain
       dotenv:
         specifier: ^17.2.1
         version: 17.2.1
@@ -241,14 +281,75 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@22.16.5)(@vitest/ui@3.2.4)(happy-dom@18.0.1)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)
 
+  libs/domain:
+    devDependencies:
+      '@eslint/js':
+        specifier: ^9.30.1
+        version: 9.30.1
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.16.5
+      '@vitest/coverage-v8':
+        specifier: ^3.2.4
+        version: 3.2.4(vitest@3.2.4)
+      eslint:
+        specifier: ^9.30.1
+        version: 9.30.1(jiti@2.4.2)
+      prettier:
+        specifier: ^3.6.2
+        version: 3.6.2
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
+      typescript-eslint:
+        specifier: ^8.35.1
+        version: 8.35.1(eslint@9.30.1(jiti@2.4.2))(typescript@5.8.3)
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@22.16.5)(@vitest/ui@3.2.4)(happy-dom@18.0.1)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)
+
   libs/mailgun:
     dependencies:
-      '@pinsquirrel/core':
+      '@pinsquirrel/domain':
         specifier: workspace:*
-        version: link:../core
+        version: link:../domain
       mailgun.js:
         specifier: ^12.0.3
         version: 12.0.3
+    devDependencies:
+      '@eslint/js':
+        specifier: ^9.30.1
+        version: 9.30.1
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.16.5
+      '@vitest/coverage-v8':
+        specifier: ^3.2.4
+        version: 3.2.4(vitest@3.2.4)
+      eslint:
+        specifier: ^9.30.1
+        version: 9.30.1(jiti@2.4.2)
+      prettier:
+        specifier: ^3.6.2
+        version: 3.6.2
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
+      typescript-eslint:
+        specifier: ^8.35.1
+        version: 8.35.1(eslint@9.30.1(jiti@2.4.2))(typescript@5.8.3)
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@22.16.5)(@vitest/ui@3.2.4)(happy-dom@18.0.1)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)
+
+  libs/services:
+    dependencies:
+      '@pinsquirrel/domain':
+        specifier: workspace:*
+        version: link:../domain
+      zod:
+        specifier: ^4.0.5
+        version: 4.0.5
     devDependencies:
       '@eslint/js':
         specifier: ^9.30.1

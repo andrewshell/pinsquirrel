@@ -6,7 +6,7 @@ import { FormText } from '~/components/ui/form-text'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import { TagMultiSelect } from '~/components/ui/tag-multi-select'
 import { TagSelect } from '~/components/ui/tag-select'
-import type { TagWithCount } from '@pinsquirrel/core'
+import type { TagWithCount } from '@pinsquirrel/domain'
 
 interface TagMergeFormProps {
   tags: TagWithCount[]

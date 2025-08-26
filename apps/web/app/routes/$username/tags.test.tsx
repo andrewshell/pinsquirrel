@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { BrowserRouter } from 'react-router'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { TagWithCount } from '@pinsquirrel/core'
+import type { TagWithCount } from '@pinsquirrel/domain'
 
 // Mock React Router hooks for integration testing
 let mockLoaderData: {
@@ -41,7 +41,7 @@ vi.mock('~/lib/session.server', () => ({
   requireUser: vi.fn().mockResolvedValue({
     id: 'user1',
     username: 'testuser',
-    hashedEmail: 'test@example.com',
+    emailHash: 'test@example.com',
     createdAt: new Date(),
     updatedAt: new Date(),
   }),

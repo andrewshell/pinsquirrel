@@ -1,4 +1,5 @@
-import type { EmailService } from '@pinsquirrel/core'
+import type { EmailService } from '@pinsquirrel/domain'
+import { EmailSendError } from '@pinsquirrel/domain'
 import Mailgun from 'mailgun.js'
 import { createPasswordResetEmailTemplate } from './templates.js'
 import type { MailgunConfig } from './types.js'
@@ -24,7 +25,6 @@ export class MailgunEmailService implements EmailService {
     resetUrl: string
   ): Promise<void> {
     if (!email || !token || !resetUrl) {
-      const { EmailSendError } = await import('@pinsquirrel/core')
       throw new EmailSendError(
         'Invalid email parameters: email, token, and resetUrl are required'
       )
@@ -49,8 +49,6 @@ export class MailgunEmailService implements EmailService {
 
       await this.mailgun.messages.create(this.config.domain, messageData)
     } catch (error) {
-      const { EmailSendError } = await import('@pinsquirrel/core')
-
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred'
 

@@ -1,4 +1,4 @@
-import type { FieldErrors } from '@pinsquirrel/core'
+import type { FieldErrors } from '~/lib/validation-errors'
 import { useFetcher, Link } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
@@ -6,11 +6,14 @@ import { Checkbox } from '~/components/ui/checkbox'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 
+type ActionData = { errors: FieldErrors } | null
+
 export function LoginForm() {
-  const fetcher = useFetcher<{ errors?: FieldErrors }>()
+  const fetcher = useFetcher<ActionData>()
 
   // Get validation errors and loading state from fetcher
   const actionData = fetcher.data
+  const errors = actionData?.errors
   const isSubmitting = fetcher.state === 'submitting'
 
   // Note: Successful login will redirect automatically via createUserSession
@@ -22,9 +25,11 @@ export function LoginForm() {
       </CardHeader>
       <CardContent>
         <fetcher.Form method="post" className="space-y-4" noValidate>
-          {actionData?.errors?._form && (
+          {errors?._form && (
             <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
-              {actionData.errors._form}
+              {Array.isArray(errors._form)
+                ? errors._form.join('. ')
+                : errors._form}
             </div>
           )}
 
@@ -35,11 +40,13 @@ export function LoginForm() {
               name="username"
               type="text"
               required
-              {...(actionData?.errors?.username && { 'aria-invalid': true })}
+              {...(errors?.username && { 'aria-invalid': true })}
             />
-            {actionData?.errors?.username && (
+            {errors?.username && (
               <p className="mt-1 text-sm text-destructive font-medium">
-                {actionData.errors.username}
+                {Array.isArray(errors.username)
+                  ? errors.username.join('. ')
+                  : errors.username}
               </p>
             )}
           </div>
@@ -59,11 +66,13 @@ export function LoginForm() {
               name="password"
               type="password"
               required
-              {...(actionData?.errors?.password && { 'aria-invalid': true })}
+              {...(errors?.password && { 'aria-invalid': true })}
             />
-            {actionData?.errors?.password && (
+            {errors?.password && (
               <p className="mt-1 text-sm text-destructive font-medium">
-                {actionData.errors.password}
+                {Array.isArray(errors.password)
+                  ? errors.password.join('. ')
+                  : errors.password}
               </p>
             )}
           </div>

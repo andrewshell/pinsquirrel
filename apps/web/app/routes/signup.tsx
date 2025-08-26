@@ -1,6 +1,6 @@
 import { Link, redirect, data } from 'react-router'
 import type { Route } from './+types/signup'
-import { validateRegistration } from '@pinsquirrel/core'
+import { ValidationError, UserAlreadyExistsError } from '@pinsquirrel/domain'
 import { authService } from '~/lib/services/container.server'
 import { createUserSession, getUserId } from '~/lib/session.server'
 import { getUserPath } from '~/lib/auth.server'
@@ -32,43 +32,44 @@ export async function action({ request }: Route.ActionArgs) {
   logger.request(request, { action: 'register' })
 
   const formData = await parseFormData(request)
-  const result = validateRegistration(formData)
-
-  if (!result.success) {
-    logger.debug('Registration validation failed', { errors: result.errors })
-    return data({ errors: result.errors }, { status: 400 })
-  }
 
   try {
-    const user = await authService.register(
-      result.data.username,
-      result.data.password,
-      result.data.email || undefined
-    )
+    const user = await authService.registerFromFormData(formData)
 
     logger.info('User registration successful', {
       userId: user.id,
       username: user.username,
-      hasEmail: !!result.data.email,
     })
 
     // Create session and redirect to user's pins
     const redirectTo = getUserPath(user.username)
     return await createUserSession(user.id, redirectTo)
   } catch (error) {
-    logger.exception(error, 'Registration failed', {
-      username: result.data.username,
-      hasEmail: !!result.data.email,
-    })
-    const message =
-      error instanceof Error ? error.message : 'Registration failed'
+    if (error instanceof ValidationError) {
+      logger.debug('Registration validation failed', { errors: error.fields })
+      return data({ errors: error.fields }, { status: 400 })
+    }
+
+    if (error instanceof UserAlreadyExistsError) {
+      logger.debug('Registration failed - user already exists')
+      return data(
+        {
+          errors: {
+            username: ['This username is already taken'],
+          },
+        },
+        { status: 400 }
+      )
+    }
+
+    logger.exception(error, 'Registration failed')
     return data(
       {
         errors: {
-          _form: message,
+          _form: 'An unexpected error occurred. Please try again.',
         },
       },
-      { status: 400 }
+      { status: 500 }
     )
   }
 }

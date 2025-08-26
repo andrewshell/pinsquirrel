@@ -1,4 +1,4 @@
-import type { User } from '@pinsquirrel/core'
+import type { User } from '@pinsquirrel/domain'
 import { CircleUserRound, Menu, Plus, X } from 'lucide-react'
 import { useState } from 'react'
 import {

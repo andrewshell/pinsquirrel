@@ -19,7 +19,7 @@
     "test:coverage": "vitest --run --coverage"
   },
   "dependencies": {
-    "@pinsquirrel/core": "workspace:*",
+    "@pinsquirrel/domain": "workspace:*",
     "mailgun.js": "^12.0.3"
   },
   "devDependencies": {

@@ -3,7 +3,6 @@ import { useState, useRef, useId, useMemo } from 'react'
 import * as Popover from '@radix-ui/react-popover'
 import { X } from 'lucide-react'
 import { cn } from '~/lib/utils'
-import { tagNameSchema } from '@pinsquirrel/core'
 
 export interface TagInputProps {
   tags: string[]
@@ -59,9 +58,15 @@ export function TagInput({
   }, [filteredSuggestions.length, inputValue])
 
   const validateTag = (tagName: string) => {
-    const result = tagNameSchema.safeParse(tagName)
-    if (!result.success) {
-      return result.error.issues?.[0]?.message || 'Invalid tag name'
+    // Basic tag validation: 1-50 characters, alphanumeric, hyphens, underscores
+    if (!tagName || tagName.length === 0) {
+      return 'Tag cannot be empty'
+    }
+    if (tagName.length > 50) {
+      return 'Tag must be 50 characters or less'
+    }
+    if (!/^[a-z0-9][a-z0-9-_]*[a-z0-9]$|^[a-z0-9]$/.test(tagName)) {
+      return 'Tag must contain only lowercase letters, numbers, hyphens, and underscores'
     }
     return null
   }

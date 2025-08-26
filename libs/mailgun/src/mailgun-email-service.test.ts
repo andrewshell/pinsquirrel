@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, Mock } from 'vitest'
 import { MailgunEmailService } from './mailgun-email-service.js'
 import type { MailgunConfig } from './types.js'
-import { EmailSendError } from '@pinsquirrel/core'
+import { EmailSendError } from '@pinsquirrel/domain'
 
 // Mock mailgun.js
 vi.mock('mailgun.js', () => ({

@@ -7,7 +7,6 @@ import {
   extractFilterParams,
 } from '~/lib/auth.server'
 import { pinService } from '~/lib/services/container.server'
-import { validateIdParam } from '@pinsquirrel/core'
 import { parseParams } from '~/lib/http-utils'
 import { logger } from '~/lib/logger.server'
 import {
@@ -42,16 +41,16 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   // Validate pin ID from params
   const paramData = parseParams(params)
-  const pinIdResult = validateIdParam(paramData.id)
+  const pinId = paramData.id
 
-  if (!pinIdResult.success) {
+  if (!pinId || typeof pinId !== 'string') {
     // eslint-disable-next-line @typescript-eslint/only-throw-error
     throw new Response('Invalid pin ID', { status: 404 })
   }
 
   // Fetch the pin to confirm ownership and get details for deletion
   try {
-    const pin = await pinService.getPin(user.id, pinIdResult.data)
+    const pin = await pinService.getPin(user.id, pinId)
 
     return data({
       pin,
@@ -59,7 +58,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     })
   } catch (error) {
     logger.exception(error, 'Failed to load pin for deletion', {
-      pinId: pinIdResult.data,
+      pinId: pinId,
       userId: user.id,
     })
 
@@ -76,9 +75,9 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   // Validate pin ID from params
   const paramData = parseParams(params)
-  const pinIdResult = validateIdParam(paramData.id)
+  const pinId = paramData.id
 
-  if (!pinIdResult.success) {
+  if (!pinId || typeof pinId !== 'string') {
     // eslint-disable-next-line @typescript-eslint/only-throw-error
     throw new Response('Invalid pin ID', { status: 404 })
   }
@@ -91,10 +90,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   try {
     // Delete the pin using the service
-    await pinService.deletePin(user.id, pinIdResult.data)
+    await pinService.deletePin(user.id, pinId)
 
     logger.info('Pin deleted successfully', {
-      pinId: pinIdResult.data,
+      pinId: pinId,
       userId: user.id,
     })
 
@@ -109,7 +108,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     )
   } catch (error) {
     logger.exception(error, 'Failed to delete pin', {
-      pinId: pinIdResult.data,
+      pinId: pinId,
       userId: user.id,
     })
 

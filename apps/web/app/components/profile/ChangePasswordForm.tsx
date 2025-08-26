@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { FormText } from '~/components/ui/form-text'
-import type { FieldErrors } from '@pinsquirrel/core'
+import type { FieldErrors } from '~/lib/validation-errors'
 
 interface ChangePasswordFormProps {
   // Username is needed for the hidden field for password managers

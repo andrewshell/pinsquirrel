@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigation } from 'react-router'
-import type { Pin } from '@pinsquirrel/core'
+import type { Pin } from '@pinsquirrel/domain'
 import { PinList } from './PinList'
 import { FilterHeader, type ReadFilterType } from './FilterHeader'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'

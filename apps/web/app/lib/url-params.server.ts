@@ -1,4 +1,4 @@
-import { isValidUrl } from '@pinsquirrel/core'
+import { urlValidationService } from '~/lib/services/container.server'
 
 export interface UrlParams {
   url?: string
@@ -56,7 +56,7 @@ function sanitizeUrl(url: string | null): string {
     .replace(/&#39;/g, "'")
 
   // Validate URL format
-  if (!isValidUrl(decoded)) {
+  if (!urlValidationService.isValidUrl(decoded)) {
     return ''
   }
 

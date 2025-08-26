@@ -1,10 +1,11 @@
 import {
   PinService,
   HttpMetadataService,
-  CheerioHtmlParser,
-  NodeHttpFetcher,
-} from '@pinsquirrel/core'
-import { AuthenticationService } from '@pinsquirrel/core/server'
+  AuthenticationService,
+  PaginationService,
+  UrlValidationService,
+} from '@pinsquirrel/services'
+import { CheerioHtmlParser, NodeHttpFetcher } from '@pinsquirrel/adapters'
 import {
   DrizzlePinRepository,
   DrizzleTagRepository,
@@ -13,7 +14,7 @@ import {
   db,
 } from '@pinsquirrel/database'
 import { MailgunEmailService } from '@pinsquirrel/mailgun'
-import type { EmailService } from '@pinsquirrel/core'
+import type { EmailService } from '@pinsquirrel/domain'
 
 // Create repository instances
 const userRepository = new DrizzleUserRepository(db)
@@ -44,6 +45,8 @@ export const authService = new AuthenticationService(
 )
 export const pinService = new PinService(pinRepository, tagRepository)
 export const metadataService = new HttpMetadataService(httpFetcher, htmlParser)
+export const paginationService = new PaginationService()
+export const urlValidationService = new UrlValidationService()
 
 // Export repositories for cases where direct access is still needed
 // TODO: These should be removed as we migrate all logic to services
@@ -51,4 +54,12 @@ export const repositories = {
   user: userRepository,
   pin: pinRepository,
   tag: tagRepository,
+}
+
+// Export static utilities for error handling
+export const metadataErrorUtils = {
+  getHttpStatusForError: (error: Error) =>
+    HttpMetadataService.getHttpStatusForError(error),
+  getUserFriendlyMessage: (error: Error) =>
+    HttpMetadataService.getUserFriendlyMessage(error),
 }

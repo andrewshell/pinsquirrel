@@ -6,7 +6,7 @@ import type {
   CreateTagData,
   UpdateTagData,
   TagWithCount,
-} from '@pinsquirrel/core'
+} from '@pinsquirrel/domain'
 import { tags, pinsTags, pins } from '../schema/index.js'
 
 export class DrizzleTagRepository implements TagRepository {

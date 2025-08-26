@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { PinCard } from './PinCard'
-import type { Pin } from '@pinsquirrel/core'
+import type { Pin } from '@pinsquirrel/domain'
 
 // Helper function to render with router context
 const renderWithRouter = (component: React.ReactNode, initialPath = '/') => {

@@ -1,4 +1,4 @@
-import type { TagWithCount } from '@pinsquirrel/core'
+import type { TagWithCount } from '@pinsquirrel/domain'
 import { Link } from 'react-router'
 
 interface TagCloudProps {

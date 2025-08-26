@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import type { Pin } from '@pinsquirrel/core'
+import type { Pin } from '@pinsquirrel/domain'
 import { PinList } from '~/components/pins/PinList'
 
 // Mock the pin service for delete operations

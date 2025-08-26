@@ -2,7 +2,7 @@ import type {
   CreatePasswordResetTokenData,
   PasswordResetToken,
   PasswordResetRepository,
-} from '@pinsquirrel/core'
+} from '@pinsquirrel/domain'
 import { eq, and, gt, lt } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { passwordResetTokens } from '../schema/password-reset-tokens'

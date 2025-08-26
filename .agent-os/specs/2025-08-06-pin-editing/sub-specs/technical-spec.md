@@ -9,7 +9,7 @@ This is the technical specification for the spec detailed in @.agent-os/specs/20
 
 - **React Router 7 Edit Route**: Create `/pins/:id/edit` route with loader and action functions
 - **Form Pre-population**: Load existing pin data in route loader and populate form fields
-- **Validation Integration**: Use existing `updatePinDataSchema` from `@pinsquirrel/core` for validation
+- **Validation Integration**: Use existing `updatePinDataSchema` from `@pinsquirrel/services` for validation
 - **Error Handling**: Implement proper error boundaries and user feedback for validation and network errors
 - **Accessibility**: Form must be keyboard navigable with proper ARIA labels and error associations
 - **Optimistic Updates**: Provide immediate user feedback during form submission
@@ -35,7 +35,7 @@ This is the technical specification for the spec detailed in @.agent-os/specs/20
 ## External Dependencies
 
 No new external dependencies are required. The implementation will use:
-- **Existing validation schemas** from `@pinsquirrel/core`
+- **Existing validation schemas** from `@pinsquirrel/services`
 - **Existing PinService updatePin method** already implemented
 - **React Hook Form** already in use for form handling
 - **shadcn/ui components** already integrated

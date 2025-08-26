@@ -9,7 +9,7 @@ import {
 } from 'react-router'
 
 import type { Route } from './+types/root'
-import type { User } from '@pinsquirrel/core'
+import type { User } from '@pinsquirrel/domain'
 import { getUser, extendSessionIfNeeded } from '~/lib/session.server'
 import { Header } from '~/components/Header'
 import { Footer } from '~/components/Footer'

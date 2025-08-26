@@ -5,7 +5,7 @@ import { getUserId } from '~/lib/session.server'
 import { ForgotPasswordForm } from '~/components/auth/ForgotPasswordForm'
 import { parseFormData } from '~/lib/http-utils'
 import { logger } from '~/lib/logger.server'
-import { emailSchema } from '@pinsquirrel/core'
+import { ValidationError } from '@pinsquirrel/domain'
 
 export function meta(_: Route.MetaArgs) {
   return [
@@ -32,26 +32,12 @@ export async function action({ request }: Route.ActionArgs) {
   const formData = await parseFormData(request)
   const email = formData.email as string
 
-  // Validate email
-  const emailResult = emailSchema.safeParse(email)
-  if (!emailResult.success) {
-    logger.debug('Invalid email format', { email })
-    return data(
-      {
-        errors: {
-          email: emailResult.error.issues[0]?.message || 'Invalid email',
-        },
-      },
-      { status: 400 }
-    )
-  }
-
   try {
     // Get the host for the reset URL
     const url = new URL(request.url)
     const resetBaseUrl = `${url.protocol}//${url.host}/reset-password`
 
-    // Request password reset
+    // Request password reset - service handles validation
     const token = await authService.requestPasswordReset(email, resetBaseUrl)
 
     if (token) {
@@ -63,6 +49,11 @@ export async function action({ request }: Route.ActionArgs) {
     // Always show success message to avoid revealing whether email exists
     return data({ success: true })
   } catch (error) {
+    if (error instanceof ValidationError) {
+      logger.debug('Password reset validation failed', { errors: error.fields })
+      return data({ errors: error.fields }, { status: 400 })
+    }
+
     logger.exception(error, 'Password reset request failed', { email })
 
     // Check for rate limiting error

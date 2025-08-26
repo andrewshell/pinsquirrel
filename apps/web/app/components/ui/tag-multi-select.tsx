@@ -3,7 +3,7 @@ import { useState, useRef, useId, useMemo } from 'react'
 import * as Popover from '@radix-ui/react-popover'
 import { Check, ChevronDown, X } from 'lucide-react'
 import { cn } from '~/lib/utils'
-import type { TagWithCount } from '@pinsquirrel/core'
+import type { TagWithCount } from '@pinsquirrel/domain'
 
 export interface TagMultiSelectProps {
   tags: TagWithCount[]

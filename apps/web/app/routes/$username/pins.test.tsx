@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { createRoutesStub } from 'react-router'
-import type { Pin } from '@pinsquirrel/core'
+import type { Pin } from '@pinsquirrel/domain'
 import PinsPage from './pins'
 
 // We need to mock the React Router hooks for this integration test

@@ -133,7 +133,7 @@ describe('PinCreationForm', () => {
     expect(mockOnMetadataFetch).toHaveBeenCalledWith('https://example.com')
   })
 
-  it('does not call onMetadataFetch with invalid URL', async () => {
+  it('calls onMetadataFetch even with invalid URL (server validates)', async () => {
     const user = userEvent.setup()
     const Stub = createPinCreationFormStub({
       onMetadataFetch: mockOnMetadataFetch,
@@ -145,7 +145,8 @@ describe('PinCreationForm', () => {
     await user.type(urlInput, 'not-a-url')
     await user.tab()
 
-    expect(mockOnMetadataFetch).not.toHaveBeenCalled()
+    // Now calls onMetadataFetch even with invalid URLs - server handles validation
+    expect(mockOnMetadataFetch).toHaveBeenCalledWith('not-a-url')
   })
 
   it('does not call onMetadataFetch in edit mode', async () => {

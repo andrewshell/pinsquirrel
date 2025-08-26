@@ -18,7 +18,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router'
-import { validatePinDataUpdate, validateIdParam } from '@pinsquirrel/core'
+import {
+  ValidationError,
+  DuplicatePinError,
+  PinNotFoundError,
+  UnauthorizedPinAccessError,
+} from '@pinsquirrel/domain'
 import { parseFormData, parseParams } from '~/lib/http-utils'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
 import { logger } from '~/lib/logger.server'
@@ -50,11 +55,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const user = await requireUser(request)
   requireUsernameMatch(user, params.username)
 
-  // Validate pin ID from params
+  // Simple ID validation - just check it exists
   const paramData = parseParams(params)
-  const pinIdResult = validateIdParam(paramData.id)
+  const pinId = paramData.id
 
-  if (!pinIdResult.success) {
+  if (!pinId || typeof pinId !== 'string') {
     // eslint-disable-next-line @typescript-eslint/only-throw-error
     throw new Response('Invalid pin ID', { status: 404 })
   }
@@ -65,7 +70,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   // Fetch the pin using the service and user's existing tags for autocomplete
   try {
     const [pin, userTags] = await Promise.all([
-      pinService.getPin(user.id, pinIdResult.data),
+      pinService.getPin(user.id, pinId),
       repositories.tag.findByUserId(user.id),
     ])
 
@@ -76,7 +81,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     })
   } catch (error) {
     logger.exception(error, 'Failed to load pin for editing', {
-      pinId: pinIdResult.data,
+      pinId: pinId,
       userId: user.id,
     })
 
@@ -91,11 +96,11 @@ export async function action({ request, params }: Route.ActionArgs) {
   const user = await requireUser(request)
   requireUsernameMatch(user, params.username)
 
-  // Validate pin ID from params
+  // Simple ID validation - just check it exists
   const paramData = parseParams(params)
-  const pinIdResult = validateIdParam(paramData.id)
+  const pinId = paramData.id
 
-  if (!pinIdResult.success) {
+  if (!pinId || typeof pinId !== 'string') {
     // eslint-disable-next-line @typescript-eslint/only-throw-error
     throw new Response('Invalid pin ID', { status: 404 })
   }
@@ -111,12 +116,12 @@ export async function action({ request, params }: Route.ActionArgs) {
         const readLater =
           formData.readLater === 'false' ? false : Boolean(formData.readLater)
 
-        await pinService.updatePin(user.id, pinIdResult.data, {
+        await pinService.updatePin(user.id, pinId, {
           readLater,
         })
 
         logger.info('Pin readLater status updated', {
-          pinId: pinIdResult.data,
+          pinId: pinId,
           userId: user.id,
           readLater,
         })
@@ -131,7 +136,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       )
     } catch (error) {
       logger.exception(error, 'Failed to update pin readLater status', {
-        pinId: pinIdResult.data,
+        pinId: pinId,
         userId: user.id,
       })
 
@@ -150,10 +155,10 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (request.method === 'DELETE') {
     try {
       // Delete the pin using the service
-      await pinService.deletePin(user.id, pinIdResult.data)
+      await pinService.deletePin(user.id, pinId)
 
       logger.info('Pin deleted successfully', {
-        pinId: pinIdResult.data,
+        pinId: pinId,
         userId: user.id,
       })
 
@@ -168,7 +173,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       )
     } catch (error) {
       logger.exception(error, 'Failed to delete pin', {
-        pinId: pinIdResult.data,
+        pinId: pinId,
         userId: user.id,
       })
 
@@ -196,27 +201,14 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   // Parse and validate form data
   const formData = await parseFormData(request)
-  const result = validatePinDataUpdate(formData)
-
-  if (!result.success) {
-    logger.debug('Pin edit validation failed', { errors: result.errors })
-    return data({ errors: result.errors }, { status: 400 })
-  }
 
   try {
-    // Update the pin using the service
-    await pinService.updatePin(user.id, pinIdResult.data, {
-      url: result.data.url,
-      title: result.data.title,
-      description: result.data.description,
-      readLater: result.data.readLater || false,
-      tagNames: result.data.tagNames || [],
-    })
+    // Update the pin using service with form data validation
+    await pinService.updatePinFromFormData(user.id, pinId, formData)
 
     logger.info('Pin updated successfully', {
-      pinId: pinIdResult.data,
+      pinId: pinId,
       userId: user.id,
-      url: result.data.url,
     })
 
     // Redirect to user's pins list with success message, preserving filter params
@@ -229,10 +221,36 @@ export async function action({ request, params }: Route.ActionArgs) {
       redirectTo
     )
   } catch (error) {
+    if (error instanceof ValidationError) {
+      logger.debug('Pin edit validation failed', { errors: error.fields })
+      return data({ errors: error.fields }, { status: 400 })
+    }
+
+    if (error instanceof DuplicatePinError) {
+      logger.debug('Pin edit failed - duplicate URL')
+      return data(
+        {
+          errors: {
+            url: ['You have already saved this URL'],
+          },
+        },
+        { status: 400 }
+      )
+    }
+
+    if (error instanceof PinNotFoundError) {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
+      throw new Response('Pin not found', { status: 404 })
+    }
+
+    if (error instanceof UnauthorizedPinAccessError) {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
+      throw new Response('Unauthorized', { status: 403 })
+    }
+
     logger.exception(error, 'Failed to update pin', {
-      pinId: pinIdResult.data,
+      pinId: pinId,
       userId: user.id,
-      url: result.data.url,
     })
 
     return data(
@@ -241,7 +259,7 @@ export async function action({ request, params }: Route.ActionArgs) {
           _form: 'Failed to update pin. Please try again.',
         },
       },
-      { status: 400 }
+      { status: 500 }
     )
   }
 }
@@ -298,7 +316,10 @@ export default function PinEditPage() {
             tagSuggestions={userTags}
             urlParams={urlParams}
             errorMessage={
-              actionData && 'errors' in actionData && actionData.errors?._form
+              actionData &&
+              'errors' in actionData &&
+              actionData.errors &&
+              '_form' in actionData.errors
                 ? Array.isArray(actionData.errors._form)
                   ? actionData.errors._form.join(', ')
                   : actionData.errors._form

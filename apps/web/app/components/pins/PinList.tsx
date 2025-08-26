@@ -1,4 +1,4 @@
-import type { Pin } from '@pinsquirrel/core'
+import type { Pin } from '@pinsquirrel/domain'
 import { PinCard } from './PinCard'
 import { EmptyState } from './EmptyState'
 

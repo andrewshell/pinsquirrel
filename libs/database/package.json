@@ -22,7 +22,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@pinsquirrel/core": "workspace:*",
+    "@pinsquirrel/domain": "workspace:*",
     "dotenv": "^17.2.1",
     "drizzle-kit": "^0.29.0",
     "drizzle-orm": "^0.37.0",

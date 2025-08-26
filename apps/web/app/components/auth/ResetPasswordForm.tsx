@@ -1,4 +1,4 @@
-import type { FieldErrors } from '@pinsquirrel/core'
+import type { FieldErrors } from '~/lib/validation-errors'
 import { useFetcher } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
@@ -9,14 +9,15 @@ interface ResetPasswordFormProps {
   token?: string
 }
 
+type ActionData = { errors: FieldErrors } | { invalidToken: true } | null
+
 export function ResetPasswordForm({ token: _token }: ResetPasswordFormProps) {
-  const fetcher = useFetcher<{
-    errors?: FieldErrors
-    invalidToken?: boolean
-  }>()
+  const fetcher = useFetcher<ActionData>()
 
   // Get validation errors and loading state from fetcher
   const actionData = fetcher.data
+  const errors =
+    actionData && 'errors' in actionData ? actionData.errors : undefined
   const isSubmitting = fetcher.state === 'submitting'
 
   return (
@@ -26,9 +27,11 @@ export function ResetPasswordForm({ token: _token }: ResetPasswordFormProps) {
       </CardHeader>
       <CardContent>
         <fetcher.Form method="post" className="space-y-4" noValidate>
-          {actionData?.errors?._form && (
+          {errors?._form && (
             <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
-              {actionData.errors._form}
+              {Array.isArray(errors._form)
+                ? errors._form.join('. ')
+                : errors._form}
             </div>
           )}
 
@@ -40,11 +43,13 @@ export function ResetPasswordForm({ token: _token }: ResetPasswordFormProps) {
               type="password"
               required
               placeholder="Enter your new password"
-              {...(actionData?.errors?.newPassword && { 'aria-invalid': true })}
+              {...(errors?.newPassword && { 'aria-invalid': true })}
             />
-            {actionData?.errors?.newPassword && (
+            {errors?.newPassword && (
               <p className="mt-1 text-sm text-destructive font-medium">
-                {actionData.errors.newPassword}
+                {Array.isArray(errors.newPassword)
+                  ? errors.newPassword.join('. ')
+                  : errors.newPassword}
               </p>
             )}
           </div>
@@ -57,13 +62,15 @@ export function ResetPasswordForm({ token: _token }: ResetPasswordFormProps) {
               type="password"
               required
               placeholder="Confirm your new password"
-              {...(actionData?.errors?.confirmPassword && {
+              {...(errors?.confirmPassword && {
                 'aria-invalid': true,
               })}
             />
-            {actionData?.errors?.confirmPassword && (
+            {errors?.confirmPassword && (
               <p className="mt-1 text-sm text-destructive font-medium">
-                {actionData.errors.confirmPassword}
+                {Array.isArray(errors.confirmPassword)
+                  ? errors.confirmPassword.join('. ')
+                  : errors.confirmPassword}
               </p>
             )}
           </div>

@@ -1,6 +1,6 @@
 import { Link, redirect, data } from 'react-router'
 import type { Route } from './+types/signin'
-import { validateLogin } from '@pinsquirrel/core'
+import { ValidationError, InvalidCredentialsError } from '@pinsquirrel/domain'
 import { authService } from '~/lib/services/container.server'
 import { createUserSession, getUserId } from '~/lib/session.server'
 import { getUserPath } from '~/lib/auth.server'
@@ -38,18 +38,9 @@ export async function action({ request }: Route.ActionArgs) {
   logger.request(request, { action: 'login' })
 
   const formData = await parseFormData(request)
-  const result = validateLogin(formData)
-
-  if (!result.success) {
-    logger.debug('Login validation failed', { errors: result.errors })
-    return data({ errors: result.errors }, { status: 400 })
-  }
 
   try {
-    const user = await authService.login(
-      result.data.username,
-      result.data.password
-    )
+    const user = await authService.loginFromFormData(formData)
 
     logger.info('User login successful', {
       userId: user.id,
@@ -61,20 +52,34 @@ export async function action({ request }: Route.ActionArgs) {
     return await createUserSession(
       user.id,
       redirectTo,
-      result.data.keepSignedIn
+      false // keepSignedIn functionality removed since not in form data
     )
   } catch (error) {
-    logger.exception(error, 'Login failed', {
-      username: result.data.username,
-    })
-    const message = error instanceof Error ? error.message : 'Login failed'
+    if (error instanceof ValidationError) {
+      logger.debug('Login validation failed', { errors: error.fields })
+      return data({ errors: error.fields }, { status: 400 })
+    }
+
+    if (error instanceof InvalidCredentialsError) {
+      logger.debug('Login failed - invalid credentials')
+      return data(
+        {
+          errors: {
+            _form: 'Invalid username or password',
+          },
+        },
+        { status: 400 }
+      )
+    }
+
+    logger.exception(error, 'Login failed')
     return data(
       {
         errors: {
-          _form: message,
+          _form: 'An unexpected error occurred. Please try again.',
         },
       },
-      { status: 400 }
+      { status: 500 }
     )
   }
 }

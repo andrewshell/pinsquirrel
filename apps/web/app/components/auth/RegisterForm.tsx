@@ -1,15 +1,18 @@
-import type { FieldErrors } from '@pinsquirrel/core'
+import type { FieldErrors } from '~/lib/validation-errors'
 import { useFetcher } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 
+type ActionData = { errors: FieldErrors } | null
+
 export function RegisterForm() {
-  const fetcher = useFetcher<{ errors?: FieldErrors }>()
+  const fetcher = useFetcher<ActionData>()
 
   // Get validation errors and loading state from fetcher
   const actionData = fetcher.data
+  const errors = actionData?.errors
   const isSubmitting = fetcher.state === 'submitting'
 
   // Note: Successful registration will redirect automatically via createUserSession
@@ -21,9 +24,11 @@ export function RegisterForm() {
       </CardHeader>
       <CardContent>
         <fetcher.Form method="post" className="space-y-4" noValidate>
-          {actionData?.errors?._form && (
+          {errors?._form && (
             <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
-              {actionData.errors._form}
+              {Array.isArray(errors._form)
+                ? errors._form.join('. ')
+                : errors._form}
             </div>
           )}
 
@@ -34,11 +39,13 @@ export function RegisterForm() {
               name="username"
               type="text"
               required
-              {...(actionData?.errors?.username && { 'aria-invalid': true })}
+              {...(errors?.username && { 'aria-invalid': true })}
             />
-            {actionData?.errors?.username && (
+            {errors?.username && (
               <p className="mt-1 text-sm text-destructive font-medium">
-                {actionData.errors.username}
+                {Array.isArray(errors.username)
+                  ? errors.username.join('. ')
+                  : errors.username}
               </p>
             )}
           </div>
@@ -50,11 +57,13 @@ export function RegisterForm() {
               name="password"
               type="password"
               required
-              {...(actionData?.errors?.password && { 'aria-invalid': true })}
+              {...(errors?.password && { 'aria-invalid': true })}
             />
-            {actionData?.errors?.password && (
+            {errors?.password && (
               <p className="mt-1 text-sm text-destructive font-medium">
-                {actionData.errors.password}
+                {Array.isArray(errors.password)
+                  ? errors.password.join('. ')
+                  : errors.password}
               </p>
             )}
           </div>
@@ -65,11 +74,13 @@ export function RegisterForm() {
               id="email"
               name="email"
               type="email"
-              {...(actionData?.errors?.email && { 'aria-invalid': true })}
+              {...(errors?.email && { 'aria-invalid': true })}
             />
-            {actionData?.errors?.email && (
+            {errors?.email && (
               <p className="mt-1 text-sm text-destructive font-medium">
-                {actionData.errors.email}
+                {Array.isArray(errors.email)
+                  ? errors.email.join('. ')
+                  : errors.email}
               </p>
             )}
           </div>

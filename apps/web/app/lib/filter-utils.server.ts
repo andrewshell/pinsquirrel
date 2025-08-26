@@ -1,4 +1,4 @@
-import type { PinFilter } from '@pinsquirrel/core'
+import type { PinFilter } from '@pinsquirrel/domain'
 
 export interface ParsedFilters {
   filter: PinFilter

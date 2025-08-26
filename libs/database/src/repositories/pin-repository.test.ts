@@ -5,7 +5,7 @@ import { DrizzlePinRepository } from './pin-repository.js'
 import { DrizzleTagRepository } from './tag-repository.js'
 import { DrizzleUserRepository } from './user-repository.js'
 import { db } from '../client.js'
-import type { User } from '@pinsquirrel/core'
+import type { User } from '@pinsquirrel/domain'
 
 describe('DrizzlePinRepository - Integration Tests', () => {
   let testDb: typeof db

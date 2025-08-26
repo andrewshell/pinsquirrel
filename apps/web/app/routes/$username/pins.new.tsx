@@ -6,13 +6,13 @@ import {
   getUserPath,
   extractFilterParams,
 } from '~/lib/auth.server'
-import { repositories } from '~/lib/services/container.server'
+import { repositories, pinService } from '~/lib/services/container.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router'
-import { validateNewPinData } from '@pinsquirrel/core'
+import { ValidationError, DuplicatePinError } from '@pinsquirrel/domain'
 import { parseFormData } from '~/lib/http-utils'
 import { useMetadataFetch } from '~/lib/useMetadataFetch'
 import { logger } from '~/lib/logger.server'
@@ -56,23 +56,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   // Parse and validate form data
   const formData = await parseFormData(request)
-  const result = validateNewPinData(formData)
-
-  if (!result.success) {
-    logger.debug('Pin creation validation failed', { errors: result.errors })
-    return data({ errors: result.errors }, { status: 400 })
-  }
 
   try {
-    // Create the pin
-    const pin = await repositories.pin.create({
-      userId: user.id,
-      url: result.data.url,
-      title: result.data.title,
-      description: result.data.description || '',
-      readLater: result.data.readLater || false,
-      tagNames: result.data.tagNames || [],
-    })
+    // Create the pin using service
+    const pin = await pinService.createPinFromFormData(user.id, formData)
 
     logger.info('Pin created successfully', {
       pinId: pin.id,
@@ -90,9 +77,25 @@ export async function action({ request, params }: Route.ActionArgs) {
       redirectTo
     )
   } catch (error) {
+    if (error instanceof ValidationError) {
+      logger.debug('Pin creation validation failed', { errors: error.fields })
+      return data({ errors: error.fields }, { status: 400 })
+    }
+
+    if (error instanceof DuplicatePinError) {
+      logger.debug('Pin creation failed - duplicate URL')
+      return data(
+        {
+          errors: {
+            url: ['You have already saved this URL'],
+          },
+        },
+        { status: 400 }
+      )
+    }
+
     logger.exception(error, 'Failed to create pin', {
       userId: user.id,
-      url: result.data.url,
     })
 
     return data(
@@ -101,7 +104,7 @@ export async function action({ request, params }: Route.ActionArgs) {
           _form: 'Failed to create pin. Please try again.',
         },
       },
-      { status: 400 }
+      { status: 500 }
     )
   }
 }
@@ -145,7 +148,7 @@ export default function PinsNewPage() {
             tagSuggestions={userTags}
             urlParams={urlParams}
             errorMessage={
-              actionData?.errors?._form
+              actionData?.errors && '_form' in actionData.errors
                 ? Array.isArray(actionData.errors._form)
                   ? actionData.errors._form.join(', ')
                   : actionData.errors._form

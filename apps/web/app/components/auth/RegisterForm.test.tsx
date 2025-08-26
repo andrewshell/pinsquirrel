@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { createRoutesStub } from 'react-router'
 import { RegisterForm } from './RegisterForm'
-import type { FieldErrors } from '@pinsquirrel/core'
+import type { FieldErrors } from '~/lib/validation-errors'
 
 describe('RegisterForm', () => {
   const createRegisterFormStub = (actionData?: { errors?: FieldErrors }) => {

@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import type { MetadataResult } from '@pinsquirrel/core'
-import { isValidUrl } from '@pinsquirrel/core'
+import type { MetadataResult } from '@pinsquirrel/domain'
 
 interface UseMetadataFetchResult {
   loading: boolean
@@ -21,8 +20,8 @@ export const useMetadataFetch = (): UseMetadataFetchResult => {
       clearTimeout(debounceTimerRef.current)
     }
 
-    // Validate URL
-    if (!url || !isValidUrl(url)) {
+    // Only proceed if URL is not empty
+    if (!url) {
       return
     }
 

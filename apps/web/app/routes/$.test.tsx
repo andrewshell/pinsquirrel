@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { loader } from './$'
-import CatchAll from './$'
+import { describe, expect, it } from 'vitest'
+import CatchAll, { loader } from './$'
 import type { Route } from './+types/$'
 
 describe('404 Route', () => {
@@ -18,11 +17,11 @@ describe('404 Route', () => {
       const result = loader(args)
 
       expect(result).toBeInstanceOf(Response)
-      expect((result as Response).status).toBe(404)
-      expect(await (result as Response).text()).toBe('')
+      expect(result.status).toBe(404)
+      expect(await result.json()).toEqual({ path: '.well-known/security.txt' })
     })
 
-    it('returns 404 response for .well-known/ root path', () => {
+    it('returns 404 response for .well-known/ root path', async () => {
       const params = { '*': '.well-known/' }
       const args: Route.LoaderArgs = {
         request: new Request('http://localhost/.well-known/'),
@@ -33,10 +32,11 @@ describe('404 Route', () => {
       const result = loader(args)
 
       expect(result).toBeInstanceOf(Response)
-      expect((result as Response).status).toBe(404)
+      expect(result.status).toBe(404)
+      expect(await result.json()).toEqual({ path: '.well-known/' })
     })
 
-    it('returns path data for regular 404 pages', () => {
+    it('returns path data for regular 404 pages', async () => {
       const params = { '*': 'some/missing/page' }
       const args: Route.LoaderArgs = {
         request: new Request('http://localhost/some/missing/page'),
@@ -46,10 +46,12 @@ describe('404 Route', () => {
 
       const result = loader(args)
 
-      expect(result).toEqual({ path: 'some/missing/page' })
+      expect(result).toBeInstanceOf(Response)
+      expect(result.status).toBe(404)
+      expect(await result.json()).toEqual({ path: 'some/missing/page' })
     })
 
-    it('returns empty path when splat is undefined', () => {
+    it('returns empty path when splat is undefined', async () => {
       const params = {} as any
       const args: Route.LoaderArgs = {
         request: new Request('http://localhost/'),
@@ -59,10 +61,12 @@ describe('404 Route', () => {
 
       const result = loader(args)
 
-      expect(result).toEqual({ path: '' })
+      expect(result).toBeInstanceOf(Response)
+      expect(result.status).toBe(404)
+      expect(await result.json()).toEqual({ path: '' })
     })
 
-    it('returns empty path when splat is empty string', () => {
+    it('returns empty path when splat is empty string', async () => {
       const params = { '*': '' }
       const args: Route.LoaderArgs = {
         request: new Request('http://localhost/'),
@@ -72,10 +76,12 @@ describe('404 Route', () => {
 
       const result = loader(args)
 
-      expect(result).toEqual({ path: '' })
+      expect(result).toBeInstanceOf(Response)
+      expect(result.status).toBe(404)
+      expect(await result.json()).toEqual({ path: '' })
     })
 
-    it('handles complex paths correctly', () => {
+    it('handles complex paths correctly', async () => {
       const params = { '*': 'users/123/settings/advanced' }
       const args: Route.LoaderArgs = {
         request: new Request('http://localhost/users/123/settings/advanced'),
@@ -85,7 +91,11 @@ describe('404 Route', () => {
 
       const result = loader(args)
 
-      expect(result).toEqual({ path: 'users/123/settings/advanced' })
+      expect(result).toBeInstanceOf(Response)
+      expect(result.status).toBe(404)
+      expect(await result.json()).toEqual({
+        path: 'users/123/settings/advanced',
+      })
     })
   })
 

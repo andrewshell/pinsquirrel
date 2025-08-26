@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { BrowserRouter } from 'react-router'
 import { describe, it, expect } from 'vitest'
 import { TagCloud } from './TagCloud'
-import type { TagWithCount } from '@pinsquirrel/core'
+import type { TagWithCount } from '@pinsquirrel/domain'
 
 const mockTags: TagWithCount[] = [
   {

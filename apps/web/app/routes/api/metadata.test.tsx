@@ -6,7 +6,7 @@ import {
   InvalidUrlError,
   FetchTimeoutError,
   HttpError,
-} from '@pinsquirrel/core'
+} from '@pinsquirrel/domain'
 
 // Mock dependencies
 vi.mock('~/lib/session.server', () => ({
@@ -22,8 +22,8 @@ const { mockFetchMetadata, mockHttpMetadataService } = vi.hoisted(() => {
   return { mockFetchMetadata, mockHttpMetadataService }
 })
 
-vi.mock('@pinsquirrel/core', async () => {
-  const actual = await vi.importActual('@pinsquirrel/core')
+vi.mock('@pinsquirrel/services', async () => {
+  const actual = await vi.importActual('@pinsquirrel/services')
   return {
     ...actual,
     HttpMetadataService: Object.assign(mockHttpMetadataService, {
@@ -40,8 +40,6 @@ vi.mock('@pinsquirrel/core', async () => {
         return 'Failed to fetch metadata'
       }),
     }),
-    CheerioHtmlParser: vi.fn(),
-    NodeHttpFetcher: vi.fn(),
     AuthenticationService: vi.fn(),
     PinService: vi.fn(),
   }

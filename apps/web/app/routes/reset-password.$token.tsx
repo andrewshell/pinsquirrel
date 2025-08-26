@@ -5,7 +5,11 @@ import { getUserId } from '~/lib/session.server'
 import { ResetPasswordForm } from '~/components/auth/ResetPasswordForm'
 import { parseFormData } from '~/lib/http-utils'
 import { logger } from '~/lib/logger.server'
-import { passwordSchema } from '@pinsquirrel/core'
+import {
+  ValidationError,
+  InvalidResetTokenError,
+  ResetTokenExpiredError,
+} from '@pinsquirrel/domain'
 
 export function meta(_: Route.MetaArgs) {
   return [
@@ -51,21 +55,6 @@ export async function action({ request, params }: Route.ActionArgs) {
   const newPassword = formData.newPassword as string
   const confirmPassword = formData.confirmPassword as string
 
-  // Validate password
-  const passwordResult = passwordSchema.safeParse(newPassword)
-  if (!passwordResult.success) {
-    logger.debug('Invalid password format', { token })
-    return data(
-      {
-        errors: {
-          newPassword:
-            passwordResult.error.issues[0]?.message || 'Invalid password',
-        },
-      },
-      { status: 400 }
-    )
-  }
-
   // Check password confirmation
   if (newPassword !== confirmPassword) {
     return data(
@@ -79,6 +68,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   try {
+    // Service handles password validation
     await authService.resetPassword(token, newPassword)
 
     logger.info('Password reset successful', { token })
@@ -86,17 +76,20 @@ export async function action({ request, params }: Route.ActionArgs) {
     // Redirect to signin with success message
     return redirect('/signin?reset=success')
   } catch (error) {
-    logger.exception(error, 'Password reset failed', { token })
-
-    // Check for specific error types
-    if (error instanceof Error) {
-      if (
-        error.message.includes('Invalid') ||
-        error.message.includes('expired')
-      ) {
-        return data({ invalidToken: true })
-      }
+    if (error instanceof ValidationError) {
+      logger.debug('Password reset validation failed', { errors: error.fields })
+      return data({ errors: error.fields }, { status: 400 })
     }
+
+    if (
+      error instanceof InvalidResetTokenError ||
+      error instanceof ResetTokenExpiredError
+    ) {
+      logger.info('Invalid or expired reset token', { token })
+      return data({ invalidToken: true })
+    }
+
+    logger.exception(error, 'Password reset failed', { token })
 
     return data(
       {

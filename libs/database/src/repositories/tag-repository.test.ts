@@ -4,7 +4,7 @@ import { Pool } from 'pg'
 import { DrizzleTagRepository } from './tag-repository.js'
 import { DrizzleUserRepository } from './user-repository.js'
 import { db } from '../client.js'
-import type { User } from '@pinsquirrel/core'
+import type { User } from '@pinsquirrel/domain'
 
 describe('DrizzleTagRepository - Integration Tests', () => {
   let testDb: typeof db
@@ -530,7 +530,7 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       const otherUser = await userRepository.create({
         username: `otheruser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'hashed_password',
-        hashedEmail: 'other@example.com',
+        emailHash: 'other@example.com',
       })
 
       // Create tags for both users
@@ -711,7 +711,7 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       const otherUser = await userRepository.create({
         username: `otheruser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'hashed_password',
-        hashedEmail: 'other@example.com',
+        emailHash: 'other@example.com',
       })
 
       const otherUserTag = await tagRepository.create({
@@ -913,7 +913,7 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       const otherUser = await userRepository.create({
         username: `otheruser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'hashed_password',
-        hashedEmail: 'other@example.com',
+        emailHash: 'other@example.com',
       })
 
       // Create empty tags for both users

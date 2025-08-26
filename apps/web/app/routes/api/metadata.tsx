@@ -1,7 +1,9 @@
 import type { Route } from './+types/metadata'
 import { requireUser } from '~/lib/session.server'
-import { metadataService } from '~/lib/services/container.server'
-import { HttpMetadataService } from '@pinsquirrel/core'
+import {
+  metadataService,
+  metadataErrorUtils,
+} from '~/lib/services/container.server'
 import { logger } from '~/lib/logger.server'
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -31,8 +33,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     })
 
     // Use the service's error mapping methods
-    const statusCode = HttpMetadataService.getHttpStatusForError(error as Error)
-    const message = HttpMetadataService.getUserFriendlyMessage(error as Error)
+    const statusCode = metadataErrorUtils.getHttpStatusForError(error as Error)
+    const message = metadataErrorUtils.getUserFriendlyMessage(error as Error)
 
     return Response.json({ error: message }, { status: statusCode })
   }

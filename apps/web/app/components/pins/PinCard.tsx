@@ -1,5 +1,5 @@
 import { Link, useFetcher, useLocation } from 'react-router'
-import type { Pin } from '@pinsquirrel/core'
+import type { Pin } from '@pinsquirrel/domain'
 
 interface PinCardProps {
   pin: Pin

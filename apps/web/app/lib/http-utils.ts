@@ -1,10 +1,9 @@
-// HTTP utilities that are validation-library agnostic
-// Uses core validation services instead of direct zod imports
+// HTTP utilities for form data parsing
 
-import type { GenericValidationResult, FieldErrors } from '@pinsquirrel/core'
+import type { FieldErrors } from '~/lib/validation-errors'
 
 // Re-export types for convenience
-export type { GenericValidationResult as ValidationResult, FieldErrors }
+export type { FieldErrors }
 
 // Parse FormData into a plain object with proper type handling
 export async function parseFormData(
@@ -139,22 +138,4 @@ export function createFormErrorResponse(errors: FieldErrors, status = 400) {
       'Content-Type': 'application/json',
     },
   })
-}
-
-// Helper to work with validation results in route actions
-export function handleValidationResult<T>(
-  result: GenericValidationResult<T>,
-  onSuccess: (data: T) => Response | Promise<Response>,
-  onError?: (errors: FieldErrors) => Response | Promise<Response>
-): Response | Promise<Response> {
-  if (result.success) {
-    return onSuccess(result.data)
-  }
-
-  if (onError) {
-    return onError(result.errors)
-  }
-
-  // Default error response
-  return createFormErrorResponse(result.errors)
 }

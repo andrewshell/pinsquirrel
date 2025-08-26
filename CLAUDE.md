@@ -9,8 +9,11 @@ This is a pnpm monorepo with Turbo orchestration:
 - `apps/` - Applications and end-user facing packages
   - `web/` - React Router 7 (Framework mode) application with SSR
 - `libs/` - Shared libraries and utilities
-  - `core/` - Core business logic and domain entities
+  - `services/` - Business logic services and validation
   - `database/` - Database layer with Drizzle ORM for PostgreSQL
+  - `domain/` - Domain entities and interfaces
+  - `adapters/` - External service adapters
+  - `mailgun/` - Email service implementation
 - `pnpm-workspace.yaml` - Defines workspace packages
 - `package.json` - Root package with Turbo scripts
 - `turbo.json` - Turbo task configuration
@@ -52,7 +55,7 @@ This is a pnpm monorepo with Turbo orchestration:
 - **NEVER navigate to subdirectories** to run commands unless absolutely necessary
 - If you must navigate to a subdirectory, **ALWAYS return to root** immediately after
 - Use `pnpm --filter @pinsquirrel/web <command>` instead of `cd apps/web && pnpm <command>`
-- Use `pnpm --filter @pinsquirrel/core <command>` instead of `cd libs/core && pnpm <command>`
+- Use `pnpm --filter @pinsquirrel/services <command>` instead of `cd libs/services && pnpm <command>`
 - Use `pnpm --filter @pinsquirrel/database <command>` instead of `cd libs/database && pnpm <command>`
 
 ### Test-Driven Development (TDD) Workflow
@@ -154,26 +157,35 @@ The web app uses React Router 7 in Framework mode with SSR enabled:
 - `pnpm test --filter @pinsquirrel/web -- <pattern>` - Run specific test files
 - `pnpm test --filter @pinsquirrel/web -- --watch` - Run tests in watch mode for TDD
 
-## Core Library (libs/core)
+## Services Library (libs/services)
 
-Business logic and domain entities:
+Business logic services and validation:
 
-- **Development**: `pnpm dev --filter @pinsquirrel/core` (TypeScript watch mode)
-- **Build**: `pnpm build --filter @pinsquirrel/core` (creates `dist/`)
-- **Type Check**: `pnpm typecheck --filter @pinsquirrel/core`
+- **Development**: `pnpm dev --filter @pinsquirrel/services` (TypeScript watch mode)
+- **Build**: `pnpm build --filter @pinsquirrel/services` (creates `dist/`)
+- **Type Check**: `pnpm typecheck --filter @pinsquirrel/services`
 - **Testing**: Vitest for unit tests
 
-### Core Architecture
+### Services Architecture
 
-- `src/entities/` - Domain entities and interfaces (e.g., User)
-- `src/interfaces/` - Repository contracts and abstractions
-- `src/errors/` - Custom domain error classes
-- Uses clean architecture principles with dependency inversion
+- `src/services/` - Business logic services (e.g., AuthenticationService, PinService)
+- `src/validation/` - Validation schemas and utilities using Zod
+- `src/utils/` - Common utilities like cryptographic functions
+- Uses dependency injection and clean architecture principles
 
 ### Running Tests
 
-- `pnpm test --filter @pinsquirrel/core` - Run all tests once
-- `pnpm test --filter @pinsquirrel/core -- --watch` - Run tests in watch mode for TDD
+- `pnpm test --filter @pinsquirrel/services` - Run all tests once
+- `pnpm test --filter @pinsquirrel/services -- --watch` - Run tests in watch mode for TDD
+
+## Domain Library (libs/domain)
+
+Core domain entities and interfaces:
+
+- **Development**: `pnpm dev --filter @pinsquirrel/domain` (TypeScript watch mode)
+- **Testing**: Vitest for unit tests
+- Contains domain entities (User, Pin, Tag) and repository interfaces
+- Pure domain logic with no external dependencies
 
 ## Database Library (libs/database)
 
@@ -192,7 +204,7 @@ Database layer with Drizzle ORM for PostgreSQL:
 - `src/repositories/` - Repository implementations using Drizzle
 - `src/client.ts` - Database connection configuration
 - `drizzle.config.ts` - Drizzle kit configuration
-- Implements repository interfaces from `@pinsquirrel/core`
+- Implements repository interfaces from `@pinsquirrel/domain`
 
 ### Database Configuration
 

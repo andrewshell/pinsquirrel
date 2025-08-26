@@ -5,7 +5,7 @@ import type {
   PinRepository,
   TagRepository,
   UpdatePinData,
-} from '@pinsquirrel/core'
+} from '@pinsquirrel/domain'
 import { and, count, desc, eq, ilike, inArray, isNull, or } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { pins, pinsTags, tags } from '../schema/index.js'

@@ -8,8 +8,7 @@ import { FormText } from '~/components/ui/form-text'
 import { Checkbox } from '~/components/ui/checkbox'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import { TagInput } from '~/components/ui/tag-input'
-import type { FieldErrors } from '@pinsquirrel/core'
-import { isValidUrl } from '@pinsquirrel/core'
+import type { FieldErrors } from '~/lib/validation-errors'
 import type { UrlParams } from '~/lib/url-params.server'
 
 // Helper to deduplicate tags while preserving original casing
@@ -49,6 +48,8 @@ interface PinCreationFormProps {
   urlParams?: UrlParams | null
 }
 
+type ActionData = { errors: FieldErrors } | null
+
 export function PinCreationForm({
   onMetadataFetch,
   metadataTitle,
@@ -63,7 +64,7 @@ export function PinCreationForm({
   tagSuggestions = [],
   urlParams,
 }: PinCreationFormProps) {
-  const fetcher = useFetcher<{ errors?: FieldErrors }>()
+  const fetcher = useFetcher<ActionData>()
   const formRef = useRef<HTMLFormElement>(null)
   const urlRef = useRef<HTMLInputElement>(null)
   const titleRef = useRef<HTMLInputElement>(null)
@@ -90,7 +91,7 @@ export function PinCreationForm({
   const [tags, setTags] = useState<string[]>(mergedInitialData.tags)
 
   // Get validation errors from fetcher or props (memoized to prevent useEffect dependencies changing)
-  const errors = useMemo(
+  const errors = useMemo<FieldErrors>(
     () => fetcher.data?.errors || {},
     [fetcher.data?.errors]
   )
@@ -131,11 +132,8 @@ export function PinCreationForm({
     }
 
     if (urlValue && onMetadataFetch) {
-      // Use centralized URL validation
-      if (isValidUrl(urlValue)) {
-        onMetadataFetch(urlValue)
-      }
-      // Invalid URL, don't fetch metadata
+      // Let server handle URL validation
+      onMetadataFetch(urlValue)
     }
   }
 
@@ -174,7 +172,9 @@ export function PinCreationForm({
       {errors._form && (
         <DismissibleAlert
           message={
-            Array.isArray(errors._form) ? errors._form.join(', ') : errors._form
+            Array.isArray(errors._form)
+              ? errors._form.join('. ')
+              : errors._form || ''
           }
           type="error"
         />
@@ -201,7 +201,7 @@ export function PinCreationForm({
         </FormText>
         {errors.url && (
           <p id="url-error" className="text-sm text-destructive" role="alert">
-            {Array.isArray(errors.url) ? errors.url.join(', ') : errors.url}
+            {Array.isArray(errors.url) ? errors.url.join('. ') : errors.url}
           </p>
         )}
       </div>
@@ -244,7 +244,7 @@ export function PinCreationForm({
         {errors.title && (
           <p id="title-error" className="text-sm text-destructive" role="alert">
             {Array.isArray(errors.title)
-              ? errors.title.join(', ')
+              ? errors.title.join('. ')
               : errors.title}
           </p>
         )}

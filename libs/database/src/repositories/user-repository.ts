@@ -3,7 +3,7 @@ import type {
   UpdateUserData,
   User,
   UserRepository,
-} from '@pinsquirrel/core'
+} from '@pinsquirrel/domain'
 import { eq } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { users } from '../schema/users.js'

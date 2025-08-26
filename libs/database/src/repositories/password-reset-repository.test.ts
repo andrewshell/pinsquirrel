@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool } from 'pg'
 import { DrizzlePasswordResetRepository } from './password-reset-repository.js'
 import { db } from '../client.js'
-import type { CreatePasswordResetTokenData } from '@pinsquirrel/core'
+import type { CreatePasswordResetTokenData } from '@pinsquirrel/domain'
 
 describe('DrizzlePasswordResetRepository - Integration Tests', () => {
   let testDb: typeof db

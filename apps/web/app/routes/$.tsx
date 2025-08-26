@@ -13,15 +13,8 @@ export function meta(_: Route.MetaArgs) {
 }
 
 export function loader({ params }: Route.LoaderArgs) {
-  const splat = params['*']
-
-  // For well-known requests, return a minimal 404 response
-  if (splat?.startsWith('.well-known/')) {
-    return new Response(null, { status: 404 })
-  }
-
-  // For other 404s, return data for the component to render
-  return { path: splat || '' }
+  const path = params['*'] || ''
+  return Response.json({ path }, { status: 404 })
 }
 
 export default function CatchAll({ loaderData }: Route.ComponentProps) {
