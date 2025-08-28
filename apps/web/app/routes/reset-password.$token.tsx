@@ -69,7 +69,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   try {
     // Service handles password validation
-    await authService.resetPassword(token, newPassword)
+    await authService.resetPassword({
+      token,
+      newPassword,
+    })
 
     logger.info('Password reset successful', { token })
 

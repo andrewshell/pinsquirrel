@@ -3,10 +3,6 @@ import type {
   PasswordResetRepository,
   EmailService,
   User,
-  RegisterInput,
-  LoginInput,
-  ChangePasswordInput,
-  UpdateEmailInput,
 } from '@pinsquirrel/domain'
 import {
   InvalidCredentialsError,
@@ -36,7 +32,11 @@ export class AuthenticationService {
     private readonly emailService?: EmailService
   ) {}
 
-  async register(input: RegisterInput): Promise<User> {
+  async register(input: {
+    username: string
+    password: string
+    email?: string | null
+  }): Promise<User> {
     // Validate inputs at service boundary
     const errors: Record<string, string[]> = {}
 
@@ -92,7 +92,7 @@ export class AuthenticationService {
     return user
   }
 
-  async login(input: LoginInput): Promise<User> {
+  async login(input: { username: string; password: string }): Promise<User> {
     // Validate inputs at service boundary
     const errors: Record<string, string[]> = {}
 
@@ -130,10 +130,11 @@ export class AuthenticationService {
     return user
   }
 
-  async changePassword(
-    userId: string,
-    input: ChangePasswordInput
-  ): Promise<void> {
+  async changePassword(input: {
+    userId: string
+    currentPassword: string
+    newPassword: string
+  }): Promise<void> {
     // Validate inputs at service boundary
     const errors: Record<string, string[]> = {}
 
@@ -157,7 +158,7 @@ export class AuthenticationService {
       throw new ValidationError(errors)
     }
 
-    const user = await this.userRepository.findById(userId)
+    const user = await this.userRepository.findById(input.userId)
     if (!user) {
       throw new InvalidCredentialsError()
     }
@@ -173,12 +174,15 @@ export class AuthenticationService {
     // Hash the new password in the business logic layer
     const passwordHash = await hashPassword(input.newPassword)
 
-    await this.userRepository.update(userId, {
+    await this.userRepository.update(input.userId, {
       passwordHash,
     })
   }
 
-  async updateEmail(userId: string, input: UpdateEmailInput): Promise<void> {
+  async updateEmail(input: {
+    userId: string
+    email: string | null
+  }): Promise<void> {
     // Validate email if provided
     if (input.email !== null) {
       const emailResult = emailSchema.safeParse(input.email)
@@ -192,7 +196,7 @@ export class AuthenticationService {
     // Hash the email in the business logic layer
     const emailHash = input.email ? hashEmail(input.email) : null
 
-    await this.userRepository.update(userId, {
+    await this.userRepository.update(input.userId, {
       emailHash,
     })
   }
@@ -211,12 +215,12 @@ export class AuthenticationService {
     return await this.userRepository.findByEmailHash(emailHash)
   }
 
-  async requestPasswordReset(
-    email: string,
+  async requestPasswordReset(input: {
+    email: string
     resetUrl: string
-  ): Promise<string | null> {
+  }): Promise<string | null> {
     // Validate email at service boundary
-    const emailResult = emailSchema.safeParse(email)
+    const emailResult = emailSchema.safeParse(input.email)
     if (!emailResult.success) {
       throw new ValidationError({
         email: [emailResult.error.issues[0]?.message || 'Invalid email'],
@@ -228,7 +232,7 @@ export class AuthenticationService {
     }
 
     // Hash the email to find the user
-    const emailHash = hashEmail(email)
+    const emailHash = hashEmail(input.email)
     const user = await this.userRepository.findByEmailHash(emailHash)
 
     // Don't reveal whether the email exists or not for security
@@ -265,14 +269,21 @@ export class AuthenticationService {
     })
 
     // Send the email with the plain token
-    await this.emailService.sendPasswordResetEmail(email, token, resetUrl)
+    await this.emailService.sendPasswordResetEmail(
+      input.email,
+      token,
+      input.resetUrl
+    )
 
     return token
   }
 
-  async resetPassword(token: string, newPassword: string): Promise<void> {
+  async resetPassword(input: {
+    token: string
+    newPassword: string
+  }): Promise<void> {
     // Validate password at service boundary
-    const passwordResult = passwordSchema.safeParse(newPassword)
+    const passwordResult = passwordSchema.safeParse(input.newPassword)
     if (!passwordResult.success) {
       throw new ValidationError({
         newPassword: [
@@ -286,7 +297,7 @@ export class AuthenticationService {
     }
 
     // Hash the token to find it in the database
-    const tokenHash = hashToken(token)
+    const tokenHash = hashToken(input.token)
     const resetToken =
       await this.passwordResetRepository.findByTokenHash(tokenHash)
 
@@ -307,7 +318,7 @@ export class AuthenticationService {
     }
 
     // Hash the new password
-    const passwordHash = await hashPassword(newPassword)
+    const passwordHash = await hashPassword(input.newPassword)
 
     // Update the user's password
     await this.userRepository.update(user.id, {

@@ -1,12 +1,7 @@
 import { useLoaderData, data } from 'react-router'
 import type { Route } from './+types/profile'
 import { requireUser } from '~/lib/session.server'
-import {
-  InvalidCredentialsError,
-  ValidationError,
-  type ChangePasswordInput,
-  type UpdateEmailInput,
-} from '@pinsquirrel/domain'
+import { InvalidCredentialsError, ValidationError } from '@pinsquirrel/domain'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { UpdateEmailForm } from '~/components/profile/UpdateEmailForm'
 import { ChangePasswordForm } from '~/components/profile/ChangePasswordForm'
@@ -46,8 +41,9 @@ export async function action({ request }: Route.ActionArgs) {
 
   try {
     if (intent === 'update-email') {
-      // Parse form data into domain input type
-      const updateEmailInput: UpdateEmailInput = {
+      // Parse form data for email update
+      const updateEmailInput = {
+        userId: user.id,
         email:
           formData.email === '' ||
           formData.email === null ||
@@ -56,7 +52,7 @@ export async function action({ request }: Route.ActionArgs) {
             : (formData.email as string),
       }
 
-      await authService.updateEmail(user.id, updateEmailInput)
+      await authService.updateEmail(updateEmailInput)
 
       logger.info('User email updated', {
         userId: user.id,
@@ -70,13 +66,14 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     if (intent === 'change-password') {
-      // Parse form data into domain input type
-      const changePasswordInput: ChangePasswordInput = {
+      // Parse form data for password change
+      const changePasswordInput = {
+        userId: user.id,
         currentPassword: formData.currentPassword as string,
         newPassword: formData.newPassword as string,
       }
 
-      await authService.changePassword(user.id, changePasswordInput)
+      await authService.changePassword(changePasswordInput)
 
       logger.info('User password changed', {
         userId: user.id,

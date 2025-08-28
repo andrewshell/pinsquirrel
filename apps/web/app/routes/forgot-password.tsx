@@ -38,7 +38,10 @@ export async function action({ request }: Route.ActionArgs) {
     const resetBaseUrl = `${url.protocol}//${url.host}/reset-password`
 
     // Request password reset - service handles validation
-    const token = await authService.requestPasswordReset(email, resetBaseUrl)
+    const token = await authService.requestPasswordReset({
+      email,
+      resetUrl: resetBaseUrl,
+    })
 
     if (token) {
       logger.info('Password reset email sent', { email })

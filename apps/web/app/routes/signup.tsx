@@ -1,10 +1,6 @@
 import { Link, redirect, data } from 'react-router'
 import type { Route } from './+types/signup'
-import {
-  ValidationError,
-  UserAlreadyExistsError,
-  type RegisterInput,
-} from '@pinsquirrel/domain'
+import { ValidationError, UserAlreadyExistsError } from '@pinsquirrel/domain'
 import { authService } from '~/lib/services/container.server'
 import { createUserSession, getUserId } from '~/lib/session.server'
 import { getUserPath } from '~/lib/auth.server'
@@ -37,8 +33,8 @@ export async function action({ request }: Route.ActionArgs) {
 
   const formData = await parseFormData(request)
 
-  // Parse form data into domain input type
-  const registerInput: RegisterInput = {
+  // Parse form data for registration
+  const registerInput = {
     username: formData.username as string,
     password: formData.password as string,
     email:
