@@ -249,7 +249,7 @@ export function PinCreationForm({
           </p>
         )}
         {metadataError && (
-          <p className="text-sm text-muted-foreground" role="status">
+          <p className="text-sm text-destructive" role="alert">
             Failed to fetch metadata. Please enter title manually.
           </p>
         )}

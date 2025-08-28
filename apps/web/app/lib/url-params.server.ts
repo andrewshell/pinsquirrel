@@ -1,5 +1,3 @@
-import { urlValidationService } from '~/lib/services/container.server'
-
 export interface UrlParams {
   url?: string
   title?: string
@@ -55,8 +53,26 @@ function sanitizeUrl(url: string | null): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
 
-  // Validate URL format
-  if (!urlValidationService.isValidUrl(decoded)) {
+  // Basic security validation - block obviously dangerous protocols
+  const trimmed = decoded.trim()
+  if (
+    trimmed.toLowerCase().startsWith('javascript:') ||
+    trimmed.toLowerCase().startsWith('data:') ||
+    trimmed.toLowerCase().startsWith('vbscript:')
+  ) {
+    return ''
+  }
+
+  // Basic URL format check - must look like a URL
+  let parsedUrl: URL
+  try {
+    parsedUrl = new URL(trimmed)
+  } catch {
+    return ''
+  }
+
+  // Only allow http and https protocols
+  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
     return ''
   }
 

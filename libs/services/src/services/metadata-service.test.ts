@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HtmlParser, HttpFetcher } from '@pinsquirrel/domain'
+import { InvalidUrlError, UnsupportedProtocolError } from '@pinsquirrel/domain'
 import { HttpMetadataService } from './metadata-service'
 
 describe('HttpMetadataService', () => {
@@ -34,18 +35,20 @@ describe('HttpMetadataService', () => {
 
   it('should reject invalid URL protocols', async () => {
     await expect(service.fetchMetadata('ftp://example.com')).rejects.toThrow(
-      'Unsupported URL protocol: ftp:'
+      UnsupportedProtocolError
     )
 
+    // Validation happens before fetching, so fetcher should not be called
     expect(mockHttpFetcher.fetch).not.toHaveBeenCalled()
     expect(mockHtmlParser.parseMetadata).not.toHaveBeenCalled()
   })
 
   it('should reject malformed URLs', async () => {
     await expect(service.fetchMetadata('not-a-url')).rejects.toThrow(
-      'Invalid URL format: not-a-url'
+      InvalidUrlError
     )
 
+    // Validation happens before fetching, so fetcher should not be called
     expect(mockHttpFetcher.fetch).not.toHaveBeenCalled()
     expect(mockHtmlParser.parseMetadata).not.toHaveBeenCalled()
   })

@@ -11,7 +11,3 @@ export {
   type PaginationResult,
 } from './services/pagination-service.js'
 export { PinService } from './services/pin-service.js'
-export {
-  UrlValidationService,
-  type UrlValidationResult,
-} from './services/url-validation-service.js'

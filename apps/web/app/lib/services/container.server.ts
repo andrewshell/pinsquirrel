@@ -3,7 +3,6 @@ import {
   HttpMetadataService,
   AuthenticationService,
   PaginationService,
-  UrlValidationService,
 } from '@pinsquirrel/services'
 import { CheerioHtmlParser, NodeHttpFetcher } from '@pinsquirrel/adapters'
 import {
@@ -46,7 +45,6 @@ export const authService = new AuthenticationService(
 export const pinService = new PinService(pinRepository, tagRepository)
 export const metadataService = new HttpMetadataService(httpFetcher, htmlParser)
 export const paginationService = new PaginationService()
-export const urlValidationService = new UrlValidationService()
 
 // Export repositories for cases where direct access is still needed
 // TODO: These should be removed as we migrate all logic to services

@@ -10,6 +10,7 @@ import {
   HttpError,
   ParseError,
 } from '@pinsquirrel/domain'
+import { validateUrlForFetching } from '../validation/url.js'
 
 export interface MetadataService {
   fetchMetadata(url: string): Promise<MetadataResult>
@@ -23,18 +24,8 @@ export class HttpMetadataService implements MetadataService {
 
   async fetchMetadata(url: string): Promise<MetadataResult> {
     try {
-      // Validate URL format
-      let parsedUrl: URL
-      try {
-        parsedUrl = new URL(url)
-      } catch {
-        throw new InvalidUrlError(url)
-      }
-
-      // Check protocol
-      if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-        throw new UnsupportedProtocolError(parsedUrl.protocol)
-      }
+      // Validate URL before fetching
+      validateUrlForFetching(url)
 
       // Fetch HTML content
       let html: string
