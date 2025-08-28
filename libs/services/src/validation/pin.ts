@@ -3,7 +3,7 @@ import { z } from 'zod'
 // URL validation
 export const urlSchema = z
   .string()
-  .url('Must be a valid URL')
+  .url({ message: 'Must be a valid URL' })
   .max(2048, 'URL must be at most 2048 characters')
 
 // Pin field validations
@@ -18,8 +18,6 @@ export const pinDescriptionSchema = z
   .nullable()
   .optional()
 
-export const readLaterSchema = z.boolean().optional().default(false)
-
 // Tag validations
 export const tagNameSchema = z
   .string()
@@ -33,15 +31,13 @@ export const tagNameSchema = z
   )
   .transform(val => val.trim().toLowerCase())
 
-export const tagNamesSchema = z.array(tagNameSchema).optional()
-
 // Pin creation and update schemas
 export const createPinDataSchema = z.object({
   url: urlSchema,
   title: pinTitleSchema,
   description: pinDescriptionSchema,
   readLater: z.boolean().optional().default(false),
-  tagNames: tagNamesSchema,
+  tagNames: z.array(tagNameSchema).optional(),
   createdAt: z.date().optional(),
   updatedAt: z.date().optional(),
 })
@@ -51,7 +47,7 @@ export const updatePinDataSchema = z.object({
   title: pinTitleSchema.optional(),
   description: pinDescriptionSchema,
   readLater: z.boolean().optional(),
-  tagNames: tagNamesSchema,
+  tagNames: z.array(tagNameSchema).optional(),
 })
 
 // Tag creation and update schemas
@@ -59,12 +55,7 @@ export const createTagDataSchema = z.object({
   name: tagNameSchema,
 })
 
-export const updateTagDataSchema = z.object({
-  name: tagNameSchema.optional(),
-})
-
 // Type exports for domain use
 export type CreatePinInput = z.infer<typeof createPinDataSchema>
 export type UpdatePinInput = z.infer<typeof updatePinDataSchema>
 export type CreateTagInput = z.infer<typeof createTagDataSchema>
-export type UpdateTagInput = z.infer<typeof updateTagDataSchema>

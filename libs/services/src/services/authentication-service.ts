@@ -23,7 +23,7 @@ import {
   usernameSchema,
   passwordSchema,
   emailSchema,
-} from '../validation/domain-schemas.js'
+} from '../validation/user.js'
 
 export class AuthenticationService {
   constructor(

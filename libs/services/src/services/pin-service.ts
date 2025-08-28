@@ -17,12 +17,12 @@ import type {
   CreatePinInput,
   CreateTagInput,
   UpdatePinInput,
-} from '../validation/pin-schemas.js'
+} from '../validation/pin.js'
 import {
   createPinDataSchema,
   createTagDataSchema,
   updatePinDataSchema,
-} from '../validation/pin-schemas.js'
+} from '../validation/pin.js'
 
 export class PinService {
   constructor(

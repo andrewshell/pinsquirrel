@@ -7,8 +7,7 @@ import {
   createPinDataSchema,
   updatePinDataSchema,
   createTagDataSchema,
-  updateTagDataSchema,
-} from './pin-schemas.js'
+} from './pin.js'
 
 describe('urlSchema', () => {
   it('should accept valid URLs', () => {
@@ -282,21 +281,5 @@ describe('createTagDataSchema', () => {
 
     const result = createTagDataSchema.safeParse(invalidData)
     expect(result.success).toBe(false)
-  })
-})
-
-describe('updateTagDataSchema', () => {
-  it('should accept valid tag update data', () => {
-    const validData = {
-      name: 'typescript',
-    }
-
-    const result = updateTagDataSchema.safeParse(validData)
-    expect(result.success).toBe(true)
-  })
-
-  it('should accept empty update data', () => {
-    const result = updateTagDataSchema.safeParse({})
-    expect(result.success).toBe(true)
   })
 })
