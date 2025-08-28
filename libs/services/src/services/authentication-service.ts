@@ -3,6 +3,10 @@ import type {
   PasswordResetRepository,
   EmailService,
   User,
+  RegisterInput,
+  LoginInput,
+  ChangePasswordInput,
+  UpdateEmailInput,
 } from '@pinsquirrel/domain'
 import {
   InvalidCredentialsError,
@@ -32,226 +36,30 @@ export class AuthenticationService {
     private readonly emailService?: EmailService
   ) {}
 
-  /**
-   * Register a new user from raw form data
-   */
-  async registerFromFormData(formData: Record<string, unknown>): Promise<User> {
-    // Validate required fields
-    const errors: Record<string, string[]> = {}
-
-    const username = formData.username
-    if (!username || typeof username !== 'string') {
-      errors.username = ['Username is required']
-    }
-
-    const password = formData.password
-    if (!password || typeof password !== 'string') {
-      errors.password = ['Password is required']
-    }
-
-    const email = formData.email
-    if (email !== undefined && email !== null && typeof email !== 'string') {
-      errors.email = ['Email must be a valid string']
-    }
-
-    // Validate username format
-    if (username && typeof username === 'string') {
-      const usernameResult = usernameSchema.safeParse(username)
-      if (!usernameResult.success) {
-        errors.username = errors.username || []
-        errors.username.push(
-          usernameResult.error.issues[0]?.message || 'Invalid username'
-        )
-      }
-    }
-
-    // Validate password format
-    if (password && typeof password === 'string') {
-      const passwordResult = passwordSchema.safeParse(password)
-      if (!passwordResult.success) {
-        errors.password = errors.password || []
-        errors.password.push(
-          passwordResult.error.issues[0]?.message || 'Invalid password'
-        )
-      }
-    }
-
-    // Validate email format if provided (treat empty string as undefined)
-    if (email && typeof email === 'string' && email.trim() !== '') {
-      const emailResult = emailSchema.safeParse(email)
-      if (!emailResult.success) {
-        errors.email = errors.email || []
-        errors.email.push(
-          emailResult.error.issues[0]?.message || 'Invalid email'
-        )
-      }
-    }
-
-    if (Object.keys(errors).length > 0) {
-      throw new ValidationError(errors)
-    }
-
-    return this.register(
-      username as string,
-      password as string,
-      email && typeof email === 'string' && email.trim() !== ''
-        ? email
-        : undefined
-    )
-  }
-
-  /**
-   * Login user from raw form data
-   */
-  async loginFromFormData(formData: Record<string, unknown>): Promise<User> {
-    // Validate required fields
-    const errors: Record<string, string[]> = {}
-
-    const username = formData.username
-    if (!username || typeof username !== 'string') {
-      errors.username = ['Username is required']
-    }
-
-    const password = formData.password
-    if (!password || typeof password !== 'string') {
-      errors.password = ['Password is required']
-    }
-
-    // Validate username format
-    if (username && typeof username === 'string') {
-      const usernameResult = usernameSchema.safeParse(username)
-      if (!usernameResult.success) {
-        errors.username = errors.username || []
-        errors.username.push(
-          usernameResult.error.issues[0]?.message || 'Invalid username'
-        )
-      }
-    }
-
-    // Validate password format
-    if (password && typeof password === 'string') {
-      const passwordResult = passwordSchema.safeParse(password)
-      if (!passwordResult.success) {
-        errors.password = errors.password || []
-        errors.password.push(
-          passwordResult.error.issues[0]?.message || 'Invalid password'
-        )
-      }
-    }
-
-    if (Object.keys(errors).length > 0) {
-      throw new ValidationError(errors)
-    }
-
-    return this.login(username as string, password as string)
-  }
-
-  /**
-   * Change password from raw form data
-   */
-  async changePasswordFromFormData(
-    userId: string,
-    formData: Record<string, unknown>
-  ): Promise<void> {
-    // Validate required fields
-    const errors: Record<string, string[]> = {}
-
-    const currentPassword = formData.currentPassword
-    if (!currentPassword || typeof currentPassword !== 'string') {
-      errors.currentPassword = ['Current password is required']
-    }
-
-    const newPassword = formData.newPassword
-    if (!newPassword || typeof newPassword !== 'string') {
-      errors.newPassword = ['New password is required']
-    }
-
-    // Validate current password format
-    if (currentPassword && typeof currentPassword === 'string') {
-      const passwordResult = passwordSchema.safeParse(currentPassword)
-      if (!passwordResult.success) {
-        errors.currentPassword = errors.currentPassword || []
-        errors.currentPassword.push(
-          passwordResult.error.issues[0]?.message || 'Invalid password'
-        )
-      }
-    }
-
-    // Validate new password format
-    if (newPassword && typeof newPassword === 'string') {
-      const passwordResult = passwordSchema.safeParse(newPassword)
-      if (!passwordResult.success) {
-        errors.newPassword = errors.newPassword || []
-        errors.newPassword.push(
-          passwordResult.error.issues[0]?.message || 'Invalid password'
-        )
-      }
-    }
-
-    if (Object.keys(errors).length > 0) {
-      throw new ValidationError(errors)
-    }
-
-    return this.changePassword(
-      userId,
-      currentPassword as string,
-      newPassword as string
-    )
-  }
-
-  /**
-   * Update email from raw form data
-   */
-  async updateEmailFromFormData(
-    userId: string,
-    formData: Record<string, unknown>
-  ): Promise<void> {
-    const email = formData.email
-
-    // Allow null/empty email
-    if (email === '' || email === null || email === undefined) {
-      return this.updateEmail(userId, null)
-    }
-
-    if (typeof email !== 'string') {
-      throw new ValidationError({ email: ['Email must be a valid string'] })
-    }
-
-    // Validate email format
-    const emailResult = emailSchema.safeParse(email)
-    if (!emailResult.success) {
-      throw new ValidationError({
-        email: [emailResult.error.issues[0]?.message || 'Invalid email'],
-      })
-    }
-
-    return this.updateEmail(userId, email)
-  }
-
-  async register(
-    username: string,
-    password: string,
-    email?: string | null
-  ): Promise<User> {
+  async register(input: RegisterInput): Promise<User> {
     // Validate inputs at service boundary
     const errors: Record<string, string[]> = {}
 
-    const usernameResult = usernameSchema.safeParse(username)
+    const usernameResult = usernameSchema.safeParse(input.username)
     if (!usernameResult.success) {
       errors.username = [
         usernameResult.error.issues[0]?.message || 'Invalid username',
       ]
     }
 
-    const passwordResult = passwordSchema.safeParse(password)
+    const passwordResult = passwordSchema.safeParse(input.password)
     if (!passwordResult.success) {
       errors.password = [
         passwordResult.error.issues[0]?.message || 'Invalid password',
       ]
     }
 
-    if (email !== null && email !== undefined && email.trim() !== '') {
-      const emailResult = emailSchema.safeParse(email)
+    if (
+      input.email !== null &&
+      input.email !== undefined &&
+      input.email.trim() !== ''
+    ) {
+      const emailResult = emailSchema.safeParse(input.email)
       if (!emailResult.success) {
         errors.email = [emailResult.error.issues[0]?.message || 'Invalid email']
       }
@@ -262,18 +70,21 @@ export class AuthenticationService {
     }
 
     // Check if username already exists
-    const existingUser = await this.userRepository.findByUsername(username)
+    const existingUser = await this.userRepository.findByUsername(
+      input.username
+    )
     if (existingUser) {
-      throw new UserAlreadyExistsError(username)
+      throw new UserAlreadyExistsError(input.username)
     }
 
     // Hash password and email in the business logic layer
-    const passwordHash = await hashPassword(password)
-    const emailHash = email && email.trim() !== '' ? hashEmail(email) : null
+    const passwordHash = await hashPassword(input.password)
+    const emailHash =
+      input.email && input.email.trim() !== '' ? hashEmail(input.email) : null
 
     // Create user with already hashed data
     const user = await this.userRepository.create({
-      username,
+      username: input.username,
       passwordHash,
       emailHash,
     })
@@ -281,18 +92,18 @@ export class AuthenticationService {
     return user
   }
 
-  async login(username: string, password: string): Promise<User> {
+  async login(input: LoginInput): Promise<User> {
     // Validate inputs at service boundary
     const errors: Record<string, string[]> = {}
 
-    const usernameResult = usernameSchema.safeParse(username)
+    const usernameResult = usernameSchema.safeParse(input.username)
     if (!usernameResult.success) {
       errors.username = [
         usernameResult.error.issues[0]?.message || 'Invalid username',
       ]
     }
 
-    const passwordResult = passwordSchema.safeParse(password)
+    const passwordResult = passwordSchema.safeParse(input.password)
     if (!passwordResult.success) {
       errors.password = [
         passwordResult.error.issues[0]?.message || 'Invalid password',
@@ -303,12 +114,15 @@ export class AuthenticationService {
       throw new ValidationError(errors)
     }
 
-    const user = await this.userRepository.findByUsername(username)
+    const user = await this.userRepository.findByUsername(input.username)
     if (!user) {
       throw new InvalidCredentialsError()
     }
 
-    const isValidPassword = await verifyPassword(password, user.passwordHash)
+    const isValidPassword = await verifyPassword(
+      input.password,
+      user.passwordHash
+    )
     if (!isValidPassword) {
       throw new InvalidCredentialsError()
     }
@@ -318,20 +132,21 @@ export class AuthenticationService {
 
   async changePassword(
     userId: string,
-    currentPassword: string,
-    newPassword: string
+    input: ChangePasswordInput
   ): Promise<void> {
     // Validate inputs at service boundary
     const errors: Record<string, string[]> = {}
 
-    const currentPasswordResult = passwordSchema.safeParse(currentPassword)
+    const currentPasswordResult = passwordSchema.safeParse(
+      input.currentPassword
+    )
     if (!currentPasswordResult.success) {
       errors.currentPassword = [
         currentPasswordResult.error.issues[0]?.message || 'Invalid password',
       ]
     }
 
-    const newPasswordResult = passwordSchema.safeParse(newPassword)
+    const newPasswordResult = passwordSchema.safeParse(input.newPassword)
     if (!newPasswordResult.success) {
       errors.newPassword = [
         newPasswordResult.error.issues[0]?.message || 'Invalid password',
@@ -348,7 +163,7 @@ export class AuthenticationService {
     }
 
     const isValidPassword = await verifyPassword(
-      currentPassword,
+      input.currentPassword,
       user.passwordHash
     )
     if (!isValidPassword) {
@@ -356,17 +171,17 @@ export class AuthenticationService {
     }
 
     // Hash the new password in the business logic layer
-    const passwordHash = await hashPassword(newPassword)
+    const passwordHash = await hashPassword(input.newPassword)
 
     await this.userRepository.update(userId, {
       passwordHash,
     })
   }
 
-  async updateEmail(userId: string, email: string | null): Promise<void> {
+  async updateEmail(userId: string, input: UpdateEmailInput): Promise<void> {
     // Validate email if provided
-    if (email !== null) {
-      const emailResult = emailSchema.safeParse(email)
+    if (input.email !== null) {
+      const emailResult = emailSchema.safeParse(input.email)
       if (!emailResult.success) {
         throw new ValidationError({
           email: [emailResult.error.issues[0]?.message || 'Invalid email'],
@@ -375,7 +190,7 @@ export class AuthenticationService {
     }
 
     // Hash the email in the business logic layer
-    const emailHash = email ? hashEmail(email) : null
+    const emailHash = input.email ? hashEmail(input.email) : null
 
     await this.userRepository.update(userId, {
       emailHash,

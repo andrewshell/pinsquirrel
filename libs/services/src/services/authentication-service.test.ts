@@ -6,6 +6,10 @@ import type {
   PasswordResetRepository,
   EmailService,
   PasswordResetToken,
+  RegisterInput,
+  LoginInput,
+  ChangePasswordInput,
+  UpdateEmailInput,
 } from '@pinsquirrel/domain'
 import {
   InvalidCredentialsError,
@@ -93,7 +97,12 @@ describe('AuthenticationService', () => {
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
       vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
 
-      const result = await authService.register('testuser', 'password123')
+      const registerInput: RegisterInput = {
+        username: 'testuser',
+        password: 'password123',
+      }
+
+      const result = await authService.register(registerInput)
 
       expect(mockUserRepository.findByUsername).toHaveBeenCalledWith('testuser')
       expect(mockUserRepository.create).toHaveBeenCalledWith({
@@ -108,11 +117,13 @@ describe('AuthenticationService', () => {
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
       vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
 
-      const result = await authService.register(
-        'testuser',
-        'password123',
-        'test@example.com'
-      )
+      const registerInput: RegisterInput = {
+        username: 'testuser',
+        password: 'password123',
+        email: 'test@example.com',
+      }
+
+      const result = await authService.register(registerInput)
 
       expect(mockUserRepository.create).toHaveBeenCalledWith({
         username: 'testuser',
@@ -125,40 +136,63 @@ describe('AuthenticationService', () => {
     it('should throw UserAlreadyExistsError if username is taken', async () => {
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(mockUser)
 
-      await expect(
-        authService.register('testuser', 'password123')
-      ).rejects.toThrow(UserAlreadyExistsError)
+      const registerInput: RegisterInput = {
+        username: 'testuser',
+        password: 'password123',
+      }
+
+      await expect(authService.register(registerInput)).rejects.toThrow(
+        UserAlreadyExistsError
+      )
 
       expect(mockUserRepository.create).not.toHaveBeenCalled()
     })
 
     it('should throw validation error for invalid username', async () => {
-      await expect(
-        authService.register('ab', 'password123') // too short
-      ).rejects.toThrow('Username must be at least 3 characters')
+      const registerInput: RegisterInput = {
+        username: 'ab', // too short
+        password: 'password123',
+      }
+
+      await expect(authService.register(registerInput)).rejects.toThrow(
+        'Username must be at least 3 characters'
+      )
     })
 
     it('should throw validation error for invalid password', async () => {
-      await expect(
-        authService.register('testuser', 'short') // too short
-      ).rejects.toThrow('Password must be at least 8 characters')
+      const registerInput: RegisterInput = {
+        username: 'testuser',
+        password: 'short', // too short
+      }
+
+      await expect(authService.register(registerInput)).rejects.toThrow(
+        'Password must be at least 8 characters'
+      )
     })
 
     it('should throw validation error for invalid email', async () => {
-      await expect(
-        authService.register('testuser', 'password123', 'invalid-email')
-      ).rejects.toThrow('Invalid email address')
+      const registerInput: RegisterInput = {
+        username: 'testuser',
+        password: 'password123',
+        email: 'invalid-email',
+      }
+
+      await expect(authService.register(registerInput)).rejects.toThrow(
+        'Invalid email address'
+      )
     })
 
     it('should register user with undefined email', async () => {
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
       vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
 
-      const result = await authService.register(
-        'testuser',
-        'password123',
-        undefined
-      )
+      const registerInput: RegisterInput = {
+        username: 'testuser',
+        password: 'password123',
+        email: undefined,
+      }
+
+      const result = await authService.register(registerInput)
 
       expect(mockUserRepository.create).toHaveBeenCalledWith({
         username: 'testuser',
@@ -172,7 +206,13 @@ describe('AuthenticationService', () => {
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
       vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
 
-      const result = await authService.register('testuser', 'password123', '')
+      const registerInput: RegisterInput = {
+        username: 'testuser',
+        password: 'password123',
+        email: '',
+      }
+
+      const result = await authService.register(registerInput)
 
       expect(mockUserRepository.create).toHaveBeenCalledWith({
         username: 'testuser',
@@ -180,100 +220,6 @@ describe('AuthenticationService', () => {
         emailHash: null,
       })
       expect(result).toEqual(mockUser)
-    })
-  })
-
-  describe('registerFromFormData', () => {
-    it('should register a new user with valid form data', async () => {
-      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
-      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
-
-      const formData = {
-        username: 'testuser',
-        password: 'password123',
-        email: 'test@example.com',
-      }
-
-      const result = await authService.registerFromFormData(formData)
-
-      expect(mockUserRepository.create).toHaveBeenCalledWith({
-        username: 'testuser',
-        passwordHash: 'hashed_password123',
-        emailHash: 'hashed_test@example.com',
-      })
-      expect(result).toEqual(mockUser)
-    })
-
-    it('should register a new user with empty string email', async () => {
-      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
-      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
-
-      const formData = {
-        username: 'testuser',
-        password: 'password123',
-        email: '', // empty string should be treated as undefined
-      }
-
-      const result = await authService.registerFromFormData(formData)
-
-      expect(mockUserRepository.create).toHaveBeenCalledWith({
-        username: 'testuser',
-        passwordHash: 'hashed_password123',
-        emailHash: null,
-      })
-      expect(result).toEqual(mockUser)
-    })
-
-    it('should register a new user with whitespace-only email', async () => {
-      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
-      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
-
-      const formData = {
-        username: 'testuser',
-        password: 'password123',
-        email: '   ', // whitespace-only string should be treated as undefined
-      }
-
-      const result = await authService.registerFromFormData(formData)
-
-      expect(mockUserRepository.create).toHaveBeenCalledWith({
-        username: 'testuser',
-        passwordHash: 'hashed_password123',
-        emailHash: null,
-      })
-      expect(result).toEqual(mockUser)
-    })
-
-    it('should register a new user without email field', async () => {
-      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
-      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
-
-      const formData = {
-        username: 'testuser',
-        password: 'password123',
-        // no email field
-      }
-
-      const result = await authService.registerFromFormData(formData)
-
-      expect(mockUserRepository.create).toHaveBeenCalledWith({
-        username: 'testuser',
-        passwordHash: 'hashed_password123',
-        emailHash: null,
-      })
-      expect(result).toEqual(mockUser)
-    })
-
-    it('should throw validation error for invalid email', async () => {
-      const formData = {
-        username: 'testuser',
-        password: 'password123',
-        email: 'invalid-email',
-      }
-
-      await expect(authService.registerFromFormData(formData)).rejects.toThrow(
-        'Invalid email address'
-      )
     })
   })
 
@@ -288,7 +234,12 @@ describe('AuthenticationService', () => {
       )
       vi.mocked(verifyPassword).mockResolvedValue(true)
 
-      const result = await authService.login('testuser', 'password123')
+      const loginInput: LoginInput = {
+        username: 'testuser',
+        password: 'password123',
+      }
+
+      const result = await authService.login(loginInput)
 
       expect(mockUserRepository.findByUsername).toHaveBeenCalledWith('testuser')
       expect(verifyPassword).toHaveBeenCalledWith(
@@ -301,30 +252,50 @@ describe('AuthenticationService', () => {
     it('should throw InvalidCredentialsError for non-existent user', async () => {
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
 
-      await expect(
-        authService.login('nonexistent', 'password123')
-      ).rejects.toThrow(InvalidCredentialsError)
+      const loginInput: LoginInput = {
+        username: 'nonexistent',
+        password: 'password123',
+      }
+
+      await expect(authService.login(loginInput)).rejects.toThrow(
+        InvalidCredentialsError
+      )
     })
 
     it('should throw InvalidCredentialsError for wrong password', async () => {
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(mockUser)
       vi.mocked(verifyPassword).mockResolvedValue(false)
 
-      await expect(
-        authService.login('testuser', 'wrongpassword')
-      ).rejects.toThrow(InvalidCredentialsError)
+      const loginInput: LoginInput = {
+        username: 'testuser',
+        password: 'wrongpassword',
+      }
+
+      await expect(authService.login(loginInput)).rejects.toThrow(
+        InvalidCredentialsError
+      )
     })
 
     it('should throw validation error for invalid username', async () => {
-      await expect(
-        authService.login('ab', 'password123') // too short
-      ).rejects.toThrow('Username must be at least 3 characters')
+      const loginInput: LoginInput = {
+        username: 'ab', // too short
+        password: 'password123',
+      }
+
+      await expect(authService.login(loginInput)).rejects.toThrow(
+        'Username must be at least 3 characters'
+      )
     })
 
     it('should throw validation error for invalid password', async () => {
-      await expect(
-        authService.login('testuser', 'short') // too short
-      ).rejects.toThrow('Password must be at least 8 characters')
+      const loginInput: LoginInput = {
+        username: 'testuser',
+        password: 'short', // too short
+      }
+
+      await expect(authService.login(loginInput)).rejects.toThrow(
+        'Password must be at least 8 characters'
+      )
     })
   })
 
@@ -334,7 +305,12 @@ describe('AuthenticationService', () => {
       vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
       vi.mocked(verifyPassword).mockResolvedValue(true)
 
-      await authService.changePassword('123', 'currentpass123', 'newpass123')
+      const changePasswordInput: ChangePasswordInput = {
+        currentPassword: 'currentpass123',
+        newPassword: 'newpass123',
+      }
+
+      await authService.changePassword('123', changePasswordInput)
 
       expect(mockUserRepository.findById).toHaveBeenCalledWith('123')
       expect(verifyPassword).toHaveBeenCalledWith(
@@ -350,8 +326,13 @@ describe('AuthenticationService', () => {
       vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
       vi.mocked(verifyPassword).mockResolvedValue(false)
 
+      const changePasswordInput: ChangePasswordInput = {
+        currentPassword: 'wrongpass123',
+        newPassword: 'newpass123',
+      }
+
       await expect(
-        authService.changePassword('123', 'wrongpass123', 'newpass123')
+        authService.changePassword('123', changePasswordInput)
       ).rejects.toThrow(InvalidCredentialsError)
 
       expect(mockUserRepository.update).not.toHaveBeenCalled()
@@ -360,20 +341,35 @@ describe('AuthenticationService', () => {
     it('should throw InvalidCredentialsError for non-existent user', async () => {
       vi.mocked(mockUserRepository.findById).mockResolvedValue(null)
 
+      const changePasswordInput: ChangePasswordInput = {
+        currentPassword: 'currentpass123',
+        newPassword: 'newpass123',
+      }
+
       await expect(
-        authService.changePassword('999', 'currentpass123', 'newpass123')
+        authService.changePassword('999', changePasswordInput)
       ).rejects.toThrow(InvalidCredentialsError)
     })
 
     it('should throw validation error for invalid current password', async () => {
+      const changePasswordInput: ChangePasswordInput = {
+        currentPassword: 'short', // too short
+        newPassword: 'newpass123',
+      }
+
       await expect(
-        authService.changePassword('123', 'short', 'newpass123') // current password too short
+        authService.changePassword('123', changePasswordInput)
       ).rejects.toThrow('Password must be at least 8 characters')
     })
 
     it('should throw validation error for invalid new password', async () => {
+      const changePasswordInput: ChangePasswordInput = {
+        currentPassword: 'currentpass123',
+        newPassword: 'short', // too short
+      }
+
       await expect(
-        authService.changePassword('123', 'currentpass123', 'short') // new password too short
+        authService.changePassword('123', changePasswordInput)
       ).rejects.toThrow('Password must be at least 8 characters')
     })
   })
@@ -382,7 +378,11 @@ describe('AuthenticationService', () => {
     it('should update email', async () => {
       vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
 
-      await authService.updateEmail('123', 'newemail@example.com')
+      const updateEmailInput: UpdateEmailInput = {
+        email: 'newemail@example.com',
+      }
+
+      await authService.updateEmail('123', updateEmailInput)
 
       expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
         emailHash: 'hashed_newemail@example.com',
@@ -392,7 +392,11 @@ describe('AuthenticationService', () => {
     it('should clear email when null is provided', async () => {
       vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
 
-      await authService.updateEmail('123', null)
+      const updateEmailInput: UpdateEmailInput = {
+        email: null,
+      }
+
+      await authService.updateEmail('123', updateEmailInput)
 
       expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
         emailHash: null,
@@ -400,8 +404,12 @@ describe('AuthenticationService', () => {
     })
 
     it('should throw validation error for invalid email', async () => {
+      const updateEmailInput: UpdateEmailInput = {
+        email: 'invalid-email',
+      }
+
       await expect(
-        authService.updateEmail('123', 'invalid-email')
+        authService.updateEmail('123', updateEmailInput)
       ).rejects.toThrow('Invalid email address')
     })
   })

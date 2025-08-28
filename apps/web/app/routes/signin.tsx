@@ -1,6 +1,10 @@
 import { Link, redirect, data } from 'react-router'
 import type { Route } from './+types/signin'
-import { ValidationError, InvalidCredentialsError } from '@pinsquirrel/domain'
+import {
+  ValidationError,
+  InvalidCredentialsError,
+  type LoginInput,
+} from '@pinsquirrel/domain'
 import { authService } from '~/lib/services/container.server'
 import { createUserSession, getUserId } from '~/lib/session.server'
 import { getUserPath } from '~/lib/auth.server'
@@ -39,8 +43,14 @@ export async function action({ request }: Route.ActionArgs) {
 
   const formData = await parseFormData(request)
 
+  // Parse form data into domain input type
+  const loginInput: LoginInput = {
+    username: formData.username as string,
+    password: formData.password as string,
+  }
+
   try {
-    const user = await authService.loginFromFormData(formData)
+    const user = await authService.login(loginInput)
 
     logger.info('User login successful', {
       userId: user.id,

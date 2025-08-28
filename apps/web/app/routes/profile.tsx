@@ -1,7 +1,12 @@
 import { useLoaderData, data } from 'react-router'
 import type { Route } from './+types/profile'
 import { requireUser } from '~/lib/session.server'
-import { InvalidCredentialsError, ValidationError } from '@pinsquirrel/domain'
+import {
+  InvalidCredentialsError,
+  ValidationError,
+  type ChangePasswordInput,
+  type UpdateEmailInput,
+} from '@pinsquirrel/domain'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { UpdateEmailForm } from '~/components/profile/UpdateEmailForm'
 import { ChangePasswordForm } from '~/components/profile/ChangePasswordForm'
@@ -41,7 +46,17 @@ export async function action({ request }: Route.ActionArgs) {
 
   try {
     if (intent === 'update-email') {
-      await authService.updateEmailFromFormData(user.id, formData)
+      // Parse form data into domain input type
+      const updateEmailInput: UpdateEmailInput = {
+        email:
+          formData.email === '' ||
+          formData.email === null ||
+          formData.email === undefined
+            ? null
+            : (formData.email as string),
+      }
+
+      await authService.updateEmail(user.id, updateEmailInput)
 
       logger.info('User email updated', {
         userId: user.id,
@@ -55,7 +70,13 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     if (intent === 'change-password') {
-      await authService.changePasswordFromFormData(user.id, formData)
+      // Parse form data into domain input type
+      const changePasswordInput: ChangePasswordInput = {
+        currentPassword: formData.currentPassword as string,
+        newPassword: formData.newPassword as string,
+      }
+
+      await authService.changePassword(user.id, changePasswordInput)
 
       logger.info('User password changed', {
         userId: user.id,

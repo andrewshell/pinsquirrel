@@ -25,6 +25,14 @@ export type {
   PasswordResetConfirmation
 } from './entities/password-reset-token.js'
 
+// Input Types
+export type {
+  RegisterInput,
+  LoginInput,
+  ChangePasswordInput,
+  UpdateEmailInput
+} from './types/AuthenticationInputs.js'
+
 // Interfaces
 export type { Repository } from './interfaces/repository.js'
 export type { UserRepository } from './interfaces/user-repository.js'
