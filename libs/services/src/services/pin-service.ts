@@ -1,8 +1,11 @@
 import type {
+  CreatePinData,
+  CreateTagData,
   Pin,
   PinRepository,
   Tag,
   TagRepository,
+  UpdatePinData,
 } from '@pinsquirrel/domain'
 import {
   DuplicatePinError,
@@ -13,11 +16,6 @@ import {
   UnauthorizedTagAccessError,
   ValidationError,
 } from '@pinsquirrel/domain'
-import type {
-  CreatePinInput,
-  CreateTagInput,
-  UpdatePinInput,
-} from '../validation/pin.js'
 import {
   createPinDataSchema,
   createTagDataSchema,
@@ -102,10 +100,11 @@ export class PinService {
       throw new ValidationError(errors)
     }
 
-    return this.createPin(userId, {
+    return this.createPin({
+      userId,
       url: url as string,
       title: title as string,
-      description: (description as string) || '',
+      description: (description as string) || null,
       readLater,
       tagNames,
     })
@@ -121,7 +120,7 @@ export class PinService {
   ): Promise<Pin> {
     // Validate and convert form data
     const errors: Record<string, string[]> = {}
-    const updateData: Partial<UpdatePinInput> = {}
+    const updateData: Partial<UpdatePinData> = {}
 
     // Optional: url
     if (formData.url !== undefined) {
@@ -195,9 +194,18 @@ export class PinService {
     return this.updatePin(userId, pinId, updateData)
   }
 
-  async createPin(userId: string, data: CreatePinInput): Promise<Pin> {
-    // Validate input
-    const validationResult = createPinDataSchema.safeParse(data)
+  async createPin(data: CreatePinData): Promise<Pin> {
+    // Validate input using zod schema (adapt domain type to validation type)
+    const validationData = {
+      url: data.url,
+      title: data.title,
+      description: data.description,
+      readLater: data.readLater,
+      tagNames: data.tagNames,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+    }
+    const validationResult = createPinDataSchema.safeParse(validationData)
     if (!validationResult.success) {
       const errors: Record<string, string[]> = {}
       for (const issue of validationResult.error.issues) {
@@ -212,7 +220,7 @@ export class PinService {
 
     // Check for duplicate URL
     const existingPin = await this.pinRepository.findByUserIdAndUrl(
-      userId,
+      data.userId,
       data.url
     )
     if (existingPin) {
@@ -221,20 +229,11 @@ export class PinService {
 
     // Handle tags using bulk fetch/create
     if (data.tagNames && data.tagNames.length > 0) {
-      await this.tagRepository.fetchOrCreateByNames(userId, data.tagNames)
+      await this.tagRepository.fetchOrCreateByNames(data.userId, data.tagNames)
     }
 
     // Create pin
-    const pin = await this.pinRepository.create({
-      userId,
-      url: data.url,
-      title: data.title,
-      description: data.description,
-      readLater: data.readLater ?? false,
-      tagNames: data.tagNames,
-      createdAt: data.createdAt,
-      updatedAt: data.updatedAt,
-    })
+    const pin = await this.pinRepository.create(data)
 
     return pin
   }
@@ -242,9 +241,9 @@ export class PinService {
   async updatePin(
     userId: string,
     pinId: string,
-    data: UpdatePinInput
+    data: UpdatePinData
   ): Promise<Pin> {
-    // Validate input
+    // Validate input using zod schema (domain type matches validation type structure)
     const validationResult = updatePinDataSchema.safeParse(data)
     if (!validationResult.success) {
       const errors: Record<string, string[]> = {}
@@ -338,9 +337,9 @@ export class PinService {
     return await this.pinRepository.findByUserId(userId, { tagId })
   }
 
-  async createTag(userId: string, data: CreateTagInput): Promise<Tag> {
+  async createTag(data: CreateTagData): Promise<Tag> {
     // Validate input
-    const validationResult = createTagDataSchema.safeParse(data)
+    const validationResult = createTagDataSchema.safeParse({ name: data.name })
     if (!validationResult.success) {
       const errors: Record<string, string[]> = {}
       for (const issue of validationResult.error.issues) {
@@ -355,7 +354,7 @@ export class PinService {
 
     // Check for duplicate tag name
     const existingTag = await this.tagRepository.findByUserIdAndName(
-      userId,
+      data.userId,
       data.name
     )
     if (existingTag) {
@@ -363,10 +362,7 @@ export class PinService {
     }
 
     // Create tag
-    const tag = await this.tagRepository.create({
-      userId,
-      name: data.name,
-    })
+    const tag = await this.tagRepository.create(data)
 
     return tag
   }

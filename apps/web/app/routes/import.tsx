@@ -145,7 +145,8 @@ export async function action({ request }: Route.ActionArgs) {
         tagNames.forEach(tag => allTagNames.add(tag))
 
         // Create pin using the service (handles duplicate checking)
-        await pinService.createPin(user.id, {
+        await pinService.createPin({
+          userId: user.id,
           url: pinboardPin.href,
           title: pinboardPin.description,
           description: pinboardPin.extended || null,

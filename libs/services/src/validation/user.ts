@@ -1,7 +1,5 @@
 import { z } from 'zod'
 
-// Domain validation rules - these define what is valid in the business domain
-
 export const usernameSchema = z
   .string()
   .min(3, 'Username must be at least 3 characters')

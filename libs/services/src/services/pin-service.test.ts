@@ -97,7 +97,8 @@ describe('PinService', () => {
       mockTagRepository.fetchOrCreateByNames.mockResolvedValue([mockTag])
       mockPinRepository.create.mockResolvedValue(mockPin)
 
-      const result = await pinService.createPin('user-123', {
+      const result = await pinService.createPin({
+        userId: 'user-123',
         url: 'https://example.com',
         title: 'Example',
         description: 'Description',
@@ -128,7 +129,8 @@ describe('PinService', () => {
       mockPinRepository.findByUserIdAndUrl.mockResolvedValue(mockPin)
 
       await expect(
-        pinService.createPin('user-123', {
+        pinService.createPin({
+          userId: 'user-123',
           url: 'https://example.com',
           title: 'Example',
           readLater: false,
@@ -138,7 +140,8 @@ describe('PinService', () => {
 
     it('should throw validation error for invalid URL', async () => {
       await expect(
-        pinService.createPin('user-123', {
+        pinService.createPin({
+          userId: 'user-123',
           url: 'not-a-url',
           title: 'Example',
           readLater: false,
@@ -150,7 +153,8 @@ describe('PinService', () => {
       mockPinRepository.findByUserIdAndUrl.mockResolvedValue(null)
       mockPinRepository.create.mockResolvedValue(mockPin)
 
-      const result = await pinService.createPin('user-123', {
+      const result = await pinService.createPin({
+        userId: 'user-123',
         url: 'https://example.com',
         title: 'Example',
         readLater: false,
@@ -164,7 +168,8 @@ describe('PinService', () => {
       mockPinRepository.findByUserIdAndUrl.mockResolvedValue(null)
       mockPinRepository.create.mockResolvedValue(mockPin)
 
-      const result = await pinService.createPin('user-123', {
+      const result = await pinService.createPin({
+        userId: 'user-123',
         url: 'https://example.com',
         title: 'Example',
         readLater: false,
@@ -418,7 +423,8 @@ describe('PinService', () => {
       mockTagRepository.findByUserIdAndName.mockResolvedValue(null)
       mockTagRepository.create.mockResolvedValue(mockTag)
 
-      const result = await pinService.createTag('user-123', {
+      const result = await pinService.createTag({
+        userId: 'user-123',
         name: 'javascript',
       })
 
@@ -433,13 +439,13 @@ describe('PinService', () => {
       mockTagRepository.findByUserIdAndName.mockResolvedValue(mockTag)
 
       await expect(
-        pinService.createTag('user-123', { name: 'javascript' })
+        pinService.createTag({ userId: 'user-123', name: 'javascript' })
       ).rejects.toThrow(DuplicateTagError)
     })
 
     it('should validate tag name', async () => {
       await expect(
-        pinService.createTag('user-123', { name: 'invalid\x00tag' })
+        pinService.createTag({ userId: 'user-123', name: 'invalid\x00tag' })
       ).rejects.toThrow('Tag name cannot contain control characters')
     })
   })

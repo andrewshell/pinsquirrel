@@ -54,8 +54,3 @@ export const updatePinDataSchema = z.object({
 export const createTagDataSchema = z.object({
   name: tagNameSchema,
 })
-
-// Type exports for domain use
-export type CreatePinInput = z.infer<typeof createPinDataSchema>
-export type UpdatePinInput = z.infer<typeof updatePinDataSchema>
-export type CreateTagInput = z.infer<typeof createTagDataSchema>
