@@ -4,10 +4,4 @@ export {
   HttpMetadataService,
   type MetadataService,
 } from './services/metadata-service.js'
-export {
-  PaginationService,
-  type PaginatedData,
-  type PaginationOptions,
-  type PaginationResult,
-} from './services/pagination-service.js'
 export { PinService } from './services/pin-service.js'

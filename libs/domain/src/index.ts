@@ -24,6 +24,10 @@ export type {
   PasswordResetRequest,
   PasswordResetConfirmation
 } from './entities/password-reset-token.js'
+export { 
+  Pagination,
+  type PaginationOptions
+} from './entities/pagination.js'
 
 // Input Types
 export type {

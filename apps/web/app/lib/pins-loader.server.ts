@@ -1,11 +1,8 @@
-import { type PinFilter } from '@pinsquirrel/domain'
+import { type PinFilter, Pagination } from '@pinsquirrel/domain'
 import { data } from 'react-router'
 import { requireUsernameMatch } from '~/lib/auth.server'
 import { parsePinFilters } from '~/lib/filter-utils.server'
-import {
-  repositories,
-  paginationService,
-} from '~/lib/services/container.server'
+import { repositories } from '~/lib/services/container.server'
 import { commitSession, getSession, requireUser } from '~/lib/session.server'
 
 export type ReadFilterType = 'all' | 'toread' | 'read'
@@ -25,10 +22,13 @@ export async function createPinsLoader(
   const url = new URL(request.url)
 
   // Parse pagination parameters from URL
-  const paginationParams = paginationService.parsePaginationParams({
-    page: url.searchParams.get('page') || undefined,
-    pageSize: url.searchParams.get('pageSize') || undefined,
-  })
+  const pageParam = url.searchParams.get('page')
+  const pageSizeParam = url.searchParams.get('pageSize')
+
+  const paginationParams = {
+    page: pageParam ? Math.max(1, Number(pageParam) || 1) : 1,
+    pageSize: pageSizeParam ? Number(pageSizeParam) || undefined : undefined,
+  }
 
   // Parse filter parameters from URL using centralized utility
   const parsedFilters = parsePinFilters(url)
@@ -54,7 +54,7 @@ export async function createPinsLoader(
   const totalCount = await repositories.pin.countByUserId(user.id, filter)
 
   // Calculate pagination details
-  const pagination = paginationService.calculatePagination(totalCount, {
+  const pagination = Pagination.fromTotalCount(totalCount, {
     ...paginationParams,
     defaultPageSize: 25,
     maxPageSize: 100,
