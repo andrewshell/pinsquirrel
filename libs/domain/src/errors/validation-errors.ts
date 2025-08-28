@@ -1,7 +1,9 @@
-export class ValidationError extends Error {
-  public readonly fields: Record<string, string[]>
+export type FieldErrors = Record<string, string[]>
 
-  constructor(fields: Record<string, string[]>, message?: string) {
+export class ValidationError extends Error {
+  public readonly fields: FieldErrors
+
+  constructor(fields: FieldErrors, message?: string) {
     // If no custom message provided, use the first field error as the message
     let errorMessage = message
     if (!errorMessage) {
@@ -17,26 +19,6 @@ export class ValidationError extends Error {
     super(errorMessage)
     this.name = 'ValidationError'
     this.fields = fields
-  }
-
-  /**
-   * Create a ValidationError with a single field error
-   */
-  static forField(field: string, message: string): ValidationError {
-    return new ValidationError({ [field]: [message] })
-  }
-
-  /**
-   * Create a ValidationError with multiple field errors
-   */
-  static forFields(fields: Record<string, string | string[]>): ValidationError {
-    const normalizedFields: Record<string, string[]> = {}
-
-    for (const [field, messages] of Object.entries(fields)) {
-      normalizedFields[field] = Array.isArray(messages) ? messages : [messages]
-    }
-
-    return new ValidationError(normalizedFields)
   }
 
   /**

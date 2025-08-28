@@ -1,4 +1,4 @@
-import type { FieldErrors } from '~/lib/validation-errors'
+import type { FieldErrors } from '@pinsquirrel/domain'
 import { useFetcher } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'

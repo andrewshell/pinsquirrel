@@ -2,7 +2,7 @@ import { useFetcher } from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
-import type { FieldErrors } from '~/lib/validation-errors'
+import type { FieldErrors } from '@pinsquirrel/domain'
 
 interface UpdateEmailFormProps {
   // Optional success callback for parent component to handle success
@@ -36,7 +36,9 @@ export function UpdateEmailForm({ onSuccess }: UpdateEmailFormProps) {
 
           {emailFetcher.data?.errors?._form && (
             <div className="p-3 text-sm text-black bg-red-400 border-4 border-foreground neobrutalism-shadow font-bold uppercase">
-              {emailFetcher.data.errors._form}
+              {Array.isArray(emailFetcher.data.errors._form)
+                ? emailFetcher.data.errors._form.join('. ')
+                : emailFetcher.data.errors._form}
             </div>
           )}
 
@@ -66,7 +68,9 @@ export function UpdateEmailForm({ onSuccess }: UpdateEmailFormProps) {
             />
             {emailFetcher.data?.errors?.email && (
               <p className="mt-1 text-sm text-red-600">
-                {emailFetcher.data.errors.email}
+                {Array.isArray(emailFetcher.data.errors.email)
+                  ? emailFetcher.data.errors.email.join('. ')
+                  : emailFetcher.data.errors.email}
               </p>
             )}
           </div>

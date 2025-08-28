@@ -66,7 +66,7 @@ export async function action({ request }: Route.ActionArgs) {
     return data(
       {
         errors: {
-          _form: 'An unexpected error occurred. Please try again.',
+          _form: ['An unexpected error occurred. Please try again.'],
         },
       },
       { status: 500 }

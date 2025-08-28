@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { createRoutesStub } from 'react-router'
 import { RegisterForm } from './RegisterForm'
-import type { FieldErrors } from '~/lib/validation-errors'
+import type { FieldErrors } from '@pinsquirrel/domain'
 
 describe('RegisterForm', () => {
   const createRegisterFormStub = (actionData?: { errors?: FieldErrors }) => {
@@ -43,7 +43,7 @@ describe('RegisterForm', () => {
   it('displays form-level error message', () => {
     // TODO: Need to simulate fetcher action data properly
     renderWithRouter({
-      errors: { _form: 'Registration failed' },
+      errors: { _form: ['Registration failed'] },
     })
 
     // For now, just test that form renders - error display needs fetcher simulation
@@ -53,7 +53,7 @@ describe('RegisterForm', () => {
   it('displays username field error', () => {
     // TODO: Need to simulate fetcher action data properly
     renderWithRouter({
-      errors: { username: 'Username is required' },
+      errors: { username: ['Username is required'] },
     })
 
     // For now, just test that form renders - error display needs fetcher simulation
@@ -63,7 +63,7 @@ describe('RegisterForm', () => {
   it('displays password field error', () => {
     // TODO: Need to simulate fetcher action data properly
     renderWithRouter({
-      errors: { password: 'Password is required' },
+      errors: { password: ['Password is required'] },
     })
 
     // For now, just test that form renders - error display needs fetcher simulation
@@ -73,7 +73,7 @@ describe('RegisterForm', () => {
   it('displays email field error', () => {
     // TODO: Need to simulate fetcher action data properly
     renderWithRouter({
-      errors: { email: 'Invalid email format' },
+      errors: { email: ['Invalid email format'] },
     })
 
     // For now, just test that form renders - error display needs fetcher simulation

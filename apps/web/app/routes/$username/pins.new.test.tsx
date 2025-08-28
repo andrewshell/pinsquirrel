@@ -283,7 +283,7 @@ describe('pins/new route', () => {
       expect(result).toMatchObject({
         data: {
           errors: {
-            _form: 'Failed to create pin. Please try again.',
+            _form: ['Failed to create pin. Please try again.'],
           },
         },
         init: {

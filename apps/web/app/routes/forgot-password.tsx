@@ -61,7 +61,9 @@ export async function action({ request }: Route.ActionArgs) {
       return data(
         {
           errors: {
-            _form: 'Too many password reset requests. Please try again later.',
+            _form: [
+              'Too many password reset requests. Please try again later.',
+            ],
           },
         },
         { status: 429 }
@@ -71,7 +73,7 @@ export async function action({ request }: Route.ActionArgs) {
     return data(
       {
         errors: {
-          _form: 'An error occurred. Please try again later.',
+          _form: ['An error occurred. Please try again later.'],
         },
       },
       { status: 500 }

@@ -8,7 +8,7 @@ import { FormText } from '~/components/ui/form-text'
 import { Checkbox } from '~/components/ui/checkbox'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import { TagInput } from '~/components/ui/tag-input'
-import type { FieldErrors } from '~/lib/validation-errors'
+import type { FieldErrors } from '@pinsquirrel/domain'
 import type { UrlParams } from '~/lib/url-params.server'
 
 // Helper to deduplicate tags while preserving original casing

@@ -214,16 +214,15 @@ export class AuthenticationService {
     }
 
     if (typeof email !== 'string') {
-      throw ValidationError.forField('email', 'Email must be a valid string')
+      throw new ValidationError({ email: ['Email must be a valid string'] })
     }
 
     // Validate email format
     const emailResult = emailSchema.safeParse(email)
     if (!emailResult.success) {
-      throw ValidationError.forField(
-        'email',
-        emailResult.error.issues[0]?.message || 'Invalid email'
-      )
+      throw new ValidationError({
+        email: [emailResult.error.issues[0]?.message || 'Invalid email'],
+      })
     }
 
     return this.updateEmail(userId, email)
@@ -369,10 +368,9 @@ export class AuthenticationService {
     if (email !== null) {
       const emailResult = emailSchema.safeParse(email)
       if (!emailResult.success) {
-        throw ValidationError.forField(
-          'email',
-          emailResult.error.issues[0]?.message || 'Invalid email'
-        )
+        throw new ValidationError({
+          email: [emailResult.error.issues[0]?.message || 'Invalid email'],
+        })
       }
     }
 
@@ -388,10 +386,9 @@ export class AuthenticationService {
     // Validate email at service boundary
     const emailResult = emailSchema.safeParse(email)
     if (!emailResult.success) {
-      throw ValidationError.forField(
-        'email',
-        emailResult.error.issues[0]?.message || 'Invalid email'
-      )
+      throw new ValidationError({
+        email: [emailResult.error.issues[0]?.message || 'Invalid email'],
+      })
     }
 
     // Hash the email in the business logic layer
@@ -406,10 +403,9 @@ export class AuthenticationService {
     // Validate email at service boundary
     const emailResult = emailSchema.safeParse(email)
     if (!emailResult.success) {
-      throw ValidationError.forField(
-        'email',
-        emailResult.error.issues[0]?.message || 'Invalid email'
-      )
+      throw new ValidationError({
+        email: [emailResult.error.issues[0]?.message || 'Invalid email'],
+      })
     }
 
     if (!this.passwordResetRepository || !this.emailService) {
@@ -463,10 +459,11 @@ export class AuthenticationService {
     // Validate password at service boundary
     const passwordResult = passwordSchema.safeParse(newPassword)
     if (!passwordResult.success) {
-      throw ValidationError.forField(
-        'newPassword',
-        passwordResult.error.issues[0]?.message || 'Invalid password'
-      )
+      throw new ValidationError({
+        newPassword: [
+          passwordResult.error.issues[0]?.message || 'Invalid password',
+        ],
+      })
     }
 
     if (!this.passwordResetRepository) {

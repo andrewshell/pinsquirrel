@@ -131,7 +131,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       }
 
       return data(
-        { errors: { _form: 'Invalid PATCH request' } },
+        { errors: { _form: ['Invalid PATCH request'] } },
         { status: 400 }
       )
     } catch (error) {
@@ -143,7 +143,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       return data(
         {
           errors: {
-            _form: 'Failed to update pin. Please try again.',
+            _form: ['Failed to update pin. Please try again.'],
           },
         },
         { status: 400 }
@@ -256,7 +256,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     return data(
       {
         errors: {
-          _form: 'Failed to update pin. Please try again.',
+          _form: ['Failed to update pin. Please try again.'],
         },
       },
       { status: 500 }

@@ -55,7 +55,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     return data(
       {
         errors: {
-          _form: 'Please select source tags and a destination tag.',
+          _form: ['Please select source tags and a destination tag.'],
         },
       },
       { status: 400 }
@@ -79,7 +79,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     return data(
       {
         errors: {
-          _form: 'Invalid source tags format.',
+          _form: ['Invalid source tags format.'],
         },
       },
       { status: 400 }
@@ -90,7 +90,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     return data(
       {
         errors: {
-          _form: 'Please select at least one source tag.',
+          _form: ['Please select at least one source tag.'],
         },
       },
       { status: 400 }
@@ -103,7 +103,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     return data(
       {
         errors: {
-          _form: 'Please select a destination tag.',
+          _form: ['Please select a destination tag.'],
         },
       },
       { status: 400 }
@@ -115,7 +115,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     return data(
       {
         errors: {
-          _form: 'Destination tag cannot be one of the source tags.',
+          _form: ['Destination tag cannot be one of the source tags.'],
         },
       },
       { status: 400 }
@@ -154,7 +154,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     return data(
       {
         errors: {
-          _form: 'Failed to merge tags. Please try again.',
+          _form: ['Failed to merge tags. Please try again.'],
         },
       },
       { status: 400 }

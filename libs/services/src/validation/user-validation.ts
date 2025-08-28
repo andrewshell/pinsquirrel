@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ValidationError } from '@pinsquirrel/domain'
 import {
   usernameSchema,
   passwordSchema,
@@ -8,156 +9,131 @@ import {
   updateUserDataSchema,
   loginCredentialsSchema,
 } from './domain-schemas.js'
-import type { ValidationResult, FieldErrors } from './types.js'
-import { createSuccessResult, createErrorResult } from './types.js'
 
-// Convert zod errors to our generic field errors
-function formatZodErrors(error: z.ZodError): FieldErrors {
-  const fieldErrors: FieldErrors = {}
+// Convert zod errors to ValidationError
+function throwValidationError(error: z.ZodError): never {
+  const fields: Record<string, string[]> = {}
 
   if (!error || !error.issues) {
-    return { _form: 'Invalid form data' }
+    throw new ValidationError({ _form: ['Invalid form data'] })
   }
 
   for (const issue of error.issues) {
-    const path = issue.path.join('.')
+    const path = issue.path.join('.') || '_form'
 
-    if (path === '') {
-      // Root level error
-      if (!fieldErrors._form) {
-        fieldErrors._form = []
-      }
-      if (Array.isArray(fieldErrors._form)) {
-        fieldErrors._form.push(issue.message)
-      }
-    } else {
-      // Field level error
-      if (!fieldErrors[path]) {
-        fieldErrors[path] = []
-      }
-      if (Array.isArray(fieldErrors[path])) {
-        ;(fieldErrors[path] as string[]).push(issue.message)
-      }
+    if (!fields[path]) {
+      fields[path] = []
     }
+    fields[path].push(issue.message)
   }
 
-  // Convert single error arrays to strings
-  for (const key in fieldErrors) {
-    const value = fieldErrors[key]
-    if (Array.isArray(value) && value.length === 1) {
-      fieldErrors[key] = value[0]
-    }
-  }
-
-  return fieldErrors
+  throw new ValidationError(fields)
 }
 
-// User validation functions that return generic results
-export function validateUsername(username: unknown): ValidationResult<string> {
+// User validation functions that return validated data or throw ValidationError
+export function validateUsername(username: unknown): string {
   const result = usernameSchema.safeParse(username)
 
   if (result.success) {
-    return createSuccessResult(result.data)
+    return result.data
   }
 
-  return createErrorResult(formatZodErrors(result.error))
+  throwValidationError(result.error)
 }
 
-export function validatePassword(password: unknown): ValidationResult<string> {
+export function validatePassword(password: unknown): string {
   const result = passwordSchema.safeParse(password)
 
   if (result.success) {
-    return createSuccessResult(result.data)
+    return result.data
   }
 
-  return createErrorResult(formatZodErrors(result.error))
+  throwValidationError(result.error)
 }
 
-export function validateEmail(email: unknown): ValidationResult<string> {
+export function validateEmail(email: unknown): string {
   const result = emailSchema.safeParse(email)
 
   if (result.success) {
-    return createSuccessResult(result.data)
+    return result.data
   }
 
-  return createErrorResult(formatZodErrors(result.error))
+  throwValidationError(result.error)
 }
 
-export function validateOptionalEmail(
-  email: unknown
-): ValidationResult<string | undefined> {
+export function validateOptionalEmail(email: unknown): string | undefined {
   const result = optionalEmailSchema.safeParse(email)
 
   if (result.success) {
-    return createSuccessResult(result.data)
+    return result.data
   }
 
-  return createErrorResult(formatZodErrors(result.error))
+  throwValidationError(result.error)
 }
 
-export function validateCreateUserData(data: unknown): ValidationResult<{
+export function validateCreateUserData(data: unknown): {
   username: string
   password: string
   email?: string
-}> {
+} {
   const result = createUserDataSchema.safeParse(data)
 
   if (result.success) {
-    return createSuccessResult(result.data)
+    return result.data
   }
 
-  return createErrorResult(formatZodErrors(result.error))
+  throwValidationError(result.error)
 }
 
-export function validateUpdateUserData(data: unknown): ValidationResult<{
+export function validateUpdateUserData(data: unknown): {
   email?: string
   currentPassword?: string
   newPassword?: string
-}> {
+} {
   const result = updateUserDataSchema.safeParse(data)
 
   if (result.success) {
-    return createSuccessResult(result.data)
+    return result.data
   }
 
-  return createErrorResult(formatZodErrors(result.error))
+  throwValidationError(result.error)
 }
 
-export function validateLoginCredentials(data: unknown): ValidationResult<{
+export function validateLoginCredentials(data: unknown): {
   username: string
   password: string
   keepSignedIn: boolean
-}> {
+} {
   const result = loginCredentialsSchema.safeParse(data)
 
   if (result.success) {
-    return createSuccessResult(result.data)
+    return result.data
   }
 
-  return createErrorResult(formatZodErrors(result.error))
+  throwValidationError(result.error)
 }
 
 // Additional validation functions for web forms
-export function validateRegistration(data: unknown): ValidationResult<{
+export function validateRegistration(data: unknown): {
   username: string
   password: string
   email?: string
-}> {
+} {
   return validateCreateUserData(data)
 }
 
-export function validateLogin(data: unknown): ValidationResult<{
+export function validateLogin(data: unknown): {
   username: string
   password: string
   keepSignedIn: boolean
-}> {
+} {
   return validateLoginCredentials(data)
 }
 
-export function validateEmailUpdate(data: unknown): ValidationResult<{
+export function validateEmailUpdate(data: unknown): {
   intent: 'update-email'
   email: string
-}> {
+} {
   const emailUpdateSchema = z.object({
     intent: z.literal('update-email'),
     email: emailSchema,
@@ -166,17 +142,17 @@ export function validateEmailUpdate(data: unknown): ValidationResult<{
   const result = emailUpdateSchema.safeParse(data)
 
   if (result.success) {
-    return createSuccessResult(result.data)
+    return result.data
   }
 
-  return createErrorResult(formatZodErrors(result.error))
+  throwValidationError(result.error)
 }
 
-export function validatePasswordChange(data: unknown): ValidationResult<{
+export function validatePasswordChange(data: unknown): {
   intent: 'change-password'
   currentPassword: string
   newPassword: string
-}> {
+} {
   const passwordChangeSchema = z.object({
     intent: z.literal('change-password'),
     currentPassword: passwordSchema,
@@ -186,8 +162,8 @@ export function validatePasswordChange(data: unknown): ValidationResult<{
   const result = passwordChangeSchema.safeParse(data)
 
   if (result.success) {
-    return createSuccessResult(result.data)
+    return result.data
   }
 
-  return createErrorResult(formatZodErrors(result.error))
+  throwValidationError(result.error)
 }

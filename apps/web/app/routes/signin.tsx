@@ -65,7 +65,7 @@ export async function action({ request }: Route.ActionArgs) {
       return data(
         {
           errors: {
-            _form: 'Invalid username or password',
+            _form: ['Invalid username or password'],
           },
         },
         { status: 400 }
@@ -76,7 +76,7 @@ export async function action({ request }: Route.ActionArgs) {
     return data(
       {
         errors: {
-          _form: 'An unexpected error occurred. Please try again.',
+          _form: ['An unexpected error occurred. Please try again.'],
         },
       },
       { status: 500 }

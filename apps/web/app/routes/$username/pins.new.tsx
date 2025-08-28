@@ -101,7 +101,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     return data(
       {
         errors: {
-          _form: 'Failed to create pin. Please try again.',
+          _form: ['Failed to create pin. Please try again.'],
         },
       },
       { status: 500 }

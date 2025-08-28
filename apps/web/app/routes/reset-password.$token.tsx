@@ -94,8 +94,9 @@ export async function action({ request, params }: Route.ActionArgs) {
     return data(
       {
         errors: {
-          _form:
+          _form: [
             'An error occurred. Please try again or request a new reset link.',
+          ],
         },
       },
       { status: 500 }

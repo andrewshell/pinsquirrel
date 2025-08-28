@@ -1,9 +1,6 @@
 // HTTP utilities for form data parsing
 
-import type { FieldErrors } from '~/lib/validation-errors'
-
-// Re-export types for convenience
-export type { FieldErrors }
+import type { ValidationError } from '@pinsquirrel/domain'
 
 // Parse FormData into a plain object with proper type handling
 export async function parseFormData(
@@ -99,7 +96,10 @@ export function parseParams(
 }
 
 // Helper to create error response for API routes
-export function validationErrorResponse(errors: FieldErrors, status = 400) {
+export function validationErrorResponse(
+  errors: ValidationError['fields'],
+  status = 400
+) {
   return new Response(
     JSON.stringify({
       success: false,
@@ -128,14 +128,4 @@ export function successResponse<T>(data: T, status = 200) {
       },
     }
   )
-}
-
-// Helper to create data() response with errors for forms
-export function createFormErrorResponse(errors: FieldErrors, status = 400) {
-  return new Response(JSON.stringify({ errors }), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  })
 }

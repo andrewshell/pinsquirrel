@@ -68,3 +68,6 @@ export {
 export {
   ValidationError
 } from './errors/validation-errors.js'
+export type {
+  FieldErrors
+} from './errors/validation-errors.js'

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { FormText } from '~/components/ui/form-text'
-import type { FieldErrors } from '~/lib/validation-errors'
+import type { FieldErrors } from '@pinsquirrel/domain'
 
 interface ChangePasswordFormProps {
   // Username is needed for the hidden field for password managers
@@ -51,7 +51,9 @@ export function ChangePasswordForm({
 
           {passwordFetcher.data?.errors?._form && (
             <div className="p-3 text-sm text-black bg-red-400 border-4 border-foreground neobrutalism-shadow font-bold uppercase">
-              {passwordFetcher.data.errors._form}
+              {Array.isArray(passwordFetcher.data.errors._form)
+                ? passwordFetcher.data.errors._form.join('. ')
+                : passwordFetcher.data.errors._form}
             </div>
           )}
 
@@ -82,7 +84,9 @@ export function ChangePasswordForm({
             />
             {passwordFetcher.data?.errors?.currentPassword && (
               <p className="mt-1 text-sm text-red-600">
-                {passwordFetcher.data.errors.currentPassword}
+                {Array.isArray(passwordFetcher.data.errors.currentPassword)
+                  ? passwordFetcher.data.errors.currentPassword.join('. ')
+                  : passwordFetcher.data.errors.currentPassword}
               </p>
             )}
           </div>
@@ -107,7 +111,9 @@ export function ChangePasswordForm({
             />
             {passwordFetcher.data?.errors?.newPassword ? (
               <FormText variant="error" className="mt-1">
-                {passwordFetcher.data.errors.newPassword}
+                {Array.isArray(passwordFetcher.data.errors.newPassword)
+                  ? passwordFetcher.data.errors.newPassword.join('. ')
+                  : passwordFetcher.data.errors.newPassword}
               </FormText>
             ) : (
               <FormText variant="hint" className="mt-1">
