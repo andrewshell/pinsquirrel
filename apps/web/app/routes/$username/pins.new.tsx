@@ -59,7 +59,20 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   try {
     // Create the pin using service
-    const pin = await pinService.createPinFromFormData(user.id, formData)
+    const pin = await pinService.createPin({
+      userId: user.id,
+      url: formData.url as string,
+      title: formData.title as string,
+      description: formData.description as string | null,
+      readLater: Boolean(formData.readLater),
+      tagNames: Array.isArray(formData.tagNames)
+        ? formData.tagNames.filter(
+            (tag): tag is string => typeof tag === 'string'
+          )
+        : typeof formData.tagNames === 'string'
+          ? [formData.tagNames]
+          : [],
+    })
 
     logger.info('Pin created successfully', {
       pinId: pin.id,

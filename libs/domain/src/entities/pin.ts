@@ -30,3 +30,8 @@ export interface UpdatePinData {
   readLater?: boolean
   tagNames?: string[]
 }
+
+export interface UpdatePinInput extends UpdatePinData {
+  userId: string
+  pinId: string
+}

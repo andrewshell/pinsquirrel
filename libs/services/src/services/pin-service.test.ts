@@ -189,7 +189,9 @@ describe('PinService', () => {
         title: 'Updated Title',
       })
 
-      const result = await pinService.updatePin('user-123', 'pin-123', {
+      const result = await pinService.updatePin({
+        userId: 'user-123',
+        pinId: 'pin-123',
         title: 'Updated Title',
       })
 
@@ -204,7 +206,9 @@ describe('PinService', () => {
       mockPinRepository.findById.mockResolvedValue(otherUserPin)
 
       await expect(
-        pinService.updatePin('user-123', 'pin-123', {
+        pinService.updatePin({
+          userId: 'user-123',
+          pinId: 'pin-123',
           title: 'Updated',
         })
       ).rejects.toThrow(UnauthorizedPinAccessError)
@@ -214,7 +218,9 @@ describe('PinService', () => {
       mockPinRepository.findById.mockResolvedValue(null)
 
       await expect(
-        pinService.updatePin('user-123', 'pin-123', {
+        pinService.updatePin({
+          userId: 'user-123',
+          pinId: 'pin-123',
           title: 'Updated',
         })
       ).rejects.toThrow(PinNotFoundError)
@@ -228,7 +234,9 @@ describe('PinService', () => {
       })
 
       await expect(
-        pinService.updatePin('user-123', 'pin-123', {
+        pinService.updatePin({
+          userId: 'user-123',
+          pinId: 'pin-123',
           url: 'https://existing.com',
         })
       ).rejects.toThrow(DuplicatePinError)
@@ -241,7 +249,9 @@ describe('PinService', () => {
         title: 'Updated Title',
       })
 
-      const result = await pinService.updatePin('user-123', 'pin-123', {
+      const result = await pinService.updatePin({
+        userId: 'user-123',
+        pinId: 'pin-123',
         url: 'https://example.com', // Same as current URL
         title: 'Updated Title',
       })
@@ -257,7 +267,9 @@ describe('PinService', () => {
         title: 'Updated Title',
       })
 
-      const result = await pinService.updatePin('user-123', 'pin-123', {
+      const result = await pinService.updatePin({
+        userId: 'user-123',
+        pinId: 'pin-123',
         title: 'Updated Title',
         tagNames: [],
       })
@@ -268,7 +280,9 @@ describe('PinService', () => {
 
     it('should throw validation error for invalid input', async () => {
       await expect(
-        pinService.updatePin('user-123', 'pin-123', {
+        pinService.updatePin({
+          userId: 'user-123',
+          pinId: 'pin-123',
           url: 'invalid-url',
         })
       ).rejects.toThrow('Must be a valid URL')
@@ -282,7 +296,9 @@ describe('PinService', () => {
         title: 'Updated with Tags',
       })
 
-      const result = await pinService.updatePin('user-123', 'pin-123', {
+      const result = await pinService.updatePin({
+        userId: 'user-123',
+        pinId: 'pin-123',
         title: 'Updated with Tags',
         tagNames: ['javascript', 'typescript'],
       })
@@ -299,7 +315,9 @@ describe('PinService', () => {
       mockPinRepository.update.mockResolvedValue(null)
 
       await expect(
-        pinService.updatePin('user-123', 'pin-123', {
+        pinService.updatePin({
+          userId: 'user-123',
+          pinId: 'pin-123',
           title: 'Updated Title',
         })
       ).rejects.toThrow(PinNotFoundError)

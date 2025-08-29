@@ -26,7 +26,7 @@ vi.mock('~/lib/services/container.server', () => ({
     },
   },
   pinService: {
-    createPinFromFormData: mockCreatePinFromFormData,
+    createPin: mockCreatePinFromFormData,
   },
 }))
 
@@ -185,10 +185,13 @@ describe('pins/new route', () => {
         typeof action
       >[0])
 
-      expect(mockCreatePinFromFormData).toHaveBeenCalledWith('user-1', {
+      expect(mockCreatePinFromFormData).toHaveBeenCalledWith({
+        userId: 'user-1',
         url: 'https://example.com',
         title: 'Test Pin',
         description: 'Test description',
+        readLater: false,
+        tagNames: [],
       })
 
       expect(response).toEqual(
@@ -227,9 +230,13 @@ describe('pins/new route', () => {
       const params = { username: 'testuser' }
       await action({ request, params } as Parameters<typeof action>[0])
 
-      expect(mockCreatePinFromFormData).toHaveBeenCalledWith('user-1', {
+      expect(mockCreatePinFromFormData).toHaveBeenCalledWith({
+        userId: 'user-1',
         url: 'https://example.com',
         title: 'Test Pin',
+        description: undefined,
+        readLater: false,
+        tagNames: [],
       })
     })
 

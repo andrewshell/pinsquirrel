@@ -116,7 +116,9 @@ export async function action({ request, params }: Route.ActionArgs) {
         const readLater =
           formData.readLater === 'false' ? false : Boolean(formData.readLater)
 
-        await pinService.updatePin(user.id, pinId, {
+        await pinService.updatePin({
+          userId: user.id,
+          pinId: pinId,
           readLater,
         })
 
@@ -203,8 +205,28 @@ export async function action({ request, params }: Route.ActionArgs) {
   const formData = await parseFormData(request)
 
   try {
-    // Update the pin using service with form data validation
-    await pinService.updatePinFromFormData(user.id, pinId, formData)
+    // Update the pin using service
+    await pinService.updatePin({
+      userId: user.id,
+      pinId: pinId,
+      url: formData.url as string | undefined,
+      title: formData.title as string | undefined,
+      description: formData.description as string | null | undefined,
+      readLater:
+        formData.readLater !== undefined
+          ? Boolean(formData.readLater)
+          : undefined,
+      tagNames:
+        formData.tagNames !== undefined
+          ? Array.isArray(formData.tagNames)
+            ? formData.tagNames.filter(
+                (tag): tag is string => typeof tag === 'string'
+              )
+            : typeof formData.tagNames === 'string'
+              ? [formData.tagNames]
+              : []
+          : undefined,
+    })
 
     logger.info('Pin updated successfully', {
       pinId: pinId,

@@ -5,7 +5,7 @@ import type {
   PinRepository,
   Tag,
   TagRepository,
-  UpdatePinData,
+  UpdatePinInput,
 } from '@pinsquirrel/domain'
 import {
   DuplicatePinError,
@@ -28,184 +28,22 @@ export class PinService {
     private readonly tagRepository: TagRepository
   ) {}
 
-  /**
-   * Create a pin from raw form data
-   */
-  async createPinFromFormData(
-    userId: string,
-    formData: Record<string, unknown>
-  ): Promise<Pin> {
-    // Validate and convert form data
-    const errors: Record<string, string[]> = {}
-
-    // Required: url
-    const url = formData.url
-    if (!url || typeof url !== 'string') {
-      errors.url = ['URL is required']
-    }
-
-    // Required: title
-    const title = formData.title
-    if (!title || typeof title !== 'string') {
-      errors.title = ['Title is required']
-    }
-
-    // Optional: description
-    const description = formData.description
-    if (
-      description !== undefined &&
-      description !== null &&
-      typeof description !== 'string'
-    ) {
-      errors.description = ['Description must be a string']
-    }
-
-    // Optional: readLater (convert string to boolean)
-    let readLater = false
-    if (formData.readLater !== undefined && formData.readLater !== null) {
-      if (typeof formData.readLater === 'boolean') {
-        readLater = formData.readLater
-      } else if (typeof formData.readLater === 'string') {
-        readLater =
-          formData.readLater === 'true' ||
-          formData.readLater === 'on' ||
-          formData.readLater === '1'
-      } else {
-        errors.readLater = ['Read Later must be a boolean value']
-      }
-    }
-
-    // Optional: tagNames (convert to array)
-    let tagNames: string[] = []
-    if (formData.tagNames !== undefined && formData.tagNames !== null) {
-      if (Array.isArray(formData.tagNames)) {
-        const allStrings = formData.tagNames.every(
-          tag => typeof tag === 'string'
-        )
-        if (allStrings) {
-          tagNames = formData.tagNames as string[]
-        } else {
-          errors.tagNames = ['All tag names must be strings']
-        }
-      } else if (typeof formData.tagNames === 'string') {
-        tagNames = [formData.tagNames]
-      } else {
-        errors.tagNames = [
-          'Tag names must be an array of strings or a single string',
-        ]
-      }
-    }
-
-    if (Object.keys(errors).length > 0) {
-      throw new ValidationError(errors)
-    }
-
-    return this.createPin({
-      userId,
-      url: url as string,
-      title: title as string,
-      description: (description as string) || null,
-      readLater,
-      tagNames,
+  async createPin(input: {
+    userId: string
+    url: string
+    title: string
+    description?: string | null
+    readLater?: boolean
+    tagNames?: string[]
+  }): Promise<Pin> {
+    // Validate input using zod schema
+    const validationResult = createPinDataSchema.safeParse({
+      url: input.url,
+      title: input.title,
+      description: input.description,
+      readLater: input.readLater,
+      tagNames: input.tagNames,
     })
-  }
-
-  /**
-   * Update a pin from raw form data
-   */
-  async updatePinFromFormData(
-    userId: string,
-    pinId: string,
-    formData: Record<string, unknown>
-  ): Promise<Pin> {
-    // Validate and convert form data
-    const errors: Record<string, string[]> = {}
-    const updateData: Partial<UpdatePinData> = {}
-
-    // Optional: url
-    if (formData.url !== undefined) {
-      const url = formData.url
-      if (url !== null && typeof url !== 'string') {
-        errors.url = ['URL must be a string']
-      } else if (url) {
-        updateData.url = url
-      }
-    }
-
-    // Optional: title
-    if (formData.title !== undefined) {
-      const title = formData.title
-      if (title !== null && typeof title !== 'string') {
-        errors.title = ['Title must be a string']
-      } else if (title) {
-        updateData.title = title
-      }
-    }
-
-    // Optional: description
-    if (formData.description !== undefined) {
-      const description = formData.description
-      if (description !== null && typeof description !== 'string') {
-        errors.description = ['Description must be a string']
-      } else {
-        updateData.description = description || ''
-      }
-    }
-
-    // Optional: readLater
-    if (formData.readLater !== undefined) {
-      if (typeof formData.readLater === 'boolean') {
-        updateData.readLater = formData.readLater
-      } else if (typeof formData.readLater === 'string') {
-        updateData.readLater =
-          formData.readLater === 'true' ||
-          formData.readLater === 'on' ||
-          formData.readLater === '1'
-      } else {
-        errors.readLater = ['Read Later must be a boolean value']
-      }
-    }
-
-    if (formData.tagNames !== undefined) {
-      if (formData.tagNames === null) {
-        updateData.tagNames = []
-      } else if (Array.isArray(formData.tagNames)) {
-        const allStrings = formData.tagNames.every(
-          tag => typeof tag === 'string'
-        )
-        if (allStrings) {
-          updateData.tagNames = formData.tagNames as string[]
-        } else {
-          errors.tagNames = ['All tag names must be strings']
-        }
-      } else if (typeof formData.tagNames === 'string') {
-        updateData.tagNames = [formData.tagNames]
-      } else {
-        errors.tagNames = [
-          'Tag names must be an array of strings or a single string',
-        ]
-      }
-    }
-
-    if (Object.keys(errors).length > 0) {
-      throw new ValidationError(errors)
-    }
-
-    return this.updatePin(userId, pinId, updateData)
-  }
-
-  async createPin(data: CreatePinData): Promise<Pin> {
-    // Validate input using zod schema (adapt domain type to validation type)
-    const validationData = {
-      url: data.url,
-      title: data.title,
-      description: data.description,
-      readLater: data.readLater,
-      tagNames: data.tagNames,
-      createdAt: data.createdAt,
-      updatedAt: data.updatedAt,
-    }
-    const validationResult = createPinDataSchema.safeParse(validationData)
     if (!validationResult.success) {
       const errors: Record<string, string[]> = {}
       for (const issue of validationResult.error.issues) {
@@ -220,31 +58,39 @@ export class PinService {
 
     // Check for duplicate URL
     const existingPin = await this.pinRepository.findByUserIdAndUrl(
-      data.userId,
-      data.url
+      input.userId,
+      input.url
     )
     if (existingPin) {
-      throw new DuplicatePinError(data.url)
+      throw new DuplicatePinError(input.url)
     }
 
     // Handle tags using bulk fetch/create
-    if (data.tagNames && data.tagNames.length > 0) {
-      await this.tagRepository.fetchOrCreateByNames(data.userId, data.tagNames)
+    if (input.tagNames && input.tagNames.length > 0) {
+      await this.tagRepository.fetchOrCreateByNames(
+        input.userId,
+        input.tagNames
+      )
     }
 
     // Create pin
-    const pin = await this.pinRepository.create(data)
+    const createPinData: CreatePinData = {
+      userId: input.userId,
+      url: input.url,
+      title: input.title,
+      description: input.description ?? null,
+      readLater: input.readLater ?? false,
+      tagNames: input.tagNames ?? [],
+    }
+    const pin = await this.pinRepository.create(createPinData)
 
     return pin
   }
 
-  async updatePin(
-    userId: string,
-    pinId: string,
-    data: UpdatePinData
-  ): Promise<Pin> {
-    // Validate input using zod schema (domain type matches validation type structure)
-    const validationResult = updatePinDataSchema.safeParse(data)
+  async updatePin(input: UpdatePinInput): Promise<Pin> {
+    // Validate input using zod schema (extract only the update fields)
+    const { userId, pinId, ...updateFields } = input
+    const validationResult = updatePinDataSchema.safeParse(updateFields)
     if (!validationResult.success) {
       const errors: Record<string, string[]> = {}
       for (const issue of validationResult.error.issues) {
@@ -267,23 +113,29 @@ export class PinService {
     }
 
     // Check for duplicate URL if updating URL
-    if (data.url && data.url !== pin.url) {
+    if (updateFields.url && updateFields.url !== pin.url) {
       const existingPin = await this.pinRepository.findByUserIdAndUrl(
         userId,
-        data.url
+        updateFields.url
       )
       if (existingPin && existingPin.id !== pinId) {
-        throw new DuplicatePinError(data.url)
+        throw new DuplicatePinError(updateFields.url)
       }
     }
 
     // Handle tags using bulk fetch/create if updating tags
-    if (data.tagNames !== undefined && data.tagNames.length > 0) {
-      await this.tagRepository.fetchOrCreateByNames(userId, data.tagNames)
+    if (
+      updateFields.tagNames !== undefined &&
+      updateFields.tagNames.length > 0
+    ) {
+      await this.tagRepository.fetchOrCreateByNames(
+        userId,
+        updateFields.tagNames
+      )
     }
 
     // Update pin
-    const updatedPin = await this.pinRepository.update(pinId, data)
+    const updatedPin = await this.pinRepository.update(pinId, updateFields)
     if (!updatedPin) {
       throw new PinNotFoundError(pinId)
     }

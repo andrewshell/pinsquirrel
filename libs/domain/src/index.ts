@@ -10,7 +10,8 @@ export type {
 export type {
   Pin,
   CreatePinData,
-  UpdatePinData
+  UpdatePinData,
+  UpdatePinInput
 } from './entities/pin.js'
 export type {
   Tag,

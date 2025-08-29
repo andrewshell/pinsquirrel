@@ -133,8 +133,7 @@ export async function action({ request }: Route.ActionArgs) {
 
     for (const pinboardPin of pinboardData) {
       try {
-        // Parse the timestamp from Pinboard format (ISO 8601)
-        const pinboardDate = new Date(pinboardPin.time)
+        // Note: Original timestamp from pinboardPin.time is not preserved in current implementation
 
         // Parse tags from space-separated string
         const tagNames = pinboardPin.tags
@@ -152,8 +151,6 @@ export async function action({ request }: Route.ActionArgs) {
           description: pinboardPin.extended || null,
           readLater: pinboardPin.toread === 'yes',
           tagNames: tagNames,
-          createdAt: pinboardDate,
-          updatedAt: pinboardDate,
         })
 
         importedCount++
