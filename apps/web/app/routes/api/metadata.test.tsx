@@ -14,19 +14,19 @@ vi.mock('~/lib/session.server', () => ({
 }))
 
 // Create hoisted mocks
-const { mockFetchMetadata, mockHttpMetadataService } = vi.hoisted(() => {
+const { mockFetchMetadata, mockMetadataService } = vi.hoisted(() => {
   const mockFetchMetadata = vi.fn()
-  const mockHttpMetadataService = vi.fn().mockImplementation(() => ({
+  const mockMetadataService = vi.fn().mockImplementation(() => ({
     fetchMetadata: mockFetchMetadata,
   }))
-  return { mockFetchMetadata, mockHttpMetadataService }
+  return { mockFetchMetadata, mockMetadataService }
 })
 
 vi.mock('@pinsquirrel/services', async () => {
   const actual = await vi.importActual('@pinsquirrel/services')
   return {
     ...actual,
-    HttpMetadataService: Object.assign(mockHttpMetadataService, {
+    MetadataService: Object.assign(mockMetadataService, {
       getHttpStatusForError: vi.fn((error: Error) => {
         if (error.name === 'InvalidUrlError') return 400
         if (error.name === 'FetchTimeoutError') return 408

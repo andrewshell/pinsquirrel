@@ -12,11 +12,7 @@ import {
 } from '@pinsquirrel/domain'
 import { validateUrlForFetching } from '../validation/url.js'
 
-export interface MetadataService {
-  fetchMetadata(url: string): Promise<MetadataResult>
-}
-
-export class HttpMetadataService implements MetadataService {
+export class MetadataService {
   constructor(
     private httpFetcher: HttpFetcher,
     private htmlParser: HtmlParser

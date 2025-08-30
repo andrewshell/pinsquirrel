@@ -1,6 +1,6 @@
 import {
   PinService,
-  HttpMetadataService,
+  MetadataService,
   AuthenticationService,
 } from '@pinsquirrel/services'
 import { CheerioHtmlParser, NodeHttpFetcher } from '@pinsquirrel/adapters'
@@ -42,7 +42,7 @@ export const authService = new AuthenticationService(
   emailService
 )
 export const pinService = new PinService(pinRepository, tagRepository)
-export const metadataService = new HttpMetadataService(httpFetcher, htmlParser)
+export const metadataService = new MetadataService(httpFetcher, htmlParser)
 
 // Export repositories for cases where direct access is still needed
 // TODO: These should be removed as we migrate all logic to services
@@ -55,7 +55,7 @@ export const repositories = {
 // Export static utilities for error handling
 export const metadataErrorUtils = {
   getHttpStatusForError: (error: Error) =>
-    HttpMetadataService.getHttpStatusForError(error),
+    MetadataService.getHttpStatusForError(error),
   getUserFriendlyMessage: (error: Error) =>
-    HttpMetadataService.getUserFriendlyMessage(error),
+    MetadataService.getUserFriendlyMessage(error),
 }

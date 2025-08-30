@@ -7,9 +7,9 @@ import {
   HttpError,
   ParseError,
 } from '@pinsquirrel/domain'
-import { HttpMetadataService } from './metadata'
+import { MetadataService } from './metadata'
 
-describe('HttpMetadataService', () => {
+describe('MetadataService', () => {
   const mockHttpFetcher: HttpFetcher = {
     fetch: vi.fn(),
   }
@@ -17,10 +17,10 @@ describe('HttpMetadataService', () => {
     parseMetadata: vi.fn(),
   }
 
-  let service: HttpMetadataService
+  let service: MetadataService
 
   beforeEach(() => {
-    service = new HttpMetadataService(mockHttpFetcher, mockHtmlParser)
+    service = new MetadataService(mockHttpFetcher, mockHtmlParser)
     vi.mocked(mockHttpFetcher.fetch).mockClear()
     vi.mocked(mockHtmlParser.parseMetadata).mockClear()
   })
@@ -143,121 +143,121 @@ describe('HttpMetadataService', () => {
   describe('getHttpStatusForError', () => {
     it('should return 400 for InvalidUrlError', () => {
       const error = new InvalidUrlError('not-a-url')
-      expect(HttpMetadataService.getHttpStatusForError(error)).toBe(400)
+      expect(MetadataService.getHttpStatusForError(error)).toBe(400)
     })
 
     it('should return 400 for UnsupportedProtocolError', () => {
       const error = new UnsupportedProtocolError('ftp://example.com')
-      expect(HttpMetadataService.getHttpStatusForError(error)).toBe(400)
+      expect(MetadataService.getHttpStatusForError(error)).toBe(400)
     })
 
     it('should return 408 for FetchTimeoutError', () => {
       const error = new FetchTimeoutError('https://example.com')
-      expect(HttpMetadataService.getHttpStatusForError(error)).toBe(408)
+      expect(MetadataService.getHttpStatusForError(error)).toBe(408)
     })
 
     it('should return 404 for HttpError with 4xx status', () => {
       const error = new HttpError(404, 'https://example.com')
-      expect(HttpMetadataService.getHttpStatusForError(error)).toBe(404)
+      expect(MetadataService.getHttpStatusForError(error)).toBe(404)
 
       const error403 = new HttpError(403, 'https://example.com')
-      expect(HttpMetadataService.getHttpStatusForError(error403)).toBe(404)
+      expect(MetadataService.getHttpStatusForError(error403)).toBe(404)
 
       const error400 = new HttpError(400, 'https://example.com')
-      expect(HttpMetadataService.getHttpStatusForError(error400)).toBe(404)
+      expect(MetadataService.getHttpStatusForError(error400)).toBe(404)
     })
 
     it('should return 500 for HttpError with 5xx status', () => {
       const error = new HttpError(500, 'https://example.com')
-      expect(HttpMetadataService.getHttpStatusForError(error)).toBe(500)
+      expect(MetadataService.getHttpStatusForError(error)).toBe(500)
 
       const error503 = new HttpError(503, 'https://example.com')
-      expect(HttpMetadataService.getHttpStatusForError(error503)).toBe(500)
+      expect(MetadataService.getHttpStatusForError(error503)).toBe(500)
     })
 
     it('should return 500 for HttpError with other status codes', () => {
       const error300 = new HttpError(300, 'https://example.com')
-      expect(HttpMetadataService.getHttpStatusForError(error300)).toBe(500)
+      expect(MetadataService.getHttpStatusForError(error300)).toBe(500)
 
       const error200 = new HttpError(200, 'https://example.com')
-      expect(HttpMetadataService.getHttpStatusForError(error200)).toBe(500)
+      expect(MetadataService.getHttpStatusForError(error200)).toBe(500)
     })
 
     it('should return 500 for ParseError', () => {
       const error = new ParseError('https://example.com')
-      expect(HttpMetadataService.getHttpStatusForError(error)).toBe(500)
+      expect(MetadataService.getHttpStatusForError(error)).toBe(500)
     })
 
     it('should return 500 for unknown errors', () => {
       const error = new Error('Unknown error')
-      expect(HttpMetadataService.getHttpStatusForError(error)).toBe(500)
+      expect(MetadataService.getHttpStatusForError(error)).toBe(500)
 
       const typeError = new TypeError('Type error')
-      expect(HttpMetadataService.getHttpStatusForError(typeError)).toBe(500)
+      expect(MetadataService.getHttpStatusForError(typeError)).toBe(500)
     })
   })
 
   describe('getUserFriendlyMessage', () => {
     it('should return "Invalid URL format" for InvalidUrlError', () => {
       const error = new InvalidUrlError('not-a-url')
-      expect(HttpMetadataService.getUserFriendlyMessage(error)).toBe(
+      expect(MetadataService.getUserFriendlyMessage(error)).toBe(
         'Invalid URL format'
       )
     })
 
     it('should return "Invalid URL format" for UnsupportedProtocolError', () => {
       const error = new UnsupportedProtocolError('ftp://example.com')
-      expect(HttpMetadataService.getUserFriendlyMessage(error)).toBe(
+      expect(MetadataService.getUserFriendlyMessage(error)).toBe(
         'Invalid URL format'
       )
     })
 
     it('should return "Request timeout" for FetchTimeoutError', () => {
       const error = new FetchTimeoutError('https://example.com')
-      expect(HttpMetadataService.getUserFriendlyMessage(error)).toBe(
+      expect(MetadataService.getUserFriendlyMessage(error)).toBe(
         'Request timeout'
       )
     })
 
     it('should return "Failed to fetch URL content" for HttpError with 404 status', () => {
       const error = new HttpError(404, 'https://example.com')
-      expect(HttpMetadataService.getUserFriendlyMessage(error)).toBe(
+      expect(MetadataService.getUserFriendlyMessage(error)).toBe(
         'Failed to fetch URL content'
       )
     })
 
     it('should return "Failed to fetch metadata" for HttpError with non-404 status', () => {
       const error500 = new HttpError(500, 'https://example.com')
-      expect(HttpMetadataService.getUserFriendlyMessage(error500)).toBe(
+      expect(MetadataService.getUserFriendlyMessage(error500)).toBe(
         'Failed to fetch metadata'
       )
 
       const error403 = new HttpError(403, 'https://example.com')
-      expect(HttpMetadataService.getUserFriendlyMessage(error403)).toBe(
+      expect(MetadataService.getUserFriendlyMessage(error403)).toBe(
         'Failed to fetch metadata'
       )
 
       const error200 = new HttpError(200, 'https://example.com')
-      expect(HttpMetadataService.getUserFriendlyMessage(error200)).toBe(
+      expect(MetadataService.getUserFriendlyMessage(error200)).toBe(
         'Failed to fetch metadata'
       )
     })
 
     it('should return "Failed to parse metadata" for ParseError', () => {
       const error = new ParseError('https://example.com')
-      expect(HttpMetadataService.getUserFriendlyMessage(error)).toBe(
+      expect(MetadataService.getUserFriendlyMessage(error)).toBe(
         'Failed to parse metadata'
       )
     })
 
     it('should return "Failed to fetch metadata" for unknown errors', () => {
       const error = new Error('Unknown error')
-      expect(HttpMetadataService.getUserFriendlyMessage(error)).toBe(
+      expect(MetadataService.getUserFriendlyMessage(error)).toBe(
         'Failed to fetch metadata'
       )
 
       const typeError = new TypeError('Type error')
-      expect(HttpMetadataService.getUserFriendlyMessage(typeError)).toBe(
+      expect(MetadataService.getUserFriendlyMessage(typeError)).toBe(
         'Failed to fetch metadata'
       )
     })
