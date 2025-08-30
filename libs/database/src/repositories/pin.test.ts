@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool } from 'pg'
-import { DrizzlePinRepository } from './pin-repository.js'
-import { DrizzleTagRepository } from './tag-repository.js'
-import { DrizzleUserRepository } from './user-repository.js'
+import { DrizzlePinRepository } from './pin.js'
+import { DrizzleTagRepository } from './tag.js'
+import { DrizzleUserRepository } from './user.js'
 import { db } from '../client.js'
 import type {
   User,

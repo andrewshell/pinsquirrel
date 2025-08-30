@@ -58,7 +58,7 @@ export {
   ResetTokenNotFoundError,
   TooManyResetRequestsError,
   EmailSendError
-} from './errors/auth-errors.js'
+} from './errors/auth.js'
 export {
   PinError,
   PinNotFoundError,
@@ -68,7 +68,7 @@ export {
   TagNotFoundError,
   UnauthorizedTagAccessError,
   DuplicateTagError
-} from './errors/pin-errors.js'
+} from './errors/pin.js'
 export {
   MetadataError,
   InvalidUrlError,
@@ -76,10 +76,10 @@ export {
   FetchTimeoutError,
   HttpError,
   ParseError,
-} from './errors/metadata-errors.js'
+} from './errors/metadata.js'
 export {
   ValidationError
-} from './errors/validation-errors.js'
+} from './errors/validation.js'
 export type {
   FieldErrors
-} from './errors/validation-errors.js'
+} from './errors/validation.js'

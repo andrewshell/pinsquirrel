@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { AuthenticationService } from './authentication-service.js'
+import { AuthenticationService } from './authentication.js'
 import type {
   UserRepository,
   User,

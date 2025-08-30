@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool } from 'pg'
-import { DrizzleUserRepository } from './user-repository.js'
+import { DrizzleUserRepository } from './user.js'
 import { db } from '../client.js'
 
 describe('DrizzleUserRepository - Integration Tests', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest'
-import { PinService } from './pin-service.js'
+import { PinService } from './pin.js'
 import type {
   PinRepository,
   TagRepository,

@@ -7,7 +7,7 @@ import {
   HttpError,
   ParseError,
 } from '@pinsquirrel/domain'
-import { HttpMetadataService } from './metadata-service'
+import { HttpMetadataService } from './metadata'
 
 describe('HttpMetadataService', () => {
   const mockHttpFetcher: HttpFetcher = {

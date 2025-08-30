@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool } from 'pg'
-import { DrizzlePasswordResetRepository } from './password-reset-repository.js'
+import { DrizzlePasswordResetRepository } from './password-reset.js'
 import { db } from '../client.js'
 import type { CreatePasswordResetTokenData } from '@pinsquirrel/domain'
 

@@ -5,7 +5,7 @@ export { db } from './client.js'
 export * from './schema/index.js'
 
 // Repository implementations
-export { DrizzleUserRepository } from './repositories/user-repository.js'
-export { DrizzlePinRepository } from './repositories/pin-repository.js'
-export { DrizzleTagRepository } from './repositories/tag-repository.js'
-export { DrizzlePasswordResetRepository } from './repositories/password-reset-repository.js'
+export { DrizzleUserRepository } from './repositories/user.js'
+export { DrizzlePinRepository } from './repositories/pin.js'
+export { DrizzleTagRepository } from './repositories/tag.js'
+export { DrizzlePasswordResetRepository } from './repositories/password-reset.js'
