@@ -87,6 +87,28 @@ describe('validateUrlForFetching', () => {
     expect(() => validateUrlForFetching('https:///')).toThrow(InvalidUrlError)
   })
 
+  it('should throw InvalidUrlError for URLs with empty hostname', () => {
+    // Some edge cases where URL constructor might succeed but hostname is empty
+    expect(() => validateUrlForFetching('http://:8080')).toThrow(
+      InvalidUrlError
+    )
+    expect(() => validateUrlForFetching('https://:443')).toThrow(
+      InvalidUrlError
+    )
+    expect(() => validateUrlForFetching('http://@')).toThrow(InvalidUrlError)
+    expect(() => validateUrlForFetching('https://@')).toThrow(InvalidUrlError)
+  })
+
+  it('should handle URLs with auth but no hostname properly', () => {
+    // URLs with auth info but missing hostname
+    expect(() => validateUrlForFetching('http://user:pass@')).toThrow(
+      InvalidUrlError
+    )
+    expect(() => validateUrlForFetching('https://token@')).toThrow(
+      InvalidUrlError
+    )
+  })
+
   describe('SSRF Protection', () => {
     it('should allow public domains', () => {
       expect(() => validateUrlForFetching('https://example.com')).not.toThrow()

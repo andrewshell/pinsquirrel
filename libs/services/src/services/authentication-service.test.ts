@@ -607,6 +607,43 @@ describe('AuthenticationService', () => {
         })
       ).rejects.toThrow('Password must be at least 8 characters')
     })
+
+    it('should handle user deleted after token creation', async () => {
+      vi.mocked(mockPasswordResetRepository.findByTokenHash).mockResolvedValue(
+        mockPasswordResetToken
+      )
+      vi.mocked(mockPasswordResetRepository.isValidToken).mockResolvedValue(
+        true
+      )
+      // User no longer exists
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(null)
+
+      await expect(
+        authService.resetPassword({
+          token: 'mock-token',
+          newPassword: 'newpassword123',
+        })
+      ).rejects.toThrow(InvalidResetTokenError)
+
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+      expect(mockPasswordResetRepository.delete).not.toHaveBeenCalled()
+    })
+
+    it('should handle repository unavailability gracefully', async () => {
+      // Create service without password reset repository
+      const serviceWithoutReset = new AuthenticationService(
+        mockUserRepository,
+        null as unknown as PasswordResetRepository, // Simulate missing repository
+        mockEmailService
+      )
+
+      await expect(
+        serviceWithoutReset.resetPassword({
+          token: 'mock-token',
+          newPassword: 'newpassword123',
+        })
+      ).rejects.toThrow('Password reset is not configured')
+    })
   })
 
   describe('validateResetToken', () => {

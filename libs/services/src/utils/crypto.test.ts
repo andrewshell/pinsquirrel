@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { hashPassword, verifyPassword, hashEmail } from './crypto.js'
+import {
+  hashPassword,
+  verifyPassword,
+  hashEmail,
+  generateSecureToken,
+  hashToken,
+} from './crypto.js'
 
 describe('crypto utilities', () => {
   describe('hashPassword', () => {
@@ -144,6 +150,122 @@ describe('crypto utilities', () => {
       const hash2 = hashEmail(email2)
 
       expect(hash1).toBe(hash2)
+    })
+  })
+
+  describe('generateSecureToken', () => {
+    it('should generate a token', () => {
+      const token = generateSecureToken()
+
+      expect(token).toBeDefined()
+      expect(typeof token).toBe('string')
+      expect(token.length).toBeGreaterThan(0)
+    })
+
+    it('should generate URL-safe tokens', () => {
+      const token = generateSecureToken()
+
+      // URL-safe base64 only contains alphanumeric, -, and _
+      expect(token).toMatch(/^[A-Za-z0-9_-]+$/)
+      // Should not contain URL-unsafe characters
+      expect(token).not.toContain('+')
+      expect(token).not.toContain('/')
+      expect(token).not.toContain('=')
+    })
+
+    it('should generate unique tokens', () => {
+      const tokens = new Set()
+      const numTokens = 100
+
+      for (let i = 0; i < numTokens; i++) {
+        tokens.add(generateSecureToken())
+      }
+
+      // All tokens should be unique
+      expect(tokens.size).toBe(numTokens)
+    })
+
+    it('should generate tokens of consistent length', () => {
+      const token1 = generateSecureToken()
+      const token2 = generateSecureToken()
+
+      // 32 bytes in base64url encoding should be ~43 characters
+      expect(token1.length).toBeGreaterThanOrEqual(42)
+      expect(token1.length).toBeLessThanOrEqual(44)
+      expect(token2.length).toBeGreaterThanOrEqual(42)
+      expect(token2.length).toBeLessThanOrEqual(44)
+    })
+
+    it('should generate cryptographically secure tokens', () => {
+      const token = generateSecureToken()
+
+      // Token should have high entropy (no obvious patterns)
+      // Check that it's not all the same character
+      const uniqueChars = new Set(token.split(''))
+      expect(uniqueChars.size).toBeGreaterThan(10)
+    })
+  })
+
+  describe('hashToken', () => {
+    it('should hash a token', () => {
+      const token = 'test-token-123'
+      const hash = hashToken(token)
+
+      expect(hash).toBeDefined()
+      expect(hash).not.toBe(token)
+      expect(hash.length).toBe(64) // SHA-256 produces 64 character hex string
+    })
+
+    it('should produce same hash for same token', () => {
+      const token = 'test-token-123'
+      const hash1 = hashToken(token)
+      const hash2 = hashToken(token)
+
+      expect(hash1).toBe(hash2)
+    })
+
+    it('should produce different hashes for different tokens', () => {
+      const token1 = 'test-token-123'
+      const token2 = 'test-token-456'
+      const hash1 = hashToken(token1)
+      const hash2 = hashToken(token2)
+
+      expect(hash1).not.toBe(hash2)
+    })
+
+    it('should handle empty token', () => {
+      const token = ''
+      const hash = hashToken(token)
+
+      expect(hash).toBeDefined()
+      expect(hash.length).toBe(64)
+    })
+
+    it('should handle special characters in token', () => {
+      const token = '!@#$%^&*()_+-=[]{}|;:,.<>?'
+      const hash = hashToken(token)
+
+      expect(hash).toBeDefined()
+      expect(hash.length).toBe(64)
+      expect(hash).toMatch(/^[a-f0-9]+$/) // Should be valid hex
+    })
+
+    it('should be case-sensitive', () => {
+      const token1 = 'Token-ABC'
+      const token2 = 'token-abc'
+      const hash1 = hashToken(token1)
+      const hash2 = hashToken(token2)
+
+      expect(hash1).not.toBe(hash2)
+    })
+
+    it('should work with generateSecureToken output', () => {
+      const token = generateSecureToken()
+      const hash = hashToken(token)
+
+      expect(hash).toBeDefined()
+      expect(hash.length).toBe(64)
+      expect(hash).toMatch(/^[a-f0-9]+$/)
     })
   })
 })
