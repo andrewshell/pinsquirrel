@@ -1,11 +1,8 @@
 import { useLoaderData, useLocation, data } from 'react-router'
 import type { Route } from './+types/pins.$id.delete'
 import { requireAccessControl, setFlashMessage } from '~/lib/session.server'
-import {
-  requireUsernameMatch,
-  getUserPath,
-  extractFilterParams,
-} from '~/lib/auth.server'
+import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
+import { extractFilterParams } from '~/lib/filter-utils.server'
 import { pinService } from '~/lib/services/container.server'
 import { parseParams } from '~/lib/http-utils'
 import { logger } from '~/lib/logger.server'

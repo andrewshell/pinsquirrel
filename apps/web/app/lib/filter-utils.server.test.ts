@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parsePinFilters } from './filter-utils.server'
+import { parsePinFilters, extractFilterParams } from './filter-utils.server'
 
 describe('parsePinFilters', () => {
   it('should return all filter when no unread parameter is present', () => {
@@ -98,5 +98,56 @@ describe('parsePinFilters', () => {
       expect(result.currentFilterType).toBe('toread')
       expect(result.activeTag).toBeUndefined()
     })
+  })
+})
+
+describe('extractFilterParams', () => {
+  it('should return empty string when no filter parameters present', () => {
+    const request = new Request('https://example.com/pins')
+    const result = extractFilterParams(request)
+    
+    expect(result).toBe('')
+  })
+
+  it('should extract tag parameter', () => {
+    const request = new Request('https://example.com/pins?tag=work')
+    const result = extractFilterParams(request)
+    
+    expect(result).toBe('?tag=work')
+  })
+
+  it('should extract unread parameter when true', () => {
+    const request = new Request('https://example.com/pins?unread=true')
+    const result = extractFilterParams(request)
+    
+    expect(result).toBe('?unread=true')
+  })
+
+  it('should ignore unread parameter when false', () => {
+    const request = new Request('https://example.com/pins?unread=false')
+    const result = extractFilterParams(request)
+    
+    expect(result).toBe('')
+  })
+
+  it('should extract both tag and unread parameters', () => {
+    const request = new Request('https://example.com/pins?tag=work&unread=true')
+    const result = extractFilterParams(request)
+    
+    expect(result).toBe('?tag=work&unread=true')
+  })
+
+  it('should ignore other parameters', () => {
+    const request = new Request('https://example.com/pins?tag=work&search=test&page=2')
+    const result = extractFilterParams(request)
+    
+    expect(result).toBe('?tag=work')
+  })
+
+  it('should ignore unread parameter when not true', () => {
+    const request = new Request('https://example.com/pins?tag=work&unread=invalid')
+    const result = extractFilterParams(request)
+    
+    expect(result).toBe('?tag=work')
   })
 })

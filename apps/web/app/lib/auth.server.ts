@@ -31,28 +31,3 @@ export function getUserPath(
   const basePath = `/${username}${path}`
   return queryParams ? `${basePath}${queryParams}` : basePath
 }
-
-/**
- * Extracts filter-related query parameters to preserve state across redirects
- * @param request The request containing URL with query parameters
- * @returns Query string with filter parameters or empty string
- */
-export function extractFilterParams(request: Request): string {
-  const url = new URL(request.url)
-  const params = new URLSearchParams()
-
-  // Extract only the filter parameters we want to preserve
-  const tag = url.searchParams.get('tag')
-  const unread = url.searchParams.get('unread')
-
-  if (tag) {
-    params.set('tag', tag)
-  }
-
-  if (unread === 'true') {
-    params.set('unread', 'true')
-  }
-
-  const queryString = params.toString()
-  return queryString ? `?${queryString}` : ''
-}

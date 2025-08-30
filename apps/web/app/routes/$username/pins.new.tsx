@@ -1,11 +1,8 @@
 import { useLoaderData, useActionData, useLocation, data } from 'react-router'
 import type { Route } from './+types/pins.new'
 import { requireAccessControl, setFlashMessage } from '~/lib/session.server'
-import {
-  requireUsernameMatch,
-  getUserPath,
-  extractFilterParams,
-} from '~/lib/auth.server'
+import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
+import { extractFilterParams } from '~/lib/filter-utils.server'
 import { pinService, tagService } from '~/lib/services/container.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
