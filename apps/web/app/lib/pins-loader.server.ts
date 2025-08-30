@@ -54,8 +54,8 @@ export async function createPinsLoader(
   const successMessage = session.get('flash-success') as string | null
   const errorMessage = session.get('flash-error') as string | null
 
-  // Get pins with pagination using the service
-  const result = await pinService.getUserPinsWithPagination(
+  // Create promise for pins data (non-critical, can be streamed)
+  const pinsPromise = pinService.getUserPinsWithPagination(
     ac,
     filter,
     paginationParams
@@ -64,10 +64,7 @@ export async function createPinsLoader(
   // Return with updated session to clear flash messages
   return data(
     {
-      pins: result.pins,
-      totalPages: result.pagination.totalPages,
-      currentPage: result.pagination.page,
-      totalCount: result.totalCount,
+      // Critical data (available immediately)
       currentFilter:
         parsedFilters.currentFilterType !== 'all'
           ? parsedFilters.currentFilterType
@@ -77,6 +74,8 @@ export async function createPinsLoader(
       username: ac.user!.username,
       successMessage,
       errorMessage,
+      // Non-critical data (promise to be resolved with Suspense)
+      pinsData: pinsPromise,
     },
     {
       headers: {

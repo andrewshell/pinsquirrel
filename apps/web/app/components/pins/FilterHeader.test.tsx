@@ -22,11 +22,10 @@ describe('FilterHeader', () => {
   }
 
   it('should render tag filter with tag icon and result count', () => {
-    renderWithRouter(<FilterHeader activeTag="react" resultCount={5} />)
+    renderWithRouter(<FilterHeader activeTag="react" />)
 
     expect(screen.getByText('FILTERS')).toBeInTheDocument()
     expect(screen.getByText('react')).toBeInTheDocument()
-    expect(screen.getByText('5 pins found')).toBeInTheDocument()
 
     // Check for tag icon
     const tagIcon = document.querySelector('.lucide-tag')
@@ -35,12 +34,11 @@ describe('FilterHeader', () => {
 
   it('should render search filter with search icon and result count', () => {
     renderWithRouter(
-      <FilterHeader searchQuery="react tutorial" resultCount={3} />
+      <FilterHeader searchQuery="react tutorial" />
     )
 
     expect(screen.getByText('FILTERS')).toBeInTheDocument()
     expect(screen.getByText('"react tutorial"')).toBeInTheDocument()
-    expect(screen.getByText('3 pins found')).toBeInTheDocument()
 
     // Check for search icon
     const searchIcon = document.querySelector('.lucide-search')
@@ -52,13 +50,11 @@ describe('FilterHeader', () => {
       <FilterHeader
         activeTag="javascript"
         searchQuery="tutorial"
-        resultCount={7}
-      />
+             />
     )
 
     expect(screen.getByText('javascript')).toBeInTheDocument()
     expect(screen.getByText('"tutorial"')).toBeInTheDocument()
-    expect(screen.getByText('7 pins found')).toBeInTheDocument()
 
     // Check for both icons
     const tagIcon = document.querySelector('.lucide-tag')
@@ -67,21 +63,19 @@ describe('FilterHeader', () => {
     expect(searchIcon).toBeInTheDocument()
   })
 
-  it('should handle singular vs plural pin count correctly', () => {
-    const { rerender } = renderWithRouter(
-      <FilterHeader activeTag="test" resultCount={1} />
-    )
+  it('should render tag filter correctly', () => {
+    renderWithRouter(<FilterHeader activeTag="test" />)
 
-    expect(screen.getByText('1 pin found')).toBeInTheDocument()
+    expect(screen.getByText('FILTERS')).toBeInTheDocument()
+    expect(screen.getByText('test')).toBeInTheDocument()
 
-    const Stub2 = createStub(<FilterHeader activeTag="test" resultCount={0} />)
-    rerender(<Stub2 initialEntries={['/']} />)
-
-    expect(screen.getByText('No pins found')).toBeInTheDocument()
+    // Check for tag icon
+    const tagIcon = document.querySelector('.lucide-tag')
+    expect(tagIcon).toBeInTheDocument()
   })
 
   it('should render remove tag button with correct link', () => {
-    renderWithRouter(<FilterHeader activeTag="react" resultCount={3} />)
+    renderWithRouter(<FilterHeader activeTag="react" />)
 
     const removeButton = screen.getByRole('button', {
       name: /remove react tag filter/i,
@@ -93,7 +87,7 @@ describe('FilterHeader', () => {
   })
 
   it('should render clear search button with correct link', () => {
-    renderWithRouter(<FilterHeader searchQuery="test query" resultCount={3} />)
+    renderWithRouter(<FilterHeader searchQuery="test query" />)
 
     const clearButton = screen.getByRole('button', { name: /clear search/i })
     expect(clearButton).toBeInTheDocument()
@@ -106,7 +100,7 @@ describe('FilterHeader', () => {
     const Stub = createRoutesStub([
       {
         path: '/user/pins',
-        Component: () => <FilterHeader activeTag="articles" resultCount={3} />,
+        Component: () => <FilterHeader activeTag="articles" />,
       },
     ])
 
@@ -121,7 +115,7 @@ describe('FilterHeader', () => {
       {
         path: '/user/pins',
         Component: () => (
-          <FilterHeader searchQuery="test query" resultCount={3} />
+          <FilterHeader searchQuery="test query" />
         ),
       },
     ])
@@ -136,7 +130,7 @@ describe('FilterHeader', () => {
 
   it('should display X icons for remove buttons', () => {
     const { container } = renderWithRouter(
-      <FilterHeader activeTag="react" searchQuery="tutorial" resultCount={2} />
+      <FilterHeader activeTag="react" searchQuery="tutorial" />
     )
 
     // Check for X icons SVG (should have 2 - one for tag, one for search)
@@ -145,7 +139,7 @@ describe('FilterHeader', () => {
   })
 
   it('should always render filter header with read status filter', () => {
-    renderWithRouter(<FilterHeader resultCount={0} />)
+    renderWithRouter(<FilterHeader />)
 
     // Should show FILTERS label
     expect(screen.queryByText('FILTERS')).toBeInTheDocument()
@@ -154,21 +148,21 @@ describe('FilterHeader', () => {
   })
 
   it('should show read filter even when tag is empty string', () => {
-    renderWithRouter(<FilterHeader activeTag="" resultCount={0} />)
+    renderWithRouter(<FilterHeader activeTag="" />)
 
     expect(screen.queryByText('FILTERS')).toBeInTheDocument()
     expect(screen.queryByText('All Pins')).toBeInTheDocument()
   })
 
   it('should show read filter even when search query is empty', () => {
-    renderWithRouter(<FilterHeader searchQuery="" resultCount={0} />)
+    renderWithRouter(<FilterHeader searchQuery="" />)
 
     expect(screen.queryByText('FILTERS')).toBeInTheDocument()
     expect(screen.queryByText('All Pins')).toBeInTheDocument()
   })
 
   it('should show read filter even when search query is only whitespace', () => {
-    renderWithRouter(<FilterHeader searchQuery="   " resultCount={0} />)
+    renderWithRouter(<FilterHeader searchQuery="   " />)
 
     expect(screen.queryByText('FILTERS')).toBeInTheDocument()
     expect(screen.queryByText('All Pins')).toBeInTheDocument()
@@ -176,7 +170,7 @@ describe('FilterHeader', () => {
 
   it('should apply custom className', () => {
     const { container } = renderWithRouter(
-      <FilterHeader activeTag="test" resultCount={1} className="custom-class" />
+      <FilterHeader activeTag="test" className="custom-class" />
     )
 
     const header = container.querySelector('.custom-class')
@@ -187,8 +181,7 @@ describe('FilterHeader', () => {
     renderWithRouter(
       <FilterHeader
         searchQuery="<script>alert('xss')</script>"
-        resultCount={0}
-      />
+             />
     )
 
     expect(
@@ -201,7 +194,7 @@ describe('FilterHeader', () => {
       {
         path: '/user/pins',
         Component: () => (
-          <FilterHeader activeTag="react" searchQuery="hooks" resultCount={5} />
+          <FilterHeader activeTag="react" searchQuery="hooks" />
         ),
       },
     ])
@@ -213,7 +206,6 @@ describe('FilterHeader', () => {
     // Should have both filters displayed
     expect(screen.getByText('react')).toBeInTheDocument()
     expect(screen.getByText('"hooks"')).toBeInTheDocument()
-    expect(screen.getByText('5 pins found')).toBeInTheDocument()
 
     // Check both remove links preserve other parameters
     const removeLinks = screen.getAllByRole('link')

@@ -43,5 +43,16 @@ export default function PinsPage() {
   // Convert search params string back to URLSearchParams object
   const searchParams = new URLSearchParams(loaderData.searchParamsString || '')
 
-  return <PinsPageLayout {...loaderData} searchParams={searchParams} />
+  return (
+    <PinsPageLayout 
+      pinsData={loaderData.pinsData}
+      username={loaderData.username}
+      successMessage={loaderData.successMessage}
+      errorMessage={loaderData.errorMessage}
+      activeTag={loaderData.activeTag}
+      currentFilter={loaderData.currentFilter}
+      noTags={loaderData.noTags}
+      searchParams={searchParams}
+    />
+  )
 }

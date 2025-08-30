@@ -12,7 +12,6 @@ export type ReadFilterType = 'all' | 'toread' | 'read'
 interface FilterHeaderProps {
   activeTag?: string
   searchQuery?: string
-  resultCount: number
   currentFilter?: ReadFilterType
   noTags?: boolean
   className?: string
@@ -21,7 +20,6 @@ interface FilterHeaderProps {
 export function FilterHeader({
   activeTag,
   searchQuery,
-  resultCount,
   currentFilter = 'all',
   noTags = false,
   className,
@@ -95,13 +93,6 @@ export function FilterHeader({
     }
   }
 
-  // Format result count text
-  const getResultText = () => {
-    if (resultCount === 0) {
-      return 'No pins found'
-    }
-    return `${resultCount} ${resultCount === 1 ? 'pin' : 'pins'} found`
-  }
 
   // Don't render if no filters are active
   if (!hasActiveFilters) {
@@ -188,9 +179,6 @@ export function FilterHeader({
                 </div>
               )}
 
-              <span className="text-xs text-muted-foreground ml-2">
-                {getResultText()}
-              </span>
             </div>
           </div>
         </div>

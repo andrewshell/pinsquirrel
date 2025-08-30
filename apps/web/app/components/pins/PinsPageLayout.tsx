@@ -1,30 +1,52 @@
-import { useState } from 'react'
-import { useNavigation } from 'react-router'
+import { Suspense, useState, use } from 'react'
 import type { Pin } from '@pinsquirrel/domain'
 import { PinList } from './PinList'
 import { FilterHeader, type ReadFilterType } from './FilterHeader'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import { PinsPagination } from '~/components/ui/pins-pagination'
 
-interface PinsPageLayoutProps {
+interface PinsResult {
   pins: Pin[]
-  totalPages: number
-  currentPage: number
+  pagination: {
+    page: number
+    totalPages: number
+  }
   totalCount: number
+}
+
+interface PinsPageLayoutProps {
+  pinsData: Promise<PinsResult>
   username: string
   successMessage: string | null
   errorMessage: string | null
-  activeTag?: string // Current tag filter
-  currentFilter?: ReadFilterType // Current read filter
-  noTags?: boolean // No tags filter
+  activeTag?: string
+  currentFilter?: ReadFilterType
+  noTags?: boolean
   searchParams: URLSearchParams
 }
 
+function PinsContent({ pinsData, username, searchParams }: { 
+  pinsData: Promise<PinsResult>, 
+  username: string, 
+  searchParams: URLSearchParams 
+}) {
+  const result = use(pinsData)
+  
+  return (
+    <>
+      <PinList pins={result.pins} isLoading={false} username={username} />
+      <PinsPagination
+        currentPage={result.pagination.page}
+        totalPages={result.pagination.totalPages}
+        totalCount={result.totalCount}
+        searchParams={searchParams}
+      />
+    </>
+  )
+}
+
 export function PinsPageLayout({
-  pins,
-  totalPages,
-  currentPage,
-  totalCount,
+  pinsData,
   username,
   successMessage,
   errorMessage,
@@ -33,14 +55,9 @@ export function PinsPageLayout({
   noTags = false,
   searchParams,
 }: PinsPageLayoutProps) {
-  const navigation = useNavigation()
-
   // Client-side state for dismissing flash messages
   const [showSuccessMessage, setShowSuccessMessage] = useState(!!successMessage)
   const [showErrorMessage, setShowErrorMessage] = useState(!!errorMessage)
-
-  // Check if we're loading (navigating or submitting)
-  const isLoading = navigation.state === 'loading'
 
   // Get current search query
   const currentSearch = searchParams.get('search') || ''
@@ -50,7 +67,6 @@ export function PinsPageLayout({
       <FilterHeader
         activeTag={activeTag}
         searchQuery={currentSearch}
-        resultCount={totalCount}
         currentFilter={currentFilter}
         noTags={noTags}
         className="mb-6"
@@ -76,14 +92,13 @@ export function PinsPageLayout({
         />
       )}
 
-      <PinList pins={pins} isLoading={isLoading} username={username} />
-
-      <PinsPagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalCount={totalCount}
-        searchParams={searchParams}
-      />
+      <Suspense fallback={<></>}>
+        <PinsContent 
+          pinsData={pinsData}
+          username={username}
+          searchParams={searchParams}
+        />
+      </Suspense>
     </>
   )
 }

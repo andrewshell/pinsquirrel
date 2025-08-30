@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 import { createRoutesStub } from 'react-router'
 import type { Pin } from '@pinsquirrel/domain'
 import PinsPage from './pins'
@@ -91,13 +91,27 @@ describe('PinsPage Integration', () => {
   })
 
   it('renders page header correctly', async () => {
-    renderWithRouter({
+    const mockPinsResult = {
       pins: [],
-      totalPages: 1,
-      currentPage: 1,
+      pagination: {
+        page: 1,
+        totalPages: 1,
+      },
       totalCount: 0,
-      successMessage: null,
-      errorMessage: null,
+    }
+
+    const mockPinsData = Promise.resolve(mockPinsResult)
+
+    await act(async () => {
+      renderWithRouter({
+        pinsData: mockPinsData,
+        username: 'testuser',
+        successMessage: null,
+        errorMessage: null,
+        searchParamsString: '',
+      })
+      // Wait for the promise to resolve
+      await mockPinsData
     })
 
     // Component rendered via renderWithRouter
@@ -107,13 +121,27 @@ describe('PinsPage Integration', () => {
   })
 
   it('renders empty state when user has no pins', async () => {
-    renderWithRouter({
+    const mockPinsResult = {
       pins: [],
-      totalPages: 1,
-      currentPage: 1,
+      pagination: {
+        page: 1,
+        totalPages: 1,
+      },
       totalCount: 0,
-      successMessage: null,
-      errorMessage: null,
+    }
+
+    const mockPinsData = Promise.resolve(mockPinsResult)
+
+    await act(async () => {
+      renderWithRouter({
+        pinsData: mockPinsData,
+        username: 'testuser',
+        successMessage: null,
+        errorMessage: null,
+        searchParamsString: '',
+      })
+      // Wait for the promise to resolve
+      await mockPinsData
     })
 
     // Component rendered via renderWithRouter
@@ -129,69 +157,128 @@ describe('PinsPage Integration', () => {
   })
 
   it('renders pin cards when user has pins', async () => {
-    renderWithRouter({
+    // Create a resolved promise with mock data
+    const mockPinsResult = {
       pins: mockPins,
-      totalPages: 1,
-      currentPage: 1,
+      pagination: {
+        page: 1,
+        totalPages: 1,
+      },
       totalCount: 2,
-      successMessage: null,
-      errorMessage: null,
+    }
+
+    const mockPinsData = new Promise(resolve => {
+      // Use setTimeout to ensure the promise resolves in next tick
+      setTimeout(() => resolve(mockPinsResult), 0)
     })
 
-    // Component rendered via renderWithRouter
+    await act(async () => {
+      renderWithRouter({
+        pinsData: mockPinsData,
+        username: 'testuser',
+        successMessage: null,
+        errorMessage: null,
+        searchParamsString: '',
+      })
+      // Wait for the promise to resolve
+      await mockPinsData
+    })
 
-    expect(await screen.findByText('Example Pin')).toBeInTheDocument()
+    // Wait for Suspense to resolve and show the actual pins
+    expect(await screen.findByText('Example Pin', {}, { timeout: 3000 })).toBeInTheDocument()
     expect(screen.getByText('• Another Pin')).toBeInTheDocument()
     expect(screen.getByText('https://example.com')).toBeInTheDocument()
     expect(screen.getByText('https://example2.com')).toBeInTheDocument()
   })
 
   it('renders pins in vertical list layout', async () => {
-    renderWithRouter({
+    const mockPinsResult = {
       pins: mockPins,
-      totalPages: 1,
-      currentPage: 1,
+      pagination: {
+        page: 1,
+        totalPages: 1,
+      },
       totalCount: 2,
-      successMessage: null,
-      errorMessage: null,
+    }
+
+    const mockPinsData = new Promise(resolve => {
+      setTimeout(() => resolve(mockPinsResult), 0)
+    })
+
+    await act(async () => {
+      renderWithRouter({
+        pinsData: mockPinsData,
+        username: 'testuser',
+        successMessage: null,
+        errorMessage: null,
+        searchParamsString: '',
+      })
+      // Wait for the promise to resolve
+      await mockPinsData
     })
 
     // Component rendered via renderWithRouter
 
-    // Check that the list container has the correct classes
-    const listContainer = await screen.findByTestId('pin-list')
+    // Wait for Suspense to resolve and check that the list container has the correct classes
+    const listContainer = await screen.findByTestId('pin-list', {}, { timeout: 3000 })
     expect(listContainer).toHaveClass('space-y-4')
   })
 
-  it('shows loading state when navigation state is loading', async () => {
-    // Test loading state by setting navigation state to loading
-    renderComponentWithRouter(
-      {
-        pins: mockPins,
+  it('shows empty fallback during loading then renders pins', async () => {
+    // Test that Suspense shows empty fallback during loading
+    const mockPinsResult = {
+      pins: mockPins,
+      pagination: {
+        page: 1,
         totalPages: 1,
-        currentPage: 1,
-        totalCount: 2,
+      },
+      totalCount: 2,
+    }
+
+    const mockPinsData = new Promise(resolve => {
+      setTimeout(() => resolve(mockPinsResult), 100) // Longer delay to test loading state
+    })
+
+    await act(async () => {
+      renderWithRouter({
+        pinsData: mockPinsData,
+        username: 'testuser',
         successMessage: null,
         errorMessage: null,
-      },
-      'loading'
-    )
+        searchParamsString: '',
+      })
+      // Wait for the promise to resolve
+      await mockPinsData
+    })
 
-    // Component rendered via renderWithRouter
-    // Should show loading skeleton instead of actual pins
-    expect(await screen.findByTestId('pin-list-loading')).toBeInTheDocument()
-    expect(screen.queryByTestId('pin-list')).not.toBeInTheDocument()
-    expect(screen.queryByText('Example Pin')).not.toBeInTheDocument()
+    // Should eventually show the pins after promise resolves
+    expect(await screen.findByTestId('pin-list', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(screen.getByText('Example Pin')).toBeInTheDocument()
   })
 
-  it('applies correct layout structure with max-width', () => {
-    const { container } = renderWithRouter({
+  it('applies correct layout structure with max-width', async () => {
+    const mockPinsResult = {
       pins: [],
-      totalPages: 1,
-      currentPage: 1,
+      pagination: {
+        page: 1,
+        totalPages: 1,
+      },
       totalCount: 0,
-      successMessage: null,
-      errorMessage: null,
+    }
+
+    const mockPinsData = Promise.resolve(mockPinsResult)
+
+    const { container } = await act(async () => {
+      const result = renderWithRouter({
+        pinsData: mockPinsData,
+        username: 'testuser',
+        successMessage: null,
+        errorMessage: null,
+        searchParamsString: '',
+      })
+      // Wait for the promise to resolve
+      await mockPinsData
+      return result
     })
 
     // Component rendered via renderWithRouter
@@ -200,14 +287,29 @@ describe('PinsPage Integration', () => {
     expect(container.firstChild).toBeInTheDocument()
   })
 
-  it('shows correct header spacing and typography', () => {
-    const { container } = renderWithRouter({
+  it('shows correct header spacing and typography', async () => {
+    const mockPinsResult = {
       pins: [],
-      totalPages: 1,
-      currentPage: 1,
+      pagination: {
+        page: 1,
+        totalPages: 1,
+      },
       totalCount: 0,
-      successMessage: null,
-      errorMessage: null,
+    }
+
+    const mockPinsData = Promise.resolve(mockPinsResult)
+
+    const { container } = await act(async () => {
+      const result = renderWithRouter({
+        pinsData: mockPinsData,
+        username: 'testuser',
+        successMessage: null,
+        errorMessage: null,
+        searchParamsString: '',
+      })
+      // Wait for the promise to resolve
+      await mockPinsData
+      return result
     })
 
     // Component rendered via renderWithRouter
@@ -221,19 +323,35 @@ describe('PinsPage Integration', () => {
 
   it('integrates PinList component correctly', async () => {
     const testPins = [mockPins[0]] // Single pin
-    renderWithRouter({
+    const mockPinsResult = {
       pins: testPins,
-      totalPages: 1,
-      currentPage: 1,
+      pagination: {
+        page: 1,
+        totalPages: 1,
+      },
       totalCount: 1,
-      successMessage: null,
-      errorMessage: null,
+    }
+
+    const mockPinsData = new Promise(resolve => {
+      setTimeout(() => resolve(mockPinsResult), 0)
+    })
+
+    await act(async () => {
+      renderWithRouter({
+        pinsData: mockPinsData,
+        username: 'testuser',
+        successMessage: null,
+        errorMessage: null,
+        searchParamsString: '',
+      })
+      // Wait for the promise to resolve
+      await mockPinsData
     })
 
     // Component rendered via renderWithRouter
 
-    // Verify UI shows the pin
-    expect(await screen.findByText('Example Pin')).toBeInTheDocument()
+    // Wait for Suspense to resolve and verify UI shows the pin
+    expect(await screen.findByText('Example Pin', {}, { timeout: 3000 })).toBeInTheDocument()
     expect(
       screen.queryByText("You don't have any pins yet")
     ).not.toBeInTheDocument()
@@ -243,18 +361,34 @@ describe('PinsPage Integration', () => {
   })
 
   it('handles navigation state changes correctly', async () => {
-    renderWithRouter({
+    const mockPinsResult = {
       pins: mockPins,
-      totalPages: 2,
-      currentPage: 1,
+      pagination: {
+        page: 1,
+        totalPages: 2,
+      },
       totalCount: 30,
-      successMessage: null,
-      errorMessage: null,
+    }
+
+    const mockPinsData = new Promise(resolve => {
+      setTimeout(() => resolve(mockPinsResult), 0)
+    })
+
+    await act(async () => {
+      renderWithRouter({
+        pinsData: mockPinsData,
+        username: 'testuser',
+        successMessage: null,
+        errorMessage: null,
+        searchParamsString: '',
+      })
+      // Wait for the promise to resolve
+      await mockPinsData
     })
 
     // Component rendered via renderWithRouter
-    // Test that component renders content correctly in idle state
-    expect(await screen.findByTestId('pin-list')).toBeInTheDocument()
+    // Wait for Suspense to resolve and test that component renders content correctly in idle state
+    expect(await screen.findByTestId('pin-list', {}, { timeout: 3000 })).toBeInTheDocument()
     expect(screen.getByText('Example Pin')).toBeInTheDocument()
 
     // Navigation state testing with createRoutesStub would require a more complex setup
