@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { User } from '@pinsquirrel/domain'
+import type { User, AccessControl } from '@pinsquirrel/domain'
 
 // Create mock functions in hoisted scope
 const mockCreatePinFromFormData = vi.hoisted(() => vi.fn())
@@ -9,6 +9,7 @@ const mockFindByUserId = vi.hoisted(() => vi.fn())
 // Mock the session.server module
 vi.mock('~/lib/session.server', () => ({
   requireUser: vi.fn(),
+  requireAccessControl: vi.fn(),
   setFlashMessage: vi.fn().mockImplementation(
     (request: Request, type: string, message: string, redirectTo: string) =>
       ({
@@ -41,10 +42,10 @@ vi.mock('~/lib/logger.server', () => ({
   },
 }))
 
-import { requireUser } from '~/lib/session.server'
+import { requireAccessControl } from '~/lib/session.server'
 import { action, loader } from './pins.new'
 
-const mockRequireUser = vi.mocked(requireUser)
+const mockRequireAccessControl = vi.mocked(requireAccessControl)
 
 describe('pins/new route', () => {
   const mockUser: User = {
@@ -56,9 +57,23 @@ describe('pins/new route', () => {
     updatedAt: new Date(),
   }
 
+  // Helper to create mock AccessControl
+  const createMockAccessControl = (
+    user: User | null = mockUser
+  ): AccessControl =>
+    ({
+      user,
+      canCreate: () => !!user,
+      canRead: () => !!user,
+      canUpdate: () => !!user,
+      canDelete: () => !!user,
+    }) as AccessControl
+
   beforeEach(() => {
     vi.clearAllMocks()
-    mockRequireUser.mockResolvedValue(mockUser)
+    mockRequireAccessControl.mockResolvedValue(
+      createMockAccessControl(mockUser)
+    )
     mockFindByUserId.mockResolvedValue([])
   })
 
@@ -68,7 +83,7 @@ describe('pins/new route', () => {
       const params = { username: 'testuser' }
       await loader({ request, params } as Parameters<typeof loader>[0])
 
-      expect(mockRequireUser).toHaveBeenCalledWith(request)
+      expect(mockRequireAccessControl).toHaveBeenCalledWith(request)
     })
 
     it('fetches and returns user tags for authenticated user', async () => {
@@ -125,7 +140,7 @@ describe('pins/new route', () => {
     })
 
     it('handles authentication errors', async () => {
-      mockRequireUser.mockRejectedValue(new Error('Unauthorized'))
+      mockRequireAccessControl.mockRejectedValue(new Error('Unauthorized'))
 
       const request = new Request('http://localhost/testuser/pins/new')
       const params = { username: 'testuser' }
@@ -150,7 +165,7 @@ describe('pins/new route', () => {
       const params = { username: 'testuser' }
       await action({ request, params } as Parameters<typeof action>[0])
 
-      expect(mockRequireUser).toHaveBeenCalledWith(request)
+      expect(mockRequireAccessControl).toHaveBeenCalledWith(request)
     })
 
     it('creates a pin with valid form data', async () => {
@@ -185,14 +200,18 @@ describe('pins/new route', () => {
         typeof action
       >[0])
 
-      expect(mockCreatePinFromFormData).toHaveBeenCalledWith({
-        userId: 'user-1',
-        url: 'https://example.com',
-        title: 'Test Pin',
-        description: 'Test description',
-        readLater: false,
-        tagNames: [],
-      })
+      expect(mockCreatePinFromFormData).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user: mockUser,
+        }),
+        {
+          url: 'https://example.com',
+          title: 'Test Pin',
+          description: 'Test description',
+          readLater: false,
+          tagNames: [],
+        }
+      )
 
       expect(response).toEqual(
         expect.objectContaining({
@@ -230,14 +249,18 @@ describe('pins/new route', () => {
       const params = { username: 'testuser' }
       await action({ request, params } as Parameters<typeof action>[0])
 
-      expect(mockCreatePinFromFormData).toHaveBeenCalledWith({
-        userId: 'user-1',
-        url: 'https://example.com',
-        title: 'Test Pin',
-        description: undefined,
-        readLater: false,
-        tagNames: [],
-      })
+      expect(mockCreatePinFromFormData).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user: mockUser,
+        }),
+        {
+          url: 'https://example.com',
+          title: 'Test Pin',
+          description: undefined,
+          readLater: false,
+          tagNames: [],
+        }
+      )
     })
 
     it('returns validation errors when core validation fails', async () => {
@@ -300,7 +323,7 @@ describe('pins/new route', () => {
     })
 
     it('handles authentication errors', async () => {
-      mockRequireUser.mockRejectedValue(new Error('Unauthorized'))
+      mockRequireAccessControl.mockRejectedValue(new Error('Unauthorized'))
 
       const formData = new FormData()
       formData.append('url', 'https://example.com')

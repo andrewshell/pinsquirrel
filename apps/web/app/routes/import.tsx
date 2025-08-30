@@ -1,6 +1,6 @@
 import { useLoaderData, useActionData, Form, data } from 'react-router'
 import type { Route } from './+types/import'
-import { requireUser, setFlashMessage } from '~/lib/session.server'
+import { requireAccessControl, setFlashMessage } from '~/lib/session.server'
 import { pinService } from '~/lib/services/container.server'
 import { DuplicatePinError } from '@pinsquirrel/domain'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
@@ -46,15 +46,15 @@ export function meta(_: Route.MetaArgs) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await requireUser(request)
+  const ac = await requireAccessControl(request)
 
   return data({
-    username: user.username,
+    username: ac.user!.username,
   })
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const user = await requireUser(request)
+  const ac = await requireAccessControl(request)
 
   try {
     // Parse multipart form data
@@ -121,8 +121,8 @@ export async function action({ request }: Route.ActionArgs) {
       )
     }
 
-    logger.info(`Starting Pinboard import for user ${user.username}`, {
-      userId: user.id,
+    logger.info(`Starting Pinboard import for user ${ac.user!.username}`, {
+      userId: ac.user!.id,
       pinCount: pinboardData.length,
     })
 
@@ -144,8 +144,7 @@ export async function action({ request }: Route.ActionArgs) {
         tagNames.forEach(tag => allTagNames.add(tag))
 
         // Create pin using the service (handles duplicate checking)
-        await pinService.createPin({
-          userId: user.id,
+        await pinService.createPin(ac, {
           url: pinboardPin.href,
           title: pinboardPin.description,
           description: pinboardPin.extended || null,
@@ -166,8 +165,8 @@ export async function action({ request }: Route.ActionArgs) {
       }
     }
 
-    logger.info(`Completed Pinboard import for user ${user.username}`, {
-      userId: user.id,
+    logger.info(`Completed Pinboard import for user ${ac.user!.username}`, {
+      userId: ac.user!.id,
       imported: importedCount,
       skipped: skippedCount,
       total: pinboardData.length,
@@ -186,12 +185,12 @@ export async function action({ request }: Route.ActionArgs) {
       request,
       'success',
       successMessage,
-      `/${user.username}/pins`
+      `/${ac.user!.username}/pins`
     )
   } catch (error) {
     logger.error('Import failed with unexpected error', {
       error,
-      userId: user.id,
+      userId: ac.user!.id,
     })
     return data<ImportResult>(
       { success: false, message: 'An unexpected error occurred during import' },

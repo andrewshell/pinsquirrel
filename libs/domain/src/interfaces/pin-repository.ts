@@ -13,7 +13,7 @@ export interface PinRepository {
   // Core CRUD operations (user-scoped for security)
   findById(id: string): Promise<Pin | null>
   create(data: CreatePinData): Promise<Pin>
-  update(id: string, data: UpdatePinData): Promise<Pin | null>
+  update(data: UpdatePinData): Promise<Pin | null>
   delete(id: string): Promise<boolean>
 
   // User-scoped queries (secure by design)

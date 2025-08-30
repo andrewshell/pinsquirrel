@@ -1,6 +1,7 @@
 import { createCookieSessionStorage, redirect } from 'react-router'
 import { repositories } from './services/container.server'
 import { logger } from './logger.server'
+import { AccessControl } from '@pinsquirrel/domain'
 
 // Session storage configuration
 const sessionStorage = createCookieSessionStorage({
@@ -72,6 +73,11 @@ export async function requireUser(request: Request) {
     throw redirect('/signin')
   }
   return user
+}
+
+export async function requireAccessControl(request: Request) {
+  const user = await getUser(request)
+  return new AccessControl(user)
 }
 
 export async function createUserSession(

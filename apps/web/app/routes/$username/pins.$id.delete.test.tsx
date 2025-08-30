@@ -24,15 +24,7 @@ describe('Pin Deletion Integration Tests', () => {
     title: 'Example Pin',
     description: 'A test pin for deletion',
     readLater: false,
-    tags: [
-      {
-        id: 'tag-1',
-        userId: 'user-1',
-        name: 'test-tag',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ],
+    tagNames: ['test-tag'],
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
   }
@@ -46,7 +38,7 @@ describe('Pin Deletion Integration Tests', () => {
       title: 'Another Pin',
       description: 'This one should remain',
       readLater: false,
-      tags: [],
+      tagNames: [],
       createdAt: new Date('2025-01-02'),
       updatedAt: new Date('2025-01-02'),
     },

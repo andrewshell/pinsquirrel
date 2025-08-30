@@ -52,22 +52,7 @@ describe('PinCard', () => {
     readLater: false,
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
-    tags: [
-      {
-        id: 'tag-1',
-        userId: 'user-1',
-        name: 'javascript',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      {
-        id: 'tag-2',
-        userId: 'user-1',
-        name: 'react',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ],
+    tagNames: ['javascript', 'react'],
   }
 
   it('renders pin title correctly', () => {
@@ -105,7 +90,7 @@ describe('PinCard', () => {
   })
 
   it('handles pins with no tags', () => {
-    const pinWithoutTags = { ...mockPin, tags: [] }
+    const pinWithoutTags = { ...mockPin, tagNames: [] }
     renderWithRouter(<PinCard pin={pinWithoutTags} username="testuser" />)
     expect(screen.queryByTestId('pin-tags')).not.toBeInTheDocument()
   })

@@ -5,6 +5,8 @@ import type {
   TagRepository,
   Pin,
   Tag,
+  User,
+  AccessControl,
 } from '@pinsquirrel/domain'
 import {
   PinNotFoundError,
@@ -55,10 +57,31 @@ describe('PinService', () => {
     title: 'Example',
     description: 'Description',
     readLater: false,
-    tags: [mockTag],
+    tagNames: ['javascript'],
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
   }
+
+  const mockUser: User = {
+    id: 'user-123',
+    username: 'testuser',
+    passwordHash: 'hash',
+    emailHash: 'emailhash',
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01'),
+  }
+
+  // Helper to create mock AccessControl
+  const createMockAccessControl = (
+    user: User | null = mockUser
+  ): AccessControl =>
+    ({
+      user,
+      canCreate: () => !!user,
+      canRead: ag => !!user && user.id === ag.userId,
+      canUpdate: ag => !!user && user.id === ag.userId,
+      canDelete: ag => !!user && user.id === ag.userId,
+    }) as AccessControl
 
   beforeEach(() => {
     mockPinRepository = {
@@ -94,26 +117,23 @@ describe('PinService', () => {
   describe('createPin', () => {
     it('should create a pin with valid data', async () => {
       mockPinRepository.findByUserIdAndUrl.mockResolvedValue(null)
-      mockTagRepository.fetchOrCreateByNames.mockResolvedValue([mockTag])
       mockPinRepository.create.mockResolvedValue(mockPin)
 
-      const result = await pinService.createPin({
-        userId: 'user-123',
-        url: 'https://example.com',
-        title: 'Example',
-        description: 'Description',
-        readLater: false,
-        tagNames: ['javascript'],
-      })
+      const result = await pinService.createPin(
+        createMockAccessControl(mockUser),
+        {
+          url: 'https://example.com',
+          title: 'Example',
+          description: 'Description',
+          readLater: false,
+          tagNames: ['javascript'],
+        }
+      )
 
       expect(result).toEqual(mockPin)
       expect(mockPinRepository.findByUserIdAndUrl).toHaveBeenCalledWith(
         'user-123',
         'https://example.com'
-      )
-      expect(mockTagRepository.fetchOrCreateByNames).toHaveBeenCalledWith(
-        'user-123',
-        ['javascript']
       )
       expect(mockPinRepository.create).toHaveBeenCalledWith({
         userId: 'user-123',
@@ -129,8 +149,7 @@ describe('PinService', () => {
       mockPinRepository.findByUserIdAndUrl.mockResolvedValue(mockPin)
 
       await expect(
-        pinService.createPin({
-          userId: 'user-123',
+        pinService.createPin(createMockAccessControl(mockUser), {
           url: 'https://example.com',
           title: 'Example',
           readLater: false,
@@ -140,8 +159,7 @@ describe('PinService', () => {
 
     it('should throw validation error for invalid URL', async () => {
       await expect(
-        pinService.createPin({
-          userId: 'user-123',
+        pinService.createPin(createMockAccessControl(mockUser), {
           url: 'not-a-url',
           title: 'Example',
           readLater: false,
@@ -153,31 +171,33 @@ describe('PinService', () => {
       mockPinRepository.findByUserIdAndUrl.mockResolvedValue(null)
       mockPinRepository.create.mockResolvedValue(mockPin)
 
-      const result = await pinService.createPin({
-        userId: 'user-123',
-        url: 'https://example.com',
-        title: 'Example',
-        readLater: false,
-      })
+      const result = await pinService.createPin(
+        createMockAccessControl(mockUser),
+        {
+          url: 'https://example.com',
+          title: 'Example',
+          readLater: false,
+        }
+      )
 
       expect(result).toEqual(mockPin)
-      expect(mockTagRepository.fetchOrCreateByNames).not.toHaveBeenCalled()
     })
 
     it('should handle empty tagNames array', async () => {
       mockPinRepository.findByUserIdAndUrl.mockResolvedValue(null)
       mockPinRepository.create.mockResolvedValue(mockPin)
 
-      const result = await pinService.createPin({
-        userId: 'user-123',
-        url: 'https://example.com',
-        title: 'Example',
-        readLater: false,
-        tagNames: [],
-      })
+      const result = await pinService.createPin(
+        createMockAccessControl(mockUser),
+        {
+          url: 'https://example.com',
+          title: 'Example',
+          readLater: false,
+          tagNames: [],
+        }
+      )
 
       expect(result).toEqual(mockPin)
-      expect(mockTagRepository.fetchOrCreateByNames).not.toHaveBeenCalled()
     })
   })
 
@@ -189,15 +209,23 @@ describe('PinService', () => {
         title: 'Updated Title',
       })
 
-      const result = await pinService.updatePin({
-        userId: 'user-123',
-        pinId: 'pin-123',
-        title: 'Updated Title',
-      })
+      const result = await pinService.updatePin(
+        createMockAccessControl(mockUser),
+        {
+          id: 'pin-123',
+          title: 'Updated Title',
+        }
+      )
 
       expect(result.title).toBe('Updated Title')
-      expect(mockPinRepository.update).toHaveBeenCalledWith('pin-123', {
-        title: 'Updated Title',
+      expect(mockPinRepository.update).toHaveBeenCalledWith({
+        id: 'pin-123',
+        userId: 'user-123',
+        url: 'https://example.com', // from existing pin
+        title: 'Updated Title', // updated field
+        description: 'Description', // from existing pin
+        readLater: false, // from existing pin
+        tagNames: ['javascript'], // from existing pin
       })
     })
 
@@ -206,9 +234,8 @@ describe('PinService', () => {
       mockPinRepository.findById.mockResolvedValue(otherUserPin)
 
       await expect(
-        pinService.updatePin({
-          userId: 'user-123',
-          pinId: 'pin-123',
+        pinService.updatePin(createMockAccessControl(null), {
+          id: 'pin-123',
           title: 'Updated',
         })
       ).rejects.toThrow(UnauthorizedPinAccessError)
@@ -218,9 +245,8 @@ describe('PinService', () => {
       mockPinRepository.findById.mockResolvedValue(null)
 
       await expect(
-        pinService.updatePin({
-          userId: 'user-123',
-          pinId: 'pin-123',
+        pinService.updatePin(createMockAccessControl(mockUser), {
+          id: 'pin-123',
           title: 'Updated',
         })
       ).rejects.toThrow(PinNotFoundError)
@@ -234,9 +260,8 @@ describe('PinService', () => {
       })
 
       await expect(
-        pinService.updatePin({
-          userId: 'user-123',
-          pinId: 'pin-123',
+        pinService.updatePin(createMockAccessControl(mockUser), {
+          id: 'pin-123',
           url: 'https://existing.com',
         })
       ).rejects.toThrow(DuplicatePinError)
@@ -249,12 +274,14 @@ describe('PinService', () => {
         title: 'Updated Title',
       })
 
-      const result = await pinService.updatePin({
-        userId: 'user-123',
-        pinId: 'pin-123',
-        url: 'https://example.com', // Same as current URL
-        title: 'Updated Title',
-      })
+      const result = await pinService.updatePin(
+        createMockAccessControl(mockUser),
+        {
+          id: 'pin-123',
+          url: 'https://example.com', // Same as current URL
+          title: 'Updated Title',
+        }
+      )
 
       expect(result.title).toBe('Updated Title')
       expect(mockPinRepository.findByUserIdAndUrl).not.toHaveBeenCalled()
@@ -267,12 +294,14 @@ describe('PinService', () => {
         title: 'Updated Title',
       })
 
-      const result = await pinService.updatePin({
-        userId: 'user-123',
-        pinId: 'pin-123',
-        title: 'Updated Title',
-        tagNames: [],
-      })
+      const result = await pinService.updatePin(
+        createMockAccessControl(mockUser),
+        {
+          id: 'pin-123',
+          title: 'Updated Title',
+          tagNames: [],
+        }
+      )
 
       expect(result.title).toBe('Updated Title')
       expect(mockTagRepository.fetchOrCreateByNames).not.toHaveBeenCalled()
@@ -280,9 +309,8 @@ describe('PinService', () => {
 
     it('should throw validation error for invalid input', async () => {
       await expect(
-        pinService.updatePin({
-          userId: 'user-123',
-          pinId: 'pin-123',
+        pinService.updatePin(createMockAccessControl(mockUser), {
+          id: 'pin-123',
           url: 'invalid-url',
         })
       ).rejects.toThrow('Must be a valid URL')
@@ -290,24 +318,21 @@ describe('PinService', () => {
 
     it('should update pin with tagNames', async () => {
       mockPinRepository.findById.mockResolvedValue(mockPin)
-      mockTagRepository.fetchOrCreateByNames.mockResolvedValue([mockTag])
       mockPinRepository.update.mockResolvedValue({
         ...mockPin,
         title: 'Updated with Tags',
       })
 
-      const result = await pinService.updatePin({
-        userId: 'user-123',
-        pinId: 'pin-123',
-        title: 'Updated with Tags',
-        tagNames: ['javascript', 'typescript'],
-      })
+      const result = await pinService.updatePin(
+        createMockAccessControl(mockUser),
+        {
+          id: 'pin-123',
+          title: 'Updated with Tags',
+          tagNames: ['javascript', 'typescript'],
+        }
+      )
 
       expect(result.title).toBe('Updated with Tags')
-      expect(mockTagRepository.fetchOrCreateByNames).toHaveBeenCalledWith(
-        'user-123',
-        ['javascript', 'typescript']
-      )
     })
 
     it('should throw PinNotFoundError if update returns null', async () => {
@@ -315,9 +340,8 @@ describe('PinService', () => {
       mockPinRepository.update.mockResolvedValue(null)
 
       await expect(
-        pinService.updatePin({
-          userId: 'user-123',
-          pinId: 'pin-123',
+        pinService.updatePin(createMockAccessControl(mockUser), {
+          id: 'pin-123',
           title: 'Updated Title',
         })
       ).rejects.toThrow(PinNotFoundError)
@@ -329,7 +353,7 @@ describe('PinService', () => {
       mockPinRepository.findById.mockResolvedValue(mockPin)
       mockPinRepository.delete.mockResolvedValue(true)
 
-      await pinService.deletePin('user-123', 'pin-123')
+      await pinService.deletePin(createMockAccessControl(mockUser), 'pin-123')
 
       expect(mockPinRepository.delete).toHaveBeenCalledWith('pin-123')
     })
@@ -337,18 +361,18 @@ describe('PinService', () => {
     it('should throw PinNotFoundError if pin does not exist', async () => {
       mockPinRepository.findById.mockResolvedValue(null)
 
-      await expect(pinService.deletePin('user-123', 'pin-123')).rejects.toThrow(
-        PinNotFoundError
-      )
+      await expect(
+        pinService.deletePin(createMockAccessControl(mockUser), 'pin-123')
+      ).rejects.toThrow(PinNotFoundError)
     })
 
     it('should throw UnauthorizedPinAccessError if user does not own the pin', async () => {
       const otherUserPin = { ...mockPin, userId: 'other-user' }
       mockPinRepository.findById.mockResolvedValue(otherUserPin)
 
-      await expect(pinService.deletePin('user-123', 'pin-123')).rejects.toThrow(
-        UnauthorizedPinAccessError
-      )
+      await expect(
+        pinService.deletePin(createMockAccessControl(mockUser), 'pin-123')
+      ).rejects.toThrow(UnauthorizedPinAccessError)
     })
   })
 
@@ -356,7 +380,10 @@ describe('PinService', () => {
     it('should return a pin owned by the user', async () => {
       mockPinRepository.findById.mockResolvedValue(mockPin)
 
-      const result = await pinService.getPin('user-123', 'pin-123')
+      const result = await pinService.getPin(
+        createMockAccessControl(mockUser),
+        'pin-123'
+      )
 
       expect(result).toEqual(mockPin)
     })
@@ -364,18 +391,18 @@ describe('PinService', () => {
     it('should throw PinNotFoundError if pin does not exist', async () => {
       mockPinRepository.findById.mockResolvedValue(null)
 
-      await expect(pinService.getPin('user-123', 'pin-123')).rejects.toThrow(
-        PinNotFoundError
-      )
+      await expect(
+        pinService.getPin(createMockAccessControl(mockUser), 'pin-123')
+      ).rejects.toThrow(PinNotFoundError)
     })
 
     it('should throw UnauthorizedPinAccessError if user does not own the pin', async () => {
       const otherUserPin = { ...mockPin, userId: 'other-user' }
       mockPinRepository.findById.mockResolvedValue(otherUserPin)
 
-      await expect(pinService.getPin('user-123', 'pin-123')).rejects.toThrow(
-        UnauthorizedPinAccessError
-      )
+      await expect(
+        pinService.getPin(createMockAccessControl(mockUser), 'pin-123')
+      ).rejects.toThrow(UnauthorizedPinAccessError)
     })
   })
 
@@ -383,7 +410,10 @@ describe('PinService', () => {
     it('should return all pins for a user', async () => {
       mockPinRepository.findByUserId.mockResolvedValue([mockPin])
 
-      const result = await pinService.getUserPins('user-123')
+      const result = await pinService.getUserPins(
+        createMockAccessControl(mockUser),
+        'user-123'
+      )
 
       expect(result).toEqual([mockPin])
       expect(mockPinRepository.findByUserId).toHaveBeenCalledWith('user-123')
@@ -395,7 +425,10 @@ describe('PinService', () => {
       const readLaterPin = { ...mockPin, readLater: true }
       mockPinRepository.findByUserId.mockResolvedValue([readLaterPin])
 
-      const result = await pinService.getReadLaterPins('user-123')
+      const result = await pinService.getReadLaterPins(
+        createMockAccessControl(mockUser),
+        'user-123'
+      )
 
       expect(result).toEqual([readLaterPin])
       expect(mockPinRepository.findByUserId).toHaveBeenCalledWith('user-123', {
@@ -409,7 +442,11 @@ describe('PinService', () => {
       mockTagRepository.findById.mockResolvedValue(mockTag)
       mockPinRepository.findByUserId.mockResolvedValue([mockPin])
 
-      const result = await pinService.getPinsByTag('user-123', 'tag-123')
+      const result = await pinService.getPinsByTag(
+        createMockAccessControl(mockUser),
+        'user-123',
+        'tag-123'
+      )
 
       expect(result).toEqual([mockPin])
       expect(mockTagRepository.findById).toHaveBeenCalledWith('tag-123')
@@ -422,7 +459,11 @@ describe('PinService', () => {
       mockTagRepository.findById.mockResolvedValue(null)
 
       await expect(
-        pinService.getPinsByTag('user-123', 'tag-123')
+        pinService.getPinsByTag(
+          createMockAccessControl(mockUser),
+          'user-123',
+          'tag-123'
+        )
       ).rejects.toThrow(TagNotFoundError)
     })
 
@@ -431,7 +472,11 @@ describe('PinService', () => {
       mockTagRepository.findById.mockResolvedValue(otherUserTag)
 
       await expect(
-        pinService.getPinsByTag('user-123', 'tag-123')
+        pinService.getPinsByTag(
+          createMockAccessControl(mockUser),
+          'user-123',
+          'tag-123'
+        )
       ).rejects.toThrow(UnauthorizedTagAccessError)
     })
   })
@@ -441,10 +486,12 @@ describe('PinService', () => {
       mockTagRepository.findByUserIdAndName.mockResolvedValue(null)
       mockTagRepository.create.mockResolvedValue(mockTag)
 
-      const result = await pinService.createTag({
-        userId: 'user-123',
-        name: 'javascript',
-      })
+      const result = await pinService.createTag(
+        createMockAccessControl(mockUser),
+        {
+          name: 'javascript',
+        }
+      )
 
       expect(result).toEqual(mockTag)
       expect(mockTagRepository.create).toHaveBeenCalledWith({
@@ -457,13 +504,17 @@ describe('PinService', () => {
       mockTagRepository.findByUserIdAndName.mockResolvedValue(mockTag)
 
       await expect(
-        pinService.createTag({ userId: 'user-123', name: 'javascript' })
+        pinService.createTag(createMockAccessControl(mockUser), {
+          name: 'javascript',
+        })
       ).rejects.toThrow(DuplicateTagError)
     })
 
     it('should validate tag name', async () => {
       await expect(
-        pinService.createTag({ userId: 'user-123', name: 'invalid\x00tag' })
+        pinService.createTag(createMockAccessControl(mockUser), {
+          name: 'invalid\x00tag',
+        })
       ).rejects.toThrow('Tag name cannot contain control characters')
     })
   })
@@ -476,7 +527,10 @@ describe('PinService', () => {
       ]
       mockTagRepository.findByUserId.mockResolvedValue(mockTags)
 
-      const result = await pinService.getUserTags('user-123')
+      const result = await pinService.getUserTags(
+        createMockAccessControl(mockUser),
+        'user-123'
+      )
 
       expect(result).toEqual(mockTags)
       expect(mockTagRepository.findByUserId).toHaveBeenCalledWith('user-123')
@@ -488,7 +542,7 @@ describe('PinService', () => {
       mockTagRepository.findById.mockResolvedValue(mockTag)
       mockTagRepository.delete.mockResolvedValue(true)
 
-      await pinService.deleteTag('user-123', 'tag-123')
+      await pinService.deleteTag(createMockAccessControl(mockUser), 'tag-123')
 
       expect(mockTagRepository.delete).toHaveBeenCalledWith('tag-123')
     })
@@ -496,18 +550,18 @@ describe('PinService', () => {
     it('should throw TagNotFoundError if tag does not exist', async () => {
       mockTagRepository.findById.mockResolvedValue(null)
 
-      await expect(pinService.deleteTag('user-123', 'tag-123')).rejects.toThrow(
-        TagNotFoundError
-      )
+      await expect(
+        pinService.deleteTag(createMockAccessControl(mockUser), 'tag-123')
+      ).rejects.toThrow(TagNotFoundError)
     })
 
     it('should throw UnauthorizedTagAccessError if user does not own the tag', async () => {
       const otherUserTag = { ...mockTag, userId: 'other-user' }
       mockTagRepository.findById.mockResolvedValue(otherUserTag)
 
-      await expect(pinService.deleteTag('user-123', 'tag-123')).rejects.toThrow(
-        UnauthorizedTagAccessError
-      )
+      await expect(
+        pinService.deleteTag(createMockAccessControl(mockUser), 'tag-123')
+      ).rejects.toThrow(UnauthorizedTagAccessError)
     })
   })
 })

@@ -5,7 +5,64 @@ import { DrizzlePinRepository } from './pin-repository.js'
 import { DrizzleTagRepository } from './tag-repository.js'
 import { DrizzleUserRepository } from './user-repository.js'
 import { db } from '../client.js'
-import type { User } from '@pinsquirrel/domain'
+import type {
+  User,
+  CreatePinData,
+  UpdatePinData,
+  Pin,
+} from '@pinsquirrel/domain'
+
+// Helper function to create test pin data with proper format
+const createTestPinData = async (
+  tagRepository: DrizzleTagRepository,
+  data: {
+    userId: string
+    url: string
+    title: string
+    description?: string | null
+    readLater?: boolean
+    tagNames?: string[]
+  }
+): Promise<CreatePinData> => {
+  // Timestamps are managed by repository, not included in CreatePinData
+  return {
+    userId: data.userId,
+    url: data.url,
+    title: data.title,
+    description: data.description ?? null,
+    readLater: data.readLater ?? false,
+    tagNames: data.tagNames ?? [],
+  }
+}
+
+// Helper function to create test update data with proper format
+const createTestUpdateData = async (
+  tagRepository: DrizzleTagRepository,
+  existingPin: Pin, // The current pin to be updated
+  updates: {
+    url?: string
+    title?: string
+    description?: string | null
+    readLater?: boolean
+    tagNames?: string[]
+  } = {}
+): Promise<UpdatePinData> => {
+  // Return complete UpdatePinData with all required fields
+  // (timestamps managed by repository)
+  return {
+    id: existingPin.id,
+    userId: existingPin.userId,
+    url: updates.url ?? existingPin.url,
+    title: updates.title ?? existingPin.title,
+    description:
+      updates.description !== undefined
+        ? updates.description
+        : existingPin.description,
+    readLater: updates.readLater ?? existingPin.readLater,
+    tagNames:
+      updates.tagNames !== undefined ? updates.tagNames : existingPin.tagNames,
+  }
+}
 
 describe('DrizzlePinRepository - Integration Tests', () => {
   let testDb: typeof db
@@ -96,9 +153,9 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       expect(result!.title).toBe('Test Pin')
       expect(result!.description).toBe('Test Description')
       expect(result!.readLater).toBe(false)
-      expect(result!.tags).toHaveLength(2)
-      expect(result!.tags.find(t => t.name === 'test-tag-1')).toBeDefined()
-      expect(result!.tags.find(t => t.name === 'test-tag-2')).toBeDefined()
+      expect(result!.tagNames).toHaveLength(2)
+      expect(result!.tagNames).toContain('test-tag-1')
+      expect(result!.tagNames).toContain('test-tag-2')
     })
 
     it('should return null when pin not found', async () => {
@@ -324,13 +381,13 @@ describe('DrizzlePinRepository - Integration Tests', () => {
 
   describe('create', () => {
     it('should create pin without tags', async () => {
-      const createData = {
+      const createData = await createTestPinData(tagRepository, {
         userId: testUser.id,
         url: 'https://example.com',
         title: 'New Pin',
         description: 'Pin description',
         readLater: true,
-      }
+      })
 
       const result = await pinRepository.create(createData)
 
@@ -339,7 +396,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       expect(result.title).toBe('New Pin')
       expect(result.description).toBe('Pin description')
       expect(result.readLater).toBe(true)
-      expect(result.tags).toEqual([])
+      expect(result.tagNames).toEqual([])
       expect(result.id).toBeDefined()
       expect(result.createdAt).toBeInstanceOf(Date)
       expect(result.updatedAt).toBeInstanceOf(Date)
@@ -350,18 +407,18 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     })
 
     it('should create pin with new tags', async () => {
-      const createData = {
+      const createData = await createTestPinData(tagRepository, {
         userId: testUser.id,
         url: 'https://example.com',
         title: 'New Pin',
         tagNames: ['new-tag-1', 'new-tag-2'],
-      }
+      })
 
       const result = await pinRepository.create(createData)
 
-      expect(result.tags).toHaveLength(2)
-      expect(result.tags.find(t => t.name === 'new-tag-1')).toBeDefined()
-      expect(result.tags.find(t => t.name === 'new-tag-2')).toBeDefined()
+      expect(result.tagNames).toHaveLength(2)
+      expect(result.tagNames).toContain('new-tag-1')
+      expect(result.tagNames).toContain('new-tag-2')
 
       // Verify tags were created
       const tag1 = await tagRepository.findByUserIdAndName(
@@ -378,23 +435,23 @@ describe('DrizzlePinRepository - Integration Tests', () => {
 
     it('should create pin with existing tags', async () => {
       // Create existing tag
-      const existingTag = await tagRepository.create({
+      await tagRepository.create({
         userId: testUser.id,
         name: 'existing-tag',
       })
 
-      const createData = {
+      const createData = await createTestPinData(tagRepository, {
         userId: testUser.id,
         url: 'https://example.com',
         title: 'New Pin',
         tagNames: ['existing-tag', 'new-tag'],
-      }
+      })
 
       const result = await pinRepository.create(createData)
 
-      expect(result.tags).toHaveLength(2)
-      expect(result.tags.find(t => t.id === existingTag.id)).toBeDefined()
-      expect(result.tags.find(t => t.name === 'new-tag')).toBeDefined()
+      expect(result.tagNames).toHaveLength(2)
+      expect(result.tagNames).toContain('existing-tag')
+      expect(result.tagNames).toContain('new-tag')
     })
   })
 
@@ -403,7 +460,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
 
     beforeEach(async () => {
       // Create a pin to update
-      const pin = await pinRepository.create({
+      const pinData = await createTestPinData(tagRepository, {
         userId: testUser.id,
         url: 'https://original.com',
         title: 'Original Title',
@@ -411,18 +468,25 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         readLater: false,
         tagNames: ['original-tag'],
       })
+      const pin = await pinRepository.create(pinData)
       existingPinId = pin.id
     })
 
     it('should update pin fields', async () => {
-      const updateData = {
-        url: 'https://updated.com',
-        title: 'Updated Title',
-        description: 'Updated description',
-        readLater: true,
-      }
+      const existingPin = await pinRepository.findById(existingPinId)
+      expect(existingPin).not.toBeNull()
+      const updateData = await createTestUpdateData(
+        tagRepository,
+        existingPin!,
+        {
+          url: 'https://updated.com',
+          title: 'Updated Title',
+          description: 'Updated description',
+          readLater: true,
+        }
+      )
 
-      const result = await pinRepository.update(existingPinId, updateData)
+      const result = await pinRepository.update(updateData)
 
       expect(result).not.toBeNull()
       expect(result!.url).toBe('https://updated.com')
@@ -436,43 +500,74 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     })
 
     it('should update pin tags', async () => {
-      const updateData = {
-        tagNames: ['new-tag-1', 'new-tag-2'],
-      }
+      const existingPin = await pinRepository.findById(existingPinId)
+      expect(existingPin).not.toBeNull()
+      const updateData = await createTestUpdateData(
+        tagRepository,
+        existingPin!,
+        {
+          tagNames: ['new-tag-1', 'new-tag-2'],
+        }
+      )
 
-      const result = await pinRepository.update(existingPinId, updateData)
+      const result = await pinRepository.update(updateData)
 
-      expect(result!.tags).toHaveLength(2)
-      expect(result!.tags.find(t => t.name === 'new-tag-1')).toBeDefined()
-      expect(result!.tags.find(t => t.name === 'new-tag-2')).toBeDefined()
-      expect(result!.tags.find(t => t.name === 'original-tag')).toBeUndefined()
+      expect(result!.tagNames).toHaveLength(2)
+      expect(result!.tagNames).toContain('new-tag-1')
+      expect(result!.tagNames).toContain('new-tag-2')
+      expect(result!.tagNames).not.toContain('original-tag')
     })
 
     it('should clear tags when empty array provided', async () => {
-      const updateData = {
-        tagNames: [],
-      }
+      const existingPin = await pinRepository.findById(existingPinId)
+      expect(existingPin).not.toBeNull()
+      const updateData = await createTestUpdateData(
+        tagRepository,
+        existingPin!,
+        {
+          tagNames: [],
+        }
+      )
 
-      const result = await pinRepository.update(existingPinId, updateData)
+      const result = await pinRepository.update(updateData)
 
-      expect(result!.tags).toEqual([])
+      expect(result!.tagNames).toEqual([])
     })
 
     it('should return null when pin not found', async () => {
-      const result = await pinRepository.update('nonexistent-id', {
-        title: 'New Title',
-      })
+      // For nonexistent pin test, we can create a fake existing pin structure
+      const fakeExistingPin = {
+        id: 'nonexistent-id',
+        userId: testUser.id,
+        url: 'https://example.com',
+        title: 'Original Title',
+        description: null,
+        readLater: false,
+        tagNames: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+      const updateData = await createTestUpdateData(
+        tagRepository,
+        fakeExistingPin,
+        {
+          title: 'New Title',
+        }
+      )
+
+      const result = await pinRepository.update(updateData)
       expect(result).toBeNull()
     })
   })
 
   describe('delete', () => {
     it('should delete pin and return true', async () => {
-      const pin = await pinRepository.create({
+      const pinData = await createTestPinData(tagRepository, {
         userId: testUser.id,
         url: 'https://example.com',
         title: 'Pin to delete',
       })
+      const pin = await pinRepository.create(pinData)
 
       const result = await pinRepository.delete(pin.id)
 
@@ -496,21 +591,27 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         userId: testUser.id,
         url: 'https://normal-pin.com',
         title: 'Normal Pin',
+        description: null,
         readLater: false,
+        tagNames: [],
       })
 
       await pinRepository.create({
         userId: testUser.id,
         url: 'https://read-later-pin1.com',
         title: 'Read Later Pin 1',
+        description: null,
         readLater: true,
+        tagNames: [],
       })
 
       await pinRepository.create({
         userId: testUser.id,
         url: 'https://read-later-pin2.com',
         title: 'Read Later Pin 2',
+        description: null,
         readLater: true,
+        tagNames: [],
       })
     })
 
@@ -563,21 +664,27 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         userId: testUser.id,
         url: 'https://normal-pin.com',
         title: 'Normal Pin',
+        description: null,
         readLater: false,
+        tagNames: [],
       })
 
       await pinRepository.create({
         userId: testUser.id,
         url: 'https://read-later-pin1.com',
         title: 'Read Later Pin 1',
+        description: null,
         readLater: true,
+        tagNames: [],
       })
 
       await pinRepository.create({
         userId: testUser.id,
         url: 'https://read-later-pin2.com',
         title: 'Read Later Pin 2',
+        description: null,
         readLater: true,
+        tagNames: [],
       })
     })
 
@@ -610,6 +717,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'React Tutorial for Beginners',
         description: 'Learn the basics of React JavaScript library',
         readLater: false,
+        tagNames: [],
       })
 
       await pinRepository.create({
@@ -618,6 +726,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'React GitHub Repository',
         description: 'Official React repository on GitHub',
         readLater: true,
+        tagNames: [],
       })
 
       await pinRepository.create({
@@ -626,6 +735,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'Vue.js Guide',
         description: 'Complete guide for Vue.js framework',
         readLater: false,
+        tagNames: [],
       })
 
       await pinRepository.create({
@@ -634,6 +744,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'Angular Documentation',
         description: 'Official Angular framework documentation',
         readLater: true,
+        tagNames: [],
       })
     })
 
@@ -744,6 +855,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'React Tutorial for Beginners',
         description: 'Learn the basics of React JavaScript library',
         readLater: false,
+        tagNames: [],
       })
 
       await pinRepository.create({
@@ -752,6 +864,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'React GitHub Repository',
         description: 'Official React repository on GitHub',
         readLater: true,
+        tagNames: [],
       })
 
       await pinRepository.create({
@@ -760,6 +873,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'Vue.js Guide',
         description: 'Complete guide for Vue.js framework',
         readLater: false,
+        tagNames: [],
       })
     })
 
@@ -795,27 +909,30 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       })
 
       // Pin with tags
-      await pinRepository.create({
+      const taggedPinData = await createTestPinData(tagRepository, {
         userId: testUser.id,
         url: 'https://tagged.com',
         title: 'Tagged Pin',
         tagNames: ['tag1'],
       })
+      await pinRepository.create(taggedPinData)
 
       // Pins without tags
-      await pinRepository.create({
+      const untaggedPin1Data = await createTestPinData(tagRepository, {
         userId: testUser.id,
         url: 'https://untagged1.com',
         title: 'Untagged Pin 1',
         readLater: false,
       })
+      await pinRepository.create(untaggedPin1Data)
 
-      await pinRepository.create({
+      const untaggedPin2Data = await createTestPinData(tagRepository, {
         userId: testUser.id,
         url: 'https://untagged2.com',
         title: 'Untagged Pin 2',
         readLater: true,
       })
+      await pinRepository.create(untaggedPin2Data)
     })
 
     it('should find only pins with no tags when noTags filter is true', async () => {
@@ -830,7 +947,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
 
       // Verify that untagged pins have empty tags arrays
       result.forEach(pin => {
-        expect(pin.tags).toEqual([])
+        expect(pin.tagNames).toEqual([])
       })
     })
 
@@ -852,7 +969,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       expect(result).toHaveLength(1)
       expect(result[0].url).toBe('https://untagged2.com')
       expect(result[0].readLater).toBe(true)
-      expect(result[0].tags).toEqual([])
+      expect(result[0].tagNames).toEqual([])
     })
 
     it('should count untagged pins with combined filters', async () => {
@@ -872,17 +989,18 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       )
 
       expect(result).toHaveLength(1)
-      expect(result[0].tags).toEqual([])
+      expect(result[0].tagNames).toEqual([])
     })
 
     it('should return empty array when no untagged pins exist', async () => {
       // Add tags to all existing pins
       const pins = await pinRepository.findByUserId(testUser.id, {})
       for (const pin of pins) {
-        if (pin.tags.length === 0) {
-          await pinRepository.update(pin.id, {
+        if (pin.tagNames.length === 0) {
+          const updateData = await createTestUpdateData(tagRepository, pin, {
             tagNames: ['some-tag'],
           })
+          await pinRepository.update(updateData)
         }
       }
 
@@ -897,10 +1015,11 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       // Add tags to all existing pins
       const pins = await pinRepository.findByUserId(testUser.id, {})
       for (const pin of pins) {
-        if (pin.tags.length === 0) {
-          await pinRepository.update(pin.id, {
+        if (pin.tagNames.length === 0) {
+          const updateData = await createTestUpdateData(tagRepository, pin, {
             tagNames: ['some-tag'],
           })
+          await pinRepository.update(updateData)
         }
       }
 

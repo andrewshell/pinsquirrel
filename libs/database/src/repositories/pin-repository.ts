@@ -268,8 +268,6 @@ export class DrizzlePinRepository implements PinRepository {
   async create(data: CreatePinData): Promise<Pin> {
     const id = crypto.randomUUID()
     const now = new Date()
-    const createdAt = data.createdAt ?? now
-    const updatedAt = data.updatedAt ?? now
 
     const [newPin] = await this.db
       .insert(pins)
@@ -278,10 +276,10 @@ export class DrizzlePinRepository implements PinRepository {
         userId: data.userId,
         url: data.url,
         title: data.title,
-        description: data.description ?? null,
-        readLater: data.readLater ?? false,
-        createdAt,
-        updatedAt,
+        description: data.description,
+        readLater: data.readLater,
+        createdAt: now,
+        updatedAt: now,
       })
       .returning()
 
@@ -302,34 +300,28 @@ export class DrizzlePinRepository implements PinRepository {
             tagId: tag.id,
           }))
         )
-        pinTags = createdTags.map(tag => ({
-          id: tag.id,
-          userId: tag.userId,
-          name: tag.name,
-          createdAt: tag.createdAt,
-          updatedAt: tag.updatedAt,
-        }))
+        pinTags = createdTags
       }
     }
 
     return this.mapToPin(newPin, pinTags)
   }
 
-  async update(id: string, data: UpdatePinData): Promise<Pin | null> {
+  async update(data: UpdatePinData): Promise<Pin | null> {
+    const { id, ...updateFields } = data
+
     const existing = await this.findById(id)
     if (!existing) {
       return null
     }
 
     const updateValues: Partial<typeof pins.$inferInsert> = {
+      url: updateFields.url,
+      title: updateFields.title,
+      description: updateFields.description,
+      readLater: updateFields.readLater,
       updatedAt: new Date(),
     }
-
-    if (data.url !== undefined) updateValues.url = data.url
-    if (data.title !== undefined) updateValues.title = data.title
-    if (data.description !== undefined)
-      updateValues.description = data.description
-    if (data.readLater !== undefined) updateValues.readLater = data.readLater
 
     const [updatedPin] = await this.db
       .update(pins)
@@ -340,15 +332,15 @@ export class DrizzlePinRepository implements PinRepository {
     // Handle tag updates if provided
     const tagsByPinId = await this.getPinTags([id])
     let pinTags = tagsByPinId.get(id) || []
-    if (data.tagNames !== undefined) {
+    if (updateFields.tagNames !== undefined) {
       // Remove all existing tag associations
       await this.db.delete(pinsTags).where(eq(pinsTags.pinId, id))
 
       // Add new tag associations
-      if (data.tagNames.length > 0) {
+      if (updateFields.tagNames.length > 0) {
         const createdTags = await this.tagRepository.fetchOrCreateByNames(
           existing.userId,
-          data.tagNames
+          updateFields.tagNames
         )
 
         await this.db.insert(pinsTags).values(
@@ -358,13 +350,7 @@ export class DrizzlePinRepository implements PinRepository {
           }))
         )
 
-        pinTags = createdTags.map(tag => ({
-          id: tag.id,
-          userId: tag.userId,
-          name: tag.name,
-          createdAt: tag.createdAt,
-          updatedAt: tag.updatedAt,
-        }))
+        pinTags = createdTags
       } else {
         pinTags = []
       }
@@ -432,13 +418,7 @@ export class DrizzlePinRepository implements PinRepository {
       title: pin.title,
       description: pin.description,
       readLater: pin.readLater,
-      tags: pinTags.map(tag => ({
-        id: tag.id,
-        userId: tag.userId,
-        name: tag.name,
-        createdAt: tag.createdAt,
-        updatedAt: tag.updatedAt,
-      })),
+      tagNames: pinTags.map(tag => tag.name),
       createdAt: pin.createdAt,
       updatedAt: pin.updatedAt,
     }

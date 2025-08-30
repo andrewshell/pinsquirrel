@@ -1,6 +1,6 @@
 import { useLoaderData, useActionData, useLocation, data } from 'react-router'
 import type { Route } from './+types/pins.new'
-import { requireUser, setFlashMessage } from '~/lib/session.server'
+import { requireAccessControl, setFlashMessage } from '~/lib/session.server'
 import {
   requireUsernameMatch,
   getUserPath,
@@ -32,12 +32,12 @@ export function meta(_: Route.MetaArgs) {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  // Ensure user is authenticated and username matches
-  const user = await requireUser(request)
-  requireUsernameMatch(user, params.username)
+  // Get access control
+  const ac = await requireAccessControl(request)
+  requireUsernameMatch(ac.user!, params.username)
 
   // Fetch user's existing tags for autocomplete
-  const userTags = await repositories.tag.findByUserId(user.id)
+  const userTags = await repositories.tag.findByUserId(ac.user!.id)
 
   // Extract and sanitize URL parameters (for bookmarklet integration)
   const urlParams = extractUrlParams(request)
@@ -50,17 +50,16 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  // Ensure user is authenticated and username matches
-  const user = await requireUser(request)
-  requireUsernameMatch(user, params.username)
+  // Get access control
+  const ac = await requireAccessControl(request)
+  requireUsernameMatch(ac.user!, params.username)
 
   // Parse and validate form data
   const formData = await parseFormData(request)
 
   try {
     // Create the pin using service
-    const pin = await pinService.createPin({
-      userId: user.id,
+    const pin = await pinService.createPin(ac, {
       url: formData.url as string,
       title: formData.title as string,
       description: formData.description as string | null,
@@ -76,13 +75,13 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     logger.info('Pin created successfully', {
       pinId: pin.id,
-      userId: user.id,
+      userId: ac.user!.id,
       url: pin.url,
     })
 
     // Redirect to user's pins list with success message, preserving filter params
     const filterParams = extractFilterParams(request)
-    const redirectTo = getUserPath(user.username, '/pins', filterParams)
+    const redirectTo = getUserPath(ac.user!.username, '/pins', filterParams)
     return setFlashMessage(
       request,
       'success',
@@ -108,7 +107,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     logger.exception(error, 'Failed to create pin', {
-      userId: user.id,
+      userId: ac.user!.id,
     })
 
     return data(

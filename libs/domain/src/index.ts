@@ -11,12 +11,15 @@ export type {
   Pin,
   CreatePinData,
   UpdatePinData,
-  UpdatePinInput
+  ServiceCreatePinData,
+  ServiceUpdatePinData
 } from './entities/pin.js'
 export type {
   Tag,
   CreateTagData,
   UpdateTagData,
+  ServiceCreateTagData,
+  ServiceUpdateTagData,
   TagWithCount
 } from './entities/tag.js'
 export type {
@@ -29,6 +32,10 @@ export {
   Pagination,
   type PaginationOptions
 } from './entities/pagination.js'
+export {
+  AccessControl,
+  type AccessGateable
+} from './entities/access.js'
 
 // Interfaces
 export type { Repository } from './interfaces/repository.js'

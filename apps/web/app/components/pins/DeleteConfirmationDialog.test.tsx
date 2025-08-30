@@ -29,15 +29,7 @@ describe('DeleteConfirmationDialog', () => {
     readLater: false,
     createdAt: mockDate,
     updatedAt: mockDate,
-    tags: [
-      {
-        id: 'tag-1',
-        name: 'test',
-        userId: 'user-1',
-        createdAt: mockDate,
-        updatedAt: mockDate,
-      },
-    ],
+    tagNames: ['test'],
   }
 
   beforeEach(() => {

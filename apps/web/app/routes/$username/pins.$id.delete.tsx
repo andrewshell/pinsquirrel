@@ -1,6 +1,6 @@
 import { useLoaderData, useLocation, data } from 'react-router'
 import type { Route } from './+types/pins.$id.delete'
-import { requireUser, setFlashMessage } from '~/lib/session.server'
+import { requireAccessControl, setFlashMessage } from '~/lib/session.server'
 import {
   requireUsernameMatch,
   getUserPath,
@@ -35,9 +35,9 @@ export function meta(_: Route.MetaArgs) {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  // Ensure user is authenticated and username matches
-  const user = await requireUser(request)
-  requireUsernameMatch(user, params.username)
+  // Get access control
+  const ac = await requireAccessControl(request)
+  requireUsernameMatch(ac.user!, params.username)
 
   // Validate pin ID from params
   const paramData = parseParams(params)
@@ -50,7 +50,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   // Fetch the pin to confirm ownership and get details for deletion
   try {
-    const pin = await pinService.getPin(user.id, pinId)
+    const pin = await pinService.getPin(ac, pinId)
 
     return data({
       pin,
@@ -59,7 +59,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   } catch (error) {
     logger.exception(error, 'Failed to load pin for deletion', {
       pinId: pinId,
-      userId: user.id,
+      userId: ac.user!.id,
     })
 
     // If pin not found or unauthorized, throw 404
@@ -69,9 +69,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  // Ensure user is authenticated and username matches
-  const user = await requireUser(request)
-  requireUsernameMatch(user, params.username)
+  // Get access control
+  const ac = await requireAccessControl(request)
+  requireUsernameMatch(ac.user!, params.username)
 
   // Validate pin ID from params
   const paramData = parseParams(params)
@@ -90,16 +90,16 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   try {
     // Delete the pin using the service
-    await pinService.deletePin(user.id, pinId)
+    await pinService.deletePin(ac, pinId)
 
     logger.info('Pin deleted successfully', {
       pinId: pinId,
-      userId: user.id,
+      userId: ac.user!.id,
     })
 
     // Redirect to user's pins list with success message, preserving filter params
     const filterParams = extractFilterParams(request)
-    const redirectTo = getUserPath(user.username, '/pins', filterParams)
+    const redirectTo = getUserPath(ac.user!.username, '/pins', filterParams)
     return setFlashMessage(
       request,
       'success',
@@ -109,7 +109,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   } catch (error) {
     logger.exception(error, 'Failed to delete pin', {
       pinId: pinId,
-      userId: user.id,
+      userId: ac.user!.id,
     })
 
     // Check for specific error types

@@ -311,6 +311,8 @@ describe('DrizzleTagRepository - Integration Tests', () => {
 
     it('should update tag name', async () => {
       const updateData = {
+        id: existingTagId,
+        userId: testUser.id,
         name: 'updated-name',
       }
 
@@ -326,7 +328,11 @@ describe('DrizzleTagRepository - Integration Tests', () => {
 
     it('should update only updatedAt when no fields provided', async () => {
       const originalTag = await tagRepository.findById(existingTagId)
-      const updateData = {}
+      const updateData = {
+        id: existingTagId,
+        userId: testUser.id,
+        name: originalTag!.name,
+      }
 
       // Wait a bit to ensure updatedAt changes
       await new Promise(resolve => setTimeout(resolve, 10))
@@ -341,6 +347,8 @@ describe('DrizzleTagRepository - Integration Tests', () => {
 
     it('should return null when tag not found', async () => {
       const result = await tagRepository.update('nonexistent-id', {
+        id: 'nonexistent-id',
+        userId: testUser.id,
         name: 'new-name',
       })
       expect(result).toBeNull()
