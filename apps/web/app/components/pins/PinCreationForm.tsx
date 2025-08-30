@@ -302,6 +302,8 @@ export function PinCreationForm({
       </div>
 
       <div className="space-y-2">
+        {/* Hidden input ensures readLater is always sent, even when unchecked */}
+        <input type="hidden" name="readLater" value="false" />
         <Checkbox
           id="readLater"
           name="readLater"
