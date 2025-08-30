@@ -1,8 +1,8 @@
 import { useLoaderData, useActionData, data } from 'react-router'
 import type { Route } from './+types/tags.merge'
-import { requireUser, setFlashMessage } from '~/lib/session.server'
+import { requireAccessControl, setFlashMessage } from '~/lib/session.server'
 import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
-import { repositories } from '~/lib/services/container.server'
+import { tagService } from '~/lib/services/container.server'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
@@ -25,11 +25,11 @@ export function meta({ params }: Route.MetaArgs) {
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   // Ensure user is authenticated and username matches
-  const user = await requireUser(request)
-  requireUsernameMatch(user, params.username)
+  const ac = await requireAccessControl(request)
+  requireUsernameMatch(ac.user!, params.username)
 
   // Fetch all user's tags for the form
-  const userTags = await repositories.tag.findByUserIdWithPinCount(user.id)
+  const userTags = await tagService.getUserTagsWithCount(ac, ac.user!.id)
 
   // Filter out tags with no pins
   const tagsWithPins = userTags.filter(tag => tag.pinCount > 0)
@@ -42,8 +42,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
 export async function action({ request, params }: Route.ActionArgs) {
   // Ensure user is authenticated and username matches
-  const user = await requireUser(request)
-  requireUsernameMatch(user, params.username)
+  const ac = await requireAccessControl(request)
+  requireUsernameMatch(ac.user!, params.username)
 
   // Parse form data
   const formData = await parseFormData(request)
@@ -124,20 +124,16 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   try {
     // Perform the merge operation
-    await repositories.tag.mergeTags(
-      user.id,
-      parsedSourceTagIds,
-      destinationTagIdStr
-    )
+    await tagService.mergeTags(ac, parsedSourceTagIds, destinationTagIdStr)
 
     logger.info('Tags merged successfully', {
-      userId: user.id,
+      userId: ac.user!.id,
       sourceTagIds: parsedSourceTagIds,
       destinationTagId: destinationTagIdStr,
     })
 
     // Redirect back to tags page with success message
-    const redirectTo = getUserPath(user.username, '/tags')
+    const redirectTo = getUserPath(ac.user!.username, '/tags')
     return setFlashMessage(
       request,
       'success',
@@ -146,7 +142,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     )
   } catch (error) {
     logger.exception(error, 'Failed to merge tags', {
-      userId: user.id,
+      userId: ac.user!.id,
       sourceTagIds: parsedSourceTagIds,
       destinationTagId: destinationTagIdStr,
     })

@@ -145,6 +145,7 @@ export async function action({ request }: Route.ActionArgs) {
 
         // Create pin using the service (handles duplicate checking)
         await pinService.createPin(ac, {
+          userId: ac.user!.id,
           url: pinboardPin.href,
           title: pinboardPin.description,
           description: pinboardPin.extended || null,

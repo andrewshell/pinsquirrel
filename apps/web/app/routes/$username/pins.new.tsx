@@ -6,7 +6,7 @@ import {
   getUserPath,
   extractFilterParams,
 } from '~/lib/auth.server'
-import { repositories, pinService } from '~/lib/services/container.server'
+import { pinService, tagService } from '~/lib/services/container.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
@@ -37,7 +37,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   requireUsernameMatch(ac.user!, params.username)
 
   // Fetch user's existing tags for autocomplete
-  const userTags = await repositories.tag.findByUserId(ac.user!.id)
+  const userTags = await tagService.getUserTags(ac, ac.user!.id)
 
   // Extract and sanitize URL parameters (for bookmarklet integration)
   const urlParams = extractUrlParams(request)
@@ -60,6 +60,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   try {
     // Create the pin using service
     const pin = await pinService.createPin(ac, {
+      userId: ac.user!.id,
       url: formData.url as string,
       title: formData.title as string,
       description: formData.description as string | null,

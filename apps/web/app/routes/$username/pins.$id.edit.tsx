@@ -12,7 +12,7 @@ import {
   getUserPath,
   extractFilterParams,
 } from '~/lib/auth.server'
-import { pinService, repositories } from '~/lib/services/container.server'
+import { pinService, tagService } from '~/lib/services/container.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
@@ -71,7 +71,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   try {
     const [pin, userTags] = await Promise.all([
       pinService.getPin(ac, pinId),
-      repositories.tag.findByUserId(ac.user!.id),
+      tagService.getUserTags(ac, ac.user!.id),
     ])
 
     return data({
@@ -116,9 +116,17 @@ export async function action({ request, params }: Route.ActionArgs) {
         const readLater =
           formData.readLater === 'false' ? false : Boolean(formData.readLater)
 
+        // Get existing pin to merge with updates
+        const existingPin = await pinService.getPin(ac, pinId)
+
         await pinService.updatePin(ac, {
           id: pinId,
+          userId: existingPin.userId,
+          url: existingPin.url,
+          title: existingPin.title,
+          description: existingPin.description,
           readLater,
+          tagNames: existingPin.tagNames,
         })
 
         logger.info('Pin readLater status updated', {
@@ -204,16 +212,21 @@ export async function action({ request, params }: Route.ActionArgs) {
   const formData = await parseFormData(request)
 
   try {
+    // Get existing pin to merge with updates
+    const existingPin = await pinService.getPin(ac, pinId)
+
     // Update the pin using service
     await pinService.updatePin(ac, {
       id: pinId,
-      url: formData.url as string | undefined,
-      title: formData.title as string | undefined,
-      description: formData.description as string | null | undefined,
+      userId: existingPin.userId,
+      url: (formData.url as string) ?? existingPin.url,
+      title: (formData.title as string) ?? existingPin.title,
+      description:
+        (formData.description as string | null) ?? existingPin.description,
       readLater:
         formData.readLater !== undefined
           ? Boolean(formData.readLater)
-          : undefined,
+          : existingPin.readLater,
       tagNames:
         formData.tagNames !== undefined
           ? Array.isArray(formData.tagNames)
@@ -223,7 +236,7 @@ export async function action({ request, params }: Route.ActionArgs) {
             : typeof formData.tagNames === 'string'
               ? [formData.tagNames]
               : []
-          : undefined,
+          : existingPin.tagNames,
     })
 
     logger.info('Pin updated successfully', {

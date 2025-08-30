@@ -26,24 +26,29 @@ vi.mock('react-router', async () => {
 })
 
 vi.mock('~/lib/services/container.server', () => ({
-  repositories: {
-    tag: {
-      findByUserIdWithPinCount: vi.fn(),
-      deleteTagsWithNoPins: vi.fn().mockResolvedValue(0),
-    },
-    pin: {
-      countByUserId: vi.fn().mockResolvedValue(0),
-    },
+  tagService: {
+    getUserTagsWithCount: vi.fn().mockResolvedValue([]),
+    deleteTagsWithNoPins: vi.fn().mockResolvedValue(undefined),
+  },
+  pinService: {
+    getUserPinsWithPagination: vi.fn().mockResolvedValue({
+      pins: [],
+      pagination: { totalPages: 1, page: 1 },
+      totalCount: 0,
+    }),
   },
 }))
 
 vi.mock('~/lib/session.server', () => ({
-  requireUser: vi.fn().mockResolvedValue({
-    id: 'user1',
-    username: 'testuser',
-    emailHash: 'test@example.com',
-    createdAt: new Date(),
-    updatedAt: new Date(),
+  requireAccessControl: vi.fn().mockResolvedValue({
+    user: {
+      id: 'user1',
+      username: 'testuser',
+      emailHash: 'test@example.com',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    canCreate: () => true,
   }),
 }))
 
@@ -53,10 +58,11 @@ vi.mock('~/lib/auth.server', () => ({
 
 // Import after mocks are set up
 import TagsPage, { loader, meta } from './tags'
-import { repositories } from '~/lib/services/container.server'
+import { tagService } from '~/lib/services/container.server'
 
-const mockTagRepository = repositories.tag as unknown as {
-  findByUserIdWithPinCount: ReturnType<typeof vi.fn>
+const mockTagService = tagService as unknown as {
+  getUserTagsWithCount: ReturnType<typeof vi.fn>
+  deleteTagsWithNoPins: ReturnType<typeof vi.fn>
 }
 
 const mockTags: TagWithCount[] = [
@@ -102,7 +108,7 @@ describe('TagsPage', () => {
 
   describe('loader function', () => {
     it('loads tags for authenticated user', async () => {
-      mockTagRepository.findByUserIdWithPinCount.mockResolvedValue(mockTags)
+      mockTagService.getUserTagsWithCount.mockResolvedValue(mockTags)
 
       const request = new Request('http://localhost/testuser/tags')
       const params = { username: 'testuser' }
@@ -116,14 +122,18 @@ describe('TagsPage', () => {
         currentFilter: 'all',
         untaggedPinsCount: 0,
       })
-      expect(mockTagRepository.findByUserIdWithPinCount).toHaveBeenCalledWith(
+      expect(mockTagService.getUserTagsWithCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          user: expect.objectContaining({ id: 'user1' }),
+        }),
         'user1',
         undefined
       )
     })
 
     it('loads tags with toread filter', async () => {
-      mockTagRepository.findByUserIdWithPinCount.mockResolvedValue(mockTags)
+      mockTagService.getUserTagsWithCount.mockResolvedValue(mockTags)
 
       const request = new Request('http://localhost/testuser/tags?unread=true')
       const params = { username: 'testuser' }
@@ -137,14 +147,18 @@ describe('TagsPage', () => {
         currentFilter: 'toread',
         untaggedPinsCount: 0,
       })
-      expect(mockTagRepository.findByUserIdWithPinCount).toHaveBeenCalledWith(
+      expect(mockTagService.getUserTagsWithCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          user: expect.objectContaining({ id: 'user1' }),
+        }),
         'user1',
         { readLater: true }
       )
     })
 
     it('defaults to all filter when no unread parameter', async () => {
-      mockTagRepository.findByUserIdWithPinCount.mockResolvedValue(mockTags)
+      mockTagService.getUserTagsWithCount.mockResolvedValue(mockTags)
 
       const request = new Request('http://localhost/testuser/tags')
       const params = { username: 'testuser' }
@@ -158,7 +172,11 @@ describe('TagsPage', () => {
         currentFilter: 'all',
         untaggedPinsCount: 0,
       })
-      expect(mockTagRepository.findByUserIdWithPinCount).toHaveBeenCalledWith(
+      expect(mockTagService.getUserTagsWithCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          user: expect.objectContaining({ id: 'user1' }),
+        }),
         'user1',
         undefined
       )

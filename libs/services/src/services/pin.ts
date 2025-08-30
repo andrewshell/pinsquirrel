@@ -1,45 +1,29 @@
 import type {
   AccessControl,
   CreatePinData,
-  CreateTagData,
   Pin,
+  PinFilter,
   PinRepository,
-  ServiceCreatePinData,
-  ServiceCreateTagData,
-  ServiceUpdatePinData,
-  Tag,
-  TagRepository,
   UpdatePinData,
+  PaginationOptions,
 } from '@pinsquirrel/domain'
+import { Pagination } from '@pinsquirrel/domain'
 import {
   DuplicatePinError,
-  DuplicateTagError,
   PinNotFoundError,
-  TagNotFoundError,
   UnauthorizedPinAccessError,
-  UnauthorizedTagAccessError,
   ValidationError,
 } from '@pinsquirrel/domain'
-import {
-  createPinDataSchema,
-  createTagDataSchema,
-  updatePinDataSchema,
-} from '../validation/pin.js'
+import { createPinDataSchema, updatePinDataSchema } from '../validation/pin.js'
 
 export class PinService {
-  constructor(
-    private readonly pinRepository: PinRepository,
-    private readonly tagRepository: TagRepository
-  ) {}
+  constructor(private readonly pinRepository: PinRepository) {}
 
-  async createPin(
-    ac: AccessControl,
-    input: ServiceCreatePinData
-  ): Promise<Pin> {
-    // Check if user can create pins
-    if (!ac.canCreate()) {
+  async createPin(ac: AccessControl, input: CreatePinData): Promise<Pin> {
+    // Check if user can create pins as the specified user
+    if (!ac.canCreateAs(input.userId)) {
       throw new UnauthorizedPinAccessError(
-        'User must be authenticated to create pins'
+        'User can only create pins for themselves'
       )
     }
     // Validate input using zod schema
@@ -64,7 +48,7 @@ export class PinService {
 
     // Check for duplicate URL
     const existingPin = await this.pinRepository.findByUserIdAndUrl(
-      ac.user!.id,
+      input.userId,
       input.url
     )
     if (existingPin) {
@@ -73,7 +57,7 @@ export class PinService {
 
     // Create pin data (timestamps managed by repository)
     const createPinData: CreatePinData = {
-      userId: ac.user!.id,
+      userId: input.userId,
       url: input.url,
       title: input.title,
       description: input.description ?? null,
@@ -85,17 +69,7 @@ export class PinService {
     return pin
   }
 
-  async updatePin(
-    ac: AccessControl,
-    input: ServiceUpdatePinData
-  ): Promise<Pin> {
-    // Check if user can update pins (basic auth check)
-    if (!ac.user) {
-      throw new UnauthorizedPinAccessError(
-        'User must be authenticated to update pins'
-      )
-    }
-
+  async updatePin(ac: AccessControl, input: UpdatePinData): Promise<Pin> {
     // Validate input using zod schema (extract only the update fields)
     const { id, tagNames, ...updateFields } = input
     const validationResult = updatePinDataSchema.safeParse({
@@ -126,7 +100,7 @@ export class PinService {
     // Check for duplicate URL if updating URL
     if (updateFields.url && updateFields.url !== existingPin.url) {
       const duplicatePin = await this.pinRepository.findByUserIdAndUrl(
-        ac.user!.id,
+        input.userId,
         updateFields.url
       )
       if (duplicatePin && duplicatePin.id !== id) {
@@ -183,115 +157,50 @@ export class PinService {
     return pin
   }
 
-  async getUserPins(ac: AccessControl, targetUserId: string): Promise<Pin[]> {
-    // Future: could add public viewing logic here
-    // For now, user can only view their own pins
-    if (!ac.user || ac.user.id !== targetUserId) {
-      return []
-    }
-    return await this.pinRepository.findByUserId(targetUserId)
-  }
-
-  async getReadLaterPins(
+  /**
+   * Get user pins with pagination and filtering
+   */
+  async getUserPinsWithPagination(
     ac: AccessControl,
-    targetUserId: string
-  ): Promise<Pin[]> {
-    // Future: could add public viewing logic here
-    // For now, user can only view their own pins
-    if (!ac.user || ac.user.id !== targetUserId) {
-      return []
-    }
-    return await this.pinRepository.findByUserId(targetUserId, {
-      readLater: true,
-    })
-  }
-
-  async getPinsByTag(
-    ac: AccessControl,
-    targetUserId: string,
-    tagId: string
-  ): Promise<Pin[]> {
-    // Validate tag exists and user has access
-    const tag = await this.tagRepository.findById(tagId)
-    if (!tag) {
-      throw new TagNotFoundError(tagId)
-    }
-    if (!ac.canRead(tag)) {
-      throw new UnauthorizedTagAccessError(tagId)
-    }
-
-    // Future: could add public viewing logic here
-    // For now, user can only view their own pins
-    if (!ac.user || ac.user.id !== targetUserId) {
-      return []
-    }
-
-    return await this.pinRepository.findByUserId(targetUserId, { tagId })
-  }
-
-  async createTag(ac: AccessControl, data: ServiceCreateTagData): Promise<Tag> {
-    // Check if user can create tags
-    if (!ac.canCreate()) {
-      throw new UnauthorizedTagAccessError(
-        'User must be authenticated to create tags'
+    filter?: PinFilter,
+    paginationOptions?: PaginationOptions
+  ): Promise<{
+    pins: Pin[]
+    pagination: Pagination
+    totalCount: number
+  }> {
+    if (!ac.user) {
+      throw new UnauthorizedPinAccessError(
+        'User must be authenticated to view pins'
       )
     }
 
-    // Validate input
-    const validationResult = createTagDataSchema.safeParse({ name: data.name })
-    if (!validationResult.success) {
-      const errors: Record<string, string[]> = {}
-      for (const issue of validationResult.error.issues) {
-        const field = issue.path.join('.') || 'unknown'
-        if (!errors[field]) {
-          errors[field] = []
-        }
-        errors[field].push(issue.message)
-      }
-      throw new ValidationError(errors)
-    }
-
-    // Check for duplicate tag name
-    const existingTag = await this.tagRepository.findByUserIdAndName(
+    // Get total count for pagination calculation
+    const totalCount = await this.pinRepository.countByUserId(
       ac.user!.id,
-      data.name
+      filter
     )
-    if (existingTag) {
-      throw new DuplicateTagError(data.name)
+
+    // Calculate pagination details
+    const pagination = Pagination.fromTotalCount(totalCount, {
+      ...paginationOptions,
+      defaultPageSize: 25,
+      maxPageSize: 100,
+    })
+
+    // Fetch pins with pagination
+    const pins = await this.pinRepository.findByUserId(ac.user!.id, filter, {
+      limit: pagination.pageSize,
+      offset: pagination.offset,
+    })
+
+    // Filter pins through access control
+    const filteredPins = pins.filter(pin => ac.canRead(pin))
+
+    return {
+      pins: filteredPins,
+      pagination,
+      totalCount,
     }
-
-    // Create tag data with user ID from AccessControl
-    const createTagData: CreateTagData = {
-      userId: ac.user!.id,
-      name: data.name,
-    }
-
-    // Create tag
-    const tag = await this.tagRepository.create(createTagData)
-
-    return tag
-  }
-
-  async getUserTags(ac: AccessControl, targetUserId: string): Promise<Tag[]> {
-    // Future: could add public viewing logic here
-    // For now, user can only view their own tags
-    if (!ac.user || ac.user.id !== targetUserId) {
-      return []
-    }
-    return await this.tagRepository.findByUserId(targetUserId)
-  }
-
-  async deleteTag(ac: AccessControl, tagId: string): Promise<void> {
-    // Get tag and check ownership
-    const tag = await this.tagRepository.findById(tagId)
-    if (!tag) {
-      throw new TagNotFoundError(tagId)
-    }
-    if (!ac.canDelete(tag)) {
-      throw new UnauthorizedTagAccessError(tagId)
-    }
-
-    // Delete tag
-    await this.tagRepository.delete(tagId)
   }
 }

@@ -21,10 +21,8 @@ vi.mock('~/lib/session.server', () => ({
 
 // Mock the services container
 vi.mock('~/lib/services/container.server', () => ({
-  repositories: {
-    tag: {
-      findByUserId: mockFindByUserId,
-    },
+  tagService: {
+    getUserTags: mockFindByUserId,
   },
   pinService: {
     createPin: mockCreatePinFromFormData,
@@ -63,7 +61,7 @@ describe('pins/new route', () => {
   ): AccessControl =>
     ({
       user,
-      canCreate: () => !!user,
+      canCreateAs: (userId: string) => !!user && user.id === userId,
       canRead: () => !!user,
       canUpdate: () => !!user,
       canDelete: () => !!user,
@@ -114,7 +112,13 @@ describe('pins/new route', () => {
         typeof loader
       >[0])
 
-      expect(mockFindByUserId).toHaveBeenCalledWith('user-1')
+      expect(mockFindByUserId).toHaveBeenCalledWith(
+        expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          user: expect.objectContaining({ id: 'user-1' }),
+        }),
+        'user-1'
+      )
       expect(result).toMatchObject({
         data: {
           userTags: ['javascript', 'react'],
@@ -131,7 +135,13 @@ describe('pins/new route', () => {
         typeof loader
       >[0])
 
-      expect(mockFindByUserId).toHaveBeenCalledWith('user-1')
+      expect(mockFindByUserId).toHaveBeenCalledWith(
+        expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          user: expect.objectContaining({ id: 'user-1' }),
+        }),
+        'user-1'
+      )
       expect(result).toMatchObject({
         data: {
           userTags: [],
@@ -205,6 +215,7 @@ describe('pins/new route', () => {
           user: mockUser,
         }),
         {
+          userId: mockUser.id,
           url: 'https://example.com',
           title: 'Test Pin',
           description: 'Test description',
@@ -254,6 +265,7 @@ describe('pins/new route', () => {
           user: mockUser,
         }),
         {
+          userId: mockUser.id,
           url: 'https://example.com',
           title: 'Test Pin',
           description: undefined,

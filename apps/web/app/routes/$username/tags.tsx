@@ -1,6 +1,6 @@
 import { useLoaderData } from 'react-router'
-import { repositories } from '~/lib/services/container.server'
-import { requireUser } from '~/lib/session.server'
+import { pinService, tagService } from '~/lib/services/container.server'
+import { requireAccessControl } from '~/lib/session.server'
 import { requireUsernameMatch } from '~/lib/auth.server'
 import { TagCloud } from '~/components/tags/TagCloud'
 import { TagFilter, type TagFilterType } from '~/components/tags/TagFilter'
@@ -23,38 +23,40 @@ export function meta({ params }: Route.MetaArgs) {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  // Get authenticated user and validate username match
-  const user = await requireUser(request)
-  requireUsernameMatch(user, params.username)
+  // Get access control and validate username match
+  const ac = await requireAccessControl(request)
+  requireUsernameMatch(ac.user!, params.username)
 
   // Parse filter from URL search params using centralized utility
   const url = new URL(request.url)
   const parsedFilters = parsePinFilters(url)
 
   // Clean up any tags with no pins before displaying
-  await repositories.tag.deleteTagsWithNoPins(user.id)
+  await tagService.deleteTagsWithNoPins(ac, ac.user!.id)
 
   // Fetch tags with pin counts, only pass filter if there are readLater constraints
-  const tags = await repositories.tag.findByUserIdWithPinCount(
-    user.id,
+  const tags = await tagService.getUserTagsWithCount(
+    ac,
+    ac.user!.id,
     parsedFilters.filter.readLater !== undefined
       ? { readLater: parsedFilters.filter.readLater }
       : undefined
   )
 
-  // Get count of untagged pins
-  const untaggedPinsCount = await repositories.pin.countByUserId(
-    user.id,
+  // Get count of untagged pins using the pin service pagination method
+  const untaggedResult = await pinService.getUserPinsWithPagination(
+    ac,
     parsedFilters.filter.readLater !== undefined
       ? { readLater: parsedFilters.filter.readLater, noTags: true }
-      : { noTags: true }
+      : { noTags: true },
+    { pageSize: 1 } // Just need the count
   )
 
   return {
     tags,
-    username: user.username,
+    username: ac.user!.username,
     currentFilter: parsedFilters.currentFilterType as TagFilterType,
-    untaggedPinsCount,
+    untaggedPinsCount: untaggedResult.totalCount,
   }
 }
 

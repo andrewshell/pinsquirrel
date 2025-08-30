@@ -10,16 +10,12 @@ export type {
 export type {
   Pin,
   CreatePinData,
-  UpdatePinData,
-  ServiceCreatePinData,
-  ServiceUpdatePinData
+  UpdatePinData
 } from './entities/pin.js'
 export type {
   Tag,
   CreateTagData,
   UpdateTagData,
-  ServiceCreateTagData,
-  ServiceUpdateTagData,
   TagWithCount
 } from './entities/tag.js'
 export type {

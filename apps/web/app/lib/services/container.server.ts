@@ -1,18 +1,20 @@
-import {
-  PinService,
-  MetadataService,
-  AuthenticationService,
-} from '@pinsquirrel/services'
 import { CheerioHtmlParser, NodeHttpFetcher } from '@pinsquirrel/adapters'
 import {
   createDatabaseClient,
+  DrizzlePasswordResetRepository,
   DrizzlePinRepository,
   DrizzleTagRepository,
   DrizzleUserRepository,
-  DrizzlePasswordResetRepository,
 } from '@pinsquirrel/database'
-import { MailgunEmailService } from '@pinsquirrel/mailgun'
 import type { EmailService } from '@pinsquirrel/domain'
+import { MailgunEmailService } from '@pinsquirrel/mailgun'
+import {
+  AuthenticationService,
+  MetadataService,
+  PinService,
+  TagService,
+  UserService,
+} from '@pinsquirrel/services'
 
 // Create database client
 const db = createDatabaseClient(
@@ -47,15 +49,9 @@ export const authService = new AuthenticationService(
   emailService
 )
 export const pinService = new PinService(pinRepository, tagRepository)
+export const tagService = new TagService(tagRepository)
+export const userService = new UserService(userRepository)
 export const metadataService = new MetadataService(httpFetcher, htmlParser)
-
-// Export repositories for cases where direct access is still needed
-// TODO: These should be removed as we migrate all logic to services
-export const repositories = {
-  user: userRepository,
-  pin: pinRepository,
-  tag: tagRepository,
-}
 
 // Export static utilities for error handling
 export const metadataErrorUtils = {

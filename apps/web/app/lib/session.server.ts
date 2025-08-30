@@ -1,7 +1,18 @@
 import { createCookieSessionStorage, redirect } from 'react-router'
-import { repositories } from './services/container.server'
+// Import userRepository directly since session validation is infrastructure-level,
+// not business logic that requires AccessControl
+import {
+  DrizzleUserRepository,
+  createDatabaseClient,
+} from '@pinsquirrel/database'
 import { logger } from './logger.server'
 import { AccessControl } from '@pinsquirrel/domain'
+
+// Create database client and user repository for session validation
+const db = createDatabaseClient(
+  process.env.DATABASE_URL || 'postgresql://localhost:5432/pinsquirrel'
+)
+const userRepository = new DrizzleUserRepository(db)
 
 // Session storage configuration
 const sessionStorage = createCookieSessionStorage({
@@ -30,7 +41,7 @@ export async function getUser(request: Request) {
   if (!userId) return null
 
   try {
-    const user = await repositories.user.findById(userId)
+    const user = await userRepository.findById(userId)
     if (!user) {
       logger.warn('User not found for valid session', { userId })
       return null

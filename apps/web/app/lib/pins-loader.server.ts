@@ -1,9 +1,13 @@
-import { type PinFilter, Pagination } from '@pinsquirrel/domain'
+import { type PinFilter } from '@pinsquirrel/domain'
 import { data } from 'react-router'
 import { requireUsernameMatch } from '~/lib/auth.server'
 import { parsePinFilters } from '~/lib/filter-utils.server'
-import { repositories } from '~/lib/services/container.server'
-import { commitSession, getSession, requireUser } from '~/lib/session.server'
+import { pinService } from '~/lib/services/container.server'
+import {
+  commitSession,
+  getSession,
+  requireAccessControl,
+} from '~/lib/session.server'
 
 export type ReadFilterType = 'all' | 'toread' | 'read'
 
@@ -39,9 +43,9 @@ export async function createPinsLoader(
     ...parsedFilters.filter,
   }
 
-  // Get authenticated user and validate username match
-  const user = await requireUser(request)
-  requireUsernameMatch(user, params.username)
+  // Get access control and validate username match
+  const ac = await requireAccessControl(request)
+  requireUsernameMatch(ac.user!, params.username)
 
   // Get session for flash messages
   const session = await getSession(request)
@@ -50,36 +54,27 @@ export async function createPinsLoader(
   const successMessage = session.get('flash-success') as string | null
   const errorMessage = session.get('flash-error') as string | null
 
-  // Get total count for pagination calculation
-  const totalCount = await repositories.pin.countByUserId(user.id, filter)
-
-  // Calculate pagination details
-  const pagination = Pagination.fromTotalCount(totalCount, {
-    ...paginationParams,
-    defaultPageSize: 25,
-    maxPageSize: 100,
-  })
-
-  // Fetch pins with pagination
-  const pins = await repositories.pin.findByUserId(user.id, filter, {
-    limit: pagination.pageSize,
-    offset: pagination.offset,
-  })
+  // Get pins with pagination using the service
+  const result = await pinService.getUserPinsWithPagination(
+    ac,
+    filter,
+    paginationParams
+  )
 
   // Return with updated session to clear flash messages
   return data(
     {
-      pins,
-      totalPages: pagination.totalPages,
-      currentPage: pagination.page,
-      totalCount,
+      pins: result.pins,
+      totalPages: result.pagination.totalPages,
+      currentPage: result.pagination.page,
+      totalCount: result.totalCount,
       currentFilter:
         parsedFilters.currentFilterType !== 'all'
           ? parsedFilters.currentFilterType
           : config.currentFilter,
       activeTag: parsedFilters.activeTag,
       noTags: filter.noTags || false,
-      username: user.username,
+      username: ac.user!.username,
       successMessage,
       errorMessage,
     },

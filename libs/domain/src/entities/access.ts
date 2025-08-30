@@ -11,8 +11,9 @@ export class AccessControl {
     this.user = user ?? null
   }
 
-  canCreate(): boolean {
-    return !!this.user
+  canCreateAs(userId: string): boolean {
+    if (!this.user) return false
+    return this.user.id === userId
   }
 
   canRead(ag: AccessGateable): boolean {
