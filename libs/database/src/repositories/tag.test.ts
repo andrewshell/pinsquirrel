@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest'
 import { drizzle } from 'drizzle-orm/node-postgres'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { Pool } from 'pg'
 import { DrizzleTagRepository } from './tag.js'
 import { DrizzleUserRepository } from './user.js'
-import { db } from '../client.js'
 import type { User } from '@pinsquirrel/domain'
 
 describe('DrizzleTagRepository - Integration Tests', () => {
-  let testDb: typeof db
+  let testDb: PostgresJsDatabase<Record<string, unknown>>
   let testPool: Pool
   let tagRepository: DrizzleTagRepository
   let userRepository: DrizzleUserRepository
@@ -24,8 +24,23 @@ describe('DrizzleTagRepository - Integration Tests', () => {
     })
 
     // Import the schema and create test database connection
-    const schema = await import('../schema/index.js')
-    testDb = drizzle(testPool, { schema }) as typeof db
+    const { users } = await import('../schema/users.js')
+    const { pins } = await import('../schema/pins.js')
+    const { tags } = await import('../schema/tags.js')
+    const { pinsTags } = await import('../schema/pins-tags.js')
+    const { passwordResetTokens } = await import(
+      '../schema/password-reset-tokens.js'
+    )
+
+    const schema = {
+      users,
+      pins,
+      tags,
+      pinsTags,
+      passwordResetTokens,
+    }
+
+    testDb = drizzle(testPool, { schema })
 
     // Create repositories
     userRepository = new DrizzleUserRepository(testDb)

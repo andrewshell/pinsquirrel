@@ -7,7 +7,9 @@ import type {
   UpdateTagData,
   TagWithCount,
 } from '@pinsquirrel/domain'
-import { tags, pinsTags, pins } from '../schema/index.js'
+import { tags } from '../schema/tags.js'
+import { pinsTags } from '../schema/pins-tags.js'
+import { pins } from '../schema/pins.js'
 
 export class DrizzleTagRepository implements TagRepository {
   constructor(private db: PostgresJsDatabase<Record<string, unknown>>) {}

@@ -18,11 +18,11 @@ vi.mock('react-router', () => ({
 }))
 
 vi.mock('@pinsquirrel/database', () => ({
+  createDatabaseClient: vi.fn(),
   DrizzleUserRepository: vi.fn(),
   DrizzleTagRepository: vi.fn(),
   DrizzlePinRepository: vi.fn(),
   DrizzlePasswordResetRepository: vi.fn(),
-  db: {},
 }))
 
 vi.mock('./logger.server', () => ({

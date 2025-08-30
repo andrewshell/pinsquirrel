@@ -8,7 +8,9 @@ import type {
 } from '@pinsquirrel/domain'
 import { and, count, desc, eq, ilike, inArray, isNull, or } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { pins, pinsTags, tags } from '../schema/index.js'
+import { pins } from '../schema/pins.js'
+import { pinsTags } from '../schema/pins-tags.js'
+import { tags } from '../schema/tags.js'
 
 export class DrizzlePinRepository implements PinRepository {
   constructor(

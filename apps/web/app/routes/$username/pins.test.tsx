@@ -27,6 +27,7 @@ vi.mock('~/lib/session.server', () => ({
 }))
 
 vi.mock('@pinsquirrel/database', () => ({
+  createDatabaseClient: vi.fn(),
   DrizzlePinRepository: vi.fn().mockImplementation(() => ({
     findByUserId: mockFindByUserId,
     countByUserId: mockCountByUserId,
@@ -34,7 +35,6 @@ vi.mock('@pinsquirrel/database', () => ({
   DrizzleTagRepository: vi.fn().mockImplementation(() => ({})),
   DrizzleUserRepository: vi.fn().mockImplementation(() => ({})),
   DrizzlePasswordResetRepository: vi.fn(),
-  db: {},
 }))
 
 // Using createRoutesStub instead of mocking React Router hooks

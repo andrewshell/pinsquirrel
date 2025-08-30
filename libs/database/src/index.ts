@@ -1,8 +1,5 @@
-// Database client
-export { db } from './client.js'
-
-// Schema
-export * from './schema/index.js'
+// Re-export drizzle as createDatabaseClient for stable API
+export { drizzle as createDatabaseClient } from 'drizzle-orm/node-postgres'
 
 // Repository implementations
 export { DrizzleUserRepository } from './repositories/user.js'

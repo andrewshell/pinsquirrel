@@ -5,14 +5,19 @@ import {
 } from '@pinsquirrel/services'
 import { CheerioHtmlParser, NodeHttpFetcher } from '@pinsquirrel/adapters'
 import {
+  createDatabaseClient,
   DrizzlePinRepository,
   DrizzleTagRepository,
   DrizzleUserRepository,
   DrizzlePasswordResetRepository,
-  db,
 } from '@pinsquirrel/database'
 import { MailgunEmailService } from '@pinsquirrel/mailgun'
 import type { EmailService } from '@pinsquirrel/domain'
+
+// Create database client
+const db = createDatabaseClient(
+  process.env.DATABASE_URL || 'postgresql://localhost:5432/pinsquirrel'
+)
 
 // Create repository instances
 const userRepository = new DrizzleUserRepository(db)
