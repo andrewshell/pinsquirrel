@@ -48,7 +48,7 @@ export const authService = new AuthenticationService(
   passwordResetRepository,
   emailService
 )
-export const pinService = new PinService(pinRepository, tagRepository)
+export const pinService = new PinService(pinRepository)
 export const tagService = new TagService(tagRepository)
 export const userService = new UserService(userRepository)
 export const metadataService = new MetadataService(httpFetcher, htmlParser)

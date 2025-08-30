@@ -1,8 +1,8 @@
 import type {
   AccessControl,
+  UpdateUserData,
   User,
   UserRepository,
-  UpdateUserData,
 } from '@pinsquirrel/domain'
 import {
   AuthenticationError,
@@ -50,19 +50,12 @@ export class UserService {
     userId: string,
     data: UpdateUserData
   ): Promise<User> {
-    if (!ac.user) {
-      throw new AuthenticationError(
-        'User must be authenticated to update user data'
-      )
-    }
-
-    // For users, we check if the authenticated user ID matches the user being updated
-    if (ac.user.id !== userId) {
+    const existingUser = await this.userRepository.findById(userId)
+    if (!existingUser) {
       throw new InvalidCredentialsError()
     }
 
-    const existingUser = await this.userRepository.findById(userId)
-    if (!existingUser) {
+    if (!ac.canUpdate(existingUser)) {
       throw new InvalidCredentialsError()
     }
 

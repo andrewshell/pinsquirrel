@@ -175,7 +175,10 @@ export class AuthenticationService {
     const passwordHash = await hashPassword(input.newPassword)
 
     await this.userRepository.update(input.userId, {
+      id: user.id,
+      username: user.username,
       passwordHash,
+      emailHash: user.emailHash,
     })
   }
 
@@ -193,10 +196,18 @@ export class AuthenticationService {
       }
     }
 
+    const user = await this.userRepository.findById(input.userId)
+    if (!user) {
+      throw new InvalidCredentialsError()
+    }
+
     // Hash the email in the business logic layer
     const emailHash = input.email ? hashEmail(input.email) : null
 
     await this.userRepository.update(input.userId, {
+      id: user.id,
+      username: user.username,
+      passwordHash: user.passwordHash,
       emailHash,
     })
   }
@@ -322,7 +333,10 @@ export class AuthenticationService {
 
     // Update the user's password
     await this.userRepository.update(user.id, {
+      id: user.id,
+      username: user.username,
       passwordHash,
+      emailHash: user.emailHash,
     })
 
     // Delete the used token

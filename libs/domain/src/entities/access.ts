@@ -16,18 +16,21 @@ export class AccessControl {
     return this.user.id === userId
   }
 
-  canRead(ag: AccessGateable): boolean {
+  canRead(ag: AccessGateable | User): boolean {
     if (!this.user) return false
-    return this.user.id === ag.userId
+    const userId = 'userId' in ag ? ag.userId : ag.id
+    return this.user.id === userId
   }
 
-  canUpdate(ag: AccessGateable): boolean {
+  canUpdate(ag: AccessGateable | User): boolean {
     if (!this.user) return false
-    return this.user.id === ag.userId
+    const userId = 'userId' in ag ? ag.userId : ag.id
+    return this.user.id === userId
   }
 
-  canDelete(ag: AccessGateable): boolean {
+  canDelete(ag: AccessGateable | User): boolean {
     if (!this.user) return false
-    return this.user.id === ag.userId
+    const userId = 'userId' in ag ? ag.userId : ag.id
+    return this.user.id === userId
   }
 }

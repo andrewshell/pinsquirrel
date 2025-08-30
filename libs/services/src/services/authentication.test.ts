@@ -313,7 +313,10 @@ describe('AuthenticationService', () => {
         mockUser.passwordHash
       )
       expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
+        id: mockUser.id,
+        username: mockUser.username,
         passwordHash: 'hashed_newpass123',
+        emailHash: mockUser.emailHash,
       })
     })
 
@@ -367,6 +370,7 @@ describe('AuthenticationService', () => {
 
   describe('updateEmail', () => {
     it('should update email', async () => {
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
       vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
 
       await authService.updateEmail({
@@ -374,12 +378,17 @@ describe('AuthenticationService', () => {
         email: 'newemail@example.com',
       })
 
+      expect(mockUserRepository.findById).toHaveBeenCalledWith('123')
       expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
+        id: mockUser.id,
+        username: mockUser.username,
+        passwordHash: mockUser.passwordHash,
         emailHash: 'hashed_newemail@example.com',
       })
     })
 
     it('should clear email when null is provided', async () => {
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
       vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
 
       await authService.updateEmail({
@@ -387,7 +396,11 @@ describe('AuthenticationService', () => {
         email: null,
       })
 
+      expect(mockUserRepository.findById).toHaveBeenCalledWith('123')
       expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
+        id: mockUser.id,
+        username: mockUser.username,
+        passwordHash: mockUser.passwordHash,
         emailHash: null,
       })
     })
@@ -555,7 +568,10 @@ describe('AuthenticationService', () => {
         'hashed_mock-token'
       )
       expect(mockUserRepository.update).toHaveBeenCalledWith(mockUser.id, {
+        id: mockUser.id,
+        username: mockUser.username,
         passwordHash: 'hashed_newpassword123',
+        emailHash: mockUser.emailHash,
       })
       expect(mockPasswordResetRepository.delete).toHaveBeenCalledWith(
         mockPasswordResetToken.id

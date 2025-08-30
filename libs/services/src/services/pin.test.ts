@@ -52,9 +52,11 @@ describe('PinService', () => {
     ({
       user,
       canCreateAs: (userId: string) => !!user && user.id === userId,
-      canRead: ag => !!user && user.id === ag.userId,
-      canUpdate: ag => !!user && user.id === ag.userId,
-      canDelete: ag => !!user && user.id === ag.userId,
+      canRead: ag => !!user && user.id === ('userId' in ag ? ag.userId : ag.id),
+      canUpdate: ag =>
+        !!user && user.id === ('userId' in ag ? ag.userId : ag.id),
+      canDelete: ag =>
+        !!user && user.id === ('userId' in ag ? ag.userId : ag.id),
     }) as AccessControl
 
   beforeEach(() => {

@@ -8,13 +8,6 @@ export interface User {
 }
 
 // These are for the repository layer - they work with hashed data
-export interface CreateUserData {
-  username: string
-  passwordHash: string
-  emailHash?: string | null
-}
+export type CreateUserData = Omit<User, 'id' | 'createdAt' | 'updatedAt'>
 
-export interface UpdateUserData {
-  passwordHash?: string
-  emailHash?: string | null
-}
+export type UpdateUserData = Omit<User, 'createdAt' | 'updatedAt'>
