@@ -15,9 +15,14 @@
     "db:down": "docker compose -f docker-compose.dev.yml down",
     "docker:build-push": "./scripts/docker-build-push.sh",
     "docker:build-push-skip-quality": "./scripts/docker-build-push.sh --skip-quality",
-    "docker:dry-run": "./scripts/docker-build-push.sh --dry-run --skip-quality"
+    "docker:dry-run": "./scripts/docker-build-push.sh --dry-run --skip-quality",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "eslint": "^9.30.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.6",
+    "prettier": "^3.6.2",
     "turbo": "latest"
   },
   "engines": {
@@ -26,5 +31,14 @@
   "packageManager": "pnpm@10.13.1+sha512.37ebf1a5c7a30d5fabe0c5df44ee8da4c965ca0c5af3dbab28c3a1681b70a256218d05c81c9c0dcf767ef6b8551eb5b960042b9ed4300c59242336377e01cfad",
   "dependencies": {
     "tsx": "^4.20.3"
+  },
+  "lint-staged": {
+    "apps/web/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/web eslint --fix",
+    "libs/services/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/services eslint --fix",
+    "libs/database/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/database eslint --fix",
+    "libs/domain/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/domain eslint --fix",
+    "libs/adapters/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/adapters eslint --fix",
+    "libs/mailgun/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/mailgun eslint --fix",
+    "**/*.{ts,tsx,js,jsx,json,md,css}": "prettier --write"
   }
 }
