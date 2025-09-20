@@ -33,9 +33,7 @@ describe('FilterHeader', () => {
   })
 
   it('should render search filter with search icon and result count', () => {
-    renderWithRouter(
-      <FilterHeader searchQuery="react tutorial" />
-    )
+    renderWithRouter(<FilterHeader searchQuery="react tutorial" />)
 
     expect(screen.getByText('FILTERS')).toBeInTheDocument()
     expect(screen.getByText('"react tutorial"')).toBeInTheDocument()
@@ -47,10 +45,7 @@ describe('FilterHeader', () => {
 
   it('should render both tag and search filters together', () => {
     renderWithRouter(
-      <FilterHeader
-        activeTag="javascript"
-        searchQuery="tutorial"
-             />
+      <FilterHeader activeTag="javascript" searchQuery="tutorial" />
     )
 
     expect(screen.getByText('javascript')).toBeInTheDocument()
@@ -114,9 +109,7 @@ describe('FilterHeader', () => {
     const Stub = createRoutesStub([
       {
         path: '/user/pins',
-        Component: () => (
-          <FilterHeader searchQuery="test query" />
-        ),
+        Component: () => <FilterHeader searchQuery="test query" />,
       },
     ])
 
@@ -179,9 +172,7 @@ describe('FilterHeader', () => {
 
   it('should escape HTML in search query', () => {
     renderWithRouter(
-      <FilterHeader
-        searchQuery="<script>alert('xss')</script>"
-             />
+      <FilterHeader searchQuery="<script>alert('xss')</script>" />
     )
 
     expect(
@@ -193,9 +184,7 @@ describe('FilterHeader', () => {
     const Stub = createRoutesStub([
       {
         path: '/user/pins',
-        Component: () => (
-          <FilterHeader activeTag="react" searchQuery="hooks" />
-        ),
+        Component: () => <FilterHeader activeTag="react" searchQuery="hooks" />,
       },
     ])
 

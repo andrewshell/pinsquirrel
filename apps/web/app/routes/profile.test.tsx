@@ -17,6 +17,7 @@ describe('Profile route', () => {
     username: 'testuser',
     passwordHash: 'hash',
     emailHash: 'emailhash',
+    roles: [],
     createdAt: new Date(),
     updatedAt: new Date(),
   }

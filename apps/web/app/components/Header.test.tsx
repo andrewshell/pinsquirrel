@@ -9,6 +9,7 @@ const mockUser: User = {
   username: 'testuser',
   passwordHash: 'hash',
   emailHash: null,
+  roles: [],
   createdAt: new Date(),
   updatedAt: new Date(),
 }

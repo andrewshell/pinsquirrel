@@ -185,7 +185,9 @@ describe('PinsPage Integration', () => {
     })
 
     // Wait for Suspense to resolve and show the actual pins
-    expect(await screen.findByText('Example Pin', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(
+      await screen.findByText('Example Pin', {}, { timeout: 3000 })
+    ).toBeInTheDocument()
     expect(screen.getByText('• Another Pin')).toBeInTheDocument()
     expect(screen.getByText('https://example.com')).toBeInTheDocument()
     expect(screen.getByText('https://example2.com')).toBeInTheDocument()
@@ -220,7 +222,11 @@ describe('PinsPage Integration', () => {
     // Component rendered via renderWithRouter
 
     // Wait for Suspense to resolve and check that the list container has the correct classes
-    const listContainer = await screen.findByTestId('pin-list', {}, { timeout: 3000 })
+    const listContainer = await screen.findByTestId(
+      'pin-list',
+      {},
+      { timeout: 3000 }
+    )
     expect(listContainer).toHaveClass('space-y-4')
   })
 
@@ -252,7 +258,9 @@ describe('PinsPage Integration', () => {
     })
 
     // Should eventually show the pins after promise resolves
-    expect(await screen.findByTestId('pin-list', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(
+      await screen.findByTestId('pin-list', {}, { timeout: 3000 })
+    ).toBeInTheDocument()
     expect(screen.getByText('Example Pin')).toBeInTheDocument()
   })
 
@@ -351,7 +359,9 @@ describe('PinsPage Integration', () => {
     // Component rendered via renderWithRouter
 
     // Wait for Suspense to resolve and verify UI shows the pin
-    expect(await screen.findByText('Example Pin', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(
+      await screen.findByText('Example Pin', {}, { timeout: 3000 })
+    ).toBeInTheDocument()
     expect(
       screen.queryByText("You don't have any pins yet")
     ).not.toBeInTheDocument()
@@ -388,7 +398,9 @@ describe('PinsPage Integration', () => {
 
     // Component rendered via renderWithRouter
     // Wait for Suspense to resolve and test that component renders content correctly in idle state
-    expect(await screen.findByTestId('pin-list', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(
+      await screen.findByTestId('pin-list', {}, { timeout: 3000 })
+    ).toBeInTheDocument()
     expect(screen.getByText('Example Pin')).toBeInTheDocument()
 
     // Navigation state testing with createRoutesStub would require a more complex setup

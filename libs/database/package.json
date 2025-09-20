@@ -14,6 +14,7 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write src/**/*.ts",
     "format:check": "prettier --check src/**/*.ts",
+    "pretest": "docker exec pinsquirrel-postgres-1 createdb -U pinsquirrel pinsquirrel_test 2>/dev/null || true",
     "test": "vitest --run --pool=forks --poolOptions.forks.singleFork=true",
     "test:watch": "vitest --watch --coverage",
     "test:coverage": "vitest --run --coverage",

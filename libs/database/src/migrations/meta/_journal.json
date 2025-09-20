@@ -29,6 +29,13 @@
       "when": 1755546573910,
       "tag": "0003_pretty_darkstar",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1758373758976,
+      "tag": "0004_striped_jimmy_woo",
+      "breakpoints": true
     }
   ]
 }

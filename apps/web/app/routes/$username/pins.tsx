@@ -44,7 +44,7 @@ export default function PinsPage() {
   const searchParams = new URLSearchParams(loaderData.searchParamsString || '')
 
   return (
-    <PinsPageLayout 
+    <PinsPageLayout
       pinsData={loaderData.pinsData}
       username={loaderData.username}
       successMessage={loaderData.successMessage}
