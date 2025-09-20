@@ -13,6 +13,8 @@ import {
   InvalidResetTokenError,
   ResetTokenExpiredError,
   TooManyResetRequestsError,
+  MissingRoleError,
+  Role,
 } from '@pinsquirrel/domain'
 
 // Mock the crypto module (which contains crypto functions)
@@ -41,7 +43,7 @@ describe('AuthenticationService', () => {
     username: 'testuser',
     passwordHash: 'hashedpassword',
     emailHash: null,
-    roles: [],
+    roles: [Role.User],
     createdAt: new Date(),
     updatedAt: new Date(),
   }
@@ -210,6 +212,27 @@ describe('AuthenticationService', () => {
 
       await expect(authService.login(loginInput)).rejects.toThrow(
         InvalidCredentialsError
+      )
+    })
+
+    it('should throw MissingRoleError when user does not have User role', async () => {
+      const userWithoutRole = {
+        ...mockUser,
+        roles: [], // No roles assigned
+        passwordHash: '$2b$10$validhash',
+      }
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(
+        userWithoutRole
+      )
+      vi.mocked(verifyPassword).mockResolvedValue(true)
+
+      const loginInput = {
+        username: 'testuser',
+        password: 'password123',
+      }
+
+      await expect(authService.login(loginInput)).rejects.toThrow(
+        MissingRoleError
       )
     })
 

@@ -69,3 +69,12 @@ export class EmailSendError extends PasswordResetError {
     this.name = 'EmailSendError'
   }
 }
+
+export class MissingRoleError extends AuthenticationError {
+  constructor() {
+    super(
+      'Your account does not have the required permissions to access this application'
+    )
+    this.name = 'MissingRoleError'
+  }
+}

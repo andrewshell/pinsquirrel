@@ -42,6 +42,7 @@ export {
   ResetTokenNotFoundError,
   TooManyResetRequestsError,
   EmailSendError,
+  MissingRoleError,
 } from './errors/auth.js'
 export {
   PinError,

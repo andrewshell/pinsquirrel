@@ -13,6 +13,7 @@ import {
   ResetTokenExpiredError,
   TooManyResetRequestsError,
   ValidationError,
+  MissingRoleError,
 } from '@pinsquirrel/domain'
 import {
   hashPassword,
@@ -138,6 +139,11 @@ export class AuthenticationService {
     )
     if (!isValidPassword) {
       throw new InvalidCredentialsError()
+    }
+
+    // Check if user has the User role
+    if (!user.roles.includes(Role.User)) {
+      throw new MissingRoleError()
     }
 
     return user

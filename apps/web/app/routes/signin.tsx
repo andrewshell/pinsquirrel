@@ -4,6 +4,7 @@ import {
   ValidationError,
   InvalidCredentialsError,
   EmailVerificationRequiredError,
+  MissingRoleError,
 } from '@pinsquirrel/domain'
 import { authService } from '~/lib/services/container.server'
 import { createUserSession, getUserId } from '~/lib/session.server'
@@ -91,6 +92,18 @@ export async function action({ request }: Route.ActionArgs) {
           },
         },
         { status: 400 }
+      )
+    }
+
+    if (error instanceof MissingRoleError) {
+      logger.debug('Login failed - missing required role')
+      return data(
+        {
+          errors: {
+            _form: [error.message],
+          },
+        },
+        { status: 403 }
       )
     }
 
