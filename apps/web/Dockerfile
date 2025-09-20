@@ -30,7 +30,7 @@ COPY libs/database/package.json ./libs/database/
 COPY libs/domain/package.json ./libs/domain/
 COPY libs/mailgun/package.json ./libs/mailgun/
 COPY libs/services/package.json ./libs/services/
-RUN pnpm install --frozen-lockfile --prod
+RUN npm_config_ignore_scripts=true pnpm install --frozen-lockfile --prod
 
 # Final runtime image
 FROM node:22-alpine AS runtime
