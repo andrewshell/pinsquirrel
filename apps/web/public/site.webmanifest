@@ -17,5 +17,14 @@
   ],
   "theme_color": "#ffffff",
   "background_color": "#ffffff",
-  "display": "standalone"
+  "display": "standalone",
+  "share_target": {
+    "action": "/pins/new",
+    "method": "GET",
+    "params": {
+      "url": "url",
+      "title": "title",
+      "text": "description"
+    }
+  }
 }

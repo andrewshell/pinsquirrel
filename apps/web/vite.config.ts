@@ -7,6 +7,8 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 export default defineConfig({
   server: {
     port: 8100,
+    host: true,
+    allowedHosts: ['localhost', '.ngrok.io', '.ngrok-free.app'],
   },
   plugins: [
     tailwindcss(),

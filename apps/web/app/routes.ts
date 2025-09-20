@@ -8,6 +8,7 @@ export default [
   route('reset-password/:token', 'routes/reset-password.$token.tsx'),
   route('profile', 'routes/profile.tsx'),
   route('import', 'routes/import.tsx'),
+  route('pins/new', 'routes/pins.new.tsx'), // Web Share Target redirect
   route(':username/pins', 'routes/$username/pins.tsx'),
   route(':username/tags', 'routes/$username/tags.tsx'),
   route(':username/tags/merge', 'routes/$username/tags.merge.tsx'),

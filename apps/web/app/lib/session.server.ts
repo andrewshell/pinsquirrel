@@ -44,7 +44,15 @@ export async function getUser(request: Request) {
     const user = await userRepository.findById(userId)
     if (!user) {
       logger.warn('User not found for valid session', { userId })
-      return null
+      // Clear the invalid session and redirect to signin
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
+      throw redirect('/signin', {
+        headers: {
+          'Set-Cookie': await sessionStorage.destroySession(
+            await getSession(request)
+          ),
+        },
+      })
     }
 
     return user
