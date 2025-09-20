@@ -19,6 +19,15 @@ export class UserAlreadyExistsError extends AuthenticationError {
   }
 }
 
+export class EmailVerificationRequiredError extends AuthenticationError {
+  constructor() {
+    super(
+      'Please check your email to set your password and complete registration'
+    )
+    this.name = 'EmailVerificationRequiredError'
+  }
+}
+
 export class PasswordResetError extends AuthenticationError {
   constructor(message: string) {
     super(message)

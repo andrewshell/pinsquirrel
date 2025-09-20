@@ -63,6 +63,7 @@ describe('AuthenticationService', () => {
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      addRole: vi.fn(),
     }
 
     mockPasswordResetRepository = {
@@ -90,43 +91,32 @@ describe('AuthenticationService', () => {
   })
 
   describe('register', () => {
-    it('should register a new user without email', async () => {
+    it('should register a new user with email verification', async () => {
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
       vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.addRole).mockResolvedValue()
 
       const registerInput = {
         username: 'testuser',
-        password: 'password123',
-      }
-
-      const result = await authService.register(registerInput)
-
-      expect(mockUserRepository.findByUsername).toHaveBeenCalledWith('testuser')
-      expect(mockUserRepository.create).toHaveBeenCalledWith({
-        username: 'testuser',
-        passwordHash: 'hashed_password123',
-        emailHash: null,
-      })
-      expect(result).toEqual(mockUser)
-    })
-
-    it('should register a new user with email', async () => {
-      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
-      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
-
-      const registerInput = {
-        username: 'testuser',
-        password: 'password123',
         email: 'test@example.com',
       }
 
       const result = await authService.register(registerInput)
 
+      expect(mockUserRepository.findByUsername).toHaveBeenCalledWith('testuser')
+      expect(mockUserRepository.findByEmailHash).toHaveBeenCalledWith(
+        'hashed_test@example.com'
+      )
       expect(mockUserRepository.create).toHaveBeenCalledWith({
         username: 'testuser',
-        passwordHash: 'hashed_password123',
+        passwordHash: null,
         emailHash: 'hashed_test@example.com',
       })
+      expect(mockUserRepository.addRole).toHaveBeenCalledWith(
+        mockUser.id,
+        'User'
+      )
       expect(result).toEqual(mockUser)
     })
 
@@ -135,7 +125,7 @@ describe('AuthenticationService', () => {
 
       const registerInput = {
         username: 'testuser',
-        password: 'password123',
+        email: 'test@example.com',
       }
 
       await expect(authService.register(registerInput)).rejects.toThrow(
@@ -148,7 +138,7 @@ describe('AuthenticationService', () => {
     it('should throw validation error for invalid username', async () => {
       const registerInput = {
         username: 'ab', // too short
-        password: 'password123',
+        email: 'test@example.com',
       }
 
       await expect(authService.register(registerInput)).rejects.toThrow(
@@ -156,21 +146,9 @@ describe('AuthenticationService', () => {
       )
     })
 
-    it('should throw validation error for invalid password', async () => {
-      const registerInput = {
-        username: 'testuser',
-        password: 'short', // too short
-      }
-
-      await expect(authService.register(registerInput)).rejects.toThrow(
-        'Password must be at least 8 characters'
-      )
-    })
-
     it('should throw validation error for invalid email', async () => {
       const registerInput = {
         username: 'testuser',
-        password: 'password123',
         email: 'invalid-email',
       }
 
@@ -179,45 +157,7 @@ describe('AuthenticationService', () => {
       )
     })
 
-    it('should register user with undefined email', async () => {
-      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
-      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
-
-      const registerInput = {
-        username: 'testuser',
-        password: 'password123',
-        email: undefined,
-      }
-
-      const result = await authService.register(registerInput)
-
-      expect(mockUserRepository.create).toHaveBeenCalledWith({
-        username: 'testuser',
-        passwordHash: 'hashed_password123',
-        emailHash: null,
-      })
-      expect(result).toEqual(mockUser)
-    })
-
-    it('should register user with empty string email (treated as undefined)', async () => {
-      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
-      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
-
-      const registerInput = {
-        username: 'testuser',
-        password: 'password123',
-        email: '',
-      }
-
-      const result = await authService.register(registerInput)
-
-      expect(mockUserRepository.create).toHaveBeenCalledWith({
-        username: 'testuser',
-        passwordHash: 'hashed_password123',
-        emailHash: null,
-      })
-      expect(result).toEqual(mockUser)
-    })
+    // Email is now required, so no tests for undefined/empty email
   })
 
   describe('login', () => {
@@ -314,7 +254,6 @@ describe('AuthenticationService', () => {
         mockUser.passwordHash
       )
       expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
-        id: mockUser.id,
         username: mockUser.username,
         passwordHash: 'hashed_newpass123',
         emailHash: mockUser.emailHash,
@@ -381,7 +320,6 @@ describe('AuthenticationService', () => {
 
       expect(mockUserRepository.findById).toHaveBeenCalledWith('123')
       expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
-        id: mockUser.id,
         username: mockUser.username,
         passwordHash: mockUser.passwordHash,
         emailHash: 'hashed_newemail@example.com',
@@ -399,7 +337,6 @@ describe('AuthenticationService', () => {
 
       expect(mockUserRepository.findById).toHaveBeenCalledWith('123')
       expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
-        id: mockUser.id,
         username: mockUser.username,
         passwordHash: mockUser.passwordHash,
         emailHash: null,
@@ -569,7 +506,6 @@ describe('AuthenticationService', () => {
         'hashed_mock-token'
       )
       expect(mockUserRepository.update).toHaveBeenCalledWith(mockUser.id, {
-        id: mockUser.id,
         username: mockUser.username,
         passwordHash: 'hashed_newpassword123',
         emailHash: mockUser.emailHash,

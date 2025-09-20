@@ -1,6 +1,10 @@
 import { Link, redirect, data } from 'react-router'
 import type { Route } from './+types/signin'
-import { ValidationError, InvalidCredentialsError } from '@pinsquirrel/domain'
+import {
+  ValidationError,
+  InvalidCredentialsError,
+  EmailVerificationRequiredError,
+} from '@pinsquirrel/domain'
 import { authService } from '~/lib/services/container.server'
 import { createUserSession, getUserId } from '~/lib/session.server'
 import { getUserPath } from '~/lib/auth.server'
@@ -72,6 +76,18 @@ export async function action({ request }: Route.ActionArgs) {
         {
           errors: {
             _form: ['Invalid username or password'],
+          },
+        },
+        { status: 400 }
+      )
+    }
+
+    if (error instanceof EmailVerificationRequiredError) {
+      logger.debug('Login failed - email verification required')
+      return data(
+        {
+          errors: {
+            _form: [error.message],
           },
         },
         { status: 400 }

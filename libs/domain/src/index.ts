@@ -35,6 +35,7 @@ export {
   AuthenticationError,
   InvalidCredentialsError,
   UserAlreadyExistsError,
+  EmailVerificationRequiredError,
   PasswordResetError,
   InvalidResetTokenError,
   ResetTokenExpiredError,

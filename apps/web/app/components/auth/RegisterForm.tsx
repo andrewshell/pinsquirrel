@@ -5,17 +5,48 @@ import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 
-type ActionData = { errors: FieldErrors } | null
+type ActionData =
+  | { errors: FieldErrors }
+  | { success: boolean; message: string }
+  | null
 
 export function RegisterForm() {
   const fetcher = useFetcher<ActionData>()
 
-  // Get validation errors and loading state from fetcher
+  // Get validation errors, success data, and loading state from fetcher
   const actionData = fetcher.data
-  const errors = actionData?.errors
+  const errors =
+    actionData && 'errors' in actionData ? actionData.errors : undefined
+  const success = actionData && 'success' in actionData ? actionData : undefined
   const isSubmitting = fetcher.state === 'submitting'
 
-  // Note: Successful registration will redirect automatically via createUserSession
+  // Note: Successful registration will show email verification instructions
+
+  // Show success message if registration was successful
+  if (success) {
+    return (
+      <Card className="w-full max-w-md mx-auto">
+        <CardHeader>
+          <CardTitle>Account Created!</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="p-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded">
+            {success.message}
+          </div>
+          <p className="text-sm text-muted-foreground mt-4">
+            Didn&apos;t receive the email? Check your spam folder or{' '}
+            <button
+              onClick={() => window.location.reload()}
+              className="text-primary hover:underline"
+            >
+              try again
+            </button>
+            .
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card className="w-full max-w-md mx-auto">
@@ -51,29 +82,12 @@ export function RegisterForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              required
-              {...(errors?.password && { 'aria-invalid': true })}
-            />
-            {errors?.password && (
-              <p className="mt-1 text-sm text-destructive font-medium">
-                {Array.isArray(errors.password)
-                  ? errors.password.join('. ')
-                  : errors.password}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Email (optional)</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               name="email"
               type="email"
+              required
               {...(errors?.email && { 'aria-invalid': true })}
             />
             {errors?.email && (
@@ -86,8 +100,13 @@ export function RegisterForm() {
           </div>
 
           <Button type="submit" disabled={isSubmitting} className="w-full">
-            {isSubmitting ? 'Creating account...' : 'Sign Up'}
+            {isSubmitting ? 'Creating account...' : 'Create Account'}
           </Button>
+
+          <p className="text-sm text-muted-foreground text-center mt-4">
+            After creating your account, check your email to set your password
+            and complete registration.
+          </p>
         </fetcher.Form>
       </CardContent>
     </Card>

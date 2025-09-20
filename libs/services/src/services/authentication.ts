@@ -4,9 +4,11 @@ import type {
   EmailService,
   User,
 } from '@pinsquirrel/domain'
+import { Role } from '@pinsquirrel/domain'
 import {
   InvalidCredentialsError,
   UserAlreadyExistsError,
+  EmailVerificationRequiredError,
   InvalidResetTokenError,
   ResetTokenExpiredError,
   TooManyResetRequestsError,
@@ -34,8 +36,8 @@ export class AuthenticationService {
 
   async register(input: {
     username: string
-    password: string
-    email?: string | null
+    email: string
+    resetUrl?: string
   }): Promise<User> {
     // Validate inputs at service boundary
     const errors: Record<string, string[]> = {}
@@ -47,22 +49,9 @@ export class AuthenticationService {
       ]
     }
 
-    const passwordResult = passwordSchema.safeParse(input.password)
-    if (!passwordResult.success) {
-      errors.password = [
-        passwordResult.error.issues[0]?.message || 'Invalid password',
-      ]
-    }
-
-    if (
-      input.email !== null &&
-      input.email !== undefined &&
-      input.email.trim() !== ''
-    ) {
-      const emailResult = emailSchema.safeParse(input.email)
-      if (!emailResult.success) {
-        errors.email = [emailResult.error.issues[0]?.message || 'Invalid email']
-      }
+    const emailResult = emailSchema.safeParse(input.email)
+    if (!emailResult.success) {
+      errors.email = [emailResult.error.issues[0]?.message || 'Invalid email']
     }
 
     if (Object.keys(errors).length > 0) {
@@ -70,24 +59,43 @@ export class AuthenticationService {
     }
 
     // Check if username already exists
-    const existingUser = await this.userRepository.findByUsername(
+    const existingUserByUsername = await this.userRepository.findByUsername(
       input.username
     )
-    if (existingUser) {
+    if (existingUserByUsername) {
       throw new UserAlreadyExistsError(input.username)
     }
 
-    // Hash password and email in the business logic layer
-    const passwordHash = await hashPassword(input.password)
-    const emailHash =
-      input.email && input.email.trim() !== '' ? hashEmail(input.email) : null
+    // Check if email already exists
+    const emailHash = hashEmail(input.email)
+    const existingUserByEmail =
+      await this.userRepository.findByEmailHash(emailHash)
+    if (existingUserByEmail) {
+      throw new UserAlreadyExistsError('Email already registered')
+    }
 
-    // Create user with already hashed data
+    // Create user without password (they'll set it via email verification)
     const user = await this.userRepository.create({
       username: input.username,
-      passwordHash,
+      passwordHash: null, // No password yet - they'll set it via email verification
       emailHash,
     })
+
+    // Immediately assign User role
+    await this.userRepository.addRole(user.id, Role.User)
+
+    // Auto-trigger password reset email for verification if URL provided
+    if (input.resetUrl && this.passwordResetRepository && this.emailService) {
+      try {
+        await this.requestPasswordReset({
+          email: input.email,
+          resetUrl: input.resetUrl,
+        })
+      } catch {
+        // Don't fail registration if email sending fails
+        // Silently ignore email errors during registration
+      }
+    }
 
     return user
   }
@@ -117,6 +125,11 @@ export class AuthenticationService {
     const user = await this.userRepository.findByUsername(input.username)
     if (!user) {
       throw new InvalidCredentialsError()
+    }
+
+    // Check if user has completed email verification (set password)
+    if (!user.passwordHash) {
+      throw new EmailVerificationRequiredError()
     }
 
     const isValidPassword = await verifyPassword(
@@ -163,6 +176,11 @@ export class AuthenticationService {
       throw new InvalidCredentialsError()
     }
 
+    // Check if user has completed email verification (set password)
+    if (!user.passwordHash) {
+      throw new EmailVerificationRequiredError()
+    }
+
     const isValidPassword = await verifyPassword(
       input.currentPassword,
       user.passwordHash
@@ -175,7 +193,6 @@ export class AuthenticationService {
     const passwordHash = await hashPassword(input.newPassword)
 
     await this.userRepository.update(input.userId, {
-      id: user.id,
       username: user.username,
       passwordHash,
       emailHash: user.emailHash,
@@ -205,7 +222,6 @@ export class AuthenticationService {
     const emailHash = input.email ? hashEmail(input.email) : null
 
     await this.userRepository.update(input.userId, {
-      id: user.id,
       username: user.username,
       passwordHash: user.passwordHash,
       emailHash,
@@ -333,7 +349,6 @@ export class AuthenticationService {
 
     // Update the user's password
     await this.userRepository.update(user.id, {
-      id: user.id,
       username: user.username,
       passwordHash,
       emailHash: user.emailHash,

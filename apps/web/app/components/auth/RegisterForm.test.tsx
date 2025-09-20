@@ -27,16 +27,13 @@ describe('RegisterForm', () => {
     expect(form).toHaveAttribute('method', 'post')
 
     const usernameInput = screen.getByLabelText('Username')
-    const passwordInput = screen.getByLabelText('Password')
-    const emailInput = screen.getByLabelText('Email (optional)')
-    const submitButton = screen.getByRole('button', { name: 'Sign Up' })
+    const emailInput = screen.getByLabelText('Email')
+    const submitButton = screen.getByRole('button', { name: 'Create Account' })
 
     expect(usernameInput).toHaveAttribute('name', 'username')
     expect(usernameInput).toHaveAttribute('required')
-    expect(passwordInput).toHaveAttribute('name', 'password')
-    expect(passwordInput).toHaveAttribute('required')
     expect(emailInput).toHaveAttribute('name', 'email')
-    expect(emailInput).not.toHaveAttribute('required')
+    expect(emailInput).toHaveAttribute('required')
     expect(submitButton).toHaveAttribute('type', 'submit')
   })
 
@@ -47,7 +44,9 @@ describe('RegisterForm', () => {
     })
 
     // For now, just test that form renders - error display needs fetcher simulation
-    expect(screen.getByRole('button', { name: 'Sign Up' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Create Account' })
+    ).toBeInTheDocument()
   })
 
   it('displays username field error', () => {
@@ -60,14 +59,14 @@ describe('RegisterForm', () => {
     expect(screen.getByLabelText('Username')).toBeInTheDocument()
   })
 
-  it('displays password field error', () => {
+  it('displays username field error', () => {
     // TODO: Need to simulate fetcher action data properly
     renderWithRouter({
-      errors: { password: ['Password is required'] },
+      errors: { username: ['Username is required'] },
     })
 
     // For now, just test that form renders - error display needs fetcher simulation
-    expect(screen.getByLabelText('Password')).toBeInTheDocument()
+    expect(screen.getByLabelText('Username')).toBeInTheDocument()
   })
 
   it('displays email field error', () => {
@@ -77,18 +76,16 @@ describe('RegisterForm', () => {
     })
 
     // For now, just test that form renders - error display needs fetcher simulation
-    expect(screen.getByLabelText('Email (optional)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Email')).toBeInTheDocument()
   })
 
   it('applies correct attributes for valid fields', () => {
     renderWithRouter()
 
     const usernameInput = screen.getByLabelText('Username')
-    const passwordInput = screen.getByLabelText('Password')
-    const emailInput = screen.getByLabelText('Email (optional)')
+    const emailInput = screen.getByLabelText('Email')
 
     expect(usernameInput).not.toHaveAttribute('aria-invalid')
-    expect(passwordInput).not.toHaveAttribute('aria-invalid')
     expect(emailInput).not.toHaveAttribute('aria-invalid')
   })
 
@@ -99,7 +96,7 @@ describe('RegisterForm', () => {
     const submitButton = screen.getByRole('button')
 
     // For now, just test default state - loading state needs fetcher simulation
-    expect(submitButton).toHaveTextContent('Sign Up')
+    expect(submitButton).toHaveTextContent('Create Account')
     expect(submitButton).not.toBeDisabled()
   })
 })

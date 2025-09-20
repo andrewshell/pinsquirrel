@@ -2,8 +2,7 @@ import { Link, redirect, data } from 'react-router'
 import type { Route } from './+types/signup'
 import { ValidationError, UserAlreadyExistsError } from '@pinsquirrel/domain'
 import { authService } from '~/lib/services/container.server'
-import { createUserSession, getUserId } from '~/lib/session.server'
-import { getUserPath } from '~/lib/auth.server'
+import { getUserId } from '~/lib/session.server'
 import { RegisterForm } from '~/components/auth/RegisterForm'
 import { parseFormData } from '~/lib/http-utils'
 import { logger } from '~/lib/logger.server'
@@ -36,13 +35,8 @@ export async function action({ request }: Route.ActionArgs) {
   // Parse form data for registration
   const registerInput = {
     username: formData.username as string,
-    password: formData.password as string,
-    email:
-      formData.email &&
-      typeof formData.email === 'string' &&
-      formData.email.trim() !== ''
-        ? formData.email
-        : null,
+    email: formData.email as string,
+    resetUrl: `${new URL(request.url).origin}/reset-password`,
   }
 
   try {
@@ -53,9 +47,15 @@ export async function action({ request }: Route.ActionArgs) {
       username: user.username,
     })
 
-    // Create session and redirect to user's pins
-    const redirectTo = getUserPath(user.username)
-    return await createUserSession(user.id, redirectTo)
+    // Return success response with verification instructions
+    return data(
+      {
+        success: true,
+        message:
+          'Account created! Check your email to set your password and complete registration.',
+      },
+      { status: 201 }
+    )
   } catch (error) {
     if (error instanceof ValidationError) {
       logger.debug('Registration validation failed', { errors: error.fields })
