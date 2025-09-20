@@ -58,7 +58,7 @@ export async function action({ request }: Route.ActionArgs) {
     return await createUserSession(
       user.id,
       redirectTo,
-      false // keepSignedIn functionality removed since not in form data
+      formData.keepSignedIn as boolean
     )
   } catch (error) {
     if (error instanceof ValidationError) {
