@@ -25,13 +25,17 @@ interface PinsPageLayoutProps {
   searchParams: URLSearchParams
 }
 
-function PinsContent({ pinsData, username, searchParams }: { 
-  pinsData: Promise<PinsResult>, 
-  username: string, 
-  searchParams: URLSearchParams 
+function PinsContent({
+  pinsData,
+  username,
+  searchParams,
+}: {
+  pinsData: Promise<PinsResult>
+  username: string
+  searchParams: URLSearchParams
 }) {
   const result = use(pinsData)
-  
+
   return (
     <>
       <PinList pins={result.pins} isLoading={false} username={username} />
@@ -93,7 +97,7 @@ export function PinsPageLayout({
       )}
 
       <Suspense fallback={<></>}>
-        <PinsContent 
+        <PinsContent
           pinsData={pinsData}
           username={username}
           searchParams={searchParams}

@@ -93,7 +93,6 @@ export function FilterHeader({
     }
   }
 
-
   // Don't render if no filters are active
   if (!hasActiveFilters) {
     return null
@@ -178,7 +177,6 @@ export function FilterHeader({
                   </button>
                 </div>
               )}
-
             </div>
           </div>
         </div>

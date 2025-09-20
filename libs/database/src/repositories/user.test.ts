@@ -178,14 +178,17 @@ describe('DrizzleUserRepository - Integration Tests', () => {
         repository.create({
           username: `user1-${crypto.randomUUID().slice(0, 8)}`,
           passwordHash: 'hash1',
+          emailHash: 'email_hash1',
         }),
         repository.create({
           username: `user2-${crypto.randomUUID().slice(0, 8)}`,
           passwordHash: 'hash2',
+          emailHash: 'email_hash2',
         }),
         repository.create({
           username: `user3-${crypto.randomUUID().slice(0, 8)}`,
           passwordHash: 'hash3',
+          emailHash: 'email_hash3',
         }),
       ])
 
@@ -199,14 +202,17 @@ describe('DrizzleUserRepository - Integration Tests', () => {
         repository.create({
           username: `user1-${crypto.randomUUID().slice(0, 8)}`,
           passwordHash: 'hash1',
+          emailHash: 'email_hash1',
         }),
         repository.create({
           username: `user2-${crypto.randomUUID().slice(0, 8)}`,
           passwordHash: 'hash2',
+          emailHash: 'email_hash2',
         }),
         repository.create({
           username: `user3-${crypto.randomUUID().slice(0, 8)}`,
           passwordHash: 'hash3',
+          emailHash: 'email_hash3',
         }),
       ])
 
@@ -220,14 +226,17 @@ describe('DrizzleUserRepository - Integration Tests', () => {
         repository.create({
           username: `user1-${crypto.randomUUID().slice(0, 8)}`,
           passwordHash: 'hash1',
+          emailHash: 'email_hash1',
         }),
         repository.create({
           username: `user2-${crypto.randomUUID().slice(0, 8)}`,
           passwordHash: 'hash2',
+          emailHash: 'email_hash2',
         }),
         repository.create({
           username: `user3-${crypto.randomUUID().slice(0, 8)}`,
           passwordHash: 'hash3',
+          emailHash: 'email_hash3',
         }),
       ])
 
@@ -241,14 +250,17 @@ describe('DrizzleUserRepository - Integration Tests', () => {
         repository.create({
           username: `user1-${crypto.randomUUID().slice(0, 8)}`,
           passwordHash: 'hash1',
+          emailHash: 'email_hash1',
         }),
         repository.create({
           username: `user2-${crypto.randomUUID().slice(0, 8)}`,
           passwordHash: 'hash2',
+          emailHash: 'email_hash2',
         }),
         repository.create({
           username: `user3-${crypto.randomUUID().slice(0, 8)}`,
           passwordHash: 'hash3',
+          emailHash: 'email_hash3',
         }),
       ])
 
@@ -262,10 +274,12 @@ describe('DrizzleUserRepository - Integration Tests', () => {
         repository.create({
           username: `user1-${crypto.randomUUID().slice(0, 8)}`,
           passwordHash: 'hash1',
+          emailHash: 'email_hash1',
         }),
         repository.create({
           username: `user2-${crypto.randomUUID().slice(0, 8)}`,
           passwordHash: 'hash2',
+          emailHash: 'email_hash2',
         }),
       ])
 
@@ -280,6 +294,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       const createData = {
         username: `newuser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'already_hashed_password',
+        emailHash: null,
       }
 
       const result = await repository.create(createData)
@@ -316,7 +331,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       const createData = {
         username: `newuser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'already_hashed_password',
-        emailHash: undefined,
+        emailHash: null,
       }
 
       const result = await repository.create(createData)
@@ -437,6 +452,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       const user = await repository.create({
         username: `deleteuser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'password',
+        emailHash: 'delete_email_hash',
       })
 
       const result = await repository.delete(user.id)

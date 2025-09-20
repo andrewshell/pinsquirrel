@@ -51,6 +51,7 @@ describe('pins/new route', () => {
     username: 'testuser',
     passwordHash: 'hash',
     emailHash: 'emailhash',
+    roles: [],
     createdAt: new Date(),
     updatedAt: new Date(),
   }
@@ -65,6 +66,7 @@ describe('pins/new route', () => {
       canRead: () => !!user,
       canUpdate: () => !!user,
       canDelete: () => !!user,
+      hasRole: () => false,
     }) as AccessControl
 
   beforeEach(() => {

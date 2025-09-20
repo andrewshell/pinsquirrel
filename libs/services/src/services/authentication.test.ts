@@ -41,6 +41,7 @@ describe('AuthenticationService', () => {
     username: 'testuser',
     passwordHash: 'hashedpassword',
     emailHash: null,
+    roles: [],
     createdAt: new Date(),
     updatedAt: new Date(),
   }

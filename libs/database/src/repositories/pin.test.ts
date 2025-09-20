@@ -123,6 +123,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     testUser = await userRepository.create({
       username: `testuser-${crypto.randomUUID().slice(0, 8)}`,
       passwordHash: 'hashed_password',
+      emailHash: 'hashed_email',
     })
   })
 
@@ -185,6 +186,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       const otherUser = await userRepository.create({
         username: `otheruser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'password',
+        emailHash: 'other_hashed_email',
       })
 
       const pin1Id = crypto.randomUUID()

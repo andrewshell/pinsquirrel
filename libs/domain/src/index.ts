@@ -2,36 +2,23 @@
 // Contains only TypeScript types, interfaces, and error classes - no validation logic
 
 // Entities
-export type { 
-  User, 
-  CreateUserData, 
-  UpdateUserData
-} from './entities/user.js'
-export type {
-  Pin,
-  CreatePinData,
-  UpdatePinData
-} from './entities/pin.js'
+export type { User, CreateUserData, UpdateUserData } from './entities/user.js'
+export { Role } from './entities/role.js'
+export type { Pin, CreatePinData, UpdatePinData } from './entities/pin.js'
 export type {
   Tag,
   CreateTagData,
   UpdateTagData,
-  TagWithCount
+  TagWithCount,
 } from './entities/tag.js'
 export type {
   PasswordResetToken,
   CreatePasswordResetTokenData,
   PasswordResetRequest,
-  PasswordResetConfirmation
+  PasswordResetConfirmation,
 } from './entities/password-reset-token.js'
-export { 
-  Pagination,
-  type PaginationOptions
-} from './entities/pagination.js'
-export {
-  AccessControl,
-  type AccessGateable
-} from './entities/access.js'
+export { Pagination, type PaginationOptions } from './entities/pagination.js'
+export { AccessControl, type AccessGateable } from './entities/access.js'
 
 // Interfaces
 export type { Repository } from './interfaces/repository.js'
@@ -44,16 +31,16 @@ export type { HttpFetcher } from './interfaces/http-fetcher.js'
 export type { HtmlParser, MetadataResult } from './interfaces/html-parser.js'
 
 // Errors
-export { 
-  AuthenticationError, 
-  InvalidCredentialsError, 
+export {
+  AuthenticationError,
+  InvalidCredentialsError,
   UserAlreadyExistsError,
   PasswordResetError,
   InvalidResetTokenError,
   ResetTokenExpiredError,
   ResetTokenNotFoundError,
   TooManyResetRequestsError,
-  EmailSendError
+  EmailSendError,
 } from './errors/auth.js'
 export {
   PinError,
@@ -63,7 +50,7 @@ export {
   TagError,
   TagNotFoundError,
   UnauthorizedTagAccessError,
-  DuplicateTagError
+  DuplicateTagError,
 } from './errors/pin.js'
 export {
   MetadataError,
@@ -73,9 +60,5 @@ export {
   HttpError,
   ParseError,
 } from './errors/metadata.js'
-export {
-  ValidationError
-} from './errors/validation.js'
-export type {
-  FieldErrors
-} from './errors/validation.js'
+export { ValidationError } from './errors/validation.js'
+export type { FieldErrors } from './errors/validation.js'

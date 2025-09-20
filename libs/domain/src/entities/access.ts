@@ -1,4 +1,5 @@
 import type { User } from './user'
+import type { Role } from './role'
 
 export interface AccessGateable {
   userId: string
@@ -9,6 +10,11 @@ export class AccessControl {
 
   constructor(user?: User | null) {
     this.user = user ?? null
+  }
+
+  hasRole(role: Role): boolean {
+    if (!this.user) return false
+    return this.user.roles.includes(role)
   }
 
   canCreateAs(userId: string): boolean {

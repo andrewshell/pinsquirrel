@@ -32,6 +32,7 @@ describe('Home Page', () => {
         username: 'testuser',
         passwordHash: 'hashed',
         emailHash: 'email-hash',
+        roles: [],
         createdAt: new Date(),
         updatedAt: new Date(),
       }
