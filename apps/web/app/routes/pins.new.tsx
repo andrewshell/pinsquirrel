@@ -45,9 +45,9 @@ export async function action({ request }: Route.ActionArgs) {
 
   // Build query string from form data
   const params = new URLSearchParams()
-  if (url) params.set('url', url.toString())
-  if (title) params.set('title', title.toString())
-  if (text) params.set('description', text.toString())
+  if (url && typeof url === 'string') params.set('url', url)
+  if (title && typeof title === 'string') params.set('title', title)
+  if (text && typeof text === 'string') params.set('description', text)
 
   // Redirect to user-specific pin creation page with preserved query params
   const redirectTo = getUserPath(
