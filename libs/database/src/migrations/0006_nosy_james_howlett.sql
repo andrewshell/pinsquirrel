@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS "pins_user_id_url_idx" ON "pins" USING btree ("user_id","url");

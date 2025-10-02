@@ -20,9 +20,12 @@ export class UnauthorizedPinAccessError extends PinError {
 }
 
 export class DuplicatePinError extends PinError {
-  constructor(url: string) {
+  public readonly existingPin?: { id: string; createdAt: Date }
+
+  constructor(url: string, existingPin?: { id: string; createdAt: Date }) {
     super(`Pin with URL "${url}" already exists`)
     this.name = 'DuplicatePinError'
+    this.existingPin = existingPin
   }
 }
 

@@ -54,7 +54,10 @@ export class PinService {
       input.url
     )
     if (existingPin) {
-      throw new DuplicatePinError(input.url)
+      throw new DuplicatePinError(input.url, {
+        id: existingPin.id,
+        createdAt: existingPin.createdAt,
+      })
     }
 
     // Create pin data (timestamps can be provided or will default to now in repository)
@@ -108,7 +111,10 @@ export class PinService {
         updateFields.url
       )
       if (duplicatePin && duplicatePin.id !== id) {
-        throw new DuplicatePinError(updateFields.url)
+        throw new DuplicatePinError(updateFields.url, {
+          id: duplicatePin.id,
+          createdAt: duplicatePin.createdAt,
+        })
       }
     }
 

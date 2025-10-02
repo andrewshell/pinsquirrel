@@ -181,34 +181,30 @@ export async function action({ request }: Route.ActionArgs) {
       } catch (error) {
         if (error instanceof DuplicatePinError) {
           // For duplicates, check if Pinboard timestamp is earlier
-          try {
-            const existingPin = await pinService.getUserPinsWithPagination(
-              ac,
-              { url: pinboardPin.href },
-              { page: 1, pageSize: 1 }
-            )
-
-            if (existingPin.pins.length > 0) {
-              const pin = existingPin.pins[0]
+          if (error.existingPin) {
+            try {
               const pinboardTimestamp = new Date(pinboardPin.time)
 
               // Update createdAt if Pinboard timestamp is earlier
-              if (pinboardTimestamp < pin.createdAt) {
+              if (pinboardTimestamp < error.existingPin.createdAt) {
                 // Use repository method to update createdAt (special case for import)
-                await pinRepository.updateCreatedAt(pin.id, pinboardTimestamp)
+                await pinRepository.updateCreatedAt(
+                  error.existingPin.id,
+                  pinboardTimestamp
+                )
 
                 logger.info(
-                  `Updated createdAt for duplicate pin from ${pin.createdAt.toISOString()} to ${pinboardTimestamp.toISOString()}: ${pinboardPin.href}`
+                  `Updated createdAt for duplicate pin from ${error.existingPin.createdAt.toISOString()} to ${pinboardTimestamp.toISOString()}: ${pinboardPin.href}`
                 )
               }
+            } catch (updateError) {
+              logger.error(
+                `Failed to update duplicate pin: ${pinboardPin.href}`,
+                {
+                  error: updateError,
+                }
+              )
             }
-          } catch (updateError) {
-            logger.error(
-              `Failed to update duplicate pin: ${pinboardPin.href}`,
-              {
-                error: updateError,
-              }
-            )
           }
 
           skippedCount++
