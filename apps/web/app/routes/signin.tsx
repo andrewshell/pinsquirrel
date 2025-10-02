@@ -31,12 +31,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     return redirect('/')
   }
 
-  // Check for password reset success
+  // Check for password reset success and redirectTo parameter
   const url = new URL(request.url)
   const reset = url.searchParams.get('reset')
+  const redirectTo = url.searchParams.get('redirectTo')
   const showResetSuccess = reset === 'success'
 
-  return data({ showResetSuccess })
+  return data({ showResetSuccess, redirectTo })
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -58,8 +59,19 @@ export async function action({ request }: Route.ActionArgs) {
       username: user.username,
     })
 
-    // Create session and redirect to user's pins
-    const redirectTo = getUserPath(user.username)
+    // Determine redirect destination
+    let redirectTo = getUserPath(user.username)
+
+    // Use redirectTo from form if provided and is a safe relative path
+    if (formData.redirectTo && typeof formData.redirectTo === 'string') {
+      const redirectPath = formData.redirectTo
+      // Only allow relative paths to prevent open redirect vulnerabilities
+      if (redirectPath.startsWith('/') && !redirectPath.startsWith('//')) {
+        redirectTo = redirectPath
+      }
+    }
+
+    // Create session and redirect
     return await createUserSession(
       user.id,
       redirectTo,
@@ -147,7 +159,7 @@ export default function LoginPage({ loaderData }: Route.ComponentProps) {
       )}
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <LoginForm />
+        <LoginForm redirectTo={loaderData?.redirectTo} />
       </div>
     </div>
   )

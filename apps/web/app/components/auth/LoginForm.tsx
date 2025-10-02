@@ -8,7 +8,11 @@ import { Label } from '~/components/ui/label'
 
 type ActionData = { errors: FieldErrors } | null
 
-export function LoginForm() {
+interface LoginFormProps {
+  redirectTo?: string | null
+}
+
+export function LoginForm({ redirectTo }: LoginFormProps = {}) {
   const fetcher = useFetcher<ActionData>()
 
   // Get validation errors and loading state from fetcher
@@ -25,6 +29,10 @@ export function LoginForm() {
       </CardHeader>
       <CardContent>
         <fetcher.Form method="post" className="space-y-4" noValidate>
+          {redirectTo && (
+            <input type="hidden" name="redirectTo" value={redirectTo} />
+          )}
+
           {errors?._form && (
             <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
               {Array.isArray(errors._form)

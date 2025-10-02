@@ -96,6 +96,12 @@ export async function requireUser(request: Request) {
 
 export async function requireAccessControl(request: Request) {
   const user = await getUser(request)
+  if (!user) {
+    const url = new URL(request.url)
+    const redirectTo = url.pathname + url.search
+    // eslint-disable-next-line @typescript-eslint/only-throw-error
+    throw redirect(`/signin?redirectTo=${encodeURIComponent(redirectTo)}`)
+  }
   return new AccessControl(user)
 }
 

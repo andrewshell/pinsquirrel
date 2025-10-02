@@ -5,18 +5,24 @@ import { LoginForm } from './LoginForm'
 import type { FieldErrors } from '@pinsquirrel/domain'
 
 describe('LoginForm', () => {
-  const createLoginFormStub = (actionData?: { errors?: FieldErrors }) => {
+  const createLoginFormStub = (
+    actionData?: { errors?: FieldErrors },
+    redirectTo?: string
+  ) => {
     return createRoutesStub([
       {
         path: '/signin',
-        Component: LoginForm,
+        Component: () => <LoginForm redirectTo={redirectTo} />,
         action: () => actionData || null,
       },
     ])
   }
 
-  const renderWithRouter = (actionData?: { errors?: FieldErrors }) => {
-    const Stub = createLoginFormStub(actionData)
+  const renderWithRouter = (
+    actionData?: { errors?: FieldErrors },
+    redirectTo?: string
+  ) => {
+    const Stub = createLoginFormStub(actionData, redirectTo)
     return render(<Stub initialEntries={['/signin']} />)
   }
 
@@ -101,5 +107,23 @@ describe('LoginForm', () => {
     // For now, just test default state - loading state needs fetcher simulation
     expect(submitButton).toHaveTextContent('Sign In')
     expect(submitButton).not.toBeDisabled()
+  })
+
+  it('includes redirectTo as hidden input when provided', () => {
+    const { container } = renderWithRouter(undefined, '/test/path?query=value')
+
+    const redirectToInput = container.querySelector(
+      'input[name="redirectTo"]'
+    ) as HTMLInputElement
+    expect(redirectToInput).toBeInTheDocument()
+    expect(redirectToInput).toHaveAttribute('type', 'hidden')
+    expect(redirectToInput).toHaveValue('/test/path?query=value')
+  })
+
+  it('does not include redirectTo input when not provided', () => {
+    const { container } = renderWithRouter()
+
+    const redirectToInput = container.querySelector('input[name="redirectTo"]')
+    expect(redirectToInput).not.toBeInTheDocument()
   })
 })

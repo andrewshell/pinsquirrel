@@ -37,7 +37,27 @@ describe('Signin route', () => {
       const result = await loader(args)
 
       expect(result).toHaveProperty('data')
-      expect((result as any).data).toEqual({ showResetSuccess: false })
+      expect((result as any).data).toEqual({
+        showResetSuccess: false,
+        redirectTo: null,
+      })
+    })
+
+    it('returns data with redirectTo when provided in query params', async () => {
+      mockGetUserId.mockResolvedValue(null)
+
+      const request = new Request(
+        'http://localhost/signin?redirectTo=/test/path%3Fquery%3Dvalue'
+      )
+      const args: Route.LoaderArgs = { request, params: {}, context: {} }
+
+      const result = await loader(args)
+
+      expect(result).toHaveProperty('data')
+      expect((result as any).data).toEqual({
+        showResetSuccess: false,
+        redirectTo: '/test/path?query=value',
+      })
     })
   })
 
