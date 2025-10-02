@@ -8,6 +8,7 @@ import { FormText } from '~/components/ui/form-text'
 import { Checkbox } from '~/components/ui/checkbox'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import { TagInput } from '~/components/ui/tag-input'
+import { RefreshCw } from 'lucide-react'
 import type { FieldErrors } from '@pinsquirrel/domain'
 import type { UrlParams } from '~/lib/url-params.server'
 
@@ -126,11 +127,6 @@ export function PinCreationForm({
   }, [errors])
 
   const handleUrlBlur = () => {
-    // Don't fetch metadata in edit mode
-    if (editMode) {
-      return
-    }
-
     if (urlValue && onMetadataFetch) {
       // Let server handle URL validation
       onMetadataFetch(urlValue)
@@ -139,6 +135,12 @@ export function PinCreationForm({
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUrlValue(e.target.value)
+  }
+
+  const handleRefreshMetadata = () => {
+    if (urlValue && onMetadataFetch) {
+      onMetadataFetch(urlValue)
+    }
   }
 
   return (
@@ -207,7 +209,23 @@ export function PinCreationForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="title">Title</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="title">Title</Label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleRefreshMetadata}
+            disabled={!urlValue || isMetadataLoading || isSubmitting}
+            className="h-8 px-2"
+            aria-label="Refresh metadata from URL"
+            title="Refresh metadata from URL"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${isMetadataLoading ? 'animate-spin' : ''}`}
+            />
+          </Button>
+        </div>
         <div className="relative">
           <Input
             ref={titleRef}

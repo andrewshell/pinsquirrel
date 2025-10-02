@@ -50,7 +50,7 @@ describe('PinCreationForm', () => {
     const Stub = createPinCreationFormStub()
     render(<Stub initialEntries={['/pins/new']} />)
 
-    const urlInput = screen.getByLabelText(/url/i)
+    const urlInput = screen.getByRole('textbox', { name: /^url$/i })
     const titleInput = screen.getByLabelText(/title/i)
     const submitButton = screen.getByRole('button', { name: /create pin/i })
 
@@ -125,7 +125,7 @@ describe('PinCreationForm', () => {
     })
     render(<Stub initialEntries={['/pins/new']} />)
 
-    const urlInput = screen.getByLabelText(/url/i)
+    const urlInput = screen.getByRole('textbox', { name: /^url$/i })
 
     await user.type(urlInput, 'https://example.com')
     await user.tab() // Trigger blur event
@@ -140,7 +140,7 @@ describe('PinCreationForm', () => {
     })
     render(<Stub initialEntries={['/pins/new']} />)
 
-    const urlInput = screen.getByLabelText(/url/i)
+    const urlInput = screen.getByRole('textbox', { name: /^url$/i })
 
     await user.type(urlInput, 'not-a-url')
     await user.tab()
@@ -149,7 +149,7 @@ describe('PinCreationForm', () => {
     expect(mockOnMetadataFetch).toHaveBeenCalledWith('not-a-url')
   })
 
-  it('does not call onMetadataFetch in edit mode', async () => {
+  it('calls onMetadataFetch in edit mode when URL blurred', async () => {
     const user = userEvent.setup()
     const Stub = createPinCreationFormStub({
       editMode: true,
@@ -157,12 +157,12 @@ describe('PinCreationForm', () => {
     })
     render(<Stub initialEntries={['/pins/new']} />)
 
-    const urlInput = screen.getByLabelText(/url/i)
+    const urlInput = screen.getByRole('textbox', { name: /^url$/i })
 
     await user.type(urlInput, 'https://example.com')
     await user.tab()
 
-    expect(mockOnMetadataFetch).not.toHaveBeenCalled()
+    expect(mockOnMetadataFetch).toHaveBeenCalledWith('https://example.com')
   })
 
   it('shows metadata loading state', () => {
