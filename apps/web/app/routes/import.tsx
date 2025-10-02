@@ -158,12 +158,18 @@ export async function action({ request }: Route.ActionArgs) {
           title = title.substring(0, 200)
         }
 
+        // Prepare description: truncate if over 1000 characters
+        let description = pinboardPin.extended || null
+        if (description && description.length > 1000) {
+          description = description.substring(0, 1000)
+        }
+
         // Create pin using the service (handles duplicate checking)
         await pinService.createPin(ac, {
           userId: ac.user!.id,
           url: pinboardPin.href,
           title: title,
-          description: pinboardPin.extended || null,
+          description: description,
           readLater: pinboardPin.toread === 'yes',
           tagNames: tagNames,
         })
