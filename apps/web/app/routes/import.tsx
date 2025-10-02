@@ -149,11 +149,20 @@ export async function action({ request }: Route.ActionArgs) {
 
         tagNames.forEach(tag => allTagNames.add(tag))
 
+        // Prepare title: use URL if blank, truncate if over 200 characters
+        let title = pinboardPin.description?.trim() || ''
+        if (!title) {
+          title = pinboardPin.href
+        }
+        if (title.length > 200) {
+          title = title.substring(0, 200)
+        }
+
         // Create pin using the service (handles duplicate checking)
         await pinService.createPin(ac, {
           userId: ac.user!.id,
           url: pinboardPin.href,
-          title: pinboardPin.description,
+          title: title,
           description: pinboardPin.extended || null,
           readLater: pinboardPin.toread === 'yes',
           tagNames: tagNames,
