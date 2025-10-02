@@ -53,6 +53,9 @@ export const tagService = new TagService(tagRepository)
 export const userService = new UserService(userRepository)
 export const metadataService = new MetadataService(httpFetcher, htmlParser)
 
+// Export repositories for special cases (e.g., import)
+export { pinRepository }
+
 // Export static utilities for error handling
 export const metadataErrorUtils = {
   getHttpStatusForError: (error: Error) =>

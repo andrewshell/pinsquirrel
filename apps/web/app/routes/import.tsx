@@ -7,7 +7,7 @@ import {
 } from 'react-router'
 import type { Route } from './+types/import'
 import { requireAccessControl, setFlashMessage } from '~/lib/session.server'
-import { pinService } from '~/lib/services/container.server'
+import { pinService, pinRepository } from '~/lib/services/container.server'
 import { DuplicatePinError } from '@pinsquirrel/domain'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
@@ -139,7 +139,8 @@ export async function action({ request }: Route.ActionArgs) {
 
     for (const pinboardPin of pinboardData) {
       try {
-        // Note: Original timestamp from pinboardPin.time is not preserved in current implementation
+        // Parse Pinboard timestamp
+        const pinboardTimestamp = new Date(pinboardPin.time)
 
         // Parse tags from space-separated string
         const tagNames = pinboardPin.tags
@@ -164,7 +165,7 @@ export async function action({ request }: Route.ActionArgs) {
           description = description.substring(0, 1000)
         }
 
-        // Create pin using the service (handles duplicate checking)
+        // Create pin using the service with original timestamp
         await pinService.createPin(ac, {
           userId: ac.user!.id,
           url: pinboardPin.href,
@@ -172,12 +173,44 @@ export async function action({ request }: Route.ActionArgs) {
           description: description,
           readLater: pinboardPin.toread === 'yes',
           tagNames: tagNames,
+          createdAt: pinboardTimestamp,
+          updatedAt: pinboardTimestamp,
         })
 
         importedCount++
       } catch (error) {
         if (error instanceof DuplicatePinError) {
-          // Skip duplicates silently
+          // For duplicates, check if Pinboard timestamp is earlier
+          try {
+            const existingPin = await pinService.getUserPinsWithPagination(
+              ac,
+              { url: pinboardPin.href },
+              { page: 1, pageSize: 1 }
+            )
+
+            if (existingPin.pins.length > 0) {
+              const pin = existingPin.pins[0]
+              const pinboardTimestamp = new Date(pinboardPin.time)
+
+              // Update createdAt if Pinboard timestamp is earlier
+              if (pinboardTimestamp < pin.createdAt) {
+                // Use repository method to update createdAt (special case for import)
+                await pinRepository.updateCreatedAt(pin.id, pinboardTimestamp)
+
+                logger.info(
+                  `Updated createdAt for duplicate pin from ${pin.createdAt.toISOString()} to ${pinboardTimestamp.toISOString()}: ${pinboardPin.href}`
+                )
+              }
+            }
+          } catch (updateError) {
+            logger.error(
+              `Failed to update duplicate pin: ${pinboardPin.href}`,
+              {
+                error: updateError,
+              }
+            )
+          }
+
           skippedCount++
           logger.debug(`Skipped duplicate pin: ${pinboardPin.href}`)
         } else {

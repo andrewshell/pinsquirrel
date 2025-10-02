@@ -280,8 +280,8 @@ export class DrizzlePinRepository implements PinRepository {
         title: data.title,
         description: data.description,
         readLater: data.readLater,
-        createdAt: now,
-        updatedAt: now,
+        createdAt: data.createdAt ?? now,
+        updatedAt: data.updatedAt ?? now,
       })
       .returning()
 
@@ -363,6 +363,14 @@ export class DrizzlePinRepository implements PinRepository {
 
   async delete(id: string): Promise<boolean> {
     const result = await this.db.delete(pins).where(eq(pins.id, id))
+    return result.rowCount > 0
+  }
+
+  async updateCreatedAt(id: string, createdAt: Date): Promise<boolean> {
+    const result = await this.db
+      .update(pins)
+      .set({ createdAt })
+      .where(eq(pins.id, id))
     return result.rowCount > 0
   }
 

@@ -11,6 +11,7 @@ export interface Pin extends AccessGateable {
   updatedAt: Date
 }
 
-export type CreatePinData = Omit<Pin, 'id' | 'createdAt' | 'updatedAt'>
+export type CreatePinData = Omit<Pin, 'id' | 'createdAt' | 'updatedAt'> &
+  Partial<Pick<Pin, 'createdAt' | 'updatedAt'>>
 
 export type UpdatePinData = Omit<Pin, 'createdAt' | 'updatedAt'>

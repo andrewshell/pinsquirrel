@@ -33,6 +33,8 @@ export class PinService {
       description: input.description,
       readLater: input.readLater,
       tagNames: input.tagNames,
+      createdAt: input.createdAt,
+      updatedAt: input.updatedAt,
     })
     if (!validationResult.success) {
       const errors: Record<string, string[]> = {}
@@ -55,7 +57,7 @@ export class PinService {
       throw new DuplicatePinError(input.url)
     }
 
-    // Create pin data (timestamps managed by repository)
+    // Create pin data (timestamps can be provided or will default to now in repository)
     const createPinData: CreatePinData = {
       userId: input.userId,
       url: input.url,
@@ -63,6 +65,8 @@ export class PinService {
       description: input.description ?? null,
       readLater: input.readLater ?? false,
       tagNames: input.tagNames ?? [],
+      createdAt: input.createdAt,
+      updatedAt: input.updatedAt,
     }
     const pin = await this.pinRepository.create(createPinData)
 

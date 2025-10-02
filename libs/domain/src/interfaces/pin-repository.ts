@@ -24,4 +24,7 @@ export interface PinRepository {
   ): Promise<Pin[]>
   findByUserIdAndUrl(userId: string, url: string): Promise<Pin | null>
   countByUserId(userId: string, filter?: PinFilter): Promise<number>
+
+  // Special operations for import/migration
+  updateCreatedAt(id: string, createdAt: Date): Promise<boolean>
 }
