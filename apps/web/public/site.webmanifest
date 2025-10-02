@@ -20,11 +20,12 @@
   "display": "standalone",
   "share_target": {
     "action": "/pins/new",
-    "method": "GET",
+    "method": "POST",
+    "enctype": "application/x-www-form-urlencoded",
     "params": {
       "url": "url",
       "title": "title",
-      "text": "description"
+      "text": "text"
     }
   }
 }
