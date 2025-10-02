@@ -1,4 +1,10 @@
-import { useLoaderData, useActionData, Form, data } from 'react-router'
+import {
+  useLoaderData,
+  useActionData,
+  Form,
+  data,
+  useNavigation,
+} from 'react-router'
 import type { Route } from './+types/import'
 import { requireAccessControl, setFlashMessage } from '~/lib/session.server'
 import { pinService } from '~/lib/services/container.server'
@@ -8,7 +14,7 @@ import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { Alert, AlertDescription, AlertTitle } from '~/components/ui/alert'
-import { ArrowLeft, Upload, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Upload, AlertCircle, Loader2 } from 'lucide-react'
 import { Link } from 'react-router'
 import { logger } from '~/lib/logger.server'
 
@@ -203,6 +209,9 @@ export async function action({ request }: Route.ActionArgs) {
 export default function ImportRoute() {
   const { username } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
+  const navigation = useNavigation()
+
+  const isSubmitting = navigation.state === 'submitting'
 
   return (
     <div className="container max-w-4xl mx-auto px-4 py-8">
@@ -264,9 +273,22 @@ export default function ImportRoute() {
             </div>
 
             <div>
-              <Button type="submit" className="flex items-center gap-2">
-                <Upload className="h-4 w-4" />
-                Import Bookmarks
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex items-center gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Importing...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Import Bookmarks
+                  </>
+                )}
               </Button>
             </div>
           </Form>
