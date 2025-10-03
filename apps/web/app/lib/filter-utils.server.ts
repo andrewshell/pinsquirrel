@@ -84,7 +84,7 @@ export function extractFilterParams(request: Request): string {
   const url = new URL(request.url)
   const params = new URLSearchParams()
 
-  // Extract only the filter parameters we want to preserve
+  // Extract filter parameters
   const tag = url.searchParams.get('tag')
   const unread = url.searchParams.get('unread')
 
@@ -94,6 +94,23 @@ export function extractFilterParams(request: Request): string {
 
   if (unread === 'true') {
     params.set('unread', 'true')
+  }
+
+  // Extract view settings parameters
+  const sort = url.searchParams.get('sort')
+  const direction = url.searchParams.get('direction')
+  const size = url.searchParams.get('size')
+
+  if (sort === 'created' || sort === 'title') {
+    params.set('sort', sort)
+  }
+
+  if (direction === 'asc' || direction === 'desc') {
+    params.set('direction', direction)
+  }
+
+  if (size === 'expanded' || size === 'compact') {
+    params.set('size', size)
   }
 
   const queryString = params.toString()

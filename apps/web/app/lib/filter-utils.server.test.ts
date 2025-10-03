@@ -154,4 +154,42 @@ describe('extractFilterParams', () => {
 
     expect(result).toBe('?tag=work')
   })
+
+  it('should extract view settings parameters', () => {
+    const request = new Request(
+      'https://example.com/pins?sort=title&direction=asc&size=compact'
+    )
+    const result = extractFilterParams(request)
+
+    expect(result).toBe('?sort=title&direction=asc&size=compact')
+  })
+
+  it('should extract all parameters together', () => {
+    const request = new Request(
+      'https://example.com/pins?tag=work&unread=true&sort=title&direction=desc&size=compact'
+    )
+    const result = extractFilterParams(request)
+
+    expect(result).toBe(
+      '?tag=work&unread=true&sort=title&direction=desc&size=compact'
+    )
+  })
+
+  it('should ignore invalid view settings parameters', () => {
+    const request = new Request(
+      'https://example.com/pins?sort=invalid&direction=invalid&size=invalid'
+    )
+    const result = extractFilterParams(request)
+
+    expect(result).toBe('')
+  })
+
+  it('should only extract valid view settings and ignore invalid ones', () => {
+    const request = new Request(
+      'https://example.com/pins?sort=title&direction=invalid&size=compact'
+    )
+    const result = extractFilterParams(request)
+
+    expect(result).toBe('?sort=title&size=compact')
+  })
 })
