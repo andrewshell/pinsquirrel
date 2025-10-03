@@ -33,9 +33,7 @@ export function Header({ user }: HeaderProps) {
   const currentSearch = searchParams.get('search') || ''
 
   // Generate create pin path if user is logged in, preserving query parameters
-  const createPinPath = user?.username
-    ? `/${user.username}/pins/new${location.search}`
-    : undefined
+  const createPinPath = user ? `/pins/new${location.search}` : undefined
 
   const handleSearchToggle = () => {
     setIsSearchVisible(!isSearchVisible)
@@ -54,9 +52,9 @@ export function Header({ user }: HeaderProps) {
       params.delete('search')
     }
 
-    // Navigate to user's pins page with updated search parameter
+    // Navigate to pins page with updated search parameter
     const searchString = params.toString()
-    const url = `/${user.username}/pins${searchString ? `?${searchString}` : ''}`
+    const url = `/pins${searchString ? `?${searchString}` : ''}`
     void navigate(url)
     setIsSearchVisible(false)
   }
@@ -91,13 +89,13 @@ export function Header({ user }: HeaderProps) {
                 {!isSearchVisible && (
                   <>
                     <Link
-                      to={`/${user.username}/pins`}
+                      to="/pins"
                       className="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
                     >
                       Pins
                     </Link>
                     <Link
-                      to={`/${user.username}/tags`}
+                      to="/tags"
                       className="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
                     >
                       Tags
@@ -208,18 +206,12 @@ export function Header({ user }: HeaderProps) {
                   fullWidth={true}
                 />
                 <Button variant="ghost" className="w-full" asChild>
-                  <Link
-                    to={`/${user.username}/pins`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
+                  <Link to="/pins" onClick={() => setIsMobileMenuOpen(false)}>
                     Pins
                   </Link>
                 </Button>
                 <Button variant="ghost" className="w-full" asChild>
-                  <Link
-                    to={`/${user.username}/tags`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
+                  <Link to="/tags" onClick={() => setIsMobileMenuOpen(false)}>
                     Tags
                   </Link>
                 </Button>

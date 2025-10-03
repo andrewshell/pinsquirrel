@@ -92,11 +92,11 @@ describe('TagsPage', () => {
   describe('meta function', () => {
     it('returns correct meta tags', () => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      const result = meta({ params: { username: 'testuser' } } as any)
+      const result = meta({ params: {} } as any)
 
       expect(result).toEqual([
         {
-          title: "testuser's Tags - PinSquirrel",
+          title: 'Tags - PinSquirrel',
         },
         {
           name: 'description',
@@ -118,7 +118,6 @@ describe('TagsPage', () => {
 
       expect(result).toEqual({
         tags: mockTags,
-        username: 'testuser',
         currentFilter: 'all',
         untaggedPinsCount: 0,
       })
@@ -143,7 +142,6 @@ describe('TagsPage', () => {
 
       expect(result).toEqual({
         tags: mockTags,
-        username: 'testuser',
         currentFilter: 'toread',
         untaggedPinsCount: 0,
       })
@@ -168,7 +166,6 @@ describe('TagsPage', () => {
 
       expect(result).toEqual({
         tags: mockTags,
-        username: 'testuser',
         currentFilter: 'all',
         untaggedPinsCount: 0,
       })
@@ -198,7 +195,7 @@ describe('TagsPage', () => {
         </BrowserRouter>
       )
 
-      expect(screen.getByText("testuser's Tags")).toBeInTheDocument()
+      expect(screen.getByText('Tags')).toBeInTheDocument()
       expect(screen.getByText('2 tags total')).toBeInTheDocument()
       expect(screen.getByText('typescript')).toBeInTheDocument()
       expect(screen.getByText('react')).toBeInTheDocument()
@@ -218,7 +215,7 @@ describe('TagsPage', () => {
         </BrowserRouter>
       )
 
-      expect(screen.getByText("testuser's Tags")).toBeInTheDocument()
+      expect(screen.getByText('Tags')).toBeInTheDocument()
       expect(
         screen.getByText(
           'No tags yet. Tags will appear here when you add them to your pins.'

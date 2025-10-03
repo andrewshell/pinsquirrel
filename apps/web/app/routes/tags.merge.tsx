@@ -1,7 +1,6 @@
 import { useLoaderData, useActionData, data } from 'react-router'
 import type { Route } from './+types/tags.merge'
 import { requireAccessControl, setFlashMessage } from '~/lib/session.server'
-import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
 import { tagService } from '~/lib/services/container.server'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
@@ -11,10 +10,10 @@ import { parseFormData } from '~/lib/http-utils'
 import { logger } from '~/lib/logger.server'
 import { TagMergeForm } from '~/components/tags/TagMergeForm'
 
-export function meta({ params }: Route.MetaArgs) {
+export function meta(_: Route.MetaArgs) {
   return [
     {
-      title: `Merge Tags - ${params.username} - PinSquirrel`,
+      title: 'Merge Tags - PinSquirrel',
     },
     {
       name: 'description',
@@ -23,10 +22,9 @@ export function meta({ params }: Route.MetaArgs) {
   ]
 }
 
-export async function loader({ request, params }: Route.LoaderArgs) {
-  // Ensure user is authenticated and username matches
+export async function loader({ request }: Route.LoaderArgs) {
+  // Ensure user is authenticated
   const ac = await requireAccessControl(request)
-  requireUsernameMatch(ac.user!, params.username)
 
   // Fetch all user's tags for the form
   const userTags = await tagService.getUserTagsWithCount(ac, ac.user!.id)
@@ -36,14 +34,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   return data({
     tags: tagsWithPins,
-    username: params.username,
   })
 }
 
-export async function action({ request, params }: Route.ActionArgs) {
-  // Ensure user is authenticated and username matches
+export async function action({ request }: Route.ActionArgs) {
+  // Ensure user is authenticated
   const ac = await requireAccessControl(request)
-  requireUsernameMatch(ac.user!, params.username)
 
   // Parse form data
   const formData = await parseFormData(request)
@@ -133,12 +129,11 @@ export async function action({ request, params }: Route.ActionArgs) {
     })
 
     // Redirect back to tags page with success message
-    const redirectTo = getUserPath(ac.user!.username, '/tags')
     return setFlashMessage(
       request,
       'success',
       'Tags merged successfully!',
-      redirectTo
+      '/tags'
     )
   } catch (error) {
     logger.exception(error, 'Failed to merge tags', {
@@ -159,11 +154,11 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function TagsMergePage() {
-  const { tags, username } = useLoaderData<typeof loader>()
+  const { tags } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
 
   // Build back link to tags page
-  const backToTagsUrl = `/${username}/tags`
+  const backToTagsUrl = '/tags'
 
   return (
     <div className="max-w-4xl mx-auto">

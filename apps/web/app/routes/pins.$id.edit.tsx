@@ -1,13 +1,6 @@
-import {
-  useLoaderData,
-  useActionData,
-  useParams,
-  useLocation,
-  data,
-} from 'react-router'
+import { useLoaderData, useActionData, useLocation, data } from 'react-router'
 import type { Route } from './+types/pins.$id.edit'
 import { requireAccessControl, setFlashMessage } from '~/lib/session.server'
-import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
 import { extractFilterParams } from '~/lib/filter-utils.server'
 import { pinService, tagService } from '~/lib/services/container.server'
 import { PinCreationForm } from '~/components/pins/PinCreationForm'
@@ -50,7 +43,6 @@ export function meta(_: Route.MetaArgs) {
 export async function loader({ request, params }: Route.LoaderArgs) {
   // Get access control
   const ac = await requireAccessControl(request)
-  requireUsernameMatch(ac.user!, params.username)
 
   // Simple ID validation - just check it exists
   const paramData = parseParams(params)
@@ -91,7 +83,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 export async function action({ request, params }: Route.ActionArgs) {
   // Get access control
   const ac = await requireAccessControl(request)
-  requireUsernameMatch(ac.user!, params.username)
 
   // Simple ID validation - just check it exists
   const paramData = parseParams(params)
@@ -168,9 +159,9 @@ export async function action({ request, params }: Route.ActionArgs) {
         userId: ac.user!.id,
       })
 
-      // Redirect to user's pins list with success message, preserving filter params
+      // Redirect to pins list with success message, preserving filter params
       const filterParams = extractFilterParams(request)
-      const redirectTo = getUserPath(ac.user!.username, '/pins', filterParams)
+      const redirectTo = `/pins${filterParams}`
       return setFlashMessage(
         request,
         'success',
@@ -243,9 +234,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       userId: ac.user!.id,
     })
 
-    // Redirect to user's pins list with success message, preserving filter params
+    // Redirect to pins list with success message, preserving filter params
     const filterParams = extractFilterParams(request)
-    const redirectTo = getUserPath(ac.user!.username, '/pins', filterParams)
+    const redirectTo = `/pins${filterParams}`
     return setFlashMessage(
       request,
       'success',
@@ -299,7 +290,6 @@ export async function action({ request, params }: Route.ActionArgs) {
 export default function PinEditPage() {
   const { pin, userTags, urlParams } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
-  const params = useParams()
   const location = useLocation()
   const {
     loading: isMetadataLoading,
@@ -309,7 +299,7 @@ export default function PinEditPage() {
   } = useMetadataFetch()
 
   // Build back link with preserved query parameters
-  const backToPinsUrl = `/${params.username}/pins${location.search}`
+  const backToPinsUrl = `/pins${location.search}`
 
   // Prepare initial data for the form
   const initialData: PinCreationFormData = {
@@ -339,7 +329,7 @@ export default function PinEditPage() {
           <PinCreationForm
             editMode
             initialData={initialData}
-            actionUrl={`/${params.username}/pins/${pin.id}/edit${location.search}`}
+            actionUrl={`/pins/${pin.id}/edit${location.search}`}
             onMetadataFetch={fetchMetadata}
             metadataTitle={metadata?.title}
             metadataDescription={metadata?.description}

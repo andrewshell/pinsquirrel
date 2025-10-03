@@ -3,7 +3,6 @@ import { Link } from 'react-router'
 
 interface TagCloudProps {
   tags: TagWithCount[]
-  username: string
   currentFilter?: 'all' | 'toread'
   untaggedPinsCount?: number
 }
@@ -53,7 +52,6 @@ function getOpacityClass(pinCount: number): string {
 
 export function TagCloud({
   tags,
-  username,
   currentFilter = 'all',
   untaggedPinsCount = 0,
 }: TagCloudProps) {
@@ -84,7 +82,7 @@ export function TagCloud({
             if (currentFilter === 'toread') {
               params.set('unread', 'true')
             }
-            const untaggedUrl = `/${username}/pins?${params.toString()}`
+            const untaggedUrl = `/pins?${params.toString()}`
 
             return (
               <Link
@@ -109,7 +107,7 @@ export function TagCloud({
         if (currentFilter === 'toread') {
           params.set('unread', 'true')
         }
-        const tagUrl = `/${username}/pins?${params.toString()}`
+        const tagUrl = `/pins?${params.toString()}`
 
         return (
           <Link

@@ -17,7 +17,6 @@ interface PinsResult {
 
 interface PinsPageLayoutProps {
   pinsData: Promise<PinsResult>
-  username: string
   successMessage: string | null
   errorMessage: string | null
   activeTag?: string
@@ -33,12 +32,10 @@ interface PinsPageLayoutProps {
 
 function PinsContent({
   pinsData,
-  username,
   searchParams,
   viewSize,
 }: {
   pinsData: Promise<PinsResult>
-  username: string
   searchParams: URLSearchParams
   viewSize: 'expanded' | 'compact'
 }) {
@@ -46,12 +43,7 @@ function PinsContent({
 
   return (
     <>
-      <PinList
-        pins={result.pins}
-        isLoading={false}
-        username={username}
-        viewSize={viewSize}
-      />
+      <PinList pins={result.pins} isLoading={false} viewSize={viewSize} />
       <PinsPagination
         currentPage={result.pagination.page}
         totalPages={result.pagination.totalPages}
@@ -64,7 +56,6 @@ function PinsContent({
 
 export function PinsPageLayout({
   pinsData,
-  username,
   successMessage,
   errorMessage,
   activeTag,
@@ -120,7 +111,6 @@ export function PinsPageLayout({
       <Suspense fallback={<></>}>
         <PinsContent
           pinsData={pinsData}
-          username={username}
           searchParams={searchParams}
           viewSize={viewSettings.size}
         />

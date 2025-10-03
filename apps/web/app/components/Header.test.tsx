@@ -330,7 +330,7 @@ describe('Header', () => {
 
   describe('Create Pin button', () => {
     it('shows create pin button when user is logged in', () => {
-      const expectedPath = '/testuser/pins/new'
+      const expectedPath = '/pins/new'
       renderWithRouter(mockUser)
 
       // Should show create pin buttons (desktop and mobile)
@@ -353,7 +353,7 @@ describe('Header', () => {
     })
 
     it('shows create pin button on mobile when user is logged in', () => {
-      const expectedPath = '/testuser/pins/new'
+      const expectedPath = '/pins/new'
 
       // Create a mobile-sized viewport
       Object.defineProperty(window, 'innerWidth', {

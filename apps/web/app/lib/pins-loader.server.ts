@@ -1,6 +1,5 @@
 import { type PinFilter } from '@pinsquirrel/domain'
 import { data } from 'react-router'
-import { requireUsernameMatch } from '~/lib/auth.server'
 import { parsePinFilters } from '~/lib/filter-utils.server'
 import { pinService } from '~/lib/services/container.server'
 import {
@@ -20,7 +19,7 @@ export interface PinsLoaderConfig {
 
 export async function createPinsLoader(
   request: Request,
-  params: { username: string },
+  params: Record<string, never>,
   config: PinsLoaderConfig
 ) {
   const url = new URL(request.url)
@@ -43,9 +42,8 @@ export async function createPinsLoader(
     ...parsedFilters.filter,
   }
 
-  // Get access control and validate username match
+  // Get access control
   const ac = await requireAccessControl(request)
-  requireUsernameMatch(ac.user!, params.username)
 
   // Get session for flash messages
   const session = await getSession(request)

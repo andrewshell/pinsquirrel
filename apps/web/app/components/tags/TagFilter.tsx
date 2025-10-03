@@ -13,15 +13,10 @@ export type TagFilterType = 'all' | 'toread'
 
 interface TagFilterProps {
   currentFilter: TagFilterType
-  username: string
   className?: string
 }
 
-export function TagFilter({
-  currentFilter,
-  username,
-  className,
-}: TagFilterProps) {
+export function TagFilter({ currentFilter, className }: TagFilterProps) {
   const getFilterLabel = (filter: TagFilterType) => {
     switch (filter) {
       case 'all':
@@ -34,11 +29,10 @@ export function TagFilter({
   }
 
   const buildFilterLink = (filter: TagFilterType) => {
-    const basePath = `/${username}/tags`
     if (filter === 'all') {
-      return basePath
+      return '/tags'
     }
-    return `${basePath}?unread=true`
+    return '/tags?unread=true'
   }
 
   return (

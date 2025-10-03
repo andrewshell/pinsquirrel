@@ -3,7 +3,6 @@ import type { Pin } from '@pinsquirrel/domain'
 
 interface PinCardProps {
   pin: Pin
-  username?: string
   viewSize?: 'expanded' | 'compact'
 }
 
@@ -23,20 +22,13 @@ function isMarkAsReadResponse(
   )
 }
 
-export function PinCard({
-  pin,
-  username,
-  viewSize = 'expanded',
-}: PinCardProps) {
+export function PinCard({ pin, viewSize = 'expanded' }: PinCardProps) {
   const markAsReadFetcher = useFetcher()
   const location = useLocation()
 
   // Build URL with preserved query parameters for edit/delete links
   const buildActionUrl = (action: 'edit' | 'delete') => {
-    const baseUrl = username
-      ? `/${username}/pins/${pin.id}/${action}`
-      : `${pin.id}/${action}`
-    return `${baseUrl}${location.search}`
+    return `/pins/${pin.id}/${action}${location.search}`
   }
 
   // Determine optimistic pin state
@@ -118,9 +110,7 @@ export function PinCard({
                   {pin.tagNames.map((tagName, index) => {
                     const params = new URLSearchParams(location.search)
                     params.set('tag', tagName)
-                    const tagUrl = username
-                      ? `/${username}/pins?${params.toString()}`
-                      : `?${params.toString()}`
+                    const tagUrl = `/pins?${params.toString()}`
 
                     return (
                       <span key={tagName} role="listitem">
@@ -218,9 +208,7 @@ export function PinCard({
               // Build URL with tag filter and preserve current unread filter
               const params = new URLSearchParams(location.search)
               params.set('tag', tagName)
-              const tagUrl = username
-                ? `/${username}/pins?${params.toString()}`
-                : `?${params.toString()}`
+              const tagUrl = `/pins?${params.toString()}`
 
               return (
                 <span key={tagName} role="listitem">
@@ -268,11 +256,7 @@ export function PinCard({
             {optimisticReadLater && (
               <markAsReadFetcher.Form
                 method="patch"
-                action={
-                  username
-                    ? `/${username}/pins/${pin.id}/edit`
-                    : `${pin.id}/edit`
-                }
+                action={`/pins/${pin.id}/edit`}
                 style={{ display: 'inline' }}
               >
                 <input type="hidden" name="readLater" value="false" />

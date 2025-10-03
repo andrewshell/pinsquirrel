@@ -1,10 +1,4 @@
-import {
-  useLoaderData,
-  useActionData,
-  Form,
-  data,
-  useNavigation,
-} from 'react-router'
+import { useActionData, Form, data, useNavigation } from 'react-router'
 import type { Route } from './+types/import'
 import { requireAccessControl, setFlashMessage } from '~/lib/session.server'
 import { pinService, pinRepository } from '~/lib/services/container.server'
@@ -52,11 +46,9 @@ export function meta(_: Route.MetaArgs) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const ac = await requireAccessControl(request)
+  await requireAccessControl(request)
 
-  return data({
-    username: ac.user!.username,
-  })
+  return data({})
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -232,12 +224,7 @@ export async function action({ request }: Route.ActionArgs) {
     successMessage += ` with ${allTagNames.size} unique tags`
 
     // Set success message and redirect
-    return setFlashMessage(
-      request,
-      'success',
-      successMessage,
-      `/${ac.user!.username}/pins`
-    )
+    return setFlashMessage(request, 'success', successMessage, '/pins')
   } catch (error) {
     logger.error('Import failed with unexpected error', {
       error,
@@ -251,7 +238,6 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function ImportRoute() {
-  const { username } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
   const navigation = useNavigation()
 
@@ -261,7 +247,7 @@ export default function ImportRoute() {
     <div className="container max-w-4xl mx-auto px-4 py-8">
       <div className="mb-6">
         <Link
-          to={`/${username}/pins`}
+          to="/pins"
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />

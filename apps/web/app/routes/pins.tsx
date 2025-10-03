@@ -2,10 +2,10 @@ import { useLoaderData, data } from 'react-router'
 import { PinsPageLayout } from '~/components/pins/PinsPageLayout'
 import type { Route } from './+types/pins'
 
-export function meta({ params }: Route.MetaArgs) {
+export function meta(_: Route.MetaArgs) {
   return [
     {
-      title: `${params.username}'s Pins - PinSquirrel`,
+      title: 'Pins - PinSquirrel',
     },
     {
       name: 'description',
@@ -25,7 +25,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const config = {
     currentFilter: 'all' as const,
     filter: {},
-    title: `{username}'s Pins - PinSquirrel`,
+    title: 'Pins - PinSquirrel',
     description:
       'Browse and manage your saved links, articles, and bookmarks on PinSquirrel.',
   }
@@ -50,7 +50,6 @@ export default function PinsPage() {
   return (
     <PinsPageLayout
       pinsData={loaderData.pinsData}
-      username={loaderData.username}
       successMessage={loaderData.successMessage}
       errorMessage={loaderData.errorMessage}
       activeTag={loaderData.activeTag}

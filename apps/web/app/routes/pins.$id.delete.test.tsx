@@ -49,12 +49,10 @@ describe('Pin Deletion Integration Tests', () => {
       [
         {
           path: '/',
-          element: (
-            <PinList pins={pins} isLoading={false} username="testuser" />
-          ),
+          element: <PinList pins={pins} isLoading={false} />,
         },
         {
-          path: '/:username/pins/:id/edit',
+          path: '/pins/:id/edit',
           action: async ({ request, params }) => {
             if (request.method === 'DELETE') {
               const pinId = params.id

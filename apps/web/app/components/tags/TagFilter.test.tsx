@@ -3,10 +3,10 @@ import { BrowserRouter } from 'react-router'
 import { describe, it, expect } from 'vitest'
 import { TagFilter, type TagFilterType } from './TagFilter'
 
-function renderTagFilter(currentFilter: TagFilterType, username = 'testuser') {
+function renderTagFilter(currentFilter: TagFilterType) {
   return render(
     <BrowserRouter>
-      <TagFilter currentFilter={currentFilter} username={username} />
+      <TagFilter currentFilter={currentFilter} />
     </BrowserRouter>
   )
 }
@@ -31,10 +31,10 @@ describe('TagFilter', () => {
 
       // Find the desktop links (not in dropdown)
       const desktopAllLink = allLinks.find(
-        link => link.getAttribute('href') === '/testuser/tags'
+        link => link.getAttribute('href') === '/tags'
       )
       const desktopToReadLink = toReadLinks.find(
-        link => link.getAttribute('href') === '/testuser/tags?unread=true'
+        link => link.getAttribute('href') === '/tags?unread=true'
       )
 
       expect(desktopAllLink).toBeInTheDocument()
@@ -80,22 +80,22 @@ describe('TagFilter', () => {
     })
   })
 
-  describe('custom username', () => {
-    it('generates links with custom username', () => {
-      renderTagFilter('all', 'customuser')
+  describe('filter navigation', () => {
+    it('generates correct filter links', () => {
+      renderTagFilter('all')
 
       const allLinks = screen.getAllByRole('link', { name: 'All' })
       const toReadLinks = screen.getAllByRole('link', { name: 'To Read' })
 
-      const customAllLink = allLinks.find(
-        link => link.getAttribute('href') === '/customuser/tags'
+      const allLink = allLinks.find(
+        link => link.getAttribute('href') === '/tags'
       )
-      const customToReadLink = toReadLinks.find(
-        link => link.getAttribute('href') === '/customuser/tags?unread=true'
+      const toReadLink = toReadLinks.find(
+        link => link.getAttribute('href') === '/tags?unread=true'
       )
 
-      expect(customAllLink).toBeInTheDocument()
-      expect(customToReadLink).toBeInTheDocument()
+      expect(allLink).toBeInTheDocument()
+      expect(toReadLink).toBeInTheDocument()
     })
   })
 })

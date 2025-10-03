@@ -1,7 +1,6 @@
 import { Link, redirect } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { getUser } from '~/lib/session.server'
-import { getUserPath } from '~/lib/auth.server'
 import type { Route } from './+types/home'
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -9,9 +8,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   // Redirect logged-in users to their pins page
   if (user) {
-    const redirectTo = getUserPath(user.username)
     // eslint-disable-next-line @typescript-eslint/only-throw-error
-    throw redirect(redirectTo)
+    throw redirect('/pins')
   }
 
   return { user }

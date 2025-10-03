@@ -15,22 +15,18 @@ interface DeleteConfirmationDialogProps {
   pin: Pin
   open: boolean
   onOpenChange: (open: boolean) => void
-  username?: string
 }
 
 export function DeleteConfirmationDialog({
   pin,
   open,
   onOpenChange,
-  username,
 }: DeleteConfirmationDialogProps) {
   const navigation = useNavigation()
   const deleteButtonRef = useRef<HTMLButtonElement>(null)
 
   // Check if we're currently deleting this specific pin
-  const expectedAction = username
-    ? `/${username}/pins/${pin.id}/edit`
-    : `/pins/${pin.id}/edit`
+  const expectedAction = `/pins/${pin.id}/edit`
   const isDeleting =
     navigation.state === 'submitting' &&
     navigation.formMethod === 'DELETE' &&
@@ -75,14 +71,7 @@ export function DeleteConfirmationDialog({
           >
             Cancel
           </Button>
-          <Form
-            method="DELETE"
-            action={
-              username
-                ? `/${username}/pins/${pin.id}/edit`
-                : `/pins/${pin.id}/edit`
-            }
-          >
+          <Form method="DELETE" action={`/pins/${pin.id}/edit`}>
             <Button
               ref={deleteButtonRef}
               type="submit"

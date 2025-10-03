@@ -1,7 +1,6 @@
 import { useLoaderData } from 'react-router'
 import { pinService, tagService } from '~/lib/services/container.server'
 import { requireAccessControl } from '~/lib/session.server'
-import { requireUsernameMatch } from '~/lib/auth.server'
 import { TagCloud } from '~/components/tags/TagCloud'
 import { TagFilter, type TagFilterType } from '~/components/tags/TagFilter'
 import { parsePinFilters } from '~/lib/filter-utils.server'
@@ -10,10 +9,10 @@ import { Merge } from 'lucide-react'
 import { Link } from 'react-router'
 import type { Route } from './+types/tags'
 
-export function meta({ params }: Route.MetaArgs) {
+export function meta(_: Route.MetaArgs) {
   return [
     {
-      title: `${params.username}'s Tags - PinSquirrel`,
+      title: 'Tags - PinSquirrel',
     },
     {
       name: 'description',
@@ -22,10 +21,9 @@ export function meta({ params }: Route.MetaArgs) {
   ]
 }
 
-export async function loader({ request, params }: Route.LoaderArgs) {
-  // Get access control and validate username match
+export async function loader({ request }: Route.LoaderArgs) {
+  // Get access control
   const ac = await requireAccessControl(request)
-  requireUsernameMatch(ac.user!, params.username)
 
   // Parse filter from URL search params using centralized utility
   const url = new URL(request.url)
@@ -54,23 +52,22 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   return {
     tags,
-    username: ac.user!.username,
     currentFilter: parsedFilters.currentFilterType as TagFilterType,
     untaggedPinsCount: untaggedResult.totalCount,
   }
 }
 
 export default function TagsPage() {
-  const { tags, username, currentFilter, untaggedPinsCount } =
+  const { tags, currentFilter, untaggedPinsCount } =
     useLoaderData<typeof loader>()
 
   return (
     <>
       <div className="mb-8 flex justify-between items-center">
-        <TagFilter currentFilter={currentFilter} username={username} />
+        <TagFilter currentFilter={currentFilter} />
         {tags.length > 1 && (
           <Button size="sm" asChild>
-            <Link to={`/${username}/tags/merge`}>
+            <Link to="/tags/merge">
               <Merge className="h-4 w-4 mr-2" />
               Merge Tags
             </Link>
@@ -79,9 +76,7 @@ export default function TagsPage() {
       </div>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2">
-          {username}&apos;s Tags
-        </h1>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Tags</h1>
         <p className="text-muted-foreground">
           {tags.length === 0
             ? 'No tags yet. Tags will appear here when you add them to your pins.'
@@ -92,7 +87,6 @@ export default function TagsPage() {
       {tags.length > 0 || untaggedPinsCount > 0 ? (
         <TagCloud
           tags={tags}
-          username={username}
           currentFilter={currentFilter}
           untaggedPinsCount={untaggedPinsCount}
         />

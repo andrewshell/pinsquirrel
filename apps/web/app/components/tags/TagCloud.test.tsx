@@ -45,27 +45,25 @@ const renderWithRouter = (component: React.ReactElement) => {
 
 describe('TagCloud', () => {
   it('renders nothing when no tags provided', () => {
-    const { container } = renderWithRouter(
-      <TagCloud tags={[]} username="testuser" />
-    )
+    const { container } = renderWithRouter(<TagCloud tags={[]} />)
     expect(container.firstChild).toBeNull()
   })
 
   it('displays all tags as clickable links', () => {
-    renderWithRouter(<TagCloud tags={mockTags} username="testuser" />)
+    renderWithRouter(<TagCloud tags={mockTags} />)
 
     mockTags.forEach(tag => {
       const link = screen.getByRole('link', { name: new RegExp(tag.name) })
       expect(link).toBeInTheDocument()
       expect(link).toHaveAttribute(
         'href',
-        `/testuser/pins?tag=${encodeURIComponent(tag.name)}`
+        `/pins?tag=${encodeURIComponent(tag.name)}`
       )
     })
   })
 
   it('sorts tags alphabetically', () => {
-    renderWithRouter(<TagCloud tags={mockTags} username="testuser" />)
+    renderWithRouter(<TagCloud tags={mockTags} />)
 
     const links = screen.getAllByRole('link')
     const linkTexts = links.map(link => link.textContent)
@@ -74,7 +72,7 @@ describe('TagCloud', () => {
   })
 
   it('applies font sizes based on pin count distribution', () => {
-    renderWithRouter(<TagCloud tags={mockTags} username="testuser" />)
+    renderWithRouter(<TagCloud tags={mockTags} />)
 
     const typescriptLink = screen.getByRole('link', { name: /typescript/ })
     const cssLink = screen.getByRole('link', { name: /css/ })
@@ -86,7 +84,7 @@ describe('TagCloud', () => {
   })
 
   it('includes pin count in title attribute', () => {
-    renderWithRouter(<TagCloud tags={mockTags} username="testuser" />)
+    renderWithRouter(<TagCloud tags={mockTags} />)
 
     const typescriptLink = screen.getByRole('link', { name: /typescript/ })
     expect(typescriptLink).toHaveAttribute('title', 'typescript (25 pins)')
@@ -97,7 +95,7 @@ describe('TagCloud', () => {
 
   it('handles single tag correctly', () => {
     const singleTag: TagWithCount[] = [mockTags[0]]
-    renderWithRouter(<TagCloud tags={singleTag} username="testuser" />)
+    renderWithRouter(<TagCloud tags={singleTag} />)
 
     const link = screen.getByRole('link', { name: /typescript/ })
     expect(link).toBeInTheDocument()
@@ -112,7 +110,7 @@ describe('TagCloud', () => {
       { ...mockTags[2], pinCount: 10 },
     ]
 
-    renderWithRouter(<TagCloud tags={samePinCountTags} username="testuser" />)
+    renderWithRouter(<TagCloud tags={samePinCountTags} />)
 
     const links = screen.getAllByRole('link')
     links.forEach(link => {
@@ -133,9 +131,9 @@ describe('TagCloud', () => {
       },
     ]
 
-    renderWithRouter(<TagCloud tags={specialTags} username="testuser" />)
+    renderWithRouter(<TagCloud tags={specialTags} />)
 
     const link = screen.getByRole('link', { name: /C\+\+/ })
-    expect(link).toHaveAttribute('href', '/testuser/pins?tag=C%2B%2B')
+    expect(link).toHaveAttribute('href', '/pins?tag=C%2B%2B')
   })
 })

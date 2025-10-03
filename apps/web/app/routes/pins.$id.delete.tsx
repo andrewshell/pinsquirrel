@@ -1,7 +1,6 @@
 import { useLoaderData, useLocation, data } from 'react-router'
 import type { Route } from './+types/pins.$id.delete'
 import { requireAccessControl, setFlashMessage } from '~/lib/session.server'
-import { requireUsernameMatch, getUserPath } from '~/lib/auth.server'
 import { extractFilterParams } from '~/lib/filter-utils.server'
 import { pinService } from '~/lib/services/container.server'
 import { parseParams } from '~/lib/http-utils'
@@ -34,7 +33,6 @@ export function meta(_: Route.MetaArgs) {
 export async function loader({ request, params }: Route.LoaderArgs) {
   // Get access control
   const ac = await requireAccessControl(request)
-  requireUsernameMatch(ac.user!, params.username)
 
   // Validate pin ID from params
   const paramData = parseParams(params)
@@ -51,7 +49,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
     return data({
       pin,
-      username: params.username,
     })
   } catch (error) {
     logger.exception(error, 'Failed to load pin for deletion', {
@@ -68,7 +65,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 export async function action({ request, params }: Route.ActionArgs) {
   // Get access control
   const ac = await requireAccessControl(request)
-  requireUsernameMatch(ac.user!, params.username)
 
   // Validate pin ID from params
   const paramData = parseParams(params)
@@ -94,9 +90,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       userId: ac.user!.id,
     })
 
-    // Redirect to user's pins list with success message, preserving filter params
+    // Redirect to pins list with success message, preserving filter params
     const filterParams = extractFilterParams(request)
-    const redirectTo = getUserPath(ac.user!.username, '/pins', filterParams)
+    const redirectTo = `/pins${filterParams}`
     return setFlashMessage(
       request,
       'success',
@@ -130,13 +126,13 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function PinDeletePage() {
-  const { pin, username } = useLoaderData<typeof loader>()
+  const { pin } = useLoaderData<typeof loader>()
   const location = useLocation()
   const navigation = useNavigation()
   const deleteButtonRef = useRef<HTMLButtonElement>(null)
 
   // Build back link with preserved query parameters
-  const backToPinsUrl = `/${username}/pins${location.search}`
+  const backToPinsUrl = `/pins${location.search}`
 
   // Check if we're currently deleting
   const isDeleting =
