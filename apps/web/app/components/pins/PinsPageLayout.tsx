@@ -2,6 +2,7 @@ import { Suspense, useState, use } from 'react'
 import type { Pin } from '@pinsquirrel/domain'
 import { PinList } from './PinList'
 import { FilterHeader, type ReadFilterType } from './FilterHeader'
+import { ViewSettings } from './ViewSettings'
 import { DismissibleAlert } from '~/components/ui/dismissible-alert'
 import { PinsPagination } from '~/components/ui/pins-pagination'
 
@@ -23,22 +24,34 @@ interface PinsPageLayoutProps {
   currentFilter?: ReadFilterType
   noTags?: boolean
   searchParams: URLSearchParams
+  viewSettings: {
+    sort: 'created' | 'title'
+    direction: 'asc' | 'desc'
+    size: 'expanded' | 'compact'
+  }
 }
 
 function PinsContent({
   pinsData,
   username,
   searchParams,
+  viewSize,
 }: {
   pinsData: Promise<PinsResult>
   username: string
   searchParams: URLSearchParams
+  viewSize: 'expanded' | 'compact'
 }) {
   const result = use(pinsData)
 
   return (
     <>
-      <PinList pins={result.pins} isLoading={false} username={username} />
+      <PinList
+        pins={result.pins}
+        isLoading={false}
+        username={username}
+        viewSize={viewSize}
+      />
       <PinsPagination
         currentPage={result.pagination.page}
         totalPages={result.pagination.totalPages}
@@ -58,6 +71,7 @@ export function PinsPageLayout({
   currentFilter = 'all',
   noTags = false,
   searchParams,
+  viewSettings,
 }: PinsPageLayoutProps) {
   // Client-side state for dismissing flash messages
   const [showSuccessMessage, setShowSuccessMessage] = useState(!!successMessage)
@@ -73,6 +87,13 @@ export function PinsPageLayout({
         searchQuery={currentSearch}
         currentFilter={currentFilter}
         noTags={noTags}
+        className="mb-0"
+      />
+
+      <ViewSettings
+        sort={viewSettings.sort}
+        direction={viewSettings.direction}
+        size={viewSettings.size}
         className="mb-6"
       />
 
@@ -101,6 +122,7 @@ export function PinsPageLayout({
           pinsData={pinsData}
           username={username}
           searchParams={searchParams}
+          viewSize={viewSettings.size}
         />
       </Suspense>
     </>

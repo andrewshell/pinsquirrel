@@ -6,6 +6,7 @@ interface PinListProps {
   pins: Pin[]
   isLoading: boolean
   username?: string
+  viewSize?: 'expanded' | 'compact'
 }
 
 function PinSkeleton({ index }: { index: number }) {
@@ -41,7 +42,12 @@ function PinSkeleton({ index }: { index: number }) {
   )
 }
 
-export function PinList({ pins, isLoading, username }: PinListProps) {
+export function PinList({
+  pins,
+  isLoading,
+  username,
+  viewSize = 'expanded',
+}: PinListProps) {
   // Show loading state with skeleton cards
   if (isLoading) {
     return (
@@ -70,12 +76,17 @@ export function PinList({ pins, isLoading, username }: PinListProps) {
   return (
     <div
       data-testid="pin-list"
-      className="space-y-4"
+      className={viewSize === 'compact' ? 'space-y-1' : 'space-y-4'}
       role="region"
       aria-label={`${pins.length} pins`}
     >
       {pins.map(pin => (
-        <PinCard key={pin.id} pin={pin} username={username} />
+        <PinCard
+          key={pin.id}
+          pin={pin}
+          username={username}
+          viewSize={viewSize}
+        />
       ))}
     </div>
   )

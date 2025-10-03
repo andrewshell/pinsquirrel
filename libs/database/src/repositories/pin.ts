@@ -6,7 +6,18 @@ import type {
   TagRepository,
   UpdatePinData,
 } from '@pinsquirrel/domain'
-import { and, count, desc, eq, ilike, inArray, isNull, or } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  or,
+  sql,
+} from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { pins } from '../schema/pins.js'
 import { pinsTags } from '../schema/pins-tags.js'
@@ -17,6 +28,17 @@ export class DrizzlePinRepository implements PinRepository {
     private db: PostgresJsDatabase<Record<string, unknown>>,
     private tagRepository: TagRepository
   ) {}
+
+  private getOrderBy(filter?: PinFilter) {
+    const sortBy = filter?.sortBy || 'created'
+    const sortDirection = filter?.sortDirection || 'desc'
+
+    if (sortBy === 'title') {
+      const lowerTitle = sql`LOWER(${pins.title})`
+      return sortDirection === 'asc' ? asc(lowerTitle) : desc(lowerTitle)
+    }
+    return sortDirection === 'asc' ? asc(pins.createdAt) : desc(pins.createdAt)
+  }
 
   async findById(id: string): Promise<Pin | null> {
     const result = await this.db
@@ -84,7 +106,7 @@ export class DrizzlePinRepository implements PinRepository {
         .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
         .innerJoin(tags, eq(pinsTags.tagId, tags.id))
         .where(and(...conditions, eq(tags.name, filter.tag)))
-        .orderBy(desc(pins.createdAt))
+        .orderBy(this.getOrderBy(filter))
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let query = baseQuery as any
@@ -118,7 +140,7 @@ export class DrizzlePinRepository implements PinRepository {
         .from(pins)
         .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
         .where(and(...conditions, eq(pinsTags.tagId, filter.tagId)))
-        .orderBy(desc(pins.createdAt))
+        .orderBy(this.getOrderBy(filter))
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let query = baseQuery as any
@@ -152,7 +174,7 @@ export class DrizzlePinRepository implements PinRepository {
         .from(pins)
         .leftJoin(pinsTags, eq(pins.id, pinsTags.pinId))
         .where(and(...conditions, isNull(pinsTags.pinId)))
-        .orderBy(desc(pins.createdAt))
+        .orderBy(this.getOrderBy(filter))
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let query = baseQuery as any
@@ -175,7 +197,7 @@ export class DrizzlePinRepository implements PinRepository {
       .select()
       .from(pins)
       .where(and(...conditions))
-      .orderBy(desc(pins.createdAt))
+      .orderBy(this.getOrderBy(filter))
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let query = baseQuery as any

@@ -7,6 +7,8 @@ export interface PinFilter {
   url?: string
   search?: string
   noTags?: boolean
+  sortBy?: 'created' | 'title'
+  sortDirection?: 'asc' | 'desc'
 }
 
 export interface PinRepository {

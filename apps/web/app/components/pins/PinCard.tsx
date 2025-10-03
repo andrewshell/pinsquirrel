@@ -4,6 +4,7 @@ import type { Pin } from '@pinsquirrel/domain'
 interface PinCardProps {
   pin: Pin
   username?: string
+  viewSize?: 'expanded' | 'compact'
 }
 
 // Type guard for mark as read response
@@ -22,7 +23,11 @@ function isMarkAsReadResponse(
   )
 }
 
-export function PinCard({ pin, username }: PinCardProps) {
+export function PinCard({
+  pin,
+  username,
+  viewSize = 'expanded',
+}: PinCardProps) {
   const markAsReadFetcher = useFetcher()
   const location = useLocation()
 
@@ -61,6 +66,103 @@ export function PinCard({ pin, username }: PinCardProps) {
     return `${Math.floor(diffInDays / 30)} month${Math.floor(diffInDays / 30) > 1 ? 's' : ''} ago`
   }
 
+  // Extract domain from URL for compact view
+  const getDomain = (url: string) => {
+    try {
+      const urlObj = new URL(url)
+      return urlObj.hostname
+    } catch {
+      return url
+    }
+  }
+
+  // Compact view rendering
+  if (viewSize === 'compact') {
+    return (
+      <div
+        className="py-1 hover:bg-accent/5 transition-all"
+        role="article"
+        aria-labelledby={`pin-title-${pin.id}`}
+      >
+        <div className="flex-1 min-w-0">
+          {/* Single line with left and right sections */}
+          <div className="flex items-baseline gap-2 text-sm justify-between">
+            {/* Left: Title, Domain, Tags */}
+            <div className="flex items-baseline gap-2 flex-wrap flex-1 min-w-0">
+              {/* Title */}
+              <h3 id={`pin-title-${pin.id}`} className="inline">
+                <a
+                  href={pin.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`text-accent hover:text-accent/80 ${optimisticReadLater ? 'font-bold' : ''}`}
+                >
+                  {optimisticReadLater && '• '}
+                  {pin.title}
+                </a>
+              </h3>
+
+              {/* Domain only */}
+              <span className="text-muted-foreground">
+                ({getDomain(pin.url)})
+              </span>
+
+              {/* Tags */}
+              {pin.tagNames.length > 0 && (
+                <span
+                  className="text-muted-foreground"
+                  data-testid="pin-tags"
+                  role="list"
+                  aria-label={`Tags: ${pin.tagNames.join(', ')}`}
+                >
+                  {pin.tagNames.map((tagName, index) => {
+                    const params = new URLSearchParams(location.search)
+                    params.set('tag', tagName)
+                    const tagUrl = username
+                      ? `/${username}/pins?${params.toString()}`
+                      : `?${params.toString()}`
+
+                    return (
+                      <span key={tagName} role="listitem">
+                        <Link
+                          to={tagUrl}
+                          className="text-accent hover:text-accent/80 hover:underline"
+                          aria-label={`Filter by tag: ${tagName}`}
+                        >
+                          {tagName}
+                        </Link>
+                        {index < pin.tagNames.length - 1 && <span>, </span>}
+                      </span>
+                    )
+                  })}
+                </span>
+              )}
+            </div>
+
+            {/* Right: Actions */}
+            <div className="flex gap-2 text-muted-foreground flex-shrink-0">
+              <Link
+                to={buildActionUrl('edit')}
+                className="text-accent hover:text-accent/80 font-bold hover:underline"
+                aria-label={`Edit ${pin.title}`}
+              >
+                edit
+              </Link>
+              <Link
+                to={buildActionUrl('delete')}
+                className="text-destructive hover:text-destructive/80 font-bold hover:underline"
+                aria-label={`Delete ${pin.title}`}
+              >
+                delete
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Expanded view rendering (default)
   return (
     <div
       className="py-2 hover:bg-accent/5 transition-all"

@@ -4,6 +4,11 @@ export interface ParsedFilters {
   filter: PinFilter
   currentFilterType: 'all' | 'toread' | 'read'
   activeTag?: string
+  viewSettings: {
+    sort: 'created' | 'title'
+    direction: 'asc' | 'desc'
+    size: 'expanded' | 'compact'
+  }
 }
 
 /**
@@ -14,6 +19,11 @@ export function parsePinFilters(url: URL): ParsedFilters {
   const unreadParam = url.searchParams.get('unread')
   const searchParam = url.searchParams.get('search') || undefined
   const noTagsParam = url.searchParams.get('notags')
+
+  // Parse view settings
+  const sortParam = url.searchParams.get('sort')
+  const directionParam = url.searchParams.get('direction')
+  const sizeParam = url.searchParams.get('size')
 
   const filter: PinFilter = {}
   let currentFilterType: 'all' | 'toread' | 'read' = 'all'
@@ -45,10 +55,23 @@ export function parsePinFilters(url: URL): ParsedFilters {
     currentFilterType = 'read'
   }
 
+  // Add sort parameters to filter
+  if (sortParam === 'created' || sortParam === 'title') {
+    filter.sortBy = sortParam
+  }
+  if (directionParam === 'asc' || directionParam === 'desc') {
+    filter.sortDirection = directionParam
+  }
+
   return {
     filter,
     currentFilterType,
     activeTag: tagFilter,
+    viewSettings: {
+      sort: sortParam === 'title' ? 'title' : 'created',
+      direction: directionParam === 'asc' ? 'asc' : 'desc',
+      size: sizeParam === 'compact' ? 'compact' : 'expanded',
+    },
   }
 }
 

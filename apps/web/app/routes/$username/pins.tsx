@@ -17,6 +17,11 @@ export function meta({ params }: Route.MetaArgs) {
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { createPinsLoader } = await import('~/lib/pins-loader.server')
+  const { parsePinFilters } = await import('~/lib/filter-utils.server')
+
+  const url = new URL(request.url)
+  const parsedFilters = parsePinFilters(url)
+
   const config = {
     currentFilter: 'all' as const,
     filter: {},
@@ -26,12 +31,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   }
   const loaderData = await createPinsLoader(request, params, config)
 
-  const url = new URL(request.url)
-
   return data(
     {
       ...loaderData.data,
       searchParamsString: url.search,
+      viewSettings: parsedFilters.viewSettings,
     },
     loaderData.init || undefined
   )
@@ -53,6 +57,7 @@ export default function PinsPage() {
       currentFilter={loaderData.currentFilter}
       noTags={loaderData.noTags}
       searchParams={searchParams}
+      viewSettings={loaderData.viewSettings}
     />
   )
 }

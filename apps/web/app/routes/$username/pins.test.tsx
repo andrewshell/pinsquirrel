@@ -109,6 +109,11 @@ describe('PinsPage Integration', () => {
         successMessage: null,
         errorMessage: null,
         searchParamsString: '',
+        viewSettings: {
+          sort: 'created' as const,
+          direction: 'desc' as const,
+          size: 'expanded' as const,
+        },
       })
       // Wait for the promise to resolve
       await mockPinsData
@@ -139,6 +144,11 @@ describe('PinsPage Integration', () => {
         successMessage: null,
         errorMessage: null,
         searchParamsString: '',
+        viewSettings: {
+          sort: 'created' as const,
+          direction: 'desc' as const,
+          size: 'expanded' as const,
+        },
       })
       // Wait for the promise to resolve
       await mockPinsData
@@ -179,6 +189,11 @@ describe('PinsPage Integration', () => {
         successMessage: null,
         errorMessage: null,
         searchParamsString: '',
+        viewSettings: {
+          sort: 'created' as const,
+          direction: 'desc' as const,
+          size: 'expanded' as const,
+        },
       })
       // Wait for the promise to resolve
       await mockPinsData
@@ -214,6 +229,11 @@ describe('PinsPage Integration', () => {
         successMessage: null,
         errorMessage: null,
         searchParamsString: '',
+        viewSettings: {
+          sort: 'created' as const,
+          direction: 'desc' as const,
+          size: 'expanded' as const,
+        },
       })
       // Wait for the promise to resolve
       await mockPinsData
@@ -252,6 +272,11 @@ describe('PinsPage Integration', () => {
         successMessage: null,
         errorMessage: null,
         searchParamsString: '',
+        viewSettings: {
+          sort: 'created' as const,
+          direction: 'desc' as const,
+          size: 'expanded' as const,
+        },
       })
       // Wait for the promise to resolve
       await mockPinsData
@@ -283,6 +308,11 @@ describe('PinsPage Integration', () => {
         successMessage: null,
         errorMessage: null,
         searchParamsString: '',
+        viewSettings: {
+          sort: 'created' as const,
+          direction: 'desc' as const,
+          size: 'expanded' as const,
+        },
       })
       // Wait for the promise to resolve
       await mockPinsData
@@ -314,6 +344,11 @@ describe('PinsPage Integration', () => {
         successMessage: null,
         errorMessage: null,
         searchParamsString: '',
+        viewSettings: {
+          sort: 'created' as const,
+          direction: 'desc' as const,
+          size: 'expanded' as const,
+        },
       })
       // Wait for the promise to resolve
       await mockPinsData
@@ -351,6 +386,11 @@ describe('PinsPage Integration', () => {
         successMessage: null,
         errorMessage: null,
         searchParamsString: '',
+        viewSettings: {
+          sort: 'created' as const,
+          direction: 'desc' as const,
+          size: 'expanded' as const,
+        },
       })
       // Wait for the promise to resolve
       await mockPinsData
@@ -391,6 +431,11 @@ describe('PinsPage Integration', () => {
         successMessage: null,
         errorMessage: null,
         searchParamsString: '',
+        viewSettings: {
+          sort: 'created' as const,
+          direction: 'desc' as const,
+          size: 'expanded' as const,
+        },
       })
       // Wait for the promise to resolve
       await mockPinsData
