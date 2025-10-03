@@ -77,7 +77,7 @@ export function PinCreationForm({
       url: urlParams?.url || initialData?.url || '',
       title: urlParams?.title || initialData?.title || '',
       description: urlParams?.description || initialData?.description || '',
-      readLater: urlParams?.unread ?? initialData?.readLater ?? false,
+      readLater: initialData?.readLater ?? false,
       tags: urlParams?.tag
         ? deduplicateTags([urlParams.tag, ...(initialData?.tags || [])])
         : initialData?.tags || [],
@@ -90,6 +90,7 @@ export function PinCreationForm({
   const [showErrorMessage, setShowErrorMessage] = useState(!!errorMessage)
   const [urlValue, setUrlValue] = useState(mergedInitialData.url)
   const [tags, setTags] = useState<string[]>(mergedInitialData.tags)
+  const [readLater, setReadLater] = useState(mergedInitialData.readLater)
   const [isManualRefresh, setIsManualRefresh] = useState(false)
 
   // Get validation errors from fetcher or props (memoized to prevent useEffect dependencies changing)
@@ -126,6 +127,11 @@ export function PinCreationForm({
       setIsManualRefresh(false)
     }
   }, [isManualRefresh, metadataTitle, metadataDescription])
+
+  // Sync readLater state when mergedInitialData changes
+  useEffect(() => {
+    setReadLater(mergedInitialData.readLater)
+  }, [mergedInitialData.readLater])
 
   // Focus management for validation errors
   useEffect(() => {
@@ -328,14 +334,18 @@ export function PinCreationForm({
           Add tags to help organize and find your pins
         </FormText>
         {/* Hidden inputs for form submission */}
-        {tags.map((tag, index) => (
-          <input
-            key={`tag-${index}`}
-            type="hidden"
-            name="tagNames"
-            value={tag}
-          />
-        ))}
+        {tags.length > 0 ? (
+          tags.map((tag, index) => (
+            <input
+              key={`tag-${index}`}
+              type="hidden"
+              name="tagNames"
+              value={tag}
+            />
+          ))
+        ) : (
+          <input type="hidden" name="tagNames" value="" />
+        )}
       </div>
 
       <div className="space-y-2">
@@ -345,7 +355,8 @@ export function PinCreationForm({
           id="readLater"
           name="readLater"
           label="Read Later"
-          defaultChecked={mergedInitialData.readLater}
+          checked={readLater}
+          onChange={e => setReadLater(e.target.checked)}
         />
         <FormText id="readLater-help" size="xs">
           Mark this pin to read later

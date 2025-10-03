@@ -228,9 +228,11 @@ export async function action({ request, params }: Route.ActionArgs) {
         formData.tagNames !== undefined
           ? Array.isArray(formData.tagNames)
             ? formData.tagNames.filter(
-                (tag): tag is string => typeof tag === 'string'
+                (tag): tag is string =>
+                  typeof tag === 'string' && tag.trim() !== ''
               )
-            : typeof formData.tagNames === 'string'
+            : typeof formData.tagNames === 'string' &&
+                formData.tagNames.trim() !== ''
               ? [formData.tagNames]
               : []
           : existingPin.tagNames,
