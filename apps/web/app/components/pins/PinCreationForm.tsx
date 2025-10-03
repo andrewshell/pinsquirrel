@@ -90,6 +90,7 @@ export function PinCreationForm({
   const [showErrorMessage, setShowErrorMessage] = useState(!!errorMessage)
   const [urlValue, setUrlValue] = useState(mergedInitialData.url)
   const [tags, setTags] = useState<string[]>(mergedInitialData.tags)
+  const [isManualRefresh, setIsManualRefresh] = useState(false)
 
   // Get validation errors from fetcher or props (memoized to prevent useEffect dependencies changing)
   const errors = useMemo<FieldErrors>(
@@ -101,18 +102,30 @@ export function PinCreationForm({
   // Auto-populate title and description when metadata is fetched
   useEffect(() => {
     if (metadataTitle && titleRef.current) {
-      titleRef.current.value = metadataTitle
+      // Manual refresh: always overwrite
+      // Auto refresh: only populate if title is empty
+      if (isManualRefresh || !titleRef.current.value.trim()) {
+        titleRef.current.value = metadataTitle
+      }
     }
-  }, [metadataTitle])
+  }, [metadataTitle, isManualRefresh])
 
   useEffect(() => {
     if (metadataDescription && descriptionRef.current) {
-      // Only auto-populate if the description field is currently empty
-      if (!descriptionRef.current.value.trim()) {
+      // Manual refresh: always overwrite
+      // Auto refresh: only populate if description is empty
+      if (isManualRefresh || !descriptionRef.current.value.trim()) {
         descriptionRef.current.value = metadataDescription
       }
     }
-  }, [metadataDescription])
+  }, [metadataDescription, isManualRefresh])
+
+  // Reset manual refresh flag after both title and description have been processed
+  useEffect(() => {
+    if (isManualRefresh && metadataTitle && metadataDescription) {
+      setIsManualRefresh(false)
+    }
+  }, [isManualRefresh, metadataTitle, metadataDescription])
 
   // Focus management for validation errors
   useEffect(() => {
@@ -127,8 +140,13 @@ export function PinCreationForm({
   }, [errors])
 
   const handleUrlBlur = () => {
-    if (urlValue && onMetadataFetch) {
-      // Let server handle URL validation
+    // Only auto-fetch metadata if title is empty
+    if (
+      urlValue &&
+      onMetadataFetch &&
+      titleRef.current &&
+      !titleRef.current.value.trim()
+    ) {
       onMetadataFetch(urlValue)
     }
   }
@@ -139,6 +157,7 @@ export function PinCreationForm({
 
   const handleRefreshMetadata = () => {
     if (urlValue && onMetadataFetch) {
+      setIsManualRefresh(true)
       onMetadataFetch(urlValue)
     }
   }
