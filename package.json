@@ -1,6 +1,6 @@
 {
   "name": "pinsquirrel",
-  "version": "1.0.14",
+  "version": "1.1.0",
   "description": "A pnpm monorepo",
   "private": true,
   "scripts": {
