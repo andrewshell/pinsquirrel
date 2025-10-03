@@ -32,9 +32,9 @@ export function Header({ user }: HeaderProps) {
 
   const currentSearch = searchParams.get('search') || ''
 
-  // Generate create pin path if user is logged in
+  // Generate create pin path if user is logged in, preserving query parameters
   const createPinPath = user?.username
-    ? `/${user.username}/pins/new`
+    ? `/${user.username}/pins/new${location.search}`
     : undefined
 
   const handleSearchToggle = () => {
