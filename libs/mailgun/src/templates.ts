@@ -92,3 +92,95 @@ This is an automated email. Please do not reply to this message.
 
   return { html, text }
 }
+
+export function createSignupNotificationEmailTemplate(
+  username: string,
+  userEmail: string
+): {
+  html: string
+  text: string
+} {
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>New Signup - PinSquirrel</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f9f9f9;
+            padding: 30px;
+            border-radius: 8px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .celebration {
+            font-size: 48px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .user-info {
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .footer {
+            margin-top: 30px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>New User Signup!</h1>
+        </div>
+
+        <div class="celebration">🎉</div>
+
+        <p><strong>Yay! ${username} just signed up for PinSquirrel.</strong></p>
+
+        <div class="user-info">
+            <p><strong>Username:</strong> ${username}</p>
+            <p><strong>Email:</strong> ${userEmail}</p>
+        </div>
+
+        <p>You can reply to this email to send them a welcome message directly!</p>
+
+        <div class="footer">
+            <p><small>This is an automated notification from PinSquirrel.</small></p>
+        </div>
+    </div>
+</body>
+</html>`.trim()
+
+  const text = `
+New User Signup!
+
+🎉
+
+Yay! ${username} just signed up for PinSquirrel.
+
+Username: ${username}
+Email: ${userEmail}
+
+You can reply to this email to send them a welcome message directly!
+
+---
+This is an automated notification from PinSquirrel.
+`.trim()
+
+  return { html, text }
+}

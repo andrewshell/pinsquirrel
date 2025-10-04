@@ -37,6 +37,7 @@ export async function action({ request }: Route.ActionArgs) {
     username: formData.username as string,
     email: formData.email as string,
     resetUrl: `${new URL(request.url).origin}/reset-password`,
+    notifyEmail: process.env.NOTIFY_EMAIL || undefined,
   }
 
   try {

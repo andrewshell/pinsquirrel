@@ -257,4 +257,189 @@ describe('MailgunEmailService', () => {
       expect(domainCall).toBe(mockConfig.domain)
     })
   })
+
+  describe('sendSignupNotificationEmail', () => {
+    const testNotifyEmail = 'admin@example.com'
+    const testUsername = 'newuser'
+    const testUserEmail = 'newuser@example.com'
+
+    beforeEach(() => {
+      mockCreateMessage.mockResolvedValue({
+        id: '<test-message-id@example.com>',
+        message: 'Queued. Thank you.',
+      })
+    })
+
+    it('should send signup notification email successfully', async () => {
+      await emailService.sendSignupNotificationEmail(
+        testNotifyEmail,
+        testUsername,
+        testUserEmail
+      )
+
+      expect(mockCreateMessage).toHaveBeenCalledTimes(1)
+      expect(mockCreateMessage).toHaveBeenCalledWith(
+        mockConfig.domain,
+        expect.objectContaining({
+          from: `${mockConfig.fromName} <${mockConfig.fromEmail}>`,
+          to: [testNotifyEmail],
+          'h:Reply-To': testUserEmail,
+          subject: `New Signup: ${testUsername}`,
+          html: expect.stringContaining(testUsername),
+          text: expect.stringContaining(testUsername),
+        })
+      )
+    })
+
+    it('should include username and email in content', async () => {
+      await emailService.sendSignupNotificationEmail(
+        testNotifyEmail,
+        testUsername,
+        testUserEmail
+      )
+
+      const call = mockCreateMessage.mock.calls[0]
+      const messageData = call[1]
+
+      expect(messageData.html).toContain(testUsername)
+      expect(messageData.html).toContain(testUserEmail)
+      expect(messageData.text).toContain(testUsername)
+      expect(messageData.text).toContain(testUserEmail)
+    })
+
+    it('should set reply-to header to user email', async () => {
+      await emailService.sendSignupNotificationEmail(
+        testNotifyEmail,
+        testUsername,
+        testUserEmail
+      )
+
+      const call = mockCreateMessage.mock.calls[0]
+      const messageData = call[1]
+
+      expect(messageData['h:Reply-To']).toBe(testUserEmail)
+    })
+
+    it('should send to notify email address', async () => {
+      await emailService.sendSignupNotificationEmail(
+        testNotifyEmail,
+        testUsername,
+        testUserEmail
+      )
+
+      const call = mockCreateMessage.mock.calls[0]
+      const messageData = call[1]
+
+      expect(messageData.to).toEqual([testNotifyEmail])
+    })
+
+    it('should use correct subject line', async () => {
+      await emailService.sendSignupNotificationEmail(
+        testNotifyEmail,
+        testUsername,
+        testUserEmail
+      )
+
+      const call = mockCreateMessage.mock.calls[0]
+      const messageData = call[1]
+
+      expect(messageData.subject).toBe(`New Signup: ${testUsername}`)
+    })
+
+    it('should throw EmailSendError when parameters are missing', async () => {
+      // Test with empty notifyEmail
+      await expect(
+        emailService.sendSignupNotificationEmail(
+          '',
+          testUsername,
+          testUserEmail
+        )
+      ).rejects.toThrow(EmailSendError)
+
+      // Test with empty username
+      await expect(
+        emailService.sendSignupNotificationEmail(
+          testNotifyEmail,
+          '',
+          testUserEmail
+        )
+      ).rejects.toThrow(EmailSendError)
+
+      // Test with empty userEmail
+      await expect(
+        emailService.sendSignupNotificationEmail(
+          testNotifyEmail,
+          testUsername,
+          ''
+        )
+      ).rejects.toThrow(EmailSendError)
+    })
+
+    it('should handle Mailgun API errors', async () => {
+      const mailgunError = new Error('API rate limit exceeded')
+      mockCreateMessage.mockRejectedValue(mailgunError)
+
+      await expect(
+        emailService.sendSignupNotificationEmail(
+          testNotifyEmail,
+          testUsername,
+          testUserEmail
+        )
+      ).rejects.toThrow(EmailSendError)
+      await expect(
+        emailService.sendSignupNotificationEmail(
+          testNotifyEmail,
+          testUsername,
+          testUserEmail
+        )
+      ).rejects.toThrow('Failed to send signup notification email')
+    })
+
+    it('should use configured fromName when provided', async () => {
+      await emailService.sendSignupNotificationEmail(
+        testNotifyEmail,
+        testUsername,
+        testUserEmail
+      )
+
+      const call = mockCreateMessage.mock.calls[0]
+      const messageData = call[1]
+
+      expect(messageData.from).toBe(
+        `${mockConfig.fromName} <${mockConfig.fromEmail}>`
+      )
+    })
+
+    it('should use email only when fromName not provided', async () => {
+      const configWithoutName: MailgunConfig = {
+        ...mockConfig,
+        fromName: undefined,
+      }
+
+      const serviceWithoutName = new MailgunEmailService(configWithoutName)
+      ;(serviceWithoutName as any).mailgun = mockMailgunClient
+
+      await serviceWithoutName.sendSignupNotificationEmail(
+        testNotifyEmail,
+        testUsername,
+        testUserEmail
+      )
+
+      const call = mockCreateMessage.mock.calls[0]
+      const messageData = call[1]
+
+      expect(messageData.from).toBe(mockConfig.fromEmail)
+    })
+
+    it('should create message for correct domain', async () => {
+      await emailService.sendSignupNotificationEmail(
+        testNotifyEmail,
+        testUsername,
+        testUserEmail
+      )
+
+      const domainCall = mockCreateMessage.mock.calls[0][0]
+      expect(domainCall).toBe(mockConfig.domain)
+    })
+  })
 })

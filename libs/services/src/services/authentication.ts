@@ -39,6 +39,7 @@ export class AuthenticationService {
     username: string
     email: string
     resetUrl?: string
+    notifyEmail?: string
   }): Promise<User> {
     // Validate inputs at service boundary
     const errors: Record<string, string[]> = {}
@@ -94,6 +95,20 @@ export class AuthenticationService {
         })
       } catch {
         // Don't fail registration if email sending fails
+        // Silently ignore email errors during registration
+      }
+    }
+
+    // Send signup notification email if notifyEmail is provided
+    if (input.notifyEmail && this.emailService) {
+      try {
+        await this.emailService.sendSignupNotificationEmail(
+          input.notifyEmail,
+          input.username,
+          input.email
+        )
+      } catch {
+        // Don't fail registration if notification email fails
         // Silently ignore email errors during registration
       }
     }

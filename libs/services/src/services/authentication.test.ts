@@ -83,6 +83,7 @@ describe('AuthenticationService', () => {
 
     mockEmailService = {
       sendPasswordResetEmail: vi.fn(),
+      sendSignupNotificationEmail: vi.fn(),
     }
 
     authService = new AuthenticationService(
@@ -160,6 +161,71 @@ describe('AuthenticationService', () => {
     })
 
     // Email is now required, so no tests for undefined/empty email
+
+    it('should send signup notification email when notifyEmail is provided', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.addRole).mockResolvedValue()
+      vi.mocked(
+        mockEmailService.sendSignupNotificationEmail
+      ).mockResolvedValue()
+
+      const registerInput = {
+        username: 'testuser',
+        email: 'test@example.com',
+        notifyEmail: 'admin@example.com',
+      }
+
+      const result = await authService.register(registerInput)
+
+      expect(mockEmailService.sendSignupNotificationEmail).toHaveBeenCalledWith(
+        'admin@example.com',
+        'testuser',
+        'test@example.com'
+      )
+      expect(result).toEqual(mockUser)
+    })
+
+    it('should not send signup notification when notifyEmail is not provided', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.addRole).mockResolvedValue()
+
+      const registerInput = {
+        username: 'testuser',
+        email: 'test@example.com',
+      }
+
+      await authService.register(registerInput)
+
+      expect(
+        mockEmailService.sendSignupNotificationEmail
+      ).not.toHaveBeenCalled()
+    })
+
+    it('should not fail registration if signup notification email fails', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.addRole).mockResolvedValue()
+      vi.mocked(mockEmailService.sendSignupNotificationEmail).mockRejectedValue(
+        new Error('Email service failed')
+      )
+
+      const registerInput = {
+        username: 'testuser',
+        email: 'test@example.com',
+        notifyEmail: 'admin@example.com',
+      }
+
+      // Should not throw even though email sending fails
+      const result = await authService.register(registerInput)
+
+      expect(result).toEqual(mockUser)
+      expect(mockEmailService.sendSignupNotificationEmail).toHaveBeenCalled()
+    })
   })
 
   describe('login', () => {

@@ -4,4 +4,10 @@ export interface EmailService {
     token: string,
     resetUrl: string
   ): Promise<void>
+
+  sendSignupNotificationEmail(
+    notifyEmail: string,
+    username: string,
+    userEmail: string
+  ): Promise<void>
 }
