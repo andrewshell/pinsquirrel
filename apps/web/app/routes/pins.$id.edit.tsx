@@ -310,6 +310,13 @@ export default function PinEditPage() {
     tags: pin.tagNames || [],
   }
 
+  // Format the created date
+  const createdDate = new Date(pin.createdAt).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
@@ -348,6 +355,9 @@ export default function PinEditPage() {
                 : undefined
             }
           />
+          <div className="mt-4 text-sm text-muted-foreground">
+            Originally pinned on {createdDate}
+          </div>
         </CardContent>
       </Card>
     </div>

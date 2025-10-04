@@ -1,4 +1,10 @@
-import { useLoaderData, useActionData, useLocation, data } from 'react-router'
+import {
+  useLoaderData,
+  useActionData,
+  useLocation,
+  data,
+  redirect,
+} from 'react-router'
 import type { Route } from './+types/pins.new'
 import { requireAccessControl, setFlashMessage } from '~/lib/session.server'
 import { extractFilterParams } from '~/lib/filter-utils.server'
@@ -31,11 +37,26 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Get access control
   const ac = await requireAccessControl(request)
 
-  // Fetch user's existing tags for autocomplete
-  const userTags = await tagService.getUserTags(ac, ac.user!.id)
-
   // Extract and sanitize URL parameters (for bookmarklet integration)
   const urlParams = extractUrlParams(request)
+
+  // Check if URL already exists for this user
+  if (urlParams?.url) {
+    const existingPin = await pinService.getUserPinsWithPagination(
+      ac,
+      { url: urlParams.url },
+      { page: 1, pageSize: 1 }
+    )
+
+    if (existingPin.pins.length > 0) {
+      // URL already exists, redirect to edit form
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
+      throw redirect(`/pins/${existingPin.pins[0].id}/edit`)
+    }
+  }
+
+  // Fetch user's existing tags for autocomplete
+  const userTags = await tagService.getUserTags(ac, ac.user!.id)
 
   return data({
     userTags: userTags.map(tag => tag.name),

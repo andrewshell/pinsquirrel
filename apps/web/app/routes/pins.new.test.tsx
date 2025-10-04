@@ -5,6 +5,7 @@ import type { User, AccessControl } from '@pinsquirrel/domain'
 // Create mock functions in hoisted scope
 const mockCreatePinFromFormData = vi.hoisted(() => vi.fn())
 const mockFindByUserId = vi.hoisted(() => vi.fn())
+const mockGetUserPinsWithPagination = vi.hoisted(() => vi.fn())
 
 // Mock the session.server module
 vi.mock('~/lib/session.server', () => ({
@@ -26,6 +27,7 @@ vi.mock('~/lib/services/container.server', () => ({
   },
   pinService: {
     createPin: mockCreatePinFromFormData,
+    getUserPinsWithPagination: mockGetUserPinsWithPagination,
   },
 }))
 
@@ -75,6 +77,11 @@ describe('pins/new route', () => {
       createMockAccessControl(mockUser)
     )
     mockFindByUserId.mockResolvedValue([])
+    mockGetUserPinsWithPagination.mockResolvedValue({
+      pins: [],
+      pagination: { page: 1, pageSize: 1, totalPages: 0, totalCount: 0 },
+      totalCount: 0,
+    })
   })
 
   describe('loader', () => {
@@ -160,6 +167,94 @@ describe('pins/new route', () => {
       await expect(
         loader({ request, params } as Parameters<typeof loader>[0])
       ).rejects.toThrow('Unauthorized')
+    })
+
+    it('redirects to edit form when URL already exists', async () => {
+      const existingPin = {
+        id: 'existing-pin-1',
+        userId: 'user-1',
+        url: 'https://example.com',
+        title: 'Existing Pin',
+        description: null,
+        readLater: false,
+        tagNames: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      mockGetUserPinsWithPagination.mockResolvedValue({
+        pins: [existingPin],
+        pagination: { page: 1, pageSize: 1, totalPages: 1, totalCount: 1 },
+        totalCount: 1,
+      })
+
+      const request = new Request(
+        'http://localhost/pins/new?url=https://example.com'
+      )
+      const params = {}
+
+      try {
+        await loader({ request, params } as Parameters<typeof loader>[0])
+        // Should have thrown a redirect response
+        expect.fail('Expected loader to throw a redirect')
+      } catch (error) {
+        // Verify it's a redirect response (redirect() throws a Response)
+        expect(error).toBeInstanceOf(Response)
+        if (error instanceof Response) {
+          expect(error.status).toBe(302)
+          expect(error.headers.get('Location')).toBe(
+            '/pins/existing-pin-1/edit'
+          )
+        }
+      }
+
+      expect(mockGetUserPinsWithPagination).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user: mockUser,
+        }),
+        { url: 'https://example.com' },
+        { page: 1, pageSize: 1 }
+      )
+    })
+
+    it('does not redirect when URL does not exist', async () => {
+      mockGetUserPinsWithPagination.mockResolvedValue({
+        pins: [],
+        pagination: { page: 1, pageSize: 1, totalPages: 0, totalCount: 0 },
+        totalCount: 0,
+      })
+
+      const request = new Request(
+        'http://localhost/pins/new?url=https://new-url.com'
+      )
+      const params = {}
+
+      const result = await loader({ request, params } as Parameters<
+        typeof loader
+      >[0])
+
+      // Should return normal loader data
+      expect(result).toHaveProperty('data')
+      expect(result.data).toHaveProperty('userTags')
+      expect(result.data).toHaveProperty('urlParams')
+
+      expect(mockGetUserPinsWithPagination).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user: mockUser,
+        }),
+        { url: 'https://new-url.com' },
+        { page: 1, pageSize: 1 }
+      )
+    })
+
+    it('does not check for duplicates when no URL parameter', async () => {
+      const request = new Request('http://localhost/pins/new')
+      const params = {}
+
+      await loader({ request, params } as Parameters<typeof loader>[0])
+
+      // Should not call getUserPinsWithPagination
+      expect(mockGetUserPinsWithPagination).not.toHaveBeenCalled()
     })
   })
 
