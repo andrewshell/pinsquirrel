@@ -6,22 +6,22 @@ images - one or more images might be attached to the pin and viewed as thumbnail
 tags - ways to group pins
 read_later - boolean for read it later functionlity
 
-/:username/pins # All pins with URLs - click title → visit URL
-/:username/notes # All pins with markdown - click title → view markdown
-/:username/images # All pins with images - click image → view full size
-/:username/tags # Tag cloud of existing tags
+/pins # All pins with URLs - click title → visit URL
+/notes # All pins with markdown - click title → view markdown (future)
+/images # All pins with images - click image → view full size (future)
+/tags # Tag cloud of existing tags
 
 These are just views of pins, each can be filtered by tag or unread status
 
 So an example could be /pins?tag=article&unread=true
 
-/:username/pins/new
-/:username/pins/:id/edit
-/:username/pins/:id/delete
+/pins/new
+/pins/:id/edit
+/pins/:id/delete
 
 These are the code crud endpoints
 
-/:username/pins/new can get query params to pre-populate from bookmarklet or browser extension
+/pins/new can get query params to pre-populate from bookmarklet or browser extension
 
 There will also be unique CRUD forms for notes and images.
 

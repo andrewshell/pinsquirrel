@@ -8,7 +8,6 @@ import {
 } from '@pinsquirrel/domain'
 import { authService } from '~/lib/services/container.server'
 import { createUserSession, getUserId } from '~/lib/session.server'
-import { getUserPath } from '~/lib/auth.server'
 import { LoginForm } from '~/components/auth/LoginForm'
 import { parseFormData } from '~/lib/http-utils'
 import { logger } from '~/lib/logger.server'
@@ -60,7 +59,7 @@ export async function action({ request }: Route.ActionArgs) {
     })
 
     // Determine redirect destination
-    let redirectTo = getUserPath(user.username)
+    let redirectTo = '/pins'
 
     // Use redirectTo from form if provided and is a safe relative path
     if (formData.redirectTo && typeof formData.redirectTo === 'string') {

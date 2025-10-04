@@ -1,5 +1,5 @@
 import type { FieldErrors } from '@pinsquirrel/domain'
-import { useFetcher } from 'react-router'
+import { Link, useFetcher } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Input } from '~/components/ui/input'
@@ -35,12 +35,12 @@ export function RegisterForm() {
           </div>
           <p className="text-sm text-muted-foreground mt-4">
             Didn&apos;t receive the email? Check your spam folder or{' '}
-            <button
-              onClick={() => window.location.reload()}
+            <Link
+              to="/forgot-password"
               className="text-primary hover:underline"
             >
               try again
-            </button>
+            </Link>
             .
           </p>
         </CardContent>

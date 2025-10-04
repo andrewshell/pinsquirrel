@@ -52,10 +52,6 @@ vi.mock('~/lib/session.server', () => ({
   }),
 }))
 
-vi.mock('~/lib/auth.server', () => ({
-  requireUsernameMatch: vi.fn(),
-}))
-
 // Import after mocks are set up
 import TagsPage, { loader, meta } from './tags'
 import { tagService } from '~/lib/services/container.server'
