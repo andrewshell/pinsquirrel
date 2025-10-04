@@ -3,21 +3,14 @@ import { describe, it, expect } from 'vitest'
 import { BookmarkletSection } from './BookmarkletSection'
 
 describe('BookmarkletSection', () => {
-  const mockUser = {
-    id: 1,
-    username: 'testuser',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }
-
   it('renders bookmarklet section with title', () => {
-    render(<BookmarkletSection user={mockUser} />)
+    render(<BookmarkletSection />)
 
     expect(screen.getByText('Quick Pin Bookmarklet')).toBeInTheDocument()
   })
 
   it('displays installation instructions', () => {
-    render(<BookmarkletSection user={mockUser} />)
+    render(<BookmarkletSection />)
 
     expect(
       screen.getByText(/drag the bookmarklet below to your bookmarks bar/i)
@@ -25,7 +18,7 @@ describe('BookmarkletSection', () => {
   })
 
   it('renders bookmarklet link with correct href structure', () => {
-    render(<BookmarkletSection user={mockUser} />)
+    render(<BookmarkletSection />)
 
     const bookmarkletLink = screen.getByText('📌 Pin to PinSquirrel')
     expect(bookmarkletLink).toBeInTheDocument()
@@ -37,7 +30,7 @@ describe('BookmarkletSection', () => {
   })
 
   it('displays usage instructions for the bookmarklet', () => {
-    render(<BookmarkletSection user={mockUser} />)
+    render(<BookmarkletSection />)
 
     expect(
       screen.getByText(/click the bookmarklet while on any webpage/i)
@@ -45,7 +38,7 @@ describe('BookmarkletSection', () => {
   })
 
   it('explains selected text behavior', () => {
-    render(<BookmarkletSection user={mockUser} />)
+    render(<BookmarkletSection />)
 
     expect(
       screen.getByText(/if you have text selected.*description/i)
@@ -53,7 +46,7 @@ describe('BookmarkletSection', () => {
   })
 
   it('shows drag instruction', () => {
-    render(<BookmarkletSection user={mockUser} />)
+    render(<BookmarkletSection />)
 
     expect(
       screen.getByText(/drag this to your bookmarks bar/i)
@@ -61,7 +54,7 @@ describe('BookmarkletSection', () => {
   })
 
   it('shows tip about selected text conversion', () => {
-    render(<BookmarkletSection user={mockUser} />)
+    render(<BookmarkletSection />)
 
     expect(
       screen.getByText(/select text on a webpage before clicking/i)
@@ -69,14 +62,14 @@ describe('BookmarkletSection', () => {
   })
 
   it('has draggable bookmarklet link', () => {
-    render(<BookmarkletSection user={mockUser} />)
+    render(<BookmarkletSection />)
 
     const bookmarkletLink = screen.getByText('📌 Pin to PinSquirrel')
     expect(bookmarkletLink.getAttribute('draggable')).toBe('true')
   })
 
   it('has proper styling classes for bookmarklet button', () => {
-    render(<BookmarkletSection user={mockUser} />)
+    render(<BookmarkletSection />)
 
     const bookmarkletLink = screen.getByText('📌 Pin to PinSquirrel')
     expect(bookmarkletLink.className).toContain('cursor-move')
@@ -84,7 +77,7 @@ describe('BookmarkletSection', () => {
   })
 
   it('shows numbered instruction list', () => {
-    render(<BookmarkletSection user={mockUser} />)
+    render(<BookmarkletSection />)
 
     expect(
       screen.getByText(/drag the bookmarklet above to your browser/i)

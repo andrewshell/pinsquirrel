@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 
 // Extract the bookmarklet generation logic for direct testing
-function generateBookmarkletCode(username: string) {
+function generateBookmarkletCode() {
   const bookmarkletJS = `
     (function() {
       const url = location.href;
@@ -37,7 +37,7 @@ function generateBookmarkletCode(username: string) {
         description: description
       });
       
-      const targetUrl = \`\${window.location.origin}/${username}/pins/new?\${params.toString()}\`;
+      const targetUrl = \`\${window.location.origin}/pins/new?\${params.toString()}\`;
       window.open(targetUrl, '_blank');
     })();
   `
@@ -49,12 +49,12 @@ function generateBookmarkletCode(username: string) {
 
 describe('Bookmarklet Code Generation', () => {
   it('generates bookmarklet with correct JavaScript structure', () => {
-    const code = generateBookmarkletCode('testuser')
+    const code = generateBookmarkletCode()
     expect(code).toMatch(/^javascript:/)
   })
 
   it('includes page metadata extraction', () => {
-    const code = decodeURIComponent(generateBookmarkletCode('testuser'))
+    const code = decodeURIComponent(generateBookmarkletCode())
 
     expect(code).toContain('document.title')
     expect(code).toContain('location.href')
@@ -62,14 +62,14 @@ describe('Bookmarklet Code Generation', () => {
   })
 
   it('includes selected text handling', () => {
-    const code = decodeURIComponent(generateBookmarkletCode('testuser'))
+    const code = decodeURIComponent(generateBookmarkletCode())
 
     expect(code).toContain('getSelection()')
     expect(code).toContain('selection.trim()')
   })
 
   it('includes HTML to markdown conversion', () => {
-    const code = decodeURIComponent(generateBookmarkletCode('testuser'))
+    const code = decodeURIComponent(generateBookmarkletCode())
 
     expect(code).toContain('replace')
     expect(code).toContain('**$1**') // Bold conversion
@@ -77,29 +77,29 @@ describe('Bookmarklet Code Generation', () => {
     expect(code).toContain('[$2]($1)') // Link conversion
   })
 
-  it('generates URL with correct username', () => {
-    const code = decodeURIComponent(generateBookmarkletCode('testuser'))
+  it('generates URL with correct path', () => {
+    const code = decodeURIComponent(generateBookmarkletCode())
 
-    // Check that the username is interpolated into the URL
-    expect(code).toContain('/testuser/pins/new')
+    // Check that the path is correct (no username in URL)
+    expect(code).toContain('/pins/new')
   })
 
   it('uses URLSearchParams for parameter encoding', () => {
-    const code = decodeURIComponent(generateBookmarkletCode('testuser'))
+    const code = decodeURIComponent(generateBookmarkletCode())
 
     expect(code).toContain('URLSearchParams')
     expect(code).toContain('params.toString()')
   })
 
   it('opens new tab for pin creation', () => {
-    const code = decodeURIComponent(generateBookmarkletCode('testuser'))
+    const code = decodeURIComponent(generateBookmarkletCode())
 
     expect(code).toContain('window.open')
     expect(code).toContain('_blank')
   })
 
   it('handles empty selection by using page description', () => {
-    const code = decodeURIComponent(generateBookmarkletCode('testuser'))
+    const code = decodeURIComponent(generateBookmarkletCode())
 
     expect(code).toContain('pageDescription')
     expect(code).toContain('else')

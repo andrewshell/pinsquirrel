@@ -201,7 +201,7 @@ export default function ProfilePage() {
         <ChangePasswordForm username={user.username} />
 
         {/* Bookmarklet Section */}
-        <BookmarkletSection user={user} />
+        <BookmarkletSection />
       </div>
     </div>
   )

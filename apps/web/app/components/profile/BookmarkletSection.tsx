@@ -1,15 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 
-interface User {
-  username: string
-}
-
-interface BookmarkletSectionProps {
-  user: User
-}
-
-export function BookmarkletSection({ user }: BookmarkletSectionProps) {
+export function BookmarkletSection() {
   const bookmarkletRef = useRef<HTMLAnchorElement>(null)
 
   // Generate bookmarklet JavaScript code
@@ -51,13 +43,13 @@ export function BookmarkletSection({ user }: BookmarkletSectionProps) {
       '    description: description',
       '  });',
       '  ',
-      `  const targetUrl = "${appOrigin}/${user.username}/pins/new?" + params.toString();`,
+      `  const targetUrl = "${appOrigin}/pins/new?" + params.toString();`,
       '  window.open(targetUrl, "_blank");',
       '})();',
     ].join(' ')
 
     return 'javascript:' + encodeURIComponent(jsCode)
-  }, [user.username])
+  }, [])
 
   // Set the href using ref after component mounts to bypass React's security restriction
   useEffect(() => {
