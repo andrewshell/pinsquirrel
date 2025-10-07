@@ -215,18 +215,14 @@ export async function action({ request, params }: Route.ActionArgs) {
         formData.readLater !== undefined
           ? Boolean(formData.readLater)
           : existingPin.readLater,
-      tagNames:
-        formData.tagNames !== undefined
-          ? Array.isArray(formData.tagNames)
-            ? formData.tagNames.filter(
-                (tag): tag is string =>
-                  typeof tag === 'string' && tag.trim() !== ''
-              )
-            : typeof formData.tagNames === 'string' &&
-                formData.tagNames.trim() !== ''
-              ? [formData.tagNames]
-              : []
-          : existingPin.tagNames,
+      tagNames: Array.isArray(formData.tagNames)
+        ? formData.tagNames.filter(
+            (tag): tag is string => typeof tag === 'string' && tag.trim() !== ''
+          )
+        : typeof formData.tagNames === 'string' &&
+            formData.tagNames.trim() !== ''
+          ? [formData.tagNames]
+          : [],
     })
 
     logger.info('Pin updated successfully', {

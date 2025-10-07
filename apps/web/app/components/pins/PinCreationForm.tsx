@@ -333,19 +333,22 @@ export function PinCreationForm({
         <FormText id="tags-help" size="xs">
           Add tags to help organize and find your pins
         </FormText>
-        {/* Hidden inputs for form submission */}
-        {tags.length > 0 ? (
-          tags.map((tag, index) => (
-            <input
-              key={`tag-${index}`}
-              type="hidden"
-              name="tagNames"
-              value={tag}
-            />
-          ))
-        ) : (
-          <input type="hidden" name="tagNames" value="" />
+        {errors.tagNames && (
+          <p id="tags-error" className="text-sm text-destructive" role="alert">
+            {Array.isArray(errors.tagNames)
+              ? errors.tagNames.join('. ')
+              : errors.tagNames}
+          </p>
         )}
+        {/* Hidden inputs for form submission */}
+        {tags.map((tag, index) => (
+          <input
+            key={`tag-${index}`}
+            type="hidden"
+            name="tagNames"
+            value={tag}
+          />
+        ))}
       </div>
 
       <div className="space-y-2">
