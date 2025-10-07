@@ -184,7 +184,13 @@ export function TagInput({
     }
   }
 
-  const handleSuggestionClick = (suggestion: string) => {
+  const handleSuggestionClick = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    suggestion: string
+  ) => {
+    // Prevent blur event from firing before we add the tag
+    // This is especially important for Safari
+    e.preventDefault()
     addTag(suggestion)
   }
 
@@ -272,7 +278,7 @@ export function TagInput({
                     index === selectedIndex &&
                       'bg-accent text-accent-foreground'
                   )}
-                  onClick={() => handleSuggestionClick(suggestion)}
+                  onMouseDown={e => handleSuggestionClick(e, suggestion)}
                   onMouseEnter={() => setSelectedIndex(index)}
                 >
                   {suggestion}
