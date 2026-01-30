@@ -510,6 +510,8 @@ pinsquirrel/
 - [ ] 7.1 Update Docker configuration
   - New Dockerfile for Hono app
   - Smaller image (no React/Node SSR overhead)
+  - Create `migrate-and-start.sh` script (like `apps/web/migrate-and-start.sh`)
+  - Ensure startup migration hook runs before app starts
 
 - [ ] 7.2 Update CI/CD pipeline
   - Build Hono app
@@ -528,7 +530,7 @@ pinsquirrel/
 
 - [ ] 7.6 Deprecate React app
   - Remove `apps/web` directory
-  - Update documentation
+  - Update documentation (including PRODUCTION_DEPLOYMENT.md)
   - Clean up unused dependencies
 
 ### Verification
