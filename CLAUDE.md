@@ -166,7 +166,7 @@ The web app uses React Router 7 in Framework mode with SSR enabled:
 
 **STATUS: Active Migration**
 
-We are migrating from React Router 7 to a simpler stack. See `PLAN.local.md` for full details.
+We are migrating from React Router 7 to a simpler stack. See `PLAN.md` for full details.
 
 ### Why the Migration
 
@@ -209,7 +209,7 @@ Key differences from React app:
 
 ### Migration Plan Reference
 
-See `PLAN.local.md` for:
+See `PLAN.md` for:
 
 - Detailed phase breakdown (7 phases)
 - Task checklists for each feature
@@ -221,7 +221,7 @@ See `PLAN.local.md` for:
 1. **Check which app you're working on** - most new work should be in `apps/hono`
 2. **The React app (`apps/web`) is being deprecated** - only fix critical bugs there
 3. **All libs remain shared** - changes to services/database/domain affect both apps
-4. **Reference PLAN.local.md** for current migration status and next tasks
+4. **Reference PLAN.md** for current migration status and next tasks
 
 ## Services Library (libs/services)
 
