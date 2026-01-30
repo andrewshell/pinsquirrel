@@ -5,7 +5,13 @@
   "private": true,
   "scripts": {
     "build": "turbo build",
-    "dev": "CI=true turbo dev",
+    "build:web": "pnpm --filter @pinsquirrel/web build",
+    "build:hono": "pnpm --filter @pinsquirrel/hono build",
+    "dev": "pnpm --filter @pinsquirrel/web dev",
+    "dev:hono": "pnpm --filter @pinsquirrel/hono dev",
+    "dev:all": "CI=true turbo dev",
+    "start": "pnpm --filter @pinsquirrel/web start",
+    "start:hono": "pnpm --filter @pinsquirrel/hono start",
     "typecheck": "turbo typecheck",
     "lint": "turbo lint",
     "format": "turbo format",
@@ -34,6 +40,7 @@
   },
   "lint-staged": {
     "apps/web/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/web eslint --fix",
+    "apps/hono/src/**/*.{ts,tsx}": "pnpm --filter @pinsquirrel/hono eslint --fix",
     "libs/services/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/services eslint --fix",
     "libs/database/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/database eslint --fix",
     "libs/domain/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/domain eslint --fix",

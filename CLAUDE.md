@@ -7,7 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a pnpm monorepo with Turbo orchestration:
 
 - `apps/` - Applications and end-user facing packages
-  - `web/` - React Router 7 (Framework mode) application with SSR
+  - `web/` - React Router 7 (Framework mode) application with SSR **(being replaced)**
+  - `hono/` - Hono + HTMX + Alpine.js application **(in development)**
 - `libs/` - Shared libraries and utilities
   - `services/` - Business logic services and validation
   - `database/` - Database layer with Drizzle ORM for PostgreSQL
@@ -22,8 +23,14 @@ This is a pnpm monorepo with Turbo orchestration:
 
 ### Development
 
-- `pnpm dev` - Start development servers across all workspaces
+- `pnpm dev` - Start React app (port 8100)
+- `pnpm dev:hono` - Start Hono app (port 3001)
+- `pnpm dev:all` - Start all development servers
 - `pnpm build` - Build all packages
+- `pnpm build:web` - Build React app only
+- `pnpm build:hono` - Build Hono app only
+- `pnpm start` - Start React app (production)
+- `pnpm start:hono` - Start Hono app (production)
 - `pnpm lint` - Run ESLint across all workspaces
 - `pnpm format` - Run Prettier formatting across all workspaces
 - `pnpm test` - Run tests across all workspaces
@@ -63,13 +70,11 @@ This is a pnpm monorepo with Turbo orchestration:
 When developing new features or fixing bugs, **ALWAYS follow the TDD red-green-refactor cycle**:
 
 1. **RED**: Write a failing test first
-
    - `pnpm test --filter <workspace> -- --watch` to start test watcher
    - Write test that describes the expected behavior
    - Verify the test fails with the expected error
 
 2. **GREEN**: Write minimal code to make the test pass
-
    - Implement just enough code to satisfy the test
    - Keep implementation simple and focused
 
@@ -156,6 +161,67 @@ The web app uses React Router 7 in Framework mode with SSR enabled:
 - `pnpm test --filter @pinsquirrel/web` - Run all tests once
 - `pnpm test --filter @pinsquirrel/web -- <pattern>` - Run specific test files
 - `pnpm test --filter @pinsquirrel/web -- --watch` - Run tests in watch mode for TDD
+
+## Stack Migration: Hono + HTMX + Alpine.js
+
+**STATUS: Active Migration**
+
+We are migrating from React Router 7 to a simpler stack. See `PLAN.local.md` for full details.
+
+### Why the Migration
+
+- React is overkill for this app's needs (mostly server-rendered forms)
+- Simpler stack = less code, easier maintenance
+- HTMX handles 90% of interactivity without client-side JavaScript
+- Alpine.js only needed for tag autocomplete component
+
+### New Stack
+
+| Component     | Technology           | Purpose                                 |
+| ------------- | -------------------- | --------------------------------------- |
+| Backend       | Hono                 | HTTP routing, middleware, JSX templates |
+| Interactivity | HTMX                 | Partial page updates, form handling     |
+| Complex UI    | Alpine.js            | Tag input autocomplete only             |
+| Database      | Drizzle (unchanged)  | Same libs, no changes                   |
+| Styling       | Tailwind (unchanged) | Same styles                             |
+
+### Parallel Development
+
+Both apps run simultaneously during migration:
+
+- **React app**: `localhost:5173` via `pnpm dev --filter @pinsquirrel/web`
+- **Hono app**: `localhost:3001` via `pnpm dev --filter @pinsquirrel/hono`
+
+Both share the same database and libs - no data migration needed.
+
+### Hono App (apps/hono) - In Development
+
+- **Development**: `pnpm dev --filter @pinsquirrel/hono`
+- **Build**: `pnpm build --filter @pinsquirrel/hono`
+- **Start**: `pnpm start --filter @pinsquirrel/hono`
+
+Key differences from React app:
+
+- Server-rendered JSX templates (not React components)
+- HTMX attributes for interactivity (not React state)
+- Database sessions stored in PostgreSQL
+- No client-side routing - traditional page navigation
+
+### Migration Plan Reference
+
+See `PLAN.local.md` for:
+
+- Detailed phase breakdown (7 phases)
+- Task checklists for each feature
+- Technical decisions made
+- Estimated effort
+
+### When Working on This Codebase
+
+1. **Check which app you're working on** - most new work should be in `apps/hono`
+2. **The React app (`apps/web`) is being deprecated** - only fix critical bugs there
+3. **All libs remain shared** - changes to services/database/domain affect both apps
+4. **Reference PLAN.local.md** for current migration status and next tasks
 
 ## Services Library (libs/services)
 
