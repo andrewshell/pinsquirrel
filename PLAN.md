@@ -276,7 +276,7 @@ pinsquirrel/
   - Simple confirmation page
   - Or: HTMX modal pattern
 
-- [ ] 3.9 Implement search
+- [x] 3.9 Implement search
 
   ```html
   <input
@@ -288,11 +288,11 @@ pinsquirrel/
   />
   ```
 
-- [ ] 3.10 Implement tag filtering
+- [x] 3.10 Implement tag filtering
   - Click tag → HTMX GET with `?tag=x`
   - Multiple filter combinations
 
-- [ ] 3.11 Implement pagination
+- [x] 3.11 Implement pagination
   ```html
   <a hx-get="/pins/partial?page=2" hx-target="#pin-list" hx-swap="innerHTML">
     Next Page
