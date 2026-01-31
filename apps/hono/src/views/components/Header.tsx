@@ -28,46 +28,39 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
           {/* Desktop Navigation */}
           <nav class="hidden md:flex items-center space-x-4">
             {user ? (
-              <div
-                class="flex items-center space-x-4"
-                x-data="{ searchOpen: false }"
-              >
+              <div class="flex items-center space-x-4">
                 <a
                   href="/pins"
-                  x-show="!searchOpen"
                   class="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
                 >
                   Pins
                 </a>
                 <a
                   href="/tags"
-                  x-show="!searchOpen"
                   class="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
                 >
                   Tags
                 </a>
 
-                {/* Search input - visible when searchOpen */}
+                {/* Search input - visible when toggled */}
                 <form
-                  x-show="searchOpen"
-                  x-cloak
-                  x-transition
                   action="/pins"
                   method="get"
-                  class="flex items-center gap-2"
+                  class="hidden items-center gap-2"
+                  data-search="form"
                 >
                   <input
                     type="text"
                     name="search"
                     placeholder="Search pins..."
                     class="w-64 px-3 py-2 text-sm border-2 border-foreground bg-background focus:outline-none focus:ring-2 focus:ring-accent"
-                    x-ref="searchInput"
+                    data-search="input"
                   />
                   <button
                     type="button"
-                    x-on:click="searchOpen = false"
                     class="p-2 text-foreground hover:text-accent transition-colors"
                     aria-label="Close search"
+                    data-search="close"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -89,9 +82,9 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                 {/* Search icon - toggles search input */}
                 <button
                   type="button"
-                  x-on:click="searchOpen = !searchOpen; $nextTick(() => { if(searchOpen) $refs.searchInput.focus() })"
                   class="p-2 text-foreground hover:text-accent transition-colors"
                   aria-label="Search"
+                  data-search="toggle"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -135,12 +128,12 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                 </a>
 
                 {/* User Dropdown */}
-                <div class="relative" x-data="{ open: false }">
+                <div class="relative" data-dropdown="container">
                   <button
                     type="button"
                     class="flex items-center gap-2 px-3 py-2 text-sm font-medium border-2 border-foreground bg-background
                            hover:bg-accent/10 transition-colors"
-                    x-on:click="open = !open"
+                    data-dropdown="toggle"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -160,16 +153,8 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                     {user.username}
                   </button>
                   <div
-                    x-show="open"
-                    x-cloak
-                    {...{ 'x-on:click.outside': 'open = false' }}
-                    x-transition:enter="transition ease-out duration-100"
-                    x-transition:enter-start="transform opacity-0 scale-95"
-                    x-transition:enter-end="transform opacity-100 scale-100"
-                    x-transition:leave="transition ease-in duration-75"
-                    x-transition:leave-start="transform opacity-100 scale-100"
-                    x-transition:leave-end="transform opacity-0 scale-95"
-                    class="absolute right-0 mt-2 w-48 bg-background border-2 border-foreground shadow-lg z-50"
+                    class="hidden absolute right-0 mt-2 w-48 bg-background border-2 border-foreground shadow-lg z-50"
+                    data-dropdown="menu"
                   >
                     <a
                       href="/profile"
@@ -210,10 +195,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
           </nav>
 
           {/* Mobile Menu Button */}
-          <div
-            class="md:hidden flex items-center space-x-2"
-            x-data="{ mobileOpen: false }"
-          >
+          <div class="md:hidden flex items-center space-x-2">
             {user && (
               <a
                 href="/pins/new"
@@ -236,99 +218,81 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                 </svg>
               </a>
             )}
-            <button
-              type="button"
-              class="p-2 text-foreground hover:bg-accent/10 transition-colors"
-              x-on:click="mobileOpen = !mobileOpen"
-              aria-label="Toggle menu"
-            >
-              <svg
-                x-show="!mobileOpen"
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+            <div data-dropdown="container">
+              <button
+                type="button"
+                class="p-2 text-foreground hover:bg-accent/10 transition-colors"
+                data-dropdown="toggle"
+                aria-label="Toggle menu"
               >
-                <line x1="4" x2="20" y1="12" y2="12" />
-                <line x1="4" x2="20" y1="6" y2="6" />
-                <line x1="4" x2="20" y1="18" y2="18" />
-              </svg>
-              <svg
-                x-show="mobileOpen"
-                x-cloak
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
-              </svg>
-            </button>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <line x1="4" x2="20" y1="12" y2="12" />
+                  <line x1="4" x2="20" y1="6" y2="6" />
+                  <line x1="4" x2="20" y1="18" y2="18" />
+                </svg>
+              </button>
 
-            {/* Mobile Menu Panel */}
-            <div
-              x-show="mobileOpen"
-              x-cloak
-              {...{ 'x-on:click.outside': 'mobileOpen = false' }}
-              x-transition
-              class="absolute top-20 left-0 right-0 bg-background border-b-4 border-foreground z-50"
-            >
-              <div class="px-4 py-4 space-y-2">
-                {user ? (
-                  <>
-                    <a
-                      href="/pins"
-                      class="block px-4 py-2 text-center font-medium hover:bg-accent/10 transition-colors"
-                    >
-                      Pins
-                    </a>
-                    <a
-                      href="/tags"
-                      class="block px-4 py-2 text-center font-medium hover:bg-accent/10 transition-colors"
-                    >
-                      Tags
-                    </a>
-                    <a
-                      href="/profile"
-                      class="block px-4 py-2 text-center font-medium hover:bg-accent/10 transition-colors"
-                    >
-                      {user.username}
-                    </a>
-                    <hr class="border-foreground/20" />
-                    <a
-                      href="/logout"
-                      class="block px-4 py-2 text-center font-medium border-2 border-foreground hover:bg-accent/10 transition-colors"
-                    >
-                      Sign Out
-                    </a>
-                  </>
-                ) : (
-                  <>
-                    <a
-                      href="/signin"
-                      class="block px-4 py-2 text-center font-medium border-2 border-foreground hover:bg-accent/10 transition-colors"
-                    >
-                      Sign In
-                    </a>
-                    <a
-                      href="/signup"
-                      class="block px-4 py-2 text-center font-medium bg-primary text-primary-foreground border-2 border-foreground"
-                    >
-                      Sign Up
-                    </a>
-                  </>
-                )}
+              {/* Mobile Menu Panel */}
+              <div
+                class="hidden absolute top-20 left-0 right-0 bg-background border-b-4 border-foreground z-50"
+                data-dropdown="menu"
+              >
+                <div class="px-4 py-4 space-y-2">
+                  {user ? (
+                    <>
+                      <a
+                        href="/pins"
+                        class="block px-4 py-2 text-center font-medium hover:bg-accent/10 transition-colors"
+                      >
+                        Pins
+                      </a>
+                      <a
+                        href="/tags"
+                        class="block px-4 py-2 text-center font-medium hover:bg-accent/10 transition-colors"
+                      >
+                        Tags
+                      </a>
+                      <a
+                        href="/profile"
+                        class="block px-4 py-2 text-center font-medium hover:bg-accent/10 transition-colors"
+                      >
+                        {user.username}
+                      </a>
+                      <hr class="border-foreground/20" />
+                      <a
+                        href="/logout"
+                        class="block px-4 py-2 text-center font-medium border-2 border-foreground hover:bg-accent/10 transition-colors"
+                      >
+                        Sign Out
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      <a
+                        href="/signin"
+                        class="block px-4 py-2 text-center font-medium border-2 border-foreground hover:bg-accent/10 transition-colors"
+                      >
+                        Sign In
+                      </a>
+                      <a
+                        href="/signup"
+                        class="block px-4 py-2 text-center font-medium bg-primary text-primary-foreground border-2 border-foreground"
+                      >
+                        Sign Up
+                      </a>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>

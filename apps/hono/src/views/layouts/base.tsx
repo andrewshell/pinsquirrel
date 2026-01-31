@@ -15,10 +15,9 @@ export const BaseLayout: FC<PropsWithChildren<BaseLayoutProps>> = ({
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>{title} - PinSquirrel</title>
         <link rel="stylesheet" href="/static/styles.css" />
-        <style>{`[x-cloak] { display: none !important; }`}</style>
         <script src="/static/htmx.min.js" />
-        <script src="/static/tag-input.js" />
-        <script src="/static/alpine.min.js" defer />
+        <script src="/static/dropdown.js" defer />
+        <script src="/static/tag-input-vanilla.js" defer />
       </head>
       <body class="bg-background text-foreground min-h-screen">{children}</body>
     </html>

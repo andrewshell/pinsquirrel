@@ -71,11 +71,11 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2 flex-wrap">
             {/* Read Status Filter - Dropdown */}
-            <div class="relative" x-data="{ open: false }">
+            <div class="relative" data-dropdown="container">
               <button
                 type="button"
                 class="inline-flex items-center gap-1 bg-secondary text-secondary-foreground px-2 py-1 text-sm font-medium border-2 border-foreground hover:bg-secondary/80 transition-colors"
-                x-on:click="open = !open"
+                data-dropdown="toggle"
               >
                 {/* Filter icon */}
                 <svg
@@ -109,11 +109,8 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
                 </svg>
               </button>
               <div
-                x-show="open"
-                x-cloak
-                {...{ 'x-on:click.outside': 'open = false' }}
-                x-transition
-                class="absolute left-0 mt-1 w-32 bg-background border-2 border-foreground shadow-lg z-50"
+                class="hidden absolute left-0 mt-1 w-32 bg-background border-2 border-foreground shadow-lg z-50"
+                data-dropdown="menu"
               >
                 <a
                   href={`/pins?${buildReadFilterUrl(searchParams, 'all')}`}
