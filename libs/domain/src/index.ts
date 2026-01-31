@@ -17,6 +17,11 @@ export type {
   PasswordResetRequest,
   PasswordResetConfirmation,
 } from './entities/password-reset-token.js'
+export type {
+  Session,
+  CreateSessionData,
+  UpdateSessionData,
+} from './entities/session.js'
 export { Pagination, type PaginationOptions } from './entities/pagination.js'
 export { AccessControl, type AccessGateable } from './entities/access.js'
 
@@ -26,6 +31,7 @@ export type { UserRepository } from './interfaces/user-repository.js'
 export type { PinRepository, PinFilter } from './interfaces/pin-repository.js'
 export type { TagRepository } from './interfaces/tag-repository.js'
 export type { PasswordResetRepository } from './interfaces/password-reset-repository.js'
+export type { SessionRepository } from './interfaces/session-repository.js'
 export type { EmailService } from './interfaces/email-service.js'
 export type { HttpFetcher } from './interfaces/http-fetcher.js'
 export type { HtmlParser, MetadataResult } from './interfaces/html-parser.js'

@@ -138,7 +138,7 @@ pinsquirrel/
 
 ### Tasks
 
-- [ ] 2.1 Add sessions table to database schema
+- [x] 2.1 Add sessions table to database schema
 
   ```ts
   // libs/database/src/schema/sessions.ts
