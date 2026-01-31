@@ -421,20 +421,20 @@ pinsquirrel/
 
 ### Tasks
 
-- [ ] 5.1 Tags cloud page (`/tags`)
+- [x] 5.1 Tags cloud page (`/tags`)
   - List all tags with usage counts
   - Click to filter pins
 
-- [ ] 5.2 Tag merge page (`/tags/merge`)
+- [x] 5.2 Tag merge page (`/tags/merge`)
   - Form to merge duplicate tags
 
-- [ ] 5.3 Profile page (`/profile`)
+- [x] 5.3 Profile page (`/profile`)
   - View/edit user settings
   - Change password form
 
 - [ ] 5.4 View settings (sort/size)
   - HTMX or Alpine for instant toggle
-  - Persist in session or localStorage
+  - Persist in query string like in original react app (use same query keys)
 
 - [ ] 5.5 Filter header component
   - Show active filters
