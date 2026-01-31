@@ -151,7 +151,7 @@ pinsquirrel/
   })
   ```
 
-- [ ] 2.2 Set up session middleware
+- [x] 2.2 Set up session middleware
 
   ```ts
   // Database-backed sessions

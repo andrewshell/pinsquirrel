@@ -5,6 +5,7 @@ import { secureHeaders } from 'hono/secure-headers'
 
 import { BaseLayout } from './views/layouts/base'
 import { healthRoutes } from './routes/health'
+import { sessionMiddleware } from './middleware/session'
 
 // Create the Hono app
 const app = new Hono()
@@ -12,6 +13,7 @@ const app = new Hono()
 // Middleware
 app.use('*', logger())
 app.use('*', secureHeaders())
+app.use('*', sessionMiddleware())
 
 // Serve static files
 app.use('/static/*', serveStatic({ root: './src' }))
