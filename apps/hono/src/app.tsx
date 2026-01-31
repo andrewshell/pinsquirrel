@@ -6,6 +6,7 @@ import { secureHeaders } from 'hono/secure-headers'
 import { BaseLayout } from './views/layouts/base'
 import { healthRoutes } from './routes/health'
 import { authRoutes } from './routes/auth'
+import { pinsRoutes } from './routes/pins'
 import { sessionMiddleware } from './middleware/session'
 
 // Create the Hono app
@@ -22,6 +23,7 @@ app.use('/static/*', serveStatic({ root: './src' }))
 // Routes
 app.route('/health', healthRoutes)
 app.route('/', authRoutes)
+app.route('/pins', pinsRoutes)
 
 // Home page (temporary - will redirect to /pins or /signin)
 app.get('/', (c) => {

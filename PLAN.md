@@ -213,7 +213,7 @@ pinsquirrel/
 
 ### Tasks
 
-- [ ] 3.1 Create pin list page (`/pins`)
+- [x] 3.1 Create pin list page (`/pins`)
 
   ```tsx
   // Server renders full page initially
