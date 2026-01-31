@@ -50,6 +50,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                 {/* Search input - visible when searchOpen */}
                 <form
                   x-show="searchOpen"
+                  x-cloak
                   x-transition
                   action="/pins"
                   method="get"
@@ -160,6 +161,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                   </button>
                   <div
                     x-show="open"
+                    x-cloak
                     {...{ 'x-on:click.away': 'open = false' }}
                     x-transition:enter="transition ease-out duration-100"
                     x-transition:enter-start="transform opacity-0 scale-95"
@@ -258,6 +260,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
               </svg>
               <svg
                 x-show="mobileOpen"
+                x-cloak
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
                 height="24"
@@ -276,6 +279,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
             {/* Mobile Menu Panel */}
             <div
               x-show="mobileOpen"
+              x-cloak
               {...{ 'x-on:click.away': 'mobileOpen = false' }}
               x-transition
               class="absolute top-20 left-0 right-0 bg-background border-b-4 border-foreground z-50"

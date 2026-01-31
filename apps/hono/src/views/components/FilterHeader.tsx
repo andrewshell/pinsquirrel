@@ -110,6 +110,7 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
               </button>
               <div
                 x-show="open"
+                x-cloak
                 {...{ 'x-on:click.away': 'open = false' }}
                 x-transition
                 class="absolute left-0 mt-1 w-32 bg-background border-2 border-foreground shadow-lg z-50"
