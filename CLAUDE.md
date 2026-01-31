@@ -8,7 +8,7 @@ This is a pnpm monorepo with Turbo orchestration:
 
 - `apps/` - Applications and end-user facing packages
   - `web/` - React Router 7 (Framework mode) application with SSR **(being replaced)**
-  - `hono/` - Hono + HTMX + Alpine.js application **(in development)**
+  - `hono/` - Hono + HTMX application **(in development)**
 - `libs/` - Shared libraries and utilities
   - `services/` - Business logic services and validation
   - `database/` - Database layer with Drizzle ORM for PostgreSQL
@@ -83,7 +83,7 @@ When developing new features or fixing bugs, **ALWAYS follow the TDD red-green-r
    - Extract reusable components/functions
    - Ensure all tests still pass
 
-### 🚨 CRITICAL: Quality Check Requirements
+### Quality Check Requirements
 
 **NEVER mark any task as complete until ALL quality checks pass!**
 
@@ -94,7 +94,7 @@ Before considering any work "done", **ALL of the following must pass**:
 3. **Tests**: `pnpm test` - All tests must pass (100% success rate)
 4. **Format**: `pnpm format` - Code must be properly formatted
 
-**💡 Quick Quality Check Commands:**
+**Quick Quality Check Commands:**
 
 ```bash
 # Single command to run all quality checks:
@@ -104,7 +104,7 @@ pnpm quality
 pnpm typecheck && pnpm lint && pnpm test && pnpm format
 ```
 
-**❌ If ANY check fails:**
+**If ANY check fails:**
 
 - Fix typecheck errors first
 - Then fix lint errors
@@ -112,7 +112,7 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm format
 - Finally run format
 - Re-run all checks until 100% pass
 
-**✅ Only when ALL checks pass should you:**
+**Only when ALL checks pass should you:**
 
 - Mark tasks as complete
 - Commit changes
@@ -137,7 +137,7 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm format
 - Caching is enabled for builds and tests
 - Output directories: `build/**`, `dist/**`, `.react-router/**`
 
-## React Router 7 App (apps/web)
+## React Router 7 App (apps/web) - Being Replaced
 
 The web app uses React Router 7 in Framework mode with SSR enabled:
 
@@ -162,7 +162,7 @@ The web app uses React Router 7 in Framework mode with SSR enabled:
 - `pnpm test --filter @pinsquirrel/web -- <pattern>` - Run specific test files
 - `pnpm test --filter @pinsquirrel/web -- --watch` - Run tests in watch mode for TDD
 
-## Stack Migration: Hono + HTMX + Alpine.js
+## Stack Migration: Hono + HTMX
 
 **STATUS: Active Migration**
 
@@ -172,8 +172,8 @@ We are migrating from React Router 7 to a simpler stack. See `PLAN.md` for full 
 
 - React is overkill for this app's needs (mostly server-rendered forms)
 - Simpler stack = less code, easier maintenance
-- HTMX handles 90% of interactivity without client-side JavaScript
-- Alpine.js only needed for tag autocomplete component
+- HTMX handles most interactivity without client-side JavaScript
+- Vanilla JS for dropdowns and tag input (no framework needed)
 
 ### New Stack
 
@@ -181,7 +181,7 @@ We are migrating from React Router 7 to a simpler stack. See `PLAN.md` for full 
 | ------------- | -------------------- | --------------------------------------- |
 | Backend       | Hono                 | HTTP routing, middleware, JSX templates |
 | Interactivity | HTMX                 | Partial page updates, form handling     |
-| Complex UI    | Alpine.js            | Tag input autocomplete only             |
+| Complex UI    | Vanilla JS           | Dropdowns, tag input autocomplete       |
 | Database      | Drizzle (unchanged)  | Same libs, no changes                   |
 | Styling       | Tailwind (unchanged) | Same styles                             |
 
@@ -206,6 +206,7 @@ Key differences from React app:
 - HTMX attributes for interactivity (not React state)
 - Database sessions stored in PostgreSQL
 - No client-side routing - traditional page navigation
+- Vanilla JS for dropdowns (`dropdown.js`) and tag input (`tag-input-vanilla.js`)
 
 ### Migration Plan Reference
 
@@ -214,7 +215,6 @@ See `PLAN.md` for:
 - Detailed phase breakdown (7 phases)
 - Task checklists for each feature
 - Technical decisions made
-- Estimated effort
 
 ### When Working on This Codebase
 
@@ -366,43 +366,3 @@ All environments use the `DATABASE_URL` environment variable:
 - **Development**: `postgresql://pinsquirrel:pinsquirrel@localhost:5432/pinsquirrel`
 - **Docker deployment**: `postgresql://pinsquirrel:pinsquirrel@postgres:5432/pinsquirrel`
 - **Managed database**: `postgresql://username:password@hostname:25060/database?sslmode=require`
-
-## Agent OS Documentation
-
-### Product Context
-
-- **Mission & Vision:** @.agent-os/product/mission.md
-- **Technical Architecture:** @.agent-os/product/tech-stack.md
-- **Development Roadmap:** @.agent-os/product/roadmap.md
-- **Decision History:** @.agent-os/product/decisions.md
-- **Notes:** @.agent-os/product/notes.md
-
-### Development Standards
-
-- **Code Style:** @~/.agent-os/standards/code-style.md
-- **Best Practices:** @~/.agent-os/standards/best-practices.md
-
-### Project Management
-
-- **Active Specs:** @.agent-os/specs/
-- **Spec Planning:** Use `@~/.agent-os/instructions/create-spec.md`
-- **Tasks Execution:** Use `@~/.agent-os/instructions/execute-tasks.md`
-
-## Workflow Instructions
-
-When asked to work on this codebase:
-
-1. **First**, check @.agent-os/product/roadmap.md for current priorities
-2. **Then**, follow the appropriate instruction file:
-   - For new features: @.agent-os/instructions/create-spec.md
-   - For tasks execution: @.agent-os/instructions/execute-tasks.md
-3. **Always**, adhere to the standards in the files listed above
-4. **🚨 BEFORE marking ANY task complete**: Run ALL quality checks (see Quality Check Requirements above)
-   - `pnpm quality` (runs all checks) OR `pnpm typecheck && pnpm lint && pnpm test && pnpm format`
-   - ALL must pass with zero errors before task completion
-
-## Important Notes
-
-- Product-specific files in `.agent-os/product/` override any global standards
-- User's specific instructions override (or amend) instructions found in `.agent-os/specs/...`
-- Always adhere to established patterns, code style, and best practices documented above.

@@ -1,6 +1,6 @@
 # PinSquirrel Stack Migration Plan
 
-> **Goal**: Migrate from React Router 7 to Hono + HTMX + Alpine.js
+> **Goal**: Migrate from React Router 7 to Hono + HTMX + Vanilla JS
 > **Approach**: Parallel development in monorepo, then swap
 > **Created**: 2026-01-30
 
@@ -12,7 +12,7 @@ Build a new `apps/hono` application alongside the existing `apps/web`, sharing a
 pinsquirrel/
 ├── apps/
 │   ├── web/          # Current React Router 7 (keep running during migration)
-│   └── hono/         # NEW: Hono + HTMX + Alpine.js
+│   └── hono/         # NEW: Hono + HTMX + Vanilla JS
 ├── libs/
 │   ├── services/     # SHARED: Business logic (no changes needed)
 │   ├── database/     # SHARED: Drizzle repositories (no changes needed)
@@ -29,7 +29,7 @@ pinsquirrel/
 | Framework     | Hono          | 4.x      | HTTP routing, middleware, JSX templates |
 | Templates     | Hono JSX      | built-in | Server-rendered HTML                    |
 | Interactivity | HTMX          | 2.x      | Partial page updates, form handling     |
-| Complex UI    | Alpine.js     | 3.x      | Tag input autocomplete only             |
+| Complex UI    | Vanilla JS    | -        | Dropdowns, tag input autocomplete       |
 | Sessions      | hono-sessions | latest   | Cookie-based auth sessions              |
 | Styling       | Tailwind CSS  | 4.x      | Keep existing styles                    |
 | Database      | Drizzle       | existing | No changes                              |
@@ -74,7 +74,6 @@ pinsquirrel/
       "hono": "^4.x",
       "@hono/node-server": "^1.x",
       "htmx.org": "^2.x",
-      "alpinejs": "^3.x",
       "@pinsquirrel/services": "workspace:*",
       "@pinsquirrel/database": "workspace:*",
       "@pinsquirrel/domain": "workspace:*"
@@ -107,7 +106,8 @@ pinsquirrel/
         <title>{title} - PinSquirrel</title>
         <link rel="stylesheet" href="/static/styles.css" />
         <script src="/static/htmx.min.js" />
-        <script src="/static/alpine.min.js" defer />
+        <script src="/static/dropdown.js" defer />
+        <script src="/static/tag-input-vanilla.js" defer />
       </head>
       <body class="bg-gray-50 dark:bg-gray-900">{children}</body>
     </html>
@@ -265,7 +265,7 @@ pinsquirrel/
 
 - [x] 3.6 Implement metadata fetch (server-side)
   - GET `/api/metadata?url=...`
-  - Returns JSON for Alpine.js to populate form
+  - Returns JSON to populate form
   - Or: HTMX partial that updates title/description fields
 
 - [x] 3.7 Create edit form (`/pins/:id/edit`)
@@ -309,89 +309,20 @@ pinsquirrel/
 
 ---
 
-## Phase 4: Tag Input Component (Alpine.js) ✅ COMPLETE
+## Phase 4: Tag Input Component (Vanilla JS) ✅ COMPLETE
 
-**Goal**: Build autocomplete tag input with Alpine.js
+**Goal**: Build autocomplete tag input with vanilla JavaScript
 
 ### Tasks
 
-- [x] 4.1 Create Alpine tag input component
+- [x] 4.1 Create vanilla JS tag input component
+  - Uses `data-tag-input` attributes for element selection
+  - Server renders initial tags as pills
+  - JavaScript handles dynamic interactions
 
-  ```html
-  <div x-data="tagInput()" class="tag-input">
-    <!-- Existing tags as pills -->
-    <template x-for="tag in tags">
-      <span class="tag-pill">
-        <span x-text="tag"></span>
-        <button @click="removeTag(tag)">&times;</button>
-      </span>
-    </template>
-
-    <!-- Input with autocomplete -->
-    <input
-      type="text"
-      x-model="input"
-      @keydown.enter.prevent="addTag()"
-      @keydown.backspace="handleBackspace()"
-      @keydown.arrow-down="selectNext()"
-      @keydown.arrow-up="selectPrev()"
-      @keydown.escape="closeSuggestions()"
-    />
-
-    <!-- Hidden input for form submission -->
-    <input type="hidden" name="tags" :value="tags.join(',')" />
-
-    <!-- Suggestions dropdown -->
-    <ul x-show="showSuggestions" class="suggestions">
-      <template x-for="(suggestion, index) in filteredSuggestions">
-        <li
-          :class="{ 'selected': index === selectedIndex }"
-          @click="selectSuggestion(suggestion)"
-          x-text="suggestion"
-        ></li>
-      </template>
-    </ul>
-  </div>
-  ```
-
-- [x] 4.2 Implement Alpine component logic
-
-  ```js
-  Alpine.data('tagInput', () => ({
-    tags: [],
-    input: '',
-    allTags: [], // Loaded from server
-    selectedIndex: -1,
-    showSuggestions: false,
-
-    get filteredSuggestions() {
-      return this.allTags
-        .filter(
-          t =>
-            t.toLowerCase().includes(this.input.toLowerCase()) &&
-            !this.tags.includes(t)
-        )
-        .slice(0, 10)
-    },
-
-    addTag() {
-      /* ... */
-    },
-    removeTag(tag) {
-      /* ... */
-    },
-    handleBackspace() {
-      /* ... */
-    },
-    selectNext() {
-      /* ... */
-    },
-    selectPrev() {
-      /* ... */
-    },
-    // ... etc
-  }))
-  ```
+- [x] 4.2 Implement vanilla JS component logic
+  - `tag-input-vanilla.js` handles all tag input functionality
+  - Autocomplete filtering, keyboard navigation, tag add/remove
 
 - [x] 4.3 Load existing tags from server
   - Inline as JSON in page
@@ -433,7 +364,7 @@ pinsquirrel/
   - Change password form
 
 - [x] 5.4 View settings (sort/size)
-  - HTMX or Alpine for instant toggle
+  - Vanilla JS dropdowns for instant toggle
   - Persist in query string like in original react app (use same query keys)
 
 - [x] 5.5 Filter header component
@@ -590,7 +521,7 @@ Phases 3 and 4 can be worked on in parallel once auth is done.
 1. **Session storage**: **Database sessions** - Store in PostgreSQL for server-side invalidation
 2. **Asset pipeline**: Vite for Tailwind (matches existing setup)
 3. **Testing strategy**: **Fresh tests** - Write new tests as we build; service/database tests in libs already exist
-4. **Alpine vs vanilla JS**: Alpine.js for tag input (simpler, more maintainable)
+4. **Alpine vs vanilla JS**: Vanilla JS for dropdowns and tag input (Alpine had JSX compatibility issues)
 
 ---
 
@@ -598,7 +529,7 @@ Phases 3 and 4 can be worked on in parallel once auth is done.
 
 Current implementations to port:
 
-- `apps/web/app/components/TagInput.tsx` → Alpine component
+- `apps/web/app/components/TagInput.tsx` → Vanilla JS component
 - `apps/web/app/components/PinCard.tsx` → JSX partial
 - `apps/web/app/routes/pins.tsx` → Hono routes
 - `apps/web/app/routes/signin.tsx` → Auth routes
@@ -611,5 +542,5 @@ Current implementations to port:
 - Keep the React app working until Hono app is feature-complete
 - Shared libs mean zero business logic duplication
 - HTMX eliminates most client-side state management
-- Alpine is only needed for the tag autocomplete
-- Could potentially eliminate Alpine too with a server-rendered autocomplete pattern
+- Vanilla JS is used for dropdowns (`dropdown.js`) and tag autocomplete (`tag-input-vanilla.js`)
+- No framework dependencies for client-side interactivity

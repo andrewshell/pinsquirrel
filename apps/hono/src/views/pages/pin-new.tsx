@@ -150,7 +150,7 @@ export const PinNewPage: FC<PinNewPageProps> = ({
                 </p>
               </div>
 
-              {/* Tags field - Alpine.js component */}
+              {/* Tags field - vanilla JS component */}
               <TagInput
                 id="tags"
                 name="tags"
