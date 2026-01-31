@@ -1,9 +1,16 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { AccessControl, type PinFilter, type User } from '@pinsquirrel/domain'
-import { pinService } from '../lib/services'
+import {
+  AccessControl,
+  type PinFilter,
+  type User,
+  ValidationError,
+  DuplicatePinError,
+} from '@pinsquirrel/domain'
+import { pinService, tagService } from '../lib/services'
 import { getSessionManager, requireAuth } from '../middleware/session'
 import { PinCard } from '../views/components/PinCard'
+import { PinNewPage } from '../views/pages/pin-new'
 import { PinsPage } from '../views/pages/pins'
 import { PinListPartial } from '../views/partials/pin-list'
 
@@ -127,6 +134,151 @@ pins.get('/partial', async (c) => {
       viewSize={viewSize}
     />
   )
+})
+
+// GET /pins/new - Show pin creation form
+pins.get('/new', async (c) => {
+  const sessionManager = getSessionManager(c)
+  const user = await sessionManager.getUser()
+
+  if (!user) {
+    return c.redirect('/signin')
+  }
+
+  const ac = new AccessControl(user)
+
+  // Get URL params for bookmarklet integration
+  const url = new URL(c.req.url)
+  const prefillUrl = url.searchParams.get('url') || ''
+  const prefillTitle = url.searchParams.get('title') || ''
+  const prefillDescription = url.searchParams.get('description') || ''
+  const prefillTag = url.searchParams.get('tag') || ''
+
+  // Check if URL already exists for this user (bookmarklet redirect to edit)
+  if (prefillUrl) {
+    const existingPins = await pinService.getUserPinsWithPagination(
+      ac,
+      { url: prefillUrl },
+      { page: 1, pageSize: 1 }
+    )
+
+    if (existingPins.pins.length > 0) {
+      // URL already exists, redirect to edit form
+      return c.redirect(`/pins/${existingPins.pins[0].id}/edit`)
+    }
+  }
+
+  // Fetch user's existing tags for display
+  const userTags = await tagService.getUserTags(ac, user.id)
+
+  // Get flash message if any
+  const flash = sessionManager.getFlash()
+
+  return c.html(
+    <PinNewPage
+      flash={flash}
+      userTags={userTags.map((t) => t.name)}
+      url={prefillUrl}
+      title={prefillTitle}
+      description={prefillDescription}
+      tags={prefillTag}
+    />
+  )
+})
+
+// POST /pins/new - Create a new pin
+pins.post('/new', async (c) => {
+  const sessionManager = getSessionManager(c)
+  const user = await sessionManager.getUser()
+
+  if (!user) {
+    return c.redirect('/signin')
+  }
+
+  const ac = new AccessControl(user)
+
+  // Parse form data
+  const formData = await c.req.parseBody()
+
+  // Helper to safely extract string from form data (handles File | string | array)
+  const getString = (value: unknown): string => {
+    if (typeof value === 'string') return value
+    if (Array.isArray(value)) return getString(value[0])
+    return ''
+  }
+
+  const pinUrl = getString(formData.url)
+  const title = getString(formData.title)
+  const description = getString(formData.description) || null
+  const readLater = getString(formData.readLater) === 'true'
+  const tagsInput = getString(formData.tags)
+
+  // Parse tags from comma-separated string
+  const tagNames = tagsInput
+    .split(',')
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0)
+
+  // Fetch user's tags for re-rendering form on error
+  const userTags = await tagService.getUserTags(ac, user.id)
+
+  try {
+    // Create the pin using service
+    await pinService.createPin(ac, {
+      userId: user.id,
+      url: pinUrl,
+      title,
+      description,
+      readLater,
+      tagNames,
+    })
+
+    // Redirect to pins list with success message
+    sessionManager.setFlash('success', 'Pin created successfully!')
+    return c.redirect('/pins')
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return c.html(
+        <PinNewPage
+          errors={error.fields}
+          userTags={userTags.map((t) => t.name)}
+          url={pinUrl}
+          title={title}
+          description={description || ''}
+          readLater={readLater}
+          tags={tagsInput}
+        />
+      )
+    }
+
+    if (error instanceof DuplicatePinError) {
+      return c.html(
+        <PinNewPage
+          errors={{ url: ['You have already saved this URL'] }}
+          userTags={userTags.map((t) => t.name)}
+          url={pinUrl}
+          title={title}
+          description={description || ''}
+          readLater={readLater}
+          tags={tagsInput}
+        />
+      )
+    }
+
+    // Generic error
+    return c.html(
+      <PinNewPage
+        errors={{ _form: ['Failed to create pin. Please try again.'] }}
+        userTags={userTags.map((t) => t.name)}
+        url={pinUrl}
+        title={title}
+        description={description || ''}
+        readLater={readLater}
+        tags={tagsInput}
+      />,
+      500
+    )
+  }
 })
 
 // POST /pins/:id/toggle-read - Toggle read later status (HTMX)

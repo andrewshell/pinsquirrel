@@ -258,7 +258,7 @@ pinsquirrel/
   - Returns updated PinCard HTML
   - HTMX swaps in place (instant feedback)
 
-- [ ] 3.5 Create pin form (`/pins/new`)
+- [x] 3.5 Create pin form (`/pins/new`)
   - Standard HTML form
   - Server-side validation with Zod
   - Redirect on success with flash message
