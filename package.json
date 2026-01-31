@@ -29,7 +29,8 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.2.3",
     "prettier": "^3.6.2",
-    "turbo": "latest"
+    "turbo": "latest",
+    "vitest": "^3.2.4"
   },
   "engines": {
     "node": ">=22.0.0"
