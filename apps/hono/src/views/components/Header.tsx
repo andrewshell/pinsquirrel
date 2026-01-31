@@ -1,0 +1,291 @@
+import type { FC } from 'hono/jsx'
+import type { User } from '@pinsquirrel/domain'
+
+interface HeaderProps {
+  user: User | null
+  currentPath?: string
+}
+
+export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
+  return (
+    <header class="w-full bg-background border-b-4 border-foreground">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-20">
+          {/* Logo/Brand */}
+          <div class="flex-shrink-0">
+            <a href="/" class="flex items-center space-x-2">
+              <img
+                src="/static/pinsquirrel.svg"
+                alt="PinSquirrel logo"
+                class="w-10 h-10"
+              />
+              <span class="text-2xl font-black text-foreground uppercase tracking-tight">
+                PinSquirrel
+              </span>
+            </a>
+          </div>
+
+          {/* Desktop Navigation */}
+          <nav class="hidden md:flex items-center space-x-4">
+            {user ? (
+              <div class="flex items-center space-x-4">
+                <a
+                  href="/pins"
+                  class="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
+                >
+                  Pins
+                </a>
+                <a
+                  href="/tags"
+                  class="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
+                >
+                  Tags
+                </a>
+
+                {/* Search icon */}
+                <a
+                  href="/pins"
+                  class="p-2 text-foreground hover:text-accent transition-colors"
+                  aria-label="Search"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                  </svg>
+                </a>
+
+                {/* Create Pin Button */}
+                <a
+                  href="/pins/new"
+                  class="px-3 py-2 bg-primary text-primary-foreground font-medium border-2 border-foreground neobrutalism-shadow
+                         hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
+                         active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
+                         transition-all"
+                  aria-label="Create Pin"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M5 12h14" />
+                    <path d="M12 5v14" />
+                  </svg>
+                </a>
+
+                {/* User Dropdown */}
+                <div class="relative" x-data="{ open: false }">
+                  <button
+                    type="button"
+                    class="flex items-center gap-2 px-3 py-2 text-sm font-medium border-2 border-foreground bg-background
+                           hover:bg-accent/10 transition-colors"
+                    x-on:click="open = !open"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <circle cx="12" cy="10" r="3" />
+                      <path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662" />
+                    </svg>
+                    {user.username}
+                  </button>
+                  <div
+                    x-show="open"
+                    {...{ 'x-on:click.away': 'open = false' }}
+                    x-transition:enter="transition ease-out duration-100"
+                    x-transition:enter-start="transform opacity-0 scale-95"
+                    x-transition:enter-end="transform opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-75"
+                    x-transition:leave-start="transform opacity-100 scale-100"
+                    x-transition:leave-end="transform opacity-0 scale-95"
+                    class="absolute right-0 mt-2 w-48 bg-background border-2 border-foreground shadow-lg z-50"
+                  >
+                    <a
+                      href="/profile"
+                      class="block px-4 py-2 text-sm hover:bg-accent/10 transition-colors"
+                    >
+                      Profile
+                    </a>
+                    <hr class="border-foreground/20" />
+                    <a
+                      href="/logout"
+                      class="block px-4 py-2 text-sm hover:bg-accent/10 transition-colors"
+                    >
+                      Sign Out
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div class="flex items-center space-x-2">
+                <a
+                  href="/signin"
+                  class="px-4 py-2 text-sm font-medium border-2 border-foreground bg-background
+                         hover:bg-accent/10 transition-colors"
+                >
+                  Sign In
+                </a>
+                <a
+                  href="/signup"
+                  class="px-4 py-2 text-sm font-medium border-2 border-foreground bg-primary text-primary-foreground neobrutalism-shadow
+                         hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
+                         active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
+                         transition-all"
+                >
+                  Sign Up
+                </a>
+              </div>
+            )}
+          </nav>
+
+          {/* Mobile Menu Button */}
+          <div
+            class="md:hidden flex items-center space-x-2"
+            x-data="{ mobileOpen: false }"
+          >
+            {user && (
+              <a
+                href="/pins/new"
+                class="px-3 py-2 bg-primary text-primary-foreground font-medium border-2 border-foreground"
+                aria-label="Create Pin"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M5 12h14" />
+                  <path d="M12 5v14" />
+                </svg>
+              </a>
+            )}
+            <button
+              type="button"
+              class="p-2 text-foreground hover:bg-accent/10 transition-colors"
+              x-on:click="mobileOpen = !mobileOpen"
+              aria-label="Toggle menu"
+            >
+              <svg
+                x-show="!mobileOpen"
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="4" x2="20" y1="12" y2="12" />
+                <line x1="4" x2="20" y1="6" y2="6" />
+                <line x1="4" x2="20" y1="18" y2="18" />
+              </svg>
+              <svg
+                x-show="mobileOpen"
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+
+            {/* Mobile Menu Panel */}
+            <div
+              x-show="mobileOpen"
+              {...{ 'x-on:click.away': 'mobileOpen = false' }}
+              x-transition
+              class="absolute top-20 left-0 right-0 bg-background border-b-4 border-foreground z-50"
+            >
+              <div class="px-4 py-4 space-y-2">
+                {user ? (
+                  <>
+                    <a
+                      href="/pins"
+                      class="block px-4 py-2 text-center font-medium hover:bg-accent/10 transition-colors"
+                    >
+                      Pins
+                    </a>
+                    <a
+                      href="/tags"
+                      class="block px-4 py-2 text-center font-medium hover:bg-accent/10 transition-colors"
+                    >
+                      Tags
+                    </a>
+                    <a
+                      href="/profile"
+                      class="block px-4 py-2 text-center font-medium hover:bg-accent/10 transition-colors"
+                    >
+                      {user.username}
+                    </a>
+                    <hr class="border-foreground/20" />
+                    <a
+                      href="/logout"
+                      class="block px-4 py-2 text-center font-medium border-2 border-foreground hover:bg-accent/10 transition-colors"
+                    >
+                      Sign Out
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    <a
+                      href="/signin"
+                      class="block px-4 py-2 text-center font-medium border-2 border-foreground hover:bg-accent/10 transition-colors"
+                    >
+                      Sign In
+                    </a>
+                    <a
+                      href="/signup"
+                      class="block px-4 py-2 text-center font-medium bg-primary text-primary-foreground border-2 border-foreground"
+                    >
+                      Sign Up
+                    </a>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+  )
+}

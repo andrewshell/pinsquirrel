@@ -7,16 +7,52 @@ interface ViewSettingsProps {
   searchParams: string
 }
 
-// Build URL with updated parameter while preserving others
-function buildSettingsUrl(
+// Build URL with updated view setting
+function buildViewSettingUrl(
   currentParams: string,
-  param: string,
+  setting: string,
   value: string
 ): string {
   const params = new URLSearchParams(currentParams)
-  params.set(param, value)
-  params.delete('page') // Reset to page 1 when changing settings
+  params.set(setting, value)
+  params.delete('page')
   return params.toString()
+}
+
+// Get label for sort
+function getSortLabel(sortValue: 'created' | 'title'): string {
+  switch (sortValue) {
+    case 'created':
+      return 'Created'
+    case 'title':
+      return 'Title'
+    default:
+      return 'Created'
+  }
+}
+
+// Get label for direction
+function getDirectionLabel(directionValue: 'asc' | 'desc'): string {
+  switch (directionValue) {
+    case 'asc':
+      return 'Ascending'
+    case 'desc':
+      return 'Descending'
+    default:
+      return 'Descending'
+  }
+}
+
+// Get label for size
+function getSizeLabel(sizeValue: 'expanded' | 'compact'): string {
+  switch (sizeValue) {
+    case 'expanded':
+      return 'Expanded'
+    case 'compact':
+      return 'Compact'
+    default:
+      return 'Expanded'
+  }
 }
 
 export const ViewSettings: FC<ViewSettingsProps> = ({
@@ -26,94 +62,168 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
   searchParams,
 }) => {
   return (
-    <div class="flex flex-wrap items-center gap-4 mb-4 text-sm">
-      {/* Sort By */}
-      <div class="flex items-center gap-2">
-        <label class="text-muted-foreground">Sort:</label>
-        <select
-          class="px-2 py-1 border-2 border-foreground bg-background text-foreground neobrutalism-shadow-sm
-                 focus:outline-none focus:ring-2 focus:ring-primary"
-          hx-get="/pins/partial"
-          hx-target="#pin-list"
-          hx-swap="innerHTML"
-          hx-push-url="true"
-          hx-include="[name='tag'], [name='search'], [name='unread'], [name='direction'], [name='size']"
-          name="sort"
+    <div class="flex items-center gap-3 mb-4">
+      {/* Sort Dropdown */}
+      <div class="relative" x-data="{ open: false }">
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 text-muted-foreground px-2 py-1 text-xs hover:text-foreground transition-colors"
+          x-on:click="open = !open"
         >
-          <option value="created" selected={sortBy === 'created'}>
-            Date Created
-          </option>
-          <option value="title" selected={sortBy === 'title'}>
+          <span>Sort: {getSortLabel(sortBy)}</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="opacity-50"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        <div
+          x-show="open"
+          {...{ 'x-on:click.away': 'open = false' }}
+          x-transition
+          class="absolute left-0 mt-1 w-28 bg-background border-2 border-foreground shadow-lg z-50"
+        >
+          <a
+            href={`/pins?${buildViewSettingUrl(searchParams, 'sort', 'created')}`}
+            hx-get={`/pins/partial?${buildViewSettingUrl(searchParams, 'sort', 'created')}`}
+            hx-target="#pin-list"
+            hx-swap="innerHTML"
+            hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'sort', 'created')}`}
+            class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
+            x-on:click="open = false"
+          >
+            Created
+          </a>
+          <a
+            href={`/pins?${buildViewSettingUrl(searchParams, 'sort', 'title')}`}
+            hx-get={`/pins/partial?${buildViewSettingUrl(searchParams, 'sort', 'title')}`}
+            hx-target="#pin-list"
+            hx-swap="innerHTML"
+            hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'sort', 'title')}`}
+            class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
+            x-on:click="open = false"
+          >
             Title
-          </option>
-        </select>
+          </a>
+        </div>
       </div>
 
-      {/* Sort Direction */}
-      <div class="flex items-center gap-2">
-        <label class="text-muted-foreground">Order:</label>
-        <select
-          class="px-2 py-1 border-2 border-foreground bg-background text-foreground neobrutalism-shadow-sm
-                 focus:outline-none focus:ring-2 focus:ring-primary"
-          hx-get="/pins/partial"
-          hx-target="#pin-list"
-          hx-swap="innerHTML"
-          hx-push-url="true"
-          hx-include="[name='tag'], [name='search'], [name='unread'], [name='sort'], [name='size']"
-          name="direction"
+      {/* Direction Dropdown */}
+      <div class="relative" x-data="{ open: false }">
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 text-muted-foreground px-2 py-1 text-xs hover:text-foreground transition-colors"
+          x-on:click="open = !open"
         >
-          <option value="desc" selected={sortDirection === 'desc'}>
-            Newest First
-          </option>
-          <option value="asc" selected={sortDirection === 'asc'}>
-            Oldest First
-          </option>
-        </select>
+          <span>{getDirectionLabel(sortDirection)}</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="opacity-50"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        <div
+          x-show="open"
+          {...{ 'x-on:click.away': 'open = false' }}
+          x-transition
+          class="absolute left-0 mt-1 w-28 bg-background border-2 border-foreground shadow-lg z-50"
+        >
+          <a
+            href={`/pins?${buildViewSettingUrl(searchParams, 'direction', 'asc')}`}
+            hx-get={`/pins/partial?${buildViewSettingUrl(searchParams, 'direction', 'asc')}`}
+            hx-target="#pin-list"
+            hx-swap="innerHTML"
+            hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'direction', 'asc')}`}
+            class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
+            x-on:click="open = false"
+          >
+            Ascending
+          </a>
+          <a
+            href={`/pins?${buildViewSettingUrl(searchParams, 'direction', 'desc')}`}
+            hx-get={`/pins/partial?${buildViewSettingUrl(searchParams, 'direction', 'desc')}`}
+            hx-target="#pin-list"
+            hx-swap="innerHTML"
+            hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'direction', 'desc')}`}
+            class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
+            x-on:click="open = false"
+          >
+            Descending
+          </a>
+        </div>
       </div>
 
-      {/* View Size */}
-      <div class="flex items-center gap-2">
-        <label class="text-muted-foreground">View:</label>
-        <select
-          class="px-2 py-1 border-2 border-foreground bg-background text-foreground neobrutalism-shadow-sm
-                 focus:outline-none focus:ring-2 focus:ring-primary"
-          hx-get="/pins/partial"
-          hx-target="#pin-list"
-          hx-swap="innerHTML"
-          hx-push-url="true"
-          hx-include="[name='tag'], [name='search'], [name='unread'], [name='sort'], [name='direction']"
-          name="size"
+      {/* Size Dropdown */}
+      <div class="relative" x-data="{ open: false }">
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 text-muted-foreground px-2 py-1 text-xs hover:text-foreground transition-colors"
+          x-on:click="open = !open"
         >
-          <option value="expanded" selected={viewSize === 'expanded'}>
+          <span>{getSizeLabel(viewSize)}</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="opacity-50"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        <div
+          x-show="open"
+          {...{ 'x-on:click.away': 'open = false' }}
+          x-transition
+          class="absolute left-0 mt-1 w-28 bg-background border-2 border-foreground shadow-lg z-50"
+        >
+          <a
+            href={`/pins?${buildViewSettingUrl(searchParams, 'size', 'expanded')}`}
+            hx-get={`/pins/partial?${buildViewSettingUrl(searchParams, 'size', 'expanded')}`}
+            hx-target="#pin-list"
+            hx-swap="innerHTML"
+            hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'size', 'expanded')}`}
+            class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
+            x-on:click="open = false"
+          >
             Expanded
-          </option>
-          <option value="compact" selected={viewSize === 'compact'}>
+          </a>
+          <a
+            href={`/pins?${buildViewSettingUrl(searchParams, 'size', 'compact')}`}
+            hx-get={`/pins/partial?${buildViewSettingUrl(searchParams, 'size', 'compact')}`}
+            hx-target="#pin-list"
+            hx-swap="innerHTML"
+            hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'size', 'compact')}`}
+            class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
+            x-on:click="open = false"
+          >
             Compact
-          </option>
-        </select>
+          </a>
+        </div>
       </div>
-
-      {/* Hidden inputs to preserve filter values */}
-      <input type="hidden" name="tag" id="view-settings-tag" />
-      <input type="hidden" name="search" id="view-settings-search" />
-      <input type="hidden" name="unread" id="view-settings-unread" />
-
-      {/* Script to populate hidden inputs from URL */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-          (function() {
-            var params = new URLSearchParams(window.location.search);
-            var tagInput = document.getElementById('view-settings-tag');
-            var searchInput = document.getElementById('view-settings-search');
-            var unreadInput = document.getElementById('view-settings-unread');
-            if (tagInput && params.get('tag')) tagInput.value = params.get('tag');
-            if (searchInput && params.get('search')) searchInput.value = params.get('search');
-            if (unreadInput && params.get('unread')) unreadInput.value = params.get('unread');
-          })();
-        `,
-        }}
-      />
     </div>
   )
 }

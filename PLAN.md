@@ -432,16 +432,16 @@ pinsquirrel/
   - View/edit user settings
   - Change password form
 
-- [ ] 5.4 View settings (sort/size)
+- [x] 5.4 View settings (sort/size)
   - HTMX or Alpine for instant toggle
   - Persist in query string like in original react app (use same query keys)
 
-- [ ] 5.5 Filter header component
+- [x] 5.5 Filter header component
   - Show active filters
   - Clear filter buttons
   - All HTMX-powered
 
-- [ ] 5.6 Empty states
+- [x] 5.6 Empty states
   - No pins yet
   - No search results
   - No tags
@@ -450,7 +450,7 @@ pinsquirrel/
   - 404 Not Found
   - 500 Server Error
 
-- [ ] 5.8 Bookmarklet support
+- [x] 5.8 Bookmarklet support
   - `/pins/new?url=...&title=...` pre-population
 
 ### Verification

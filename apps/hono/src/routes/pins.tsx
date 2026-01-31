@@ -124,6 +124,7 @@ pins.get('/', async (c) => {
 
   return c.html(
     <PinsPage
+      user={user}
       pins={result.pins}
       pagination={result.pagination}
       totalCount={result.totalCount}
