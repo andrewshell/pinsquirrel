@@ -8,6 +8,7 @@ import { healthRoutes } from './routes/health'
 import { authRoutes } from './routes/auth'
 import { pinsRoutes } from './routes/pins'
 import { tagsRoutes } from './routes/tags'
+import { profileRoutes } from './routes/profile'
 import { apiRoutes } from './routes/api'
 import { sessionMiddleware } from './middleware/session'
 
@@ -27,6 +28,7 @@ app.route('/health', healthRoutes)
 app.route('/', authRoutes)
 app.route('/pins', pinsRoutes)
 app.route('/tags', tagsRoutes)
+app.route('/profile', profileRoutes)
 app.route('/api', apiRoutes)
 
 // Home page (temporary - will redirect to /pins or /signin)
