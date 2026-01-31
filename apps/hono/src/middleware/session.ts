@@ -10,6 +10,7 @@ const SESSION_DURATION_TEMPORARY = 24 * 60 * 60 * 1000 // 24 hours (for browser 
 
 // Flash message types
 export type FlashType = 'success' | 'error' | 'info' | 'warning'
+export type FlashMessage = { type: FlashType; message: string }
 
 // Session data stored in the database
 export interface SessionData {
