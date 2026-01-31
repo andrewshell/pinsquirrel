@@ -5,11 +5,15 @@ import {
   EmailVerificationRequiredError,
   MissingRoleError,
   UserAlreadyExistsError,
+  InvalidResetTokenError,
+  ResetTokenExpiredError,
 } from '@pinsquirrel/domain'
 import { authService } from '../lib/services'
 import { getSessionManager } from '../middleware/session'
 import { SignInPage } from '../views/pages/signin'
 import { SignUpPage } from '../views/pages/signup'
+import { ForgotPasswordPage } from '../views/pages/forgot-password'
+import { ResetPasswordPage } from '../views/pages/reset-password'
 
 const auth = new Hono()
 
@@ -148,6 +152,159 @@ auth.post('/signup', async (c) => {
     return c.html(
       <SignUpPage errors={errors} username={username} email={email} />,
       400
+    )
+  }
+})
+
+// GET /forgot-password - Render forgot password form
+auth.get('/forgot-password', (c) => {
+  const sessionManager = getSessionManager(c)
+
+  // Already logged in, redirect to home
+  if (sessionManager.isAuthenticated()) {
+    return c.redirect('/pins')
+  }
+
+  return c.html(<ForgotPasswordPage />)
+})
+
+// POST /forgot-password - Process forgot password form
+auth.post('/forgot-password', async (c) => {
+  const sessionManager = getSessionManager(c)
+
+  // Already logged in, redirect to home
+  if (sessionManager.isAuthenticated()) {
+    return c.redirect('/pins')
+  }
+
+  const formData = await c.req.parseBody()
+  const email = formData.email as string
+
+  // Build the reset URL
+  const url = new URL(c.req.url)
+  const resetBaseUrl = `${url.origin}/reset-password`
+
+  try {
+    // Request password reset - service handles validation
+    await authService.requestPasswordReset({
+      email,
+      resetUrl: resetBaseUrl,
+    })
+
+    // Always show success message to avoid revealing whether email exists
+    return c.html(<ForgotPasswordPage success={true} />)
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return c.html(
+        <ForgotPasswordPage errors={error.fields} email={email} />,
+        400
+      )
+    }
+
+    // Check for rate limiting error
+    if (error instanceof Error && error.message.includes('Too many')) {
+      return c.html(
+        <ForgotPasswordPage
+          errors={{
+            _form: [
+              'Too many password reset requests. Please try again later.',
+            ],
+          }}
+          email={email}
+        />,
+        429
+      )
+    }
+
+    return c.html(
+      <ForgotPasswordPage
+        errors={{ _form: ['An error occurred. Please try again later.'] }}
+        email={email}
+      />,
+      500
+    )
+  }
+})
+
+// GET /reset-password/:token - Render reset password form
+auth.get('/reset-password/:token', async (c) => {
+  const sessionManager = getSessionManager(c)
+
+  // Already logged in, redirect to home
+  if (sessionManager.isAuthenticated()) {
+    return c.redirect('/pins')
+  }
+
+  const token = c.req.param('token')
+  if (!token) {
+    return c.redirect('/forgot-password')
+  }
+
+  // Validate the token
+  const isValidToken = await authService.validateResetToken(token)
+  if (!isValidToken) {
+    return c.html(<ResetPasswordPage invalidToken={true} />)
+  }
+
+  return c.html(<ResetPasswordPage token={token} />)
+})
+
+// POST /reset-password/:token - Process reset password form
+auth.post('/reset-password/:token', async (c) => {
+  const token = c.req.param('token')
+  if (!token) {
+    return c.redirect('/forgot-password')
+  }
+
+  const formData = await c.req.parseBody()
+  const newPassword = formData.newPassword as string
+  const confirmPassword = formData.confirmPassword as string
+
+  // Check password confirmation
+  if (newPassword !== confirmPassword) {
+    return c.html(
+      <ResetPasswordPage
+        token={token}
+        errors={{ confirmPassword: ['Passwords do not match'] }}
+      />,
+      400
+    )
+  }
+
+  try {
+    // Service handles password validation
+    await authService.resetPassword({
+      token,
+      newPassword,
+    })
+
+    // Redirect to signin with success message
+    return c.redirect('/signin?reset=success')
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return c.html(
+        <ResetPasswordPage token={token} errors={error.fields} />,
+        400
+      )
+    }
+
+    if (
+      error instanceof InvalidResetTokenError ||
+      error instanceof ResetTokenExpiredError
+    ) {
+      return c.html(<ResetPasswordPage invalidToken={true} />)
+    }
+
+    return c.html(
+      <ResetPasswordPage
+        token={token}
+        errors={{
+          _form: [
+            'An error occurred. Please try again or request a new reset link.',
+          ],
+        }}
+      />,
+      500
     )
   }
 })
