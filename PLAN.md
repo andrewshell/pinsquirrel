@@ -272,7 +272,7 @@ pinsquirrel/
   - Pre-populated form
   - Same validation as create
 
-- [ ] 3.8 Create delete confirmation (`/pins/:id/delete`)
+- [x] 3.8 Create delete confirmation (`/pins/:id/delete`)
   - Simple confirmation page
   - Or: HTMX modal pattern
 

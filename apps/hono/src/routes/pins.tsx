@@ -12,6 +12,7 @@ import {
 import { pinService, tagService } from '../lib/services'
 import { getSessionManager, requireAuth } from '../middleware/session'
 import { PinCard } from '../views/components/PinCard'
+import { PinDeletePage } from '../views/pages/pin-delete'
 import { PinEditPage } from '../views/pages/pin-edit'
 import { PinNewPage } from '../views/pages/pin-new'
 import { PinsPage } from '../views/pages/pins'
@@ -483,6 +484,61 @@ pins.post('/:id/toggle-read', async (c) => {
   return c.html(
     <PinCard pin={updatedPin} viewSize="expanded" searchParams={searchParams} />
   )
+})
+
+// GET /pins/:id/delete - Show delete confirmation
+pins.get('/:id/delete', async (c) => {
+  const sessionManager = getSessionManager(c)
+  const user = await sessionManager.getUser()
+
+  if (!user) {
+    return c.redirect('/signin')
+  }
+
+  const pinId = c.req.param('id')
+  const ac = new AccessControl(user)
+
+  try {
+    const pin = await pinService.getPin(ac, pinId)
+
+    return c.html(<PinDeletePage pin={pin} />)
+  } catch (error) {
+    if (
+      error instanceof PinNotFoundError ||
+      error instanceof UnauthorizedPinAccessError
+    ) {
+      return c.text('Pin not found', 404)
+    }
+    throw error
+  }
+})
+
+// POST /pins/:id/delete - Delete a pin
+pins.post('/:id/delete', async (c) => {
+  const sessionManager = getSessionManager(c)
+  const user = await sessionManager.getUser()
+
+  if (!user) {
+    return c.redirect('/signin')
+  }
+
+  const pinId = c.req.param('id')
+  const ac = new AccessControl(user)
+
+  try {
+    await pinService.deletePin(ac, pinId)
+
+    sessionManager.setFlash('success', 'Pin deleted successfully!')
+    return c.redirect('/pins')
+  } catch (error) {
+    if (
+      error instanceof PinNotFoundError ||
+      error instanceof UnauthorizedPinAccessError
+    ) {
+      return c.text('Pin not found', 404)
+    }
+    throw error
+  }
 })
 
 export { pins as pinsRoutes }
