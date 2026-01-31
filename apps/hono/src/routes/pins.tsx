@@ -6,10 +6,13 @@ import {
   type User,
   ValidationError,
   DuplicatePinError,
+  PinNotFoundError,
+  UnauthorizedPinAccessError,
 } from '@pinsquirrel/domain'
 import { pinService, tagService } from '../lib/services'
 import { getSessionManager, requireAuth } from '../middleware/session'
 import { PinCard } from '../views/components/PinCard'
+import { PinEditPage } from '../views/pages/pin-edit'
 import { PinNewPage } from '../views/pages/pin-new'
 import { PinsPage } from '../views/pages/pins'
 import { PinListPartial } from '../views/partials/pin-list'
@@ -269,6 +272,164 @@ pins.post('/new', async (c) => {
     return c.html(
       <PinNewPage
         errors={{ _form: ['Failed to create pin. Please try again.'] }}
+        userTags={userTags.map((t) => t.name)}
+        url={pinUrl}
+        title={title}
+        description={description || ''}
+        readLater={readLater}
+        tags={tagsInput}
+      />,
+      500
+    )
+  }
+})
+
+// GET /pins/:id/edit - Show pin edit form
+pins.get('/:id/edit', async (c) => {
+  const sessionManager = getSessionManager(c)
+  const user = await sessionManager.getUser()
+
+  if (!user) {
+    return c.redirect('/signin')
+  }
+
+  const pinId = c.req.param('id')
+  const ac = new AccessControl(user)
+
+  try {
+    // Fetch the pin and user's tags
+    const [pin, userTags] = await Promise.all([
+      pinService.getPin(ac, pinId),
+      tagService.getUserTags(ac, user.id),
+    ])
+
+    // Get flash message if any
+    const flash = sessionManager.getFlash()
+
+    return c.html(
+      <PinEditPage
+        pin={pin}
+        flash={flash}
+        userTags={userTags.map((t) => t.name)}
+      />
+    )
+  } catch (error) {
+    if (
+      error instanceof PinNotFoundError ||
+      error instanceof UnauthorizedPinAccessError
+    ) {
+      return c.text('Pin not found', 404)
+    }
+    throw error
+  }
+})
+
+// POST /pins/:id/edit - Update a pin
+pins.post('/:id/edit', async (c) => {
+  const sessionManager = getSessionManager(c)
+  const user = await sessionManager.getUser()
+
+  if (!user) {
+    return c.redirect('/signin')
+  }
+
+  const pinId = c.req.param('id')
+  const ac = new AccessControl(user)
+
+  // Parse form data
+  const formData = await c.req.parseBody()
+
+  // Helper to safely extract string from form data
+  const getString = (value: unknown): string => {
+    if (typeof value === 'string') return value
+    if (Array.isArray(value)) return getString(value[0])
+    return ''
+  }
+
+  const pinUrl = getString(formData.url)
+  const title = getString(formData.title)
+  const description = getString(formData.description) || null
+  const readLater = getString(formData.readLater) === 'true'
+  const tagsInput = getString(formData.tags)
+
+  // Parse tags from comma-separated string
+  const tagNames = tagsInput
+    .split(',')
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0)
+
+  // Fetch user's tags for re-rendering form on error
+  const userTags = await tagService.getUserTags(ac, user.id)
+
+  try {
+    // Get existing pin to get userId
+    const existingPin = await pinService.getPin(ac, pinId)
+
+    // Update the pin using service
+    await pinService.updatePin(ac, {
+      id: pinId,
+      userId: existingPin.userId,
+      url: pinUrl,
+      title,
+      description,
+      readLater,
+      tagNames,
+    })
+
+    // Redirect to pins list with success message
+    sessionManager.setFlash('success', 'Pin updated successfully!')
+    return c.redirect('/pins')
+  } catch (error) {
+    // Get the pin for re-rendering the form (may fail if not found)
+    let pin
+    try {
+      pin = await pinService.getPin(ac, pinId)
+    } catch {
+      return c.text('Pin not found', 404)
+    }
+
+    if (error instanceof ValidationError) {
+      return c.html(
+        <PinEditPage
+          pin={pin}
+          errors={error.fields}
+          userTags={userTags.map((t) => t.name)}
+          url={pinUrl}
+          title={title}
+          description={description || ''}
+          readLater={readLater}
+          tags={tagsInput}
+        />
+      )
+    }
+
+    if (error instanceof DuplicatePinError) {
+      return c.html(
+        <PinEditPage
+          pin={pin}
+          errors={{ url: ['You have already saved this URL'] }}
+          userTags={userTags.map((t) => t.name)}
+          url={pinUrl}
+          title={title}
+          description={description || ''}
+          readLater={readLater}
+          tags={tagsInput}
+        />
+      )
+    }
+
+    if (
+      error instanceof PinNotFoundError ||
+      error instanceof UnauthorizedPinAccessError
+    ) {
+      return c.text('Pin not found', 404)
+    }
+
+    // Generic error
+    return c.html(
+      <PinEditPage
+        pin={pin}
+        errors={{ _form: ['Failed to update pin. Please try again.'] }}
         userTags={userTags.map((t) => t.name)}
         url={pinUrl}
         title={title}

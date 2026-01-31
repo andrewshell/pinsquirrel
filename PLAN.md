@@ -268,7 +268,7 @@ pinsquirrel/
   - Returns JSON for Alpine.js to populate form
   - Or: HTMX partial that updates title/description fields
 
-- [ ] 3.7 Create edit form (`/pins/:id/edit`)
+- [x] 3.7 Create edit form (`/pins/:id/edit`)
   - Pre-populated form
   - Same validation as create
 
