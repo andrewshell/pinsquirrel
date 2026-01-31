@@ -162,7 +162,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                   <div
                     x-show="open"
                     x-cloak
-                    {...{ 'x-on:click.away': 'open = false' }}
+                    {...{ 'x-on:click.outside': 'open = false' }}
                     x-transition:enter="transition ease-out duration-100"
                     x-transition:enter-start="transform opacity-0 scale-95"
                     x-transition:enter-end="transform opacity-100 scale-100"
@@ -280,7 +280,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
             <div
               x-show="mobileOpen"
               x-cloak
-              {...{ 'x-on:click.away': 'mobileOpen = false' }}
+              {...{ 'x-on:click.outside': 'mobileOpen = false' }}
               x-transition
               class="absolute top-20 left-0 right-0 bg-background border-b-4 border-foreground z-50"
             >

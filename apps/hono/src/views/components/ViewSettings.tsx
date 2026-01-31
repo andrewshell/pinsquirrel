@@ -89,7 +89,7 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
         <div
           x-show="open"
           x-cloak
-          {...{ 'x-on:click.away': 'open = false' }}
+          {...{ 'x-on:click.outside': 'open = false' }}
           x-transition
           class="absolute left-0 mt-1 w-28 bg-background border-2 border-foreground shadow-lg z-50"
         >
@@ -144,7 +144,7 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
         <div
           x-show="open"
           x-cloak
-          {...{ 'x-on:click.away': 'open = false' }}
+          {...{ 'x-on:click.outside': 'open = false' }}
           x-transition
           class="absolute left-0 mt-1 w-28 bg-background border-2 border-foreground shadow-lg z-50"
         >
@@ -199,7 +199,7 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
         <div
           x-show="open"
           x-cloak
-          {...{ 'x-on:click.away': 'open = false' }}
+          {...{ 'x-on:click.outside': 'open = false' }}
           x-transition
           class="absolute left-0 mt-1 w-28 bg-background border-2 border-foreground shadow-lg z-50"
         >
