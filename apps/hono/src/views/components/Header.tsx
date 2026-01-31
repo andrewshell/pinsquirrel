@@ -28,23 +28,67 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
           {/* Desktop Navigation */}
           <nav class="hidden md:flex items-center space-x-4">
             {user ? (
-              <div class="flex items-center space-x-4">
+              <div
+                class="flex items-center space-x-4"
+                x-data="{ searchOpen: false }"
+              >
                 <a
                   href="/pins"
+                  x-show="!searchOpen"
                   class="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
                 >
                   Pins
                 </a>
                 <a
                   href="/tags"
+                  x-show="!searchOpen"
                   class="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
                 >
                   Tags
                 </a>
 
-                {/* Search icon */}
-                <a
-                  href="/pins"
+                {/* Search input - visible when searchOpen */}
+                <form
+                  x-show="searchOpen"
+                  x-transition
+                  action="/pins"
+                  method="get"
+                  class="flex items-center gap-2"
+                >
+                  <input
+                    type="text"
+                    name="search"
+                    placeholder="Search pins..."
+                    class="w-64 px-3 py-2 text-sm border-2 border-foreground bg-background focus:outline-none focus:ring-2 focus:ring-accent"
+                    x-ref="searchInput"
+                  />
+                  <button
+                    type="button"
+                    x-on:click="searchOpen = false"
+                    class="p-2 text-foreground hover:text-accent transition-colors"
+                    aria-label="Close search"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M18 6 6 18" />
+                      <path d="m6 6 12 12" />
+                    </svg>
+                  </button>
+                </form>
+
+                {/* Search icon - toggles search input */}
+                <button
+                  type="button"
+                  x-on:click="searchOpen = !searchOpen; $nextTick(() => { if(searchOpen) $refs.searchInput.focus() })"
                   class="p-2 text-foreground hover:text-accent transition-colors"
                   aria-label="Search"
                 >
@@ -62,7 +106,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                     <circle cx="11" cy="11" r="8" />
                     <path d="m21 21-4.3-4.3" />
                   </svg>
-                </a>
+                </button>
 
                 {/* Create Pin Button */}
                 <a
