@@ -164,7 +164,7 @@ pinsquirrel/
   )
   ```
 
-- [ ] 2.3 Create auth middleware
+- [x] 2.3 Create auth middleware (completed as part of 2.2)
 
   ```ts
   // Redirect to /signin if not authenticated
@@ -175,18 +175,19 @@ pinsquirrel/
   }
   ```
 
-- [ ] 2.4 Implement sign-in page
+- [x] 2.4 Implement sign-in page
   - GET `/signin` - render form
   - POST `/signin` - validate, create session, redirect
   - Use existing `AuthenticationService.signIn()`
 
-- [ ] 2.5 Implement sign-up page
+- [x] 2.5 Implement sign-up page
   - GET `/signup` - render form
-  - POST `/signup` - validate, create user, redirect
-  - Use existing `AuthenticationService.signUp()`
+  - POST `/signup` - validate, create user, redirect (via email verification)
+  - Use existing `AuthenticationService.register()`
 
-- [ ] 2.6 Implement sign-out
+- [x] 2.6 Implement sign-out
   - POST `/logout` - destroy session (delete from DB), redirect
+  - GET `/logout` - also supported for convenience
 
 - [ ] 2.7 Implement forgot password flow
   - GET/POST `/forgot-password`
