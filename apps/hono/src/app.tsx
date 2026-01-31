@@ -4,6 +4,8 @@ import { logger } from 'hono/logger'
 import { secureHeaders } from 'hono/secure-headers'
 
 import { BaseLayout } from './views/layouts/base'
+import { NotFoundPage } from './views/pages/not-found'
+import { ServerErrorPage } from './views/pages/server-error'
 import { healthRoutes } from './routes/health'
 import { authRoutes } from './routes/auth'
 import { pinsRoutes } from './routes/pins'
@@ -64,6 +66,20 @@ app.get('/', (c) => {
         </div>
       </div>
     </BaseLayout>
+  )
+})
+
+// 404 Not Found handler
+app.notFound((c) => {
+  return c.html(<NotFoundPage />, 404)
+})
+
+// Error handler for 500 errors
+app.onError((err, c) => {
+  console.error('Server error:', err)
+  return c.html(
+    <ServerErrorPage message="Something went wrong. Please try again later." />,
+    500
   )
 })
 

@@ -446,7 +446,7 @@ pinsquirrel/
   - No search results
   - No tags
 
-- [ ] 5.7 Error pages
+- [x] 5.7 Error pages
   - 404 Not Found
   - 500 Server Error
 
