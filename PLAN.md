@@ -127,7 +127,7 @@ pinsquirrel/
 ### Verification
 
 - `pnpm dev --filter @pinsquirrel/hono` starts server
-- `curl localhost:3001/health` returns `{"status":"ok"}`
+- `curl localhost:8100/health` returns `{"status":"ok"}`
 - Can query database via shared libs
 
 ---
@@ -556,7 +556,7 @@ pnpm dev --filter @pinsquirrel/hono
 **Port allocation:**
 
 - React app: `localhost:5173` (current)
-- Hono app: `localhost:3001` (new)
+- Hono app: `localhost:8100` (new)
 
 **Database:** Both apps share the same database and libs, so:
 

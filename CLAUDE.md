@@ -24,7 +24,7 @@ This is a pnpm monorepo with Turbo orchestration:
 ### Development
 
 - `pnpm dev` - Start React app (port 8100)
-- `pnpm dev:hono` - Start Hono app (port 3001)
+- `pnpm dev:hono` - Start Hono app (port 8100)
 - `pnpm dev:all` - Start all development servers
 - `pnpm build` - Build all packages
 - `pnpm build:web` - Build React app only
@@ -190,7 +190,7 @@ We are migrating from React Router 7 to a simpler stack. See `PLAN.md` for full 
 Both apps run simultaneously during migration:
 
 - **React app**: `localhost:5173` via `pnpm dev --filter @pinsquirrel/web`
-- **Hono app**: `localhost:3001` via `pnpm dev --filter @pinsquirrel/hono`
+- **Hono app**: `localhost:8100` via `pnpm dev --filter @pinsquirrel/hono`
 
 Both share the same database and libs - no data migration needed.
 
