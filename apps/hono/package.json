@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "concurrently --kill-others \"tsx watch src/index.ts\" \"pnpm css:watch\"",
     "build": "tsup src/index.ts --format esm --dts",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
@@ -34,6 +34,7 @@
     "@tailwindcss/cli": "^4.1.4",
     "@types/node": "^22.0.0",
     "@vitest/coverage-v8": "^3.2.4",
+    "concurrently": "^9.2.1",
     "eslint": "^9.30.1",
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-prettier": "^5.5.1",
