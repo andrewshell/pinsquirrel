@@ -2,6 +2,7 @@ import type { FC } from 'hono/jsx'
 import type { Pin, Pagination } from '@pinsquirrel/domain'
 import { BaseLayout } from '../layouts/base'
 import { PinListPartial } from '../partials/pin-list'
+import { ViewSettings } from '../components/ViewSettings'
 import type { FlashType } from '../../middleware/session'
 
 interface PinsPageProps {
@@ -12,6 +13,9 @@ interface PinsPageProps {
   activeTag?: string
   searchQuery?: string
   readFilter?: 'all' | 'unread' | 'read'
+  viewSize?: 'expanded' | 'compact'
+  sortBy?: 'created' | 'title'
+  sortDirection?: 'asc' | 'desc'
   flash?: { type: FlashType; message: string } | null
 }
 
@@ -175,6 +179,9 @@ export const PinsPage: FC<PinsPageProps> = ({
   activeTag,
   searchQuery,
   readFilter = 'all',
+  viewSize = 'expanded',
+  sortBy = 'created',
+  sortDirection = 'desc',
   flash,
 }) => {
   return (
@@ -233,6 +240,13 @@ export const PinsPage: FC<PinsPageProps> = ({
             searchParams={searchParams}
           />
 
+          <ViewSettings
+            sortBy={sortBy}
+            sortDirection={sortDirection}
+            viewSize={viewSize}
+            searchParams={searchParams}
+          />
+
           {/* Pin list - content loaded via server render, updates via HTMX */}
           <div id="pin-list">
             <PinListPartial
@@ -240,7 +254,7 @@ export const PinsPage: FC<PinsPageProps> = ({
               pagination={pagination}
               totalCount={totalCount}
               searchParams={searchParams}
-              viewSize="expanded"
+              viewSize={viewSize}
             />
           </div>
         </main>

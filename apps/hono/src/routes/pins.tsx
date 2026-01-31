@@ -31,6 +31,8 @@ function parsePinQueryParams(c: Context) {
   const unreadParam = url.searchParams.get('unread')
   const pageParam = url.searchParams.get('page')
   const sizeParam = url.searchParams.get('size')
+  const sortParam = url.searchParams.get('sort')
+  const directionParam = url.searchParams.get('direction')
 
   // Build filter
   const filter: PinFilter = {}
@@ -53,6 +55,15 @@ function parsePinQueryParams(c: Context) {
     readFilter = 'read'
   }
 
+  // Handle sort settings
+  const sortBy: 'created' | 'title' =
+    sortParam === 'title' ? 'title' : 'created'
+  const sortDirection: 'asc' | 'desc' =
+    directionParam === 'asc' ? 'asc' : 'desc'
+
+  filter.sortBy = sortBy
+  filter.sortDirection = sortDirection
+
   // Parse page number
   const page = pageParam ? parseInt(pageParam, 10) : 1
 
@@ -70,6 +81,8 @@ function parsePinQueryParams(c: Context) {
     filter,
     page,
     viewSize,
+    sortBy,
+    sortDirection,
     searchParams,
   }
 }
@@ -92,8 +105,17 @@ pins.get('/', async (c) => {
     return c.redirect('/signin')
   }
 
-  const { tag, search, readFilter, filter, page, searchParams } =
-    parsePinQueryParams(c)
+  const {
+    tag,
+    search,
+    readFilter,
+    filter,
+    page,
+    viewSize,
+    sortBy,
+    sortDirection,
+    searchParams,
+  } = parsePinQueryParams(c)
 
   const result = await fetchUserPins(user, filter, page)
 
@@ -109,6 +131,9 @@ pins.get('/', async (c) => {
       activeTag={tag}
       searchQuery={search}
       readFilter={readFilter}
+      viewSize={viewSize}
+      sortBy={sortBy}
+      sortDirection={sortDirection}
       flash={flash}
     />
   )
