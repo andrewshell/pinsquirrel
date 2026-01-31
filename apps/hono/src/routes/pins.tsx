@@ -3,6 +3,7 @@ import type { Context } from 'hono'
 import { AccessControl, type PinFilter, type User } from '@pinsquirrel/domain'
 import { pinService } from '../lib/services'
 import { getSessionManager, requireAuth } from '../middleware/session'
+import { PinCard } from '../views/components/PinCard'
 import { PinsPage } from '../views/pages/pins'
 import { PinListPartial } from '../views/partials/pin-list'
 
@@ -125,6 +126,49 @@ pins.get('/partial', async (c) => {
       searchParams={searchParams}
       viewSize={viewSize}
     />
+  )
+})
+
+// POST /pins/:id/toggle-read - Toggle read later status (HTMX)
+pins.post('/:id/toggle-read', async (c) => {
+  const sessionManager = getSessionManager(c)
+  const user = await sessionManager.getUser()
+
+  if (!user) {
+    c.header('HX-Redirect', '/signin')
+    return c.body(null, 204)
+  }
+
+  const pinId = c.req.param('id')
+  const ac = new AccessControl(user)
+
+  // Get the current pin to toggle its status
+  const existingPin = await pinService.getPin(ac, pinId)
+
+  // Toggle the readLater status
+  const updatedPin = await pinService.updatePin(ac, {
+    id: existingPin.id,
+    userId: existingPin.userId,
+    url: existingPin.url,
+    title: existingPin.title,
+    description: existingPin.description,
+    readLater: !existingPin.readLater,
+    tagNames: existingPin.tagNames,
+  })
+
+  // Get search params from referer or request for preserving filters
+  const referer = c.req.header('Referer') || ''
+  let searchParams = ''
+  try {
+    const refererUrl = new URL(referer)
+    searchParams = refererUrl.search.replace(/^\?/, '')
+  } catch {
+    // Ignore invalid referer
+  }
+
+  // Return updated PinCard for HTMX to swap
+  return c.html(
+    <PinCard pin={updatedPin} viewSize="expanded" searchParams={searchParams} />
   )
 })
 

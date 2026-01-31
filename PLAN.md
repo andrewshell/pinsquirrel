@@ -228,7 +228,7 @@ pinsquirrel/
   - Accepts query params: `?tag=x&search=y&unread=true&page=1`
   - Used by HTMX for filtering/pagination
 
-- [ ] 3.3 Create PinCard component
+- [x] 3.3 Create PinCard component
 
   ```tsx
   const PinCard = ({ pin }) => (
@@ -253,7 +253,7 @@ pinsquirrel/
   )
   ```
 
-- [ ] 3.4 Implement mark as read toggle
+- [x] 3.4 Implement mark as read toggle
   - POST `/pins/:id/toggle-read`
   - Returns updated PinCard HTML
   - HTMX swaps in place (instant feedback)
