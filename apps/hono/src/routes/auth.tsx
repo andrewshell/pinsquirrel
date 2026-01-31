@@ -85,6 +85,8 @@ auth.post('/signin', async (c) => {
     } else if (error instanceof MissingRoleError) {
       errors = { _form: [error.message] }
     } else {
+      // Log unexpected errors for debugging
+      console.error('[SIGNIN ERROR]', error)
       errors = { _form: ['An unexpected error occurred. Please try again.'] }
     }
 
@@ -146,6 +148,8 @@ auth.post('/signup', async (c) => {
     } else if (error instanceof UserAlreadyExistsError) {
       errors = { username: ['Username is already taken'] }
     } else {
+      // Log unexpected errors for debugging
+      console.error('[SIGNUP ERROR]', error)
       errors = { _form: ['An unexpected error occurred. Please try again.'] }
     }
 

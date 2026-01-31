@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+/* Scan JSX files for Tailwind classes */
+@source "../**/*.tsx";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {
@@ -151,6 +154,10 @@ body {
 
   .neobrutalism-shadow {
     box-shadow: 4px 4px 0 0 theme(colors.foreground);
+  }
+
+  .neobrutalism-shadow-sm {
+    box-shadow: 2px 2px 0 0 theme(colors.foreground);
   }
 
   .neobrutalism-shadow-lg {
