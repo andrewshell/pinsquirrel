@@ -189,12 +189,12 @@ pinsquirrel/
   - POST `/logout` - destroy session (delete from DB), redirect
   - GET `/logout` - also supported for convenience
 
-- [ ] 2.7 Implement forgot password flow
+- [x] 2.7 Implement forgot password flow
   - GET/POST `/forgot-password`
   - GET/POST `/reset-password/:token`
   - Use existing `AuthenticationService` methods
 
-- [ ] 2.8 Port flash message system
+- [x] 2.8 Port flash message system
   - Session-based flash messages for success/error
   - Display in layout template
 
