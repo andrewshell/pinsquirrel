@@ -16,6 +16,7 @@ export const BaseLayout: FC<PropsWithChildren<BaseLayoutProps>> = ({
         <title>{title} - PinSquirrel</title>
         <link rel="stylesheet" href="/static/styles.css" />
         <script src="/static/htmx.min.js" />
+        <script src="/static/tag-input.js" />
         <script src="/static/alpine.min.js" defer />
       </head>
       <body class="bg-background text-foreground min-h-screen">{children}</body>

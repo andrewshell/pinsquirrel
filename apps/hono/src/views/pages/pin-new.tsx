@@ -1,5 +1,6 @@
 import type { FC } from 'hono/jsx'
 import { BaseLayout } from '../layouts/base'
+import { TagInput } from '../components/TagInput'
 import type { FlashType } from '../../middleware/session'
 
 interface PinNewPageProps {
@@ -149,51 +150,21 @@ export const PinNewPage: FC<PinNewPageProps> = ({
                 </p>
               </div>
 
-              {/* Tags field */}
-              <div class="space-y-2">
-                <label for="tags" class="block text-sm font-medium">
-                  Tags (optional)
-                </label>
-                <input
-                  id="tags"
-                  name="tags"
-                  type="text"
-                  value={tags}
-                  placeholder="Enter tags separated by commas"
-                  aria-describedby="tags-help"
-                  class="w-full px-3 py-2 border-2 border-foreground bg-background neobrutalism-shadow-sm
-                         focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                />
-                <p id="tags-help" class="text-xs text-muted-foreground">
-                  Add tags separated by commas (e.g., "javascript, tutorial,
-                  react")
-                </p>
-                {errors?.tagNames && (
-                  <p class="text-sm text-red-600 font-medium">
-                    {errors.tagNames.join('. ')}
-                  </p>
-                )}
-                {/* Show existing tags for reference */}
-                {userTags.length > 0 && (
-                  <div class="mt-2">
-                    <p class="text-xs text-muted-foreground mb-1">
-                      Your existing tags:
-                    </p>
-                    <div class="flex flex-wrap gap-1">
-                      {userTags.slice(0, 20).map((tag) => (
-                        <span class="text-xs px-2 py-0.5 bg-accent/10 text-accent border border-accent/30">
-                          {tag}
-                        </span>
-                      ))}
-                      {userTags.length > 20 && (
-                        <span class="text-xs text-muted-foreground">
-                          +{userTags.length - 20} more
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* Tags field - Alpine.js component */}
+              <TagInput
+                id="tags"
+                name="tags"
+                initialTags={
+                  tags
+                    ? tags
+                        .split(',')
+                        .map((t) => t.trim())
+                        .filter((t) => t)
+                    : []
+                }
+                allTags={userTags}
+                error={errors?.tagNames?.join('. ')}
+              />
 
               {/* Read Later checkbox */}
               <div class="space-y-2">
