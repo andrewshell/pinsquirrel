@@ -263,8 +263,8 @@ pinsquirrel/
   - Server-side validation with Zod
   - Redirect on success with flash message
 
-- [ ] 3.6 Implement metadata fetch (server-side)
-  - POST `/api/metadata?url=...`
+- [x] 3.6 Implement metadata fetch (server-side)
+  - GET `/api/metadata?url=...`
   - Returns JSON for Alpine.js to populate form
   - Or: HTMX partial that updates title/description fields
 
