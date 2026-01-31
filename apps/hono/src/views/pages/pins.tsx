@@ -1,7 +1,7 @@
 import type { FC } from 'hono/jsx'
 import type { Pin, Pagination } from '@pinsquirrel/domain'
 import { BaseLayout } from '../layouts/base'
-import { PinCard } from '../components/PinCard'
+import { PinListPartial } from '../partials/pin-list'
 import type { FlashType } from '../../middleware/session'
 
 interface PinsPageProps {
@@ -15,14 +15,12 @@ interface PinsPageProps {
   flash?: { type: FlashType; message: string } | null
 }
 
-// Build pagination URL
-function buildPageUrl(page: number, currentParams: string): string {
-  const params = new URLSearchParams(currentParams)
-  params.set('page', String(page))
-  return `/pins?${params.toString()}`
+// Build partial URL for HTMX requests
+function buildPartialUrl(currentParams: string): string {
+  return `/pins/partial?${currentParams}`
 }
 
-// Build filter clear URL
+// Build filter clear URL (for both regular links and HTMX)
 function buildClearFilterUrl(
   currentParams: string,
   filterToRemove: 'tag' | 'search' | 'unread'
@@ -30,43 +28,7 @@ function buildClearFilterUrl(
   const params = new URLSearchParams(currentParams)
   params.delete(filterToRemove)
   params.delete('page') // Reset to page 1 when changing filters
-  return `/pins?${params.toString()}`
-}
-
-const EmptyState: FC<{ hasFilters: boolean }> = ({ hasFilters }) => {
-  if (hasFilters) {
-    return (
-      <div class="text-center py-12">
-        <p class="text-muted-foreground text-lg mb-4">
-          No pins match your current filters.
-        </p>
-        <a
-          href="/pins"
-          class="text-accent hover:text-accent/80 hover:underline font-medium"
-        >
-          Clear all filters
-        </a>
-      </div>
-    )
-  }
-
-  return (
-    <div class="text-center py-12">
-      <p class="text-muted-foreground text-lg mb-4">
-        You haven't saved any pins yet.
-      </p>
-      <a
-        href="/pins/new"
-        class="inline-block px-6 py-3 bg-primary text-primary-foreground font-medium
-               border-2 border-foreground neobrutalism-shadow
-               hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
-               active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
-               transition-all"
-      >
-        Add your first pin
-      </a>
-    </div>
-  )
+  return params.toString()
 }
 
 const FilterHeader: FC<{
@@ -80,11 +42,23 @@ const FilterHeader: FC<{
     !!searchQuery ||
     (readFilter !== undefined && readFilter !== 'all')
 
+  // Build the base params without search for the form
+  const baseParams = new URLSearchParams(searchParams)
+  baseParams.delete('search')
+  baseParams.delete('page')
+
   return (
     <div class="mb-6">
-      {/* Search bar */}
+      {/* Search bar with HTMX */}
       <div class="mb-4">
-        <form method="get" action="/pins" class="flex gap-2">
+        <form
+          class="flex gap-2"
+          hx-get="/pins/partial"
+          hx-target="#pin-list"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          hx-include="[name='tag'], [name='unread']"
+        >
           {/* Preserve existing filters */}
           {activeTag && <input type="hidden" name="tag" value={activeTag} />}
           {readFilter && readFilter !== 'all' && (
@@ -101,6 +75,12 @@ const FilterHeader: FC<{
             placeholder="Search pins..."
             class="flex-1 px-3 py-2 border-2 border-foreground bg-background neobrutalism-shadow-sm
                    focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+            hx-get="/pins/partial"
+            hx-target="#pin-list"
+            hx-swap="innerHTML"
+            hx-trigger="keyup changed delay:300ms"
+            hx-push-url="true"
+            hx-include="closest form"
           />
           <button
             type="submit"
@@ -124,7 +104,11 @@ const FilterHeader: FC<{
             <span class="inline-flex items-center gap-1 px-2 py-1 bg-accent/10 text-accent text-sm border border-accent/30">
               tag: {activeTag}
               <a
-                href={buildClearFilterUrl(searchParams, 'tag')}
+                href={`/pins?${buildClearFilterUrl(searchParams, 'tag')}`}
+                hx-get={`/pins/partial?${buildClearFilterUrl(searchParams, 'tag')}`}
+                hx-target="#pin-list"
+                hx-swap="innerHTML"
+                hx-push-url={`/pins?${buildClearFilterUrl(searchParams, 'tag')}`}
                 class="hover:text-destructive ml-1"
                 aria-label={`Remove tag filter: ${activeTag}`}
               >
@@ -137,7 +121,11 @@ const FilterHeader: FC<{
             <span class="inline-flex items-center gap-1 px-2 py-1 bg-accent/10 text-accent text-sm border border-accent/30">
               search: {searchQuery}
               <a
-                href={buildClearFilterUrl(searchParams, 'search')}
+                href={`/pins?${buildClearFilterUrl(searchParams, 'search')}`}
+                hx-get={`/pins/partial?${buildClearFilterUrl(searchParams, 'search')}`}
+                hx-target="#pin-list"
+                hx-swap="innerHTML"
+                hx-push-url={`/pins?${buildClearFilterUrl(searchParams, 'search')}`}
                 class="hover:text-destructive ml-1"
                 aria-label="Remove search filter"
               >
@@ -150,7 +138,11 @@ const FilterHeader: FC<{
             <span class="inline-flex items-center gap-1 px-2 py-1 bg-accent/10 text-accent text-sm border border-accent/30">
               unread only
               <a
-                href={buildClearFilterUrl(searchParams, 'unread')}
+                href={`/pins?${buildClearFilterUrl(searchParams, 'unread')}`}
+                hx-get={`/pins/partial?${buildClearFilterUrl(searchParams, 'unread')}`}
+                hx-target="#pin-list"
+                hx-swap="innerHTML"
+                hx-push-url={`/pins?${buildClearFilterUrl(searchParams, 'unread')}`}
                 class="hover:text-destructive ml-1"
                 aria-label="Remove unread filter"
               >
@@ -161,51 +153,16 @@ const FilterHeader: FC<{
 
           <a
             href="/pins"
+            hx-get="/pins/partial"
+            hx-target="#pin-list"
+            hx-swap="innerHTML"
+            hx-push-url="/pins"
             class="text-sm text-muted-foreground hover:text-foreground hover:underline ml-2"
           >
             Clear all
           </a>
         </div>
       )}
-    </div>
-  )
-}
-
-const PaginationControls: FC<{
-  pagination: Pagination
-  totalCount: number
-  searchParams: string
-}> = ({ pagination, totalCount, searchParams }) => {
-  if (pagination.totalPages <= 1) return null
-
-  return (
-    <div class="flex items-center justify-between mt-8 pt-4 border-t border-foreground/20">
-      <div class="text-sm text-muted-foreground">
-        Showing page {pagination.page} of {pagination.totalPages} ({totalCount}{' '}
-        total pins)
-      </div>
-
-      <div class="flex gap-2">
-        {pagination.hasPrevious && (
-          <a
-            href={buildPageUrl(pagination.page - 1, searchParams)}
-            class="px-3 py-1 text-sm font-medium border-2 border-foreground bg-background
-                   hover:bg-accent/10 transition-colors"
-          >
-            ← Previous
-          </a>
-        )}
-
-        {pagination.hasNext && (
-          <a
-            href={buildPageUrl(pagination.page + 1, searchParams)}
-            class="px-3 py-1 text-sm font-medium border-2 border-foreground bg-background
-                   hover:bg-accent/10 transition-colors"
-          >
-            Next →
-          </a>
-        )}
-      </div>
     </div>
   )
 }
@@ -220,11 +177,6 @@ export const PinsPage: FC<PinsPageProps> = ({
   readFilter = 'all',
   flash,
 }) => {
-  const hasFilters: boolean =
-    !!activeTag ||
-    !!searchQuery ||
-    (readFilter !== undefined && readFilter !== 'all')
-
   return (
     <BaseLayout title="Pins">
       <div class="min-h-screen">
@@ -281,29 +233,16 @@ export const PinsPage: FC<PinsPageProps> = ({
             searchParams={searchParams}
           />
 
-          {/* Pin list */}
+          {/* Pin list - content loaded via server render, updates via HTMX */}
           <div id="pin-list">
-            {pins.length === 0 ? (
-              <EmptyState hasFilters={hasFilters} />
-            ) : (
-              <div class="space-y-4">
-                {pins.map((pin) => (
-                  <PinCard
-                    key={pin.id}
-                    pin={pin}
-                    viewSize="expanded"
-                    searchParams={searchParams}
-                  />
-                ))}
-              </div>
-            )}
+            <PinListPartial
+              pins={pins}
+              pagination={pagination}
+              totalCount={totalCount}
+              searchParams={searchParams}
+              viewSize="expanded"
+            />
           </div>
-
-          <PaginationControls
-            pagination={pagination}
-            totalCount={totalCount}
-            searchParams={searchParams}
-          />
         </main>
       </div>
     </BaseLayout>

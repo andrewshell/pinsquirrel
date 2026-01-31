@@ -223,7 +223,7 @@ pinsquirrel/
   </div>
   ```
 
-- [ ] 3.2 Implement pin list partial (`/pins/partial`)
+- [x] 3.2 Implement pin list partial (`/pins/partial`)
   - Returns just the pin cards HTML
   - Accepts query params: `?tag=x&search=y&unread=true&page=1`
   - Used by HTMX for filtering/pagination

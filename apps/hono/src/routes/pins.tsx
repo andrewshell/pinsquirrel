@@ -1,29 +1,24 @@
 import { Hono } from 'hono'
-import { AccessControl, type PinFilter } from '@pinsquirrel/domain'
+import type { Context } from 'hono'
+import { AccessControl, type PinFilter, type User } from '@pinsquirrel/domain'
 import { pinService } from '../lib/services'
 import { getSessionManager, requireAuth } from '../middleware/session'
 import { PinsPage } from '../views/pages/pins'
+import { PinListPartial } from '../views/partials/pin-list'
 
 const pins = new Hono()
 
 // Apply auth middleware to all pin routes
 pins.use('*', requireAuth())
 
-// GET /pins - List all pins with filtering and pagination
-pins.get('/', async (c) => {
-  const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
-
-  // Parse query parameters
+// Helper to parse pin query parameters
+function parsePinQueryParams(c: Context) {
   const url = new URL(c.req.url)
   const tag = url.searchParams.get('tag') || undefined
   const search = url.searchParams.get('search') || undefined
   const unreadParam = url.searchParams.get('unread')
   const pageParam = url.searchParams.get('page')
+  const sizeParam = url.searchParams.get('size')
 
   // Build filter
   const filter: PinFilter = {}
@@ -49,20 +44,49 @@ pins.get('/', async (c) => {
   // Parse page number
   const page = pageParam ? parseInt(pageParam, 10) : 1
 
-  // Create access control for the user
-  const ac = new AccessControl(user)
+  // Parse view size
+  const viewSize: 'expanded' | 'compact' =
+    sizeParam === 'compact' ? 'compact' : 'expanded'
 
-  // Fetch pins with pagination
-  const result = await pinService.getUserPinsWithPagination(ac, filter, {
+  // Build search params string for preserving filters (exclude page for base params)
+  const searchParams = url.search.replace(/^\?/, '')
+
+  return {
+    tag,
+    search,
+    readFilter,
+    filter,
+    page,
+    viewSize,
+    searchParams,
+  }
+}
+
+// Helper to fetch pins for a user
+async function fetchUserPins(user: User, filter: PinFilter, page: number) {
+  const ac = new AccessControl(user)
+  return pinService.getUserPinsWithPagination(ac, filter, {
     page,
     pageSize: 25,
   })
+}
+
+// GET /pins - List all pins with filtering and pagination (full page)
+pins.get('/', async (c) => {
+  const sessionManager = getSessionManager(c)
+  const user = await sessionManager.getUser()
+
+  if (!user) {
+    return c.redirect('/signin')
+  }
+
+  const { tag, search, readFilter, filter, page, searchParams } =
+    parsePinQueryParams(c)
+
+  const result = await fetchUserPins(user, filter, page)
 
   // Get flash message if any
   const flash = sessionManager.getFlash()
-
-  // Build search params string for preserving filters
-  const searchParams = url.search.replace(/^\?/, '')
 
   return c.html(
     <PinsPage
@@ -74,6 +98,32 @@ pins.get('/', async (c) => {
       searchQuery={search}
       readFilter={readFilter}
       flash={flash}
+    />
+  )
+})
+
+// GET /pins/partial - Return just the pin list HTML for HTMX
+pins.get('/partial', async (c) => {
+  const sessionManager = getSessionManager(c)
+  const user = await sessionManager.getUser()
+
+  if (!user) {
+    // For HTMX requests, return a redirect indicator
+    c.header('HX-Redirect', '/signin')
+    return c.body(null, 204)
+  }
+
+  const { filter, page, viewSize, searchParams } = parsePinQueryParams(c)
+
+  const result = await fetchUserPins(user, filter, page)
+
+  return c.html(
+    <PinListPartial
+      pins={result.pins}
+      pagination={result.pagination}
+      totalCount={result.totalCount}
+      searchParams={searchParams}
+      viewSize={viewSize}
     />
   )
 })
