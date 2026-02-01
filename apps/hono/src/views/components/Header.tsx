@@ -60,14 +60,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                     class="w-64 px-3 py-2 text-sm border-4 border-foreground bg-background focus:outline-none focus:ring-2 focus:ring-accent"
                     data-search="input"
                   />
-                  <button
-                    type="submit"
-                    class="px-3 py-2 bg-primary text-primary-foreground font-medium border-4 border-foreground neobrutalism-shadow
-                           hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
-                           active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
-                           transition-all"
-                    aria-label="Search"
-                  >
+                  <Button type="submit" size="icon" aria-label="Search">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="16"
@@ -82,7 +75,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                       <circle cx="11" cy="11" r="8" />
                       <path d="m21 21-4.3-4.3" />
                     </svg>
-                  </button>
+                  </Button>
                 </form>
 
                 {/* Search toggle - shows magnifying glass when closed, X when open */}
@@ -128,14 +121,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                 </button>
 
                 {/* Create Pin Button */}
-                <a
-                  href="/pins/new"
-                  class="px-3 py-2 bg-primary text-primary-foreground font-medium border-4 border-foreground neobrutalism-shadow
-                         hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
-                         active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
-                         transition-all"
-                  aria-label="Create Pin"
-                >
+                <Button href="/pins/new" size="icon" aria-label="Create Pin">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="16"
@@ -150,7 +136,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                     <path d="M5 12h14" />
                     <path d="M12 5v14" />
                   </svg>
-                </a>
+                </Button>
 
                 {/* User Dropdown */}
                 <div class="relative" data-dropdown="container">
@@ -207,14 +193,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
           {/* Mobile Menu Button */}
           <div class="md:hidden flex items-center space-x-2">
             {user && (
-              <a
-                href="/pins/new"
-                class="px-3 py-2 bg-primary text-primary-foreground font-medium border-4 border-foreground neobrutalism-shadow
-                       hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
-                       active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
-                       transition-all"
-                aria-label="Create Pin"
-              >
+              <Button href="/pins/new" size="icon" aria-label="Create Pin">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="16"
@@ -229,7 +208,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                   <path d="M5 12h14" />
                   <path d="M12 5v14" />
                 </svg>
-              </a>
+              </Button>
             )}
             <div data-dropdown="container">
               <button
@@ -275,11 +254,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                           placeholder="Search pins..."
                           class="flex-1 px-3 py-2 text-sm border-4 border-foreground bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                         />
-                        <button
-                          type="submit"
-                          class="px-3 py-2 bg-primary text-primary-foreground border-4 border-foreground"
-                          aria-label="Search"
-                        >
+                        <Button type="submit" size="icon" aria-label="Search">
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
                             width="20"
@@ -294,7 +269,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                             <circle cx="11" cy="11" r="8" />
                             <path d="m21 21-4.3-4.3" />
                           </svg>
-                        </button>
+                        </Button>
                       </form>
 
                       <a
@@ -328,18 +303,12 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                     </>
                   ) : (
                     <>
-                      <a
-                        href="/signin"
-                        class="block px-4 py-2 text-center font-medium border-4 border-foreground hover:bg-accent/10 transition-colors"
-                      >
+                      <Button href="/signin" variant="outline" class="w-full">
                         Sign In
-                      </a>
-                      <a
-                        href="/signup"
-                        class="block px-4 py-2 text-center font-medium bg-primary text-primary-foreground border-4 border-foreground"
-                      >
+                      </Button>
+                      <Button href="/signup" class="w-full">
                         Sign Up
-                      </a>
+                      </Button>
                     </>
                   )}
                 </div>
