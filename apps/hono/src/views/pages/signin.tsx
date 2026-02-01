@@ -1,5 +1,10 @@
 import type { FC } from 'hono/jsx'
 import { BaseLayout } from '../layouts/base'
+import {
+  FlashMessage,
+  SuccessMessage,
+  ErrorMessage,
+} from '../components/FlashMessage'
 import type { FlashType } from '../../middleware/session'
 
 interface SignInPageProps {
@@ -39,27 +44,19 @@ export const SignInPage: FC<SignInPageProps> = ({
 
           {/* Password reset success message */}
           {showResetSuccess && (
-            <div class="mb-4 p-3 text-sm text-green-700 bg-green-50 border-2 border-green-200 neobrutalism-shadow">
-              Your password has been reset successfully. You can now sign in
-              with your new password.
-            </div>
+            <SuccessMessage
+              message="Your password has been reset successfully. You can now sign in with your new password."
+              className="mb-4"
+            />
           )}
 
           {/* Flash message */}
           {flash && (
-            <div
-              class={`mb-4 p-3 text-sm border-2 neobrutalism-shadow ${
-                flash.type === 'success'
-                  ? 'text-green-700 bg-green-50 border-green-200'
-                  : flash.type === 'error'
-                    ? 'text-red-700 bg-red-50 border-red-200'
-                    : flash.type === 'warning'
-                      ? 'text-yellow-700 bg-yellow-50 border-yellow-200'
-                      : 'text-blue-700 bg-blue-50 border-blue-200'
-              }`}
-            >
-              {flash.message}
-            </div>
+            <FlashMessage
+              type={flash.type}
+              message={flash.message}
+              className="mb-4"
+            />
           )}
 
           {/* Sign In Card */}
@@ -74,9 +71,7 @@ export const SignInPage: FC<SignInPageProps> = ({
 
               {/* Form-level errors */}
               {errors?._form && (
-                <div class="p-3 text-sm text-red-700 bg-red-50 border-2 border-red-200 neobrutalism-shadow">
-                  {errors._form.join('. ')}
-                </div>
+                <ErrorMessage message={errors._form.join('. ')} />
               )}
 
               {/* Username field */}

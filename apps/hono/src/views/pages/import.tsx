@@ -1,5 +1,6 @@
 import type { FC } from 'hono/jsx'
 import { BaseLayout } from '../layouts/base'
+import { FlashMessage as FlashMessageComponent } from '../components/FlashMessage'
 import type { FlashMessage } from '../../middleware/session'
 
 interface ImportPageProps {
@@ -44,15 +45,11 @@ export const ImportPage: FC<ImportPageProps> = ({
 
         {/* Flash message */}
         {flash && (
-          <div
-            class={`mb-6 p-4 border-2 border-foreground ${
-              flash.type === 'success'
-                ? 'bg-green-50 dark:bg-green-950 text-green-800 dark:text-green-200'
-                : 'bg-red-50 dark:bg-red-950 text-red-800 dark:text-red-200'
-            }`}
-          >
-            {flash.message}
-          </div>
+          <FlashMessageComponent
+            type={flash.type}
+            message={flash.message}
+            className="mb-6"
+          />
         )}
 
         <div class="bg-card border-2 border-foreground neobrutalism-shadow">

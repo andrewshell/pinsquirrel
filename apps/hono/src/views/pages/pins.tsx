@@ -5,6 +5,7 @@ import { PinListPartial } from '../partials/pin-list'
 import { Header } from '../components/Header'
 import { FilterHeader } from '../components/FilterHeader'
 import { ViewSettings } from '../components/ViewSettings'
+import { FlashMessage } from '../components/FlashMessage'
 import type { FlashType } from '../../middleware/session'
 
 interface PinsPageProps {
@@ -48,19 +49,11 @@ export const PinsPage: FC<PinsPageProps> = ({
         <main class="max-w-4xl mx-auto px-4 py-6">
           {/* Flash message */}
           {flash && (
-            <div
-              class={`mb-6 p-3 text-sm border-2 neobrutalism-shadow ${
-                flash.type === 'success'
-                  ? 'text-green-700 bg-green-50 border-green-200'
-                  : flash.type === 'error'
-                    ? 'text-red-700 bg-red-50 border-red-200'
-                    : flash.type === 'warning'
-                      ? 'text-yellow-700 bg-yellow-50 border-yellow-200'
-                      : 'text-blue-700 bg-blue-50 border-blue-200'
-              }`}
-            >
-              {flash.message}
-            </div>
+            <FlashMessage
+              type={flash.type}
+              message={flash.message}
+              className="mb-6"
+            />
           )}
 
           <FilterHeader

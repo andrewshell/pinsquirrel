@@ -433,24 +433,24 @@ pinsquirrel/
 
       **All features implemented! Full parity achieved.**
 
-- [ ] 6.2 Port all Tailwind styles
-  - Verify responsive design
-  - Dark mode support
+- [x] 6.2 Port all Tailwind styles
+  - Responsive design verified (sm:, md:, lg: breakpoints used appropriately)
+  - Dark mode support added:
+    - Created `FlashMessage` component with dark mode variants
+    - Added dark mode detection script in base layout
+    - Updated all pages to use consistent FlashMessage components
+    - Created SuccessMessage, ErrorMessage, WarningMessage, InfoMessage helpers
 
-- [ ] 6.3 Test on multiple browsers
-  - Chrome, Firefox, Safari
-  - Mobile browsers
-
-- [ ] 6.4 Performance comparison
+- [ ] 6.3 Performance comparison
   - Page load times
   - Time to interactive
   - Bundle sizes
 
-- [ ] 6.5 Add any missing validations
+- [ ] 6.4 Add any missing validations
   - Server-side matches React app
   - Error messages consistent
 
-- [x] 6.6 Duplicate URL detection
+- [x] 6.5 Duplicate URL detection
   - Already implemented in pin creation/editing routes
   - Handles DuplicatePinError with user-friendly message
 

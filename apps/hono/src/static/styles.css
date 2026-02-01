@@ -1535,6 +1535,21 @@
       border-color: var(--color-blue-800);
     }
   }
+  .dark\:border-green-800 {
+    &:is(.dark *) {
+      border-color: var(--color-green-800);
+    }
+  }
+  .dark\:border-red-800 {
+    &:is(.dark *) {
+      border-color: var(--color-red-800);
+    }
+  }
+  .dark\:border-yellow-700 {
+    &:is(.dark *) {
+      border-color: var(--color-yellow-700);
+    }
+  }
   .dark\:bg-blue-900\/20 {
     &:is(.dark *) {
       background-color: color-mix(

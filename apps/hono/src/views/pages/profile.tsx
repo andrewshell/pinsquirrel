@@ -1,5 +1,10 @@
 import type { User } from '@pinsquirrel/domain'
 import { BaseLayout } from '../layouts/base'
+import {
+  FlashMessage as FlashMessageComponent,
+  SuccessMessage,
+  ErrorMessage,
+} from '../components/FlashMessage'
 import type { FlashMessage } from '../../middleware/session'
 
 interface ProfilePageProps {
@@ -34,15 +39,11 @@ export function ProfilePage({
       <div class="container mx-auto px-4 py-8 max-w-2xl">
         {/* Flash message */}
         {flash && (
-          <div
-            class={`mb-6 p-4 border-2 border-foreground ${
-              flash.type === 'success'
-                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
-                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
-            }`}
-          >
-            {flash.message}
-          </div>
+          <FlashMessageComponent
+            type={flash.type}
+            message={flash.message}
+            className="mb-6"
+          />
         )}
 
         {/* Page title */}
@@ -104,16 +105,10 @@ export function ProfilePage({
             <form method="post" action="/profile" class="space-y-4">
               <input type="hidden" name="intent" value="update-email" />
 
-              {formError && (
-                <div class="p-3 text-sm text-black bg-red-400 border-4 border-foreground neobrutalism-shadow font-bold uppercase">
-                  {formError}
-                </div>
-              )}
+              {formError && <ErrorMessage message={formError} />}
 
               {emailSuccess && (
-                <div class="p-3 text-sm text-black bg-lime-300 border-4 border-foreground neobrutalism-shadow font-bold uppercase">
-                  Email updated successfully
-                </div>
+                <SuccessMessage message="Email updated successfully" />
               )}
 
               <div>
@@ -165,9 +160,7 @@ export function ProfilePage({
               />
 
               {passwordSuccess && (
-                <div class="p-3 text-sm text-black bg-lime-300 border-4 border-foreground neobrutalism-shadow font-bold uppercase">
-                  Password changed successfully
-                </div>
+                <SuccessMessage message="Password changed successfully" />
               )}
 
               <div>

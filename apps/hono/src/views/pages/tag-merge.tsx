@@ -1,5 +1,10 @@
 import type { TagWithCount } from '@pinsquirrel/domain'
 import { BaseLayout } from '../layouts/base'
+import {
+  FlashMessage as FlashMessageComponent,
+  ErrorMessage,
+  WarningMessage,
+} from '../components/FlashMessage'
 import type { FlashMessage } from '../../middleware/session'
 
 interface TagMergePageProps {
@@ -24,15 +29,11 @@ export function TagMergePage({
       <div class="container mx-auto px-4 py-8 max-w-2xl">
         {/* Flash message */}
         {flash && (
-          <div
-            class={`mb-6 p-4 border-2 border-foreground ${
-              flash.type === 'success'
-                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
-                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
-            }`}
-          >
-            {flash.message}
-          </div>
+          <FlashMessageComponent
+            type={flash.type}
+            message={flash.message}
+            className="mb-6"
+          />
         )}
 
         {/* Back link */}
@@ -85,9 +86,7 @@ export function TagMergePage({
             <form method="post" action="/tags/merge">
               {/* Form error */}
               {formError && (
-                <div class="mb-6 p-4 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100 border-2 border-foreground">
-                  {formError}
-                </div>
+                <ErrorMessage message={formError} className="mb-6" />
               )}
 
               {/* Source tags selection */}
@@ -154,10 +153,10 @@ export function TagMergePage({
               </div>
 
               {/* Warning */}
-              <div class="mb-6 p-4 bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100 border-2 border-foreground">
-                <strong>Warning:</strong> This action cannot be undone. Source
-                tags will be permanently deleted after merging.
-              </div>
+              <WarningMessage
+                message="Warning: This action cannot be undone. Source tags will be permanently deleted after merging."
+                className="mb-6"
+              />
 
               {/* Submit button */}
               <div class="flex gap-4">

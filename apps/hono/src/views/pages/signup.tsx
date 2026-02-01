@@ -1,5 +1,6 @@
 import type { FC } from 'hono/jsx'
 import { BaseLayout } from '../layouts/base'
+import { SuccessMessage, ErrorMessage } from '../components/FlashMessage'
 
 interface SignUpPageProps {
   errors?: Record<string, string[]>
@@ -39,12 +40,12 @@ export const SignUpPage: FC<SignUpPageProps> = ({
             {success ? (
               // Success state
               <div>
-                <h2 class="text-xl font-bold mb-4 text-green-700">
+                <h2 class="text-xl font-bold mb-4 text-green-700 dark:text-green-300">
                   Account Created!
                 </h2>
-                <div class="p-4 text-green-700 bg-green-50 border-2 border-green-200 neobrutalism-shadow mb-4">
-                  {message}
-                </div>
+                {message && (
+                  <SuccessMessage message={message} className="mb-4" />
+                )}
                 <p class="text-muted-foreground mb-4">
                   We've sent you an email with a link to set your password.
                   Check your inbox (and spam folder) and click the link to
@@ -74,9 +75,7 @@ export const SignUpPage: FC<SignUpPageProps> = ({
                 >
                   {/* Form-level errors */}
                   {errors?._form && (
-                    <div class="p-3 text-sm text-red-700 bg-red-50 border-2 border-red-200 neobrutalism-shadow">
-                      {errors._form.join('. ')}
-                    </div>
+                    <ErrorMessage message={errors._form.join('. ')} />
                   )}
 
                   {/* Username field */}

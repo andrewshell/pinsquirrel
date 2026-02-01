@@ -1,5 +1,6 @@
 import type { FC } from 'hono/jsx'
 import { BaseLayout } from '../layouts/base'
+import { ErrorMessage } from '../components/FlashMessage'
 
 interface ResetPasswordPageProps {
   token?: string
@@ -35,12 +36,13 @@ export const ResetPasswordPage: FC<ResetPasswordPageProps> = ({
             {invalidToken ? (
               // Invalid or expired token state
               <div>
-                <h2 class="text-xl font-bold mb-4 text-red-700">
+                <h2 class="text-xl font-bold mb-4 text-red-700 dark:text-red-300">
                   Invalid or Expired Link
                 </h2>
-                <div class="p-4 text-red-700 bg-red-50 border-2 border-red-200 neobrutalism-shadow mb-4">
-                  This password reset link is invalid or has expired.
-                </div>
+                <ErrorMessage
+                  message="This password reset link is invalid or has expired."
+                  className="mb-4"
+                />
                 <p class="text-muted-foreground mb-4">
                   Password reset links expire after 15 minutes for security.
                   Please request a new one.
@@ -73,9 +75,7 @@ export const ResetPasswordPage: FC<ResetPasswordPageProps> = ({
                 >
                   {/* Form-level errors */}
                   {errors?._form && (
-                    <div class="p-3 text-sm text-red-700 bg-red-50 border-2 border-red-200 neobrutalism-shadow">
-                      {errors._form.join('. ')}
-                    </div>
+                    <ErrorMessage message={errors._form.join('. ')} />
                   )}
 
                   {/* New Password field */}

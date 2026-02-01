@@ -88,32 +88,14 @@ export class AuthenticationService {
 
     // Auto-trigger password reset email for verification if URL provided
     if (input.resetUrl && this.passwordResetRepository && this.emailService) {
-      console.log(
-        '[AUTH] Attempting to send password reset email during registration',
-        {
-          email: input.email,
-          resetUrl: input.resetUrl,
-          hasPasswordResetRepo: !!this.passwordResetRepository,
-          hasEmailService: !!this.emailService,
-        }
-      )
       try {
-        const result = await this.requestPasswordReset({
+        await this.requestPasswordReset({
           email: input.email,
           resetUrl: input.resetUrl,
         })
-        console.log('[AUTH] Password reset email request completed', {
-          result,
-          resultType: typeof result,
-          isNull: result === null,
-        })
-      } catch (error) {
+      } catch {
         // Don't fail registration if email sending fails
         // Silently ignore email errors during registration
-        console.error(
-          '[AUTH] Password reset email failed during registration',
-          error
-        )
       }
     }
 
@@ -299,34 +281,12 @@ export class AuthenticationService {
 
     // Hash the email to find the user
     const emailHash = hashEmail(input.email)
-    console.log(
-      '[AUTH] Looking up user by email hash in requestPasswordReset',
-      {
-        email: input.email,
-        emailHash,
-      }
-    )
     const user = await this.userRepository.findByEmailHash(emailHash)
 
     // Don't reveal whether the email exists or not for security
     if (!user) {
-      console.log(
-        '[AUTH] User not found by email hash in requestPasswordReset',
-        {
-          email: input.email,
-          emailHash,
-        }
-      )
       return null
     }
-
-    console.log(
-      '[AUTH] User found, proceeding with password reset token generation',
-      {
-        userId: user.id,
-        username: user.username,
-      }
-    )
 
     // Check rate limiting - max 3 requests per hour
     const existingTokens = await this.passwordResetRepository.findByUserId(
@@ -357,17 +317,11 @@ export class AuthenticationService {
     })
 
     // Send the email with the plain token
-    console.log('[AUTH] Sending password reset email', {
-      email: input.email,
-      resetUrl: input.resetUrl,
-      tokenLength: token.length,
-    })
     await this.emailService.sendPasswordResetEmail(
       input.email,
       token,
       input.resetUrl
     )
-    console.log('[AUTH] Password reset email sent successfully')
 
     return token
   }

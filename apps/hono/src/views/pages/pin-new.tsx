@@ -1,6 +1,7 @@
 import type { FC } from 'hono/jsx'
 import { BaseLayout } from '../layouts/base'
 import { TagInput } from '../components/TagInput'
+import { FlashMessage, ErrorMessage } from '../components/FlashMessage'
 import type { FlashType } from '../../middleware/session'
 
 interface PinNewPageProps {
@@ -46,19 +47,11 @@ export const PinNewPage: FC<PinNewPageProps> = ({
 
           {/* Flash message */}
           {flash && (
-            <div
-              class={`mb-4 p-3 text-sm border-2 neobrutalism-shadow ${
-                flash.type === 'success'
-                  ? 'text-green-700 bg-green-50 border-green-200'
-                  : flash.type === 'error'
-                    ? 'text-red-700 bg-red-50 border-red-200'
-                    : flash.type === 'warning'
-                      ? 'text-yellow-700 bg-yellow-50 border-yellow-200'
-                      : 'text-blue-700 bg-blue-50 border-blue-200'
-              }`}
-            >
-              {flash.message}
-            </div>
+            <FlashMessage
+              type={flash.type}
+              message={flash.message}
+              className="mb-4"
+            />
           )}
 
           {/* Form Card */}
@@ -68,9 +61,7 @@ export const PinNewPage: FC<PinNewPageProps> = ({
             <form method="post" action="/pins/new" class="space-y-4" novalidate>
               {/* Form-level errors */}
               {errors?._form && (
-                <div class="p-3 text-sm text-red-700 bg-red-50 border-2 border-red-200 neobrutalism-shadow">
-                  {errors._form.join('. ')}
-                </div>
+                <ErrorMessage message={errors._form.join('. ')} />
               )}
 
               {/* URL field */}

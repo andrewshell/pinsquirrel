@@ -1,5 +1,6 @@
 import type { TagWithCount } from '@pinsquirrel/domain'
 import { BaseLayout } from '../layouts/base'
+import { FlashMessage as FlashMessageComponent } from '../components/FlashMessage'
 import type { FlashMessage } from '../../middleware/session'
 
 export type TagFilterType = 'all' | 'toread'
@@ -91,15 +92,11 @@ export function TagsPage({
       <div class="container mx-auto px-4 py-8 max-w-4xl">
         {/* Flash message */}
         {flash && (
-          <div
-            class={`mb-6 p-4 border-2 border-foreground ${
-              flash.type === 'success'
-                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
-                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
-            }`}
-          >
-            {flash.message}
-          </div>
+          <FlashMessageComponent
+            type={flash.type}
+            message={flash.message}
+            className="mb-6"
+          />
         )}
 
         {/* Header with filter and merge button */}
