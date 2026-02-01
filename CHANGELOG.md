@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/andrewshell/pinsquirrel/compare/v2.0.0...v2.0.1) (2026-02-01)
+
+
+### Bug Fixes
+
+* bundle workspace dependencies for Docker production build ([22821d0](https://github.com/andrewshell/pinsquirrel/commit/22821d0f1ee9fb5b915f6daaa3d17659db9a2b91))
+
 ## [2.0.0](https://github.com/andrewshell/pinsquirrel/compare/v1.1.5...v2.0.0) (2026-02-01)
 
 
