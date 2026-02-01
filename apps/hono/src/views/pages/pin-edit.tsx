@@ -45,50 +45,46 @@ export const PinEditPage: FC<PinEditPageProps> = ({
   const backUrl = returnParams ? `/pins?${returnParams}` : '/pins'
 
   return (
-    <DefaultLayout title="Edit Pin" user={user}>
-      <div class="py-8 px-4">
-        <div class="max-w-2xl mx-auto">
-          {/* Back link */}
-          <div class="mb-6">
-            <a
-              href={backUrl}
-              class="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-            >
-              ← Back to Pins
-            </a>
-          </div>
-
-          {/* Flash message */}
-          {flash && (
-            <FlashMessage
-              type={flash.type}
-              message={flash.message}
-              className="mb-4"
-            />
-          )}
-
-          {/* Form Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Edit Pin</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <PinForm
-                action={`/pins/${pin.id}/edit`}
-                submitLabel="Update Pin"
-                url={formUrl}
-                title={formTitle}
-                description={formDescription}
-                readLater={formReadLater}
-                tags={formTags}
-                userTags={userTags}
-                errors={errors}
-                createdAt={pin.createdAt}
-              />
-            </CardContent>
-          </Card>
-        </div>
+    <DefaultLayout title="Edit Pin" user={user} width="form">
+      {/* Back link */}
+      <div class="mb-6">
+        <a
+          href={backUrl}
+          class="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+        >
+          ← Back to Pins
+        </a>
       </div>
+
+      {/* Flash message */}
+      {flash && (
+        <FlashMessage
+          type={flash.type}
+          message={flash.message}
+          className="mb-4"
+        />
+      )}
+
+      {/* Form Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Edit Pin</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PinForm
+            action={`/pins/${pin.id}/edit`}
+            submitLabel="Update Pin"
+            url={formUrl}
+            title={formTitle}
+            description={formDescription}
+            readLater={formReadLater}
+            tags={formTags}
+            userTags={userTags}
+            errors={errors}
+            createdAt={pin.createdAt}
+          />
+        </CardContent>
+      </Card>
     </DefaultLayout>
   )
 }

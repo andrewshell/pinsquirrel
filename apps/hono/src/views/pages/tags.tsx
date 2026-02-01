@@ -91,119 +91,117 @@ export function TagsPage({
   const pinCounts = tags.map((tag) => tag.pinCount)
 
   return (
-    <DefaultLayout title="Tags" user={user} currentPath="/tags">
-      <div class="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Flash message */}
-        {flash && (
-          <FlashMessageComponent
-            type={flash.type}
-            message={flash.message}
-            className="mb-6"
-          />
-        )}
+    <DefaultLayout title="Tags" user={user} currentPath="/tags" width="narrow">
+      {/* Flash message */}
+      {flash && (
+        <FlashMessageComponent
+          type={flash.type}
+          message={flash.message}
+          className="mb-6"
+        />
+      )}
 
-        {/* Header with filter and merge button */}
-        <div
-          class="mb-8 flex flex-col gap-4
+      {/* Header with filter and merge button */}
+      <div
+        class="mb-8 flex flex-col gap-4
                     sm:flex-row sm:justify-between sm:items-center"
-        >
-          {/* Filter buttons */}
-          <div class="flex gap-2">
-            <Button
-              href="/tags"
-              variant={currentFilter === 'all' ? 'default' : 'secondary'}
-              size="sm"
-            >
-              All
-            </Button>
-            <Button
-              href="/tags?unread=true"
-              variant={currentFilter === 'toread' ? 'default' : 'secondary'}
-              size="sm"
-            >
-              To Read
-            </Button>
-          </div>
-
-          {/* Merge button - only show if more than 1 tag */}
-          {tags.length > 1 && (
-            <Button href="/tags/merge" variant="secondary" size="sm">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="m8 6 4-4 4 4" />
-                <path d="M12 2v10.3a4 4 0 0 1-1.172 2.872L4 22" />
-                <path d="m20 22-5-5" />
-              </svg>
-              Merge Tags
-            </Button>
-          )}
+      >
+        {/* Filter buttons */}
+        <div class="flex gap-2">
+          <Button
+            href="/tags"
+            variant={currentFilter === 'all' ? 'default' : 'secondary'}
+            size="sm"
+          >
+            All
+          </Button>
+          <Button
+            href="/tags?unread=true"
+            variant={currentFilter === 'toread' ? 'default' : 'secondary'}
+            size="sm"
+          >
+            To Read
+          </Button>
         </div>
 
-        {/* Page title */}
-        <div class="mb-8">
-          <h1 class="text-3xl font-bold text-foreground mb-2">Tags</h1>
-          <p class="text-muted-foreground">
-            {tags.length === 0
-              ? 'No tags yet. Tags will appear here when you add them to your pins.'
-              : `${tags.length} tag${tags.length === 1 ? '' : 's'} total`}
-          </p>
-        </div>
-
-        {/* Tag cloud or empty state */}
-        {tags.length > 0 || untaggedPinsCount > 0 ? (
-          <div class="flex flex-wrap gap-3 items-center justify-start">
-            {/* Untagged pins link - shown first in italics */}
-            {untaggedPinsCount > 0 && (
-              <a
-                href={buildUntaggedUrl(currentFilter)}
-                class={`${getFontSizeClass(untaggedPinsCount, pinCounts)} ${getOpacityClass(untaggedPinsCount)} text-accent hover:text-accent/80 hover:underline transition-all duration-200 font-medium italic`}
-                title={`Untagged pins (${untaggedPinsCount} pin${untaggedPinsCount === 1 ? '' : 's'})`}
-                aria-label={`View untagged pins (${untaggedPinsCount} pin${untaggedPinsCount === 1 ? '' : 's'})`}
-              >
-                Untagged
-              </a>
-            )}
-
-            {/* Tag links */}
-            {sortedTags.map((tag) => {
-              const fontSizeClass = getFontSizeClass(tag.pinCount, pinCounts)
-              const opacityClass = getOpacityClass(tag.pinCount)
-              const tagUrl = buildTagUrl(tag.name, currentFilter)
-
-              return (
-                <a
-                  key={tag.id}
-                  href={tagUrl}
-                  class={`${fontSizeClass} ${opacityClass} text-accent hover:text-accent/80 hover:underline transition-all duration-200 font-medium`}
-                  title={`${tag.name} (${tag.pinCount} pin${tag.pinCount === 1 ? '' : 's'})`}
-                  aria-label={`View pins tagged with ${tag.name} (${tag.pinCount} pin${tag.pinCount === 1 ? '' : 's'})`}
-                >
-                  {tag.name}
-                </a>
-              )
-            })}
-          </div>
-        ) : (
-          <div class="text-center py-12">
-            <p class="text-muted-foreground mb-4">
-              You haven't created any tags yet.
-            </p>
-            <p class="text-sm text-muted-foreground">
-              Tags help organize your pins. Add some tags to your pins to see
-              them here!
-            </p>
-          </div>
+        {/* Merge button - only show if more than 1 tag */}
+        {tags.length > 1 && (
+          <Button href="/tags/merge" variant="secondary" size="sm">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="m8 6 4-4 4 4" />
+              <path d="M12 2v10.3a4 4 0 0 1-1.172 2.872L4 22" />
+              <path d="m20 22-5-5" />
+            </svg>
+            Merge Tags
+          </Button>
         )}
       </div>
+
+      {/* Page title */}
+      <div class="mb-8">
+        <h1 class="text-3xl font-bold text-foreground mb-2">Tags</h1>
+        <p class="text-muted-foreground">
+          {tags.length === 0
+            ? 'No tags yet. Tags will appear here when you add them to your pins.'
+            : `${tags.length} tag${tags.length === 1 ? '' : 's'} total`}
+        </p>
+      </div>
+
+      {/* Tag cloud or empty state */}
+      {tags.length > 0 || untaggedPinsCount > 0 ? (
+        <div class="flex flex-wrap gap-3 items-center justify-start">
+          {/* Untagged pins link - shown first in italics */}
+          {untaggedPinsCount > 0 && (
+            <a
+              href={buildUntaggedUrl(currentFilter)}
+              class={`${getFontSizeClass(untaggedPinsCount, pinCounts)} ${getOpacityClass(untaggedPinsCount)} text-accent hover:text-accent/80 hover:underline transition-all duration-200 font-medium italic`}
+              title={`Untagged pins (${untaggedPinsCount} pin${untaggedPinsCount === 1 ? '' : 's'})`}
+              aria-label={`View untagged pins (${untaggedPinsCount} pin${untaggedPinsCount === 1 ? '' : 's'})`}
+            >
+              Untagged
+            </a>
+          )}
+
+          {/* Tag links */}
+          {sortedTags.map((tag) => {
+            const fontSizeClass = getFontSizeClass(tag.pinCount, pinCounts)
+            const opacityClass = getOpacityClass(tag.pinCount)
+            const tagUrl = buildTagUrl(tag.name, currentFilter)
+
+            return (
+              <a
+                key={tag.id}
+                href={tagUrl}
+                class={`${fontSizeClass} ${opacityClass} text-accent hover:text-accent/80 hover:underline transition-all duration-200 font-medium`}
+                title={`${tag.name} (${tag.pinCount} pin${tag.pinCount === 1 ? '' : 's'})`}
+                aria-label={`View pins tagged with ${tag.name} (${tag.pinCount} pin${tag.pinCount === 1 ? '' : 's'})`}
+              >
+                {tag.name}
+              </a>
+            )
+          })}
+        </div>
+      ) : (
+        <div class="text-center py-12">
+          <p class="text-muted-foreground mb-4">
+            You haven't created any tags yet.
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Tags help organize your pins. Add some tags to your pins to see them
+            here!
+          </p>
+        </div>
+      )}
     </DefaultLayout>
   )
 }

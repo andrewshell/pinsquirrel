@@ -36,49 +36,50 @@ export const PinNewPage: FC<PinNewPageProps> = ({
   const backUrl = returnParams ? `/pins?${returnParams}` : '/pins'
 
   return (
-    <DefaultLayout title="Create New Pin" user={user} currentPath="/pins/new">
-      <div class="py-8 px-4">
-        <div class="max-w-2xl mx-auto">
-          {/* Back link */}
-          <div class="mb-6">
-            <a
-              href={backUrl}
-              class="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-            >
-              ← Back to Pins
-            </a>
-          </div>
-
-          {/* Flash message */}
-          {flash && (
-            <FlashMessage
-              type={flash.type}
-              message={flash.message}
-              className="mb-4"
-            />
-          )}
-
-          {/* Form Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Create New Pin</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <PinForm
-                action="/pins/new"
-                submitLabel="Create Pin"
-                url={url}
-                title={title}
-                description={description}
-                readLater={readLater}
-                tags={tags}
-                userTags={userTags}
-                errors={errors}
-              />
-            </CardContent>
-          </Card>
-        </div>
+    <DefaultLayout
+      title="Create New Pin"
+      user={user}
+      currentPath="/pins/new"
+      width="form"
+    >
+      {/* Back link */}
+      <div class="mb-6">
+        <a
+          href={backUrl}
+          class="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+        >
+          ← Back to Pins
+        </a>
       </div>
+
+      {/* Flash message */}
+      {flash && (
+        <FlashMessage
+          type={flash.type}
+          message={flash.message}
+          className="mb-4"
+        />
+      )}
+
+      {/* Form Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Create New Pin</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PinForm
+            action="/pins/new"
+            submitLabel="Create Pin"
+            url={url}
+            title={title}
+            description={description}
+            readLater={readLater}
+            tags={tags}
+            userTags={userTags}
+            errors={errors}
+          />
+        </CardContent>
+      </Card>
     </DefaultLayout>
   )
 }

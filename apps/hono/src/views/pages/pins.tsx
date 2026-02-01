@@ -40,41 +40,39 @@ export const PinsPage: FC<PinsPageProps> = ({
 }) => {
   return (
     <DefaultLayout title="Pins" user={user} currentPath="/pins">
-      <div class="max-w-4xl mx-auto px-4 py-6">
-        {/* Flash message */}
-        {flash && (
-          <FlashMessage
-            type={flash.type}
-            message={flash.message}
-            className="mb-6"
-          />
-        )}
-
-        <FilterHeader
-          activeTag={activeTag}
-          searchQuery={searchQuery}
-          readFilter={readFilter}
-          searchParams={searchParams}
-          noTags={noTags}
+      {/* Flash message */}
+      {flash && (
+        <FlashMessage
+          type={flash.type}
+          message={flash.message}
+          className="mb-6"
         />
+      )}
 
-        <ViewSettings
-          sortBy={sortBy}
-          sortDirection={sortDirection}
+      <FilterHeader
+        activeTag={activeTag}
+        searchQuery={searchQuery}
+        readFilter={readFilter}
+        searchParams={searchParams}
+        noTags={noTags}
+      />
+
+      <ViewSettings
+        sortBy={sortBy}
+        sortDirection={sortDirection}
+        viewSize={viewSize}
+        searchParams={searchParams}
+      />
+
+      {/* Pin list - content loaded via server render, updates via HTMX */}
+      <div id="pin-list">
+        <PinListPartial
+          pins={pins}
+          pagination={pagination}
+          totalCount={totalCount}
+          searchParams={searchParams}
           viewSize={viewSize}
-          searchParams={searchParams}
         />
-
-        {/* Pin list - content loaded via server render, updates via HTMX */}
-        <div id="pin-list">
-          <PinListPartial
-            pins={pins}
-            pagination={pagination}
-            totalCount={totalCount}
-            searchParams={searchParams}
-            viewSize={viewSize}
-          />
-        </div>
       </div>
     </DefaultLayout>
   )
