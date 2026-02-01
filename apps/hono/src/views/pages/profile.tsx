@@ -1,14 +1,14 @@
 import type { User } from '@pinsquirrel/domain'
-import { DefaultLayout } from '../layouts/default'
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
-import { Button } from '../components/ui/Button'
-import { Alert, AlertTitle, AlertDescription } from '../components/ui/Alert'
+import type { FlashMessage } from '../../middleware/session'
 import {
+  ErrorMessage,
   FlashMessage as FlashMessageComponent,
   SuccessMessage,
-  ErrorMessage,
 } from '../components/FlashMessage'
-import type { FlashMessage } from '../../middleware/session'
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/Alert'
+import { Button } from '../components/ui/Button'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
+import { DefaultLayout } from '../layouts/default'
 
 interface ProfilePageProps {
   user: User
@@ -42,7 +42,7 @@ export function ProfilePage({
       title="Profile"
       user={user}
       currentPath="/profile"
-      width="form"
+      width="narrow"
     >
       {/* Flash message */}
       {flash && (

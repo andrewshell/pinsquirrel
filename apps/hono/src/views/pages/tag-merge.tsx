@@ -1,11 +1,11 @@
 import type { TagWithCount, User } from '@pinsquirrel/domain'
-import { DefaultLayout } from '../layouts/default'
+import type { FlashMessage } from '../../middleware/session'
 import {
-  FlashMessage as FlashMessageComponent,
   ErrorMessage,
+  FlashMessage as FlashMessageComponent,
   WarningMessage,
 } from '../components/FlashMessage'
-import type { FlashMessage } from '../../middleware/session'
+import { DefaultLayout } from '../layouts/default'
 
 interface TagMergePageProps {
   user: User
@@ -31,7 +31,7 @@ export function TagMergePage({
       title="Merge Tags"
       user={user}
       currentPath="/tags/merge"
-      width="form"
+      width="narrow"
     >
       {/* Flash message */}
       {flash && (

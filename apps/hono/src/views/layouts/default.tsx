@@ -1,8 +1,8 @@
-import type { FC, PropsWithChildren } from 'hono/jsx'
 import type { User } from '@pinsquirrel/domain'
-import { BaseLayout } from './base'
-import { Header } from '../components/Header'
+import type { FC, PropsWithChildren } from 'hono/jsx'
 import { Footer } from '../components/Footer'
+import { Header } from '../components/Header'
+import { BaseLayout } from './base'
 
 type ContentWidth = 'wide' | 'narrow' | 'form'
 
@@ -23,14 +23,13 @@ export const DefaultLayout: FC<PropsWithChildren<DefaultLayoutProps>> = ({
   children,
   title,
   user,
-  currentPath,
   width = 'wide',
 }) => {
   const containerClass = `${widthClasses[width]} mx-auto px-4 py-6`
 
   return (
     <BaseLayout title={title}>
-      <Header user={user} currentPath={currentPath} />
+      <Header user={user} />
       <main class="flex-1">
         <div class={containerClass}>{children}</div>
       </main>
