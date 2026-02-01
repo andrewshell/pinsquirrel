@@ -41,13 +41,13 @@ export const TagInput: FC<TagInputProps> = ({
           {/* Initial tags rendered server-side (will be replaced by JS) */}
           {initialTags.map((tag) => (
             <span
-              class="inline-flex items-center gap-1 px-2 py-0.5 text-sm bg-accent/10 text-accent border border-accent/30"
+              class="inline-flex items-center gap-1 px-2 py-1 text-sm font-medium bg-secondary text-secondary-foreground border-2 border-foreground"
               data-tag-pill={tag}
             >
               <span>{tag}</span>
               <button
                 type="button"
-                class="text-accent/60 hover:text-accent focus:outline-none"
+                class="ml-1 hover:text-destructive focus:outline-none"
                 data-remove-tag={tag}
                 aria-label="Remove tag"
               >

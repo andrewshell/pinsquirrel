@@ -36,11 +36,11 @@ function initTagInput(container) {
     tags.forEach((tag) => {
       const pill = document.createElement('span')
       pill.className =
-        'inline-flex items-center gap-1 px-2 py-0.5 text-sm bg-accent/10 text-accent border border-accent/30'
+        'inline-flex items-center gap-1 px-2 py-1 text-sm font-medium bg-secondary text-secondary-foreground border-2 border-foreground'
       pill.dataset.tagPill = tag
       pill.innerHTML = `
         <span>${escapeHtml(tag)}</span>
-        <button type="button" class="text-accent/60 hover:text-accent focus:outline-none" data-remove-tag="${escapeHtml(tag)}" aria-label="Remove tag">×</button>
+        <button type="button" class="ml-1 hover:text-destructive focus:outline-none" data-remove-tag="${escapeHtml(tag)}" aria-label="Remove tag">×</button>
       `
       pillsContainer.insertBefore(pill, input)
     })
