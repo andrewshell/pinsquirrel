@@ -11,4 +11,5 @@ export default defineConfig({
     '@pinsquirrel/mailgun',
     '@pinsquirrel/services',
   ],
+  external: ['cheerio', 'mailgun.js'],
 })
