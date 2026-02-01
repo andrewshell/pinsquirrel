@@ -3,8 +3,8 @@ import type { FlashMessage } from '../../middleware/session'
 import {
   ErrorMessage,
   FlashMessage as FlashMessageComponent,
-  WarningMessage,
 } from '../components/FlashMessage'
+import { TagSelectDropdown } from '../components/TagSelectDropdown'
 import { DefaultLayout } from '../layouts/default'
 
 interface TagMergePageProps {
@@ -74,6 +74,21 @@ export function TagMergePage({
           source tags will be moved to the destination tag.
         </p>
 
+        {/* Tags data for JS merge summary calculation */}
+        <script
+          type="application/json"
+          id="tags-data"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(
+              tags.map((t) => ({
+                id: t.id,
+                name: t.name,
+                pinCount: t.pinCount,
+              }))
+            ),
+          }}
+        />
+
         {tags.length < 2 ? (
           <div class="text-center py-8">
             <p class="text-muted-foreground mb-4">
@@ -102,64 +117,53 @@ export function TagMergePage({
                 Select the tags you want to merge. These tags will be deleted
                 after merging.
               </p>
-              <div class="space-y-2 max-h-64 overflow-y-auto border-2 border-muted p-3">
-                {tags.map((tag) => (
-                  <label
-                    key={tag.id}
-                    class="flex items-center gap-3 p-2 hover:bg-muted/50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      name="sourceTagIds"
-                      value={tag.id}
-                      checked={selectedSourceTags.includes(tag.id)}
-                      class="h-4 w-4 border-2 border-foreground"
-                    />
-                    <span class="flex-1">{tag.name}</span>
-                    <span class="text-sm text-muted-foreground">
-                      ({tag.pinCount} pin{tag.pinCount === 1 ? '' : 's'})
-                    </span>
-                  </label>
-                ))}
-              </div>
+              <TagSelectDropdown
+                tags={tags}
+                selectedIds={selectedSourceTags}
+                multiple={true}
+                name="sourceTagIds"
+                placeholder="Select tags to merge..."
+              />
             </div>
 
             {/* Destination tag selection */}
             <div class="mb-6">
-              <label
-                for="destinationTagId"
-                class="block text-sm font-medium text-foreground mb-2"
-              >
+              <label class="block text-sm font-medium text-foreground mb-2">
                 Destination Tag <span class="text-red-500">*</span>
               </label>
               <p class="text-sm text-muted-foreground mb-3">
                 Select the tag that will receive all pins from the source tags.
               </p>
-              <select
-                id="destinationTagId"
+              <TagSelectDropdown
+                tags={tags}
+                selectedIds={
+                  selectedDestinationTag ? [selectedDestinationTag] : []
+                }
+                multiple={false}
                 name="destinationTagId"
-                class="w-full px-3 py-2 border-2 border-foreground bg-background text-foreground"
-                required
-              >
-                <option value="">Select destination tag...</option>
-                {tags.map((tag) => (
-                  <option
-                    key={tag.id}
-                    value={tag.id}
-                    selected={selectedDestinationTag === tag.id}
-                  >
-                    {tag.name} ({tag.pinCount} pin
-                    {tag.pinCount === 1 ? '' : 's'})
-                  </option>
-                ))}
-              </select>
+                placeholder="Select destination tag..."
+                excludeSourceSelector="[name='sourceTagIds']"
+              />
             </div>
 
-            {/* Warning */}
-            <WarningMessage
-              message="Warning: This action cannot be undone. Source tags will be permanently deleted after merging."
-              className="mb-6"
-            />
+            {/* Merge Summary - shown by JS when both source and destination are selected */}
+            <div
+              id="merge-summary"
+              class="hidden mb-6 p-4 bg-muted/50 border-2 border-muted"
+            >
+              <h3 class="font-semibold text-foreground mb-2">Merge Summary</h3>
+              <ul class="list-disc list-inside space-y-1 text-sm text-foreground">
+                <li>
+                  <span id="merge-summary-tag-count">0</span> source tag(s) will
+                  be merged
+                </li>
+                <li>
+                  <span id="merge-summary-pin-count">0</span> pin(s) will be
+                  moved to the destination tag
+                </li>
+                <li>Source tags will be deleted after merging</li>
+              </ul>
+            </div>
 
             {/* Submit button */}
             <div class="flex gap-4">

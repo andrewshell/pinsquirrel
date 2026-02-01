@@ -107,7 +107,7 @@ tags.post('/merge', async (c) => {
     return ''
   }
 
-  // Get source tag IDs (can be multiple checkboxes with same name)
+  // Get source tag IDs (comma-separated string from hidden input)
   let sourceTagIds: string[] = []
   const sourceTagIdsRaw = formData['sourceTagIds']
   if (Array.isArray(sourceTagIdsRaw)) {
@@ -115,7 +115,8 @@ tags.post('/merge', async (c) => {
       .map((v) => (typeof v === 'string' ? v : ''))
       .filter((v) => v.length > 0)
   } else if (typeof sourceTagIdsRaw === 'string' && sourceTagIdsRaw) {
-    sourceTagIds = [sourceTagIdsRaw]
+    // Split comma-separated IDs from hidden input
+    sourceTagIds = sourceTagIdsRaw.split(',').filter((v) => v.length > 0)
   }
 
   const destinationTagId = getString(formData['destinationTagId'])

@@ -68,6 +68,7 @@ export const BaseLayout: FC<PropsWithChildren<BaseLayoutProps>> = ({
         <script src="/static/htmx.min.js"></script>
         <script src="/static/dropdown.js" defer></script>
         <script src="/static/tag-input-vanilla.js" defer></script>
+        <script src="/static/tag-select.js" defer></script>
         <script src="/static/metadata-fetch.js" defer></script>
       </head>
       <body class="bg-background text-foreground min-h-screen flex flex-col">
