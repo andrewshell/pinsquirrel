@@ -398,12 +398,40 @@ pinsquirrel/
 
 ### Tasks
 
-- [ ] 6.1 Compare feature checklist
-      | Feature | React App | Hono App |
-      |---------|-----------|----------|
-      | Sign up | ✓ | ? |
-      | Sign in | ✓ | ? |
-      | ... | | |
+- [x] 6.1 Compare feature checklist
+
+      | Feature | React App | Hono App | Status |
+      |---------|-----------|----------|--------|
+      | Home page (`/`) | ✓ | ✓ | ✓ Parity |
+      | Sign in (`/signin`) | ✓ | ✓ | ✓ Parity |
+      | Sign up (`/signup`) | ✓ | ✓ | ✓ Parity |
+      | Forgot password (`/forgot-password`) | ✓ | ✓ | ✓ Parity |
+      | Reset password (`/reset-password/:token`) | ✓ | ✓ | ✓ Parity |
+      | Logout (`/logout`) | ✓ | ✓ | ✓ Parity |
+      | Profile page (`/profile`) | ✓ | ✓ | ✓ Parity |
+      | Pins list (`/pins`) | ✓ | ✓ | ✓ Parity |
+      | New pin (`/pins/new`) | ✓ | ✓ | ✓ Parity |
+      | Edit pin (`/pins/:id/edit`) | ✓ | ✓ | ✓ Parity |
+      | Delete pin (`/pins/:id/delete`) | ✓ | ✓ | ✓ Parity |
+      | Toggle read status | ✓ | ✓ | ✓ Parity |
+      | Pin search | ✓ | ✓ | ✓ Parity |
+      | Tag filtering | ✓ | ✓ | ✓ Parity |
+      | Pagination | ✓ | ✓ | ✓ Parity |
+      | View settings (sort/size) | ✓ | ✓ | ✓ Parity |
+      | Tags page (`/tags`) | ✓ | ✓ | ✓ Parity |
+      | Tags merge (`/tags/merge`) | ✓ | ✓ | ✓ Parity |
+      | Metadata API (`/api/metadata`) | ✓ | ✓ | ✓ Parity |
+      | Bookmarklet support | ✓ | ✓ | ✓ Parity |
+      | Flash messages | ✓ | ✓ | ✓ Parity |
+      | 404 error page | ✓ | ✓ | ✓ Parity |
+      | 500 error page | ✓ | ✓ | ✓ Parity |
+      | Import from Pinboard (`/import`) | ✓ | ✓ | ✓ Parity |
+      | Privacy policy (`/privacy`) | ✓ | ✓ | ✓ Parity |
+      | Terms of use (`/terms`) | ✓ | ✓ | ✓ Parity |
+      | Footer with legal links | ✓ | ✓ | ✓ Parity |
+      | Health check (`/health`) | ✗ | ✓ | Hono-only (OK) |
+
+      **All features implemented! Full parity achieved.**
 
 - [ ] 6.2 Port all Tailwind styles
   - Verify responsive design
@@ -422,8 +450,9 @@ pinsquirrel/
   - Server-side matches React app
   - Error messages consistent
 
-- [ ] 6.6 Duplicate URL detection
-  - Port existing functionality
+- [x] 6.6 Duplicate URL detection
+  - Already implemented in pin creation/editing routes
+  - Handles DuplicatePinError with user-friendly message
 
 ### Verification
 

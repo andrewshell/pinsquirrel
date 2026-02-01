@@ -12,6 +12,8 @@ import { pinsRoutes } from './routes/pins'
 import { tagsRoutes } from './routes/tags'
 import { profileRoutes } from './routes/profile'
 import { apiRoutes } from './routes/api'
+import { staticRoutes } from './routes/static'
+import { importRoutes } from './routes/import'
 import { sessionMiddleware } from './middleware/session'
 
 // Create the Hono app
@@ -28,9 +30,11 @@ app.use('/static/*', serveStatic({ root: './src' }))
 // Routes
 app.route('/health', healthRoutes)
 app.route('/', authRoutes)
+app.route('/', staticRoutes)
 app.route('/pins', pinsRoutes)
 app.route('/tags', tagsRoutes)
 app.route('/profile', profileRoutes)
+app.route('/import', importRoutes)
 app.route('/api', apiRoutes)
 
 // Home page (temporary - will redirect to /pins or /signin)

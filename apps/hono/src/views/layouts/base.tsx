@@ -1,12 +1,15 @@
 import type { FC, PropsWithChildren } from 'hono/jsx'
+import { Footer } from '../components/Footer'
 
 interface BaseLayoutProps {
   title: string
+  showFooter?: boolean
 }
 
 export const BaseLayout: FC<PropsWithChildren<BaseLayoutProps>> = ({
   children,
   title,
+  showFooter = true,
 }) => {
   return (
     <html lang="en">
@@ -19,7 +22,10 @@ export const BaseLayout: FC<PropsWithChildren<BaseLayoutProps>> = ({
         <script src="/static/dropdown.js" defer />
         <script src="/static/tag-input-vanilla.js" defer />
       </head>
-      <body class="bg-background text-foreground min-h-screen">{children}</body>
+      <body class="bg-background text-foreground min-h-screen flex flex-col">
+        <div class="flex-1">{children}</div>
+        {showFooter && <Footer />}
+      </body>
     </html>
   )
 }
