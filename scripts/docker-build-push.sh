@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 DOCKER_REPO="andrewshell/pinsquirrel"
-DOCKERFILE_PATH="apps/web/Dockerfile"
+DOCKERFILE_PATH="apps/hono/Dockerfile"
 
 # Helper functions
 log_info() {
@@ -216,7 +216,7 @@ show_image_info() {
     fi
     echo ""
     echo "🚀 To run the image:"
-    echo "   docker run -p 3000:3000 -e DATABASE_URL=your_db_url ${DOCKER_REPO}:latest"
+    echo "   docker run -p 8100:8100 -e DATABASE_URL=your_db_url ${DOCKER_REPO}:latest"
     echo ""
 }
 

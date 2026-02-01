@@ -1,0 +1,32 @@
+# Build artifacts
+dist
+coverage
+
+# Dependencies
+node_modules
+
+# Development files
+README.md
+*.md
+.env*
+.git
+.gitignore
+
+# IDE and system files
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Test files
+**/*.test.*
+**/*.spec.*
+vitest.setup.ts
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temporary files
+.tmp
+.cache
