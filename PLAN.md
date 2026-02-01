@@ -495,7 +495,7 @@ pinsquirrel/
 
 - [ ] 7.36 Deprecate React app
   - Remove `apps/web` directory
-  - Update documentation (including PRODUCTION_DEPLOYMENT.md)
+  - Update documentation (including DEPLOYMENT.md)
   - Clean up unused dependencies
 
 ### Verification
