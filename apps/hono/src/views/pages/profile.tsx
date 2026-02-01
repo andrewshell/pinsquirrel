@@ -1,6 +1,7 @@
 import type { User } from '@pinsquirrel/domain'
 import { DefaultLayout } from '../layouts/default'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
+import { Button } from '../components/ui/Button'
 import {
   FlashMessage as FlashMessageComponent,
   SuccessMessage,
@@ -137,15 +138,7 @@ export function ProfilePage({
                   )}
                 </div>
 
-                <button
-                  type="submit"
-                  class="px-6 py-3 bg-primary text-primary-foreground font-medium border-2 border-foreground neobrutalism-shadow
-                         hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
-                         active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
-                         transition-all"
-                >
-                  Update Email
-                </button>
+                <Button type="submit">Update Email</Button>
               </form>
             </CardContent>
           </Card>
@@ -219,15 +212,7 @@ export function ProfilePage({
                   )}
                 </div>
 
-                <button
-                  type="submit"
-                  class="px-6 py-3 bg-primary text-primary-foreground font-medium border-2 border-foreground neobrutalism-shadow
-                         hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
-                         active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
-                         transition-all"
-                >
-                  Change Password
-                </button>
+                <Button type="submit">Change Password</Button>
               </form>
             </CardContent>
           </Card>
