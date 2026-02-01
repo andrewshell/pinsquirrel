@@ -165,7 +165,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                     </a>
                     <hr class="border-foreground/20" />
                     <a
-                      href="/logout"
+                      href="/signout"
                       class="block px-4 py-2 text-sm hover:bg-accent/10 transition-colors"
                     >
                       Sign Out
@@ -261,7 +261,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                       </a>
                       <hr class="border-foreground/20" />
                       <a
-                        href="/logout"
+                        href="/signout"
                         class="block px-4 py-2 text-center font-medium border-2 border-foreground hover:bg-accent/10 transition-colors"
                       >
                         Sign Out

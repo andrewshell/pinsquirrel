@@ -313,15 +313,15 @@ auth.post('/reset-password/:token', async (c) => {
   }
 })
 
-// POST /logout - Process logout
-auth.post('/logout', async (c) => {
+// POST /signout - Process sign out
+auth.post('/signout', async (c) => {
   const sessionManager = getSessionManager(c)
   await sessionManager.destroy()
   return c.redirect('/signin')
 })
 
-// GET /logout - Also support GET for convenience
-auth.get('/logout', async (c) => {
+// GET /signout - Also support GET for convenience
+auth.get('/signout', async (c) => {
   const sessionManager = getSessionManager(c)
   await sessionManager.destroy()
   return c.redirect('/signin')
