@@ -1,6 +1,5 @@
 import type { FC } from 'hono/jsx'
-import { BaseLayout } from '../layouts/base'
-import { Header } from '../components/Header'
+import { DefaultLayout } from '../layouts/default'
 import { SuccessMessage, ErrorMessage } from '../components/FlashMessage'
 
 interface SignUpPageProps {
@@ -19,8 +18,7 @@ export const SignUpPage: FC<SignUpPageProps> = ({
   message,
 }) => {
   return (
-    <BaseLayout title="Sign Up">
-      <Header user={null} />
+    <DefaultLayout title="Sign Up" user={null}>
       <div class="flex flex-col items-center justify-center px-4 py-16">
         <div class="w-full max-w-md">
           {/* Header */}
@@ -147,6 +145,6 @@ export const SignUpPage: FC<SignUpPageProps> = ({
           </div>
         </div>
       </div>
-    </BaseLayout>
+    </DefaultLayout>
   )
 }

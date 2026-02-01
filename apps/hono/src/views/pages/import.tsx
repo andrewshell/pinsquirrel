@@ -1,9 +1,11 @@
 import type { FC } from 'hono/jsx'
-import { BaseLayout } from '../layouts/base'
+import type { User } from '@pinsquirrel/domain'
+import { DefaultLayout } from '../layouts/default'
 import { FlashMessage as FlashMessageComponent } from '../components/FlashMessage'
 import type { FlashMessage } from '../../middleware/session'
 
 interface ImportPageProps {
+  user: User
   flash?: FlashMessage | null
   errors?: Record<string, string[]>
   success?: boolean
@@ -11,6 +13,7 @@ interface ImportPageProps {
 }
 
 export const ImportPage: FC<ImportPageProps> = ({
+  user,
   flash,
   errors,
   success,
@@ -19,7 +22,7 @@ export const ImportPage: FC<ImportPageProps> = ({
   const formError = errors?._form?.[0]
 
   return (
-    <BaseLayout title="Import Bookmarks">
+    <DefaultLayout title="Import Bookmarks" user={user} currentPath="/import">
       <div class="container max-w-4xl mx-auto px-4 py-8">
         <div class="mb-6">
           <a
@@ -207,6 +210,6 @@ export const ImportPage: FC<ImportPageProps> = ({
           </div>
         </div>
       </div>
-    </BaseLayout>
+    </DefaultLayout>
   )
 }

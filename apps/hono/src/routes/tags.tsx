@@ -54,6 +54,7 @@ tags.get('/', async (c) => {
 
   return c.html(
     <TagsPage
+      user={user}
       tags={userTags}
       currentFilter={currentFilter}
       untaggedPinsCount={untaggedResult.totalCount}
@@ -82,7 +83,7 @@ tags.get('/merge', async (c) => {
   // Get flash message if any
   const flash = sessionManager.getFlash()
 
-  return c.html(<TagMergePage tags={tagsWithPins} flash={flash} />)
+  return c.html(<TagMergePage user={user} tags={tagsWithPins} flash={flash} />)
 })
 
 // POST /tags/merge - Perform tag merge
@@ -127,6 +128,7 @@ tags.post('/merge', async (c) => {
   if (sourceTagIds.length === 0) {
     return c.html(
       <TagMergePage
+        user={user}
         tags={tagsWithPins}
         errors={{ _form: ['Please select at least one source tag.'] }}
         selectedSourceTags={sourceTagIds}
@@ -138,6 +140,7 @@ tags.post('/merge', async (c) => {
   if (!destinationTagId) {
     return c.html(
       <TagMergePage
+        user={user}
         tags={tagsWithPins}
         errors={{ _form: ['Please select a destination tag.'] }}
         selectedSourceTags={sourceTagIds}
@@ -149,6 +152,7 @@ tags.post('/merge', async (c) => {
   if (sourceTagIds.includes(destinationTagId)) {
     return c.html(
       <TagMergePage
+        user={user}
         tags={tagsWithPins}
         errors={{
           _form: ['Destination tag cannot be one of the source tags.'],
@@ -169,6 +173,7 @@ tags.post('/merge', async (c) => {
   } catch {
     return c.html(
       <TagMergePage
+        user={user}
         tags={tagsWithPins}
         errors={{ _form: ['Failed to merge tags. Please try again.'] }}
         selectedSourceTags={sourceTagIds}

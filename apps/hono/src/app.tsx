@@ -3,11 +3,10 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { logger } from 'hono/logger'
 import { secureHeaders } from 'hono/secure-headers'
 
-import { BaseLayout } from './views/layouts/base'
 import { NotFoundPage } from './views/pages/not-found'
 import { ServerErrorPage } from './views/pages/server-error'
 import { HomePage } from './views/pages/home'
-import { Header } from './views/components/Header'
+import { DefaultLayout } from './views/layouts/default'
 import { getSessionManager } from './middleware/session'
 import { healthRoutes } from './routes/health'
 import { authRoutes } from './routes/auth'
@@ -50,10 +49,9 @@ app.get('/', async (c) => {
   }
 
   return c.html(
-    <BaseLayout title="Hoard your links like winter is coming">
-      <Header user={null} />
+    <DefaultLayout title="Hoard your links like winter is coming" user={null}>
       <HomePage />
-    </BaseLayout>
+    </DefaultLayout>
   )
 })
 

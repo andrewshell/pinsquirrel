@@ -1,15 +1,16 @@
 import type { FC } from 'hono/jsx'
-import type { Pin } from '@pinsquirrel/domain'
-import { BaseLayout } from '../layouts/base'
+import type { Pin, User } from '@pinsquirrel/domain'
+import { DefaultLayout } from '../layouts/default'
 
 interface PinDeletePageProps {
+  user: User
   pin: Pin
 }
 
-export const PinDeletePage: FC<PinDeletePageProps> = ({ pin }) => {
+export const PinDeletePage: FC<PinDeletePageProps> = ({ user, pin }) => {
   return (
-    <BaseLayout title="Delete Pin">
-      <div class="min-h-screen py-8 px-4">
+    <DefaultLayout title="Delete Pin" user={user}>
+      <div class="py-8 px-4">
         <div class="max-w-2xl mx-auto">
           {/* Back link */}
           <div class="mb-6">
@@ -89,6 +90,6 @@ export const PinDeletePage: FC<PinDeletePageProps> = ({ pin }) => {
           </div>
         </div>
       </div>
-    </BaseLayout>
+    </DefaultLayout>
   )
 }

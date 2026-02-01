@@ -1,10 +1,8 @@
 import type { FC, PropsWithChildren } from 'hono/jsx'
 import { html } from 'hono/html'
-import { Footer } from '../components/Footer'
 
 interface BaseLayoutProps {
   title: string
-  showFooter?: boolean
 }
 
 // Script to detect system dark mode preference and apply .dark class
@@ -40,7 +38,6 @@ const darkModeScript = html`
 export const BaseLayout: FC<PropsWithChildren<BaseLayoutProps>> = ({
   children,
   title,
-  showFooter = true,
 }) => {
   return (
     <html lang="en">
@@ -55,8 +52,7 @@ export const BaseLayout: FC<PropsWithChildren<BaseLayoutProps>> = ({
         <script src="/static/tag-input-vanilla.js" defer />
       </head>
       <body class="bg-background text-foreground min-h-screen flex flex-col">
-        <div class="flex-1">{children}</div>
-        {showFooter && <Footer />}
+        {children}
       </body>
     </html>
   )

@@ -1,11 +1,12 @@
-import type { TagWithCount } from '@pinsquirrel/domain'
-import { BaseLayout } from '../layouts/base'
+import type { TagWithCount, User } from '@pinsquirrel/domain'
+import { DefaultLayout } from '../layouts/default'
 import { FlashMessage as FlashMessageComponent } from '../components/FlashMessage'
 import type { FlashMessage } from '../../middleware/session'
 
 export type TagFilterType = 'all' | 'toread'
 
 interface TagsPageProps {
+  user: User
   tags: TagWithCount[]
   currentFilter: TagFilterType
   untaggedPinsCount: number
@@ -74,6 +75,7 @@ function buildUntaggedUrl(currentFilter: TagFilterType): string {
 }
 
 export function TagsPage({
+  user,
   tags,
   currentFilter,
   untaggedPinsCount,
@@ -88,7 +90,7 @@ export function TagsPage({
   const pinCounts = tags.map((tag) => tag.pinCount)
 
   return (
-    <BaseLayout title="Tags">
+    <DefaultLayout title="Tags" user={user} currentPath="/tags">
       <div class="container mx-auto px-4 py-8 max-w-4xl">
         {/* Flash message */}
         {flash && (
@@ -215,6 +217,6 @@ export function TagsPage({
           </div>
         )}
       </div>
-    </BaseLayout>
+    </DefaultLayout>
   )
 }

@@ -1,11 +1,12 @@
 import type { FC } from 'hono/jsx'
-import type { Pin } from '@pinsquirrel/domain'
-import { BaseLayout } from '../layouts/base'
+import type { Pin, User } from '@pinsquirrel/domain'
+import { DefaultLayout } from '../layouts/default'
 import { TagInput } from '../components/TagInput'
 import { FlashMessage, ErrorMessage } from '../components/FlashMessage'
 import type { FlashType } from '../../middleware/session'
 
 interface PinEditPageProps {
+  user: User
   pin: Pin
   errors?: Record<string, string[]>
   flash?: { type: FlashType; message: string } | null
@@ -21,6 +22,7 @@ interface PinEditPageProps {
 }
 
 export const PinEditPage: FC<PinEditPageProps> = ({
+  user,
   pin,
   errors,
   flash,
@@ -49,8 +51,8 @@ export const PinEditPage: FC<PinEditPageProps> = ({
   })
 
   return (
-    <BaseLayout title="Edit Pin">
-      <div class="min-h-screen py-8 px-4">
+    <DefaultLayout title="Edit Pin" user={user}>
+      <div class="py-8 px-4">
         <div class="max-w-2xl mx-auto">
           {/* Back link */}
           <div class="mb-6">
@@ -223,6 +225,6 @@ export const PinEditPage: FC<PinEditPageProps> = ({
           </div>
         </div>
       </div>
-    </BaseLayout>
+    </DefaultLayout>
   )
 }

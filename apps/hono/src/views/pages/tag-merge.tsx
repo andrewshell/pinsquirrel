@@ -1,5 +1,5 @@
-import type { TagWithCount } from '@pinsquirrel/domain'
-import { BaseLayout } from '../layouts/base'
+import type { TagWithCount, User } from '@pinsquirrel/domain'
+import { DefaultLayout } from '../layouts/default'
 import {
   FlashMessage as FlashMessageComponent,
   ErrorMessage,
@@ -8,6 +8,7 @@ import {
 import type { FlashMessage } from '../../middleware/session'
 
 interface TagMergePageProps {
+  user: User
   tags: TagWithCount[]
   flash?: FlashMessage | null
   errors?: Record<string, string[]>
@@ -16,6 +17,7 @@ interface TagMergePageProps {
 }
 
 export function TagMergePage({
+  user,
   tags,
   flash,
   errors,
@@ -25,7 +27,7 @@ export function TagMergePage({
   const formError = errors?._form?.[0]
 
   return (
-    <BaseLayout title="Merge Tags">
+    <DefaultLayout title="Merge Tags" user={user} currentPath="/tags/merge">
       <div class="container mx-auto px-4 py-8 max-w-2xl">
         {/* Flash message */}
         {flash && (
@@ -183,6 +185,6 @@ export function TagMergePage({
           )}
         </div>
       </div>
-    </BaseLayout>
+    </DefaultLayout>
   )
 }

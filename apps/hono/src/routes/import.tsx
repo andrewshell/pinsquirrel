@@ -32,7 +32,7 @@ importRoute.get('/', async (c) => {
 
   const flash = sessionManager.getFlash()
 
-  return c.html(<ImportPage flash={flash} />)
+  return c.html(<ImportPage user={user} flash={flash} />)
 })
 
 // POST /import - Process import
@@ -54,14 +54,20 @@ importRoute.post('/', async (c) => {
     // Check if file was provided
     if (!file || !(file instanceof File)) {
       return c.html(
-        <ImportPage errors={{ _form: ['Please select a file to import'] }} />
+        <ImportPage
+          user={user}
+          errors={{ _form: ['Please select a file to import'] }}
+        />
       )
     }
 
     // Validate file type
     if (!file.name.endsWith('.json')) {
       return c.html(
-        <ImportPage errors={{ _form: ['Please upload a JSON file'] }} />
+        <ImportPage
+          user={user}
+          errors={{ _form: ['Please upload a JSON file'] }}
+        />
       )
     }
 
@@ -69,7 +75,10 @@ importRoute.post('/', async (c) => {
     const maxSize = 10 * 1024 * 1024
     if (file.size > maxSize) {
       return c.html(
-        <ImportPage errors={{ _form: ['File size exceeds 10MB limit'] }} />
+        <ImportPage
+          user={user}
+          errors={{ _form: ['File size exceeds 10MB limit'] }}
+        />
       )
     }
 
@@ -81,7 +90,10 @@ importRoute.post('/', async (c) => {
       pinboardData = JSON.parse(fileContent) as PinboardPin[]
     } catch {
       return c.html(
-        <ImportPage errors={{ _form: ['Invalid JSON file format'] }} />
+        <ImportPage
+          user={user}
+          errors={{ _form: ['Invalid JSON file format'] }}
+        />
       )
     }
 
@@ -89,6 +101,7 @@ importRoute.post('/', async (c) => {
     if (!Array.isArray(pinboardData) || pinboardData.length === 0) {
       return c.html(
         <ImportPage
+          user={user}
           errors={{
             _form: ['File does not appear to be a valid Pinboard export'],
           }}
@@ -100,6 +113,7 @@ importRoute.post('/', async (c) => {
     if (!firstPin.href || !firstPin.description || !firstPin.time) {
       return c.html(
         <ImportPage
+          user={user}
           errors={{
             _form: ['File structure does not match Pinboard export format'],
           }}
@@ -215,6 +229,7 @@ importRoute.post('/', async (c) => {
     console.error('Import failed with unexpected error', error)
     return c.html(
       <ImportPage
+        user={user}
         errors={{ _form: ['An unexpected error occurred during import'] }}
       />,
       500

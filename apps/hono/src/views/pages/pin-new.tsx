@@ -1,10 +1,12 @@
 import type { FC } from 'hono/jsx'
-import { BaseLayout } from '../layouts/base'
+import type { User } from '@pinsquirrel/domain'
+import { DefaultLayout } from '../layouts/default'
 import { TagInput } from '../components/TagInput'
 import { FlashMessage, ErrorMessage } from '../components/FlashMessage'
 import type { FlashType } from '../../middleware/session'
 
 interface PinNewPageProps {
+  user: User
   errors?: Record<string, string[]>
   flash?: { type: FlashType; message: string } | null
   userTags?: string[]
@@ -19,6 +21,7 @@ interface PinNewPageProps {
 }
 
 export const PinNewPage: FC<PinNewPageProps> = ({
+  user,
   errors,
   flash,
   userTags = [],
@@ -32,8 +35,8 @@ export const PinNewPage: FC<PinNewPageProps> = ({
   const backUrl = returnParams ? `/pins?${returnParams}` : '/pins'
 
   return (
-    <BaseLayout title="Create New Pin">
-      <div class="min-h-screen py-8 px-4">
+    <DefaultLayout title="Create New Pin" user={user} currentPath="/pins/new">
+      <div class="py-8 px-4">
         <div class="max-w-2xl mx-auto">
           {/* Back link */}
           <div class="mb-6">
@@ -196,6 +199,6 @@ export const PinNewPage: FC<PinNewPageProps> = ({
           </div>
         </div>
       </div>
-    </BaseLayout>
+    </DefaultLayout>
   )
 }

@@ -1,7 +1,6 @@
 import type { FC } from 'hono/jsx'
 import type { User } from '@pinsquirrel/domain'
-import { BaseLayout } from '../layouts/base'
-import { Header } from '../components/Header'
+import { DefaultLayout } from '../layouts/default'
 
 interface TermsPageProps {
   user: User | null
@@ -11,8 +10,7 @@ export const TermsPage: FC<TermsPageProps> = ({ user }) => {
   const today = new Date().toLocaleDateString()
 
   return (
-    <BaseLayout title="Terms of Use">
-      <Header user={user} />
+    <DefaultLayout title="Terms of Use" user={user}>
       <div class="bg-background">
         <div class="container mx-auto px-4 py-16">
           <div class="max-w-4xl mx-auto">
@@ -134,6 +132,6 @@ export const TermsPage: FC<TermsPageProps> = ({ user }) => {
           </div>
         </div>
       </div>
-    </BaseLayout>
+    </DefaultLayout>
   )
 }

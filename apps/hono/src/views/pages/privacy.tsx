@@ -1,7 +1,6 @@
 import type { FC } from 'hono/jsx'
 import type { User } from '@pinsquirrel/domain'
-import { BaseLayout } from '../layouts/base'
-import { Header } from '../components/Header'
+import { DefaultLayout } from '../layouts/default'
 
 interface PrivacyPageProps {
   user: User | null
@@ -11,8 +10,7 @@ export const PrivacyPage: FC<PrivacyPageProps> = ({ user }) => {
   const today = new Date().toLocaleDateString()
 
   return (
-    <BaseLayout title="Privacy Policy">
-      <Header user={user} />
+    <DefaultLayout title="Privacy Policy" user={user}>
       <div class="bg-background">
         <div class="container mx-auto px-4 py-16">
           <div class="max-w-4xl mx-auto">
@@ -116,6 +114,6 @@ export const PrivacyPage: FC<PrivacyPageProps> = ({ user }) => {
           </div>
         </div>
       </div>
-    </BaseLayout>
+    </DefaultLayout>
   )
 }

@@ -1,6 +1,5 @@
 import type { FC } from 'hono/jsx'
-import { BaseLayout } from '../layouts/base'
-import { Header } from '../components/Header'
+import { DefaultLayout } from '../layouts/default'
 import {
   FlashMessage,
   SuccessMessage,
@@ -26,8 +25,7 @@ export const SignInPage: FC<SignInPageProps> = ({
   flash,
 }) => {
   return (
-    <BaseLayout title="Sign In">
-      <Header user={null} />
+    <DefaultLayout title="Sign In" user={null}>
       <div class="flex flex-col items-center justify-center px-4 py-16">
         <div class="w-full max-w-md">
           {/* Header */}
@@ -161,6 +159,6 @@ export const SignInPage: FC<SignInPageProps> = ({
           </div>
         </div>
       </div>
-    </BaseLayout>
+    </DefaultLayout>
   )
 }

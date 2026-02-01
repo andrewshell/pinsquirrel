@@ -1,5 +1,5 @@
 import type { User } from '@pinsquirrel/domain'
-import { BaseLayout } from '../layouts/base'
+import { DefaultLayout } from '../layouts/default'
 import {
   FlashMessage as FlashMessageComponent,
   SuccessMessage,
@@ -35,7 +35,7 @@ export function ProfilePage({
   const formError = errors?._form?.[0]
 
   return (
-    <BaseLayout title="Profile">
+    <DefaultLayout title="Profile" user={user} currentPath="/profile">
       <div class="container mx-auto px-4 py-8 max-w-2xl">
         {/* Flash message */}
         {flash && (
@@ -329,6 +329,6 @@ export function ProfilePage({
           }}
         />
       </div>
-    </BaseLayout>
+    </DefaultLayout>
   )
 }

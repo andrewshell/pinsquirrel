@@ -1,8 +1,7 @@
 import type { FC } from 'hono/jsx'
 import type { Pin, Pagination, User } from '@pinsquirrel/domain'
-import { BaseLayout } from '../layouts/base'
+import { DefaultLayout } from '../layouts/default'
 import { PinListPartial } from '../partials/pin-list'
-import { Header } from '../components/Header'
 import { FilterHeader } from '../components/FilterHeader'
 import { ViewSettings } from '../components/ViewSettings'
 import { FlashMessage } from '../components/FlashMessage'
@@ -40,49 +39,43 @@ export const PinsPage: FC<PinsPageProps> = ({
   flash,
 }) => {
   return (
-    <BaseLayout title="Pins">
-      <div class="min-h-screen">
-        {/* Global Header */}
-        <Header user={user} currentPath="/pins" />
-
-        {/* Main content */}
-        <main class="max-w-4xl mx-auto px-4 py-6">
-          {/* Flash message */}
-          {flash && (
-            <FlashMessage
-              type={flash.type}
-              message={flash.message}
-              className="mb-6"
-            />
-          )}
-
-          <FilterHeader
-            activeTag={activeTag}
-            searchQuery={searchQuery}
-            readFilter={readFilter}
-            searchParams={searchParams}
-            noTags={noTags}
+    <DefaultLayout title="Pins" user={user} currentPath="/pins">
+      <div class="max-w-4xl mx-auto px-4 py-6">
+        {/* Flash message */}
+        {flash && (
+          <FlashMessage
+            type={flash.type}
+            message={flash.message}
+            className="mb-6"
           />
+        )}
 
-          <ViewSettings
-            sortBy={sortBy}
-            sortDirection={sortDirection}
+        <FilterHeader
+          activeTag={activeTag}
+          searchQuery={searchQuery}
+          readFilter={readFilter}
+          searchParams={searchParams}
+          noTags={noTags}
+        />
+
+        <ViewSettings
+          sortBy={sortBy}
+          sortDirection={sortDirection}
+          viewSize={viewSize}
+          searchParams={searchParams}
+        />
+
+        {/* Pin list - content loaded via server render, updates via HTMX */}
+        <div id="pin-list">
+          <PinListPartial
+            pins={pins}
+            pagination={pagination}
+            totalCount={totalCount}
+            searchParams={searchParams}
             viewSize={viewSize}
-            searchParams={searchParams}
           />
-
-          {/* Pin list - content loaded via server render, updates via HTMX */}
-          <div id="pin-list">
-            <PinListPartial
-              pins={pins}
-              pagination={pagination}
-              totalCount={totalCount}
-              searchParams={searchParams}
-              viewSize={viewSize}
-            />
-          </div>
-        </main>
+        </div>
       </div>
-    </BaseLayout>
+    </DefaultLayout>
   )
 }

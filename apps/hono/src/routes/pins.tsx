@@ -206,6 +206,7 @@ pins.get('/new', async (c) => {
 
   return c.html(
     <PinNewPage
+      user={user}
       flash={flash}
       userTags={userTags.map((t) => t.name)}
       url={prefillUrl}
@@ -270,6 +271,7 @@ pins.post('/new', async (c) => {
     if (error instanceof ValidationError) {
       return c.html(
         <PinNewPage
+          user={user}
           errors={error.fields}
           userTags={userTags.map((t) => t.name)}
           url={pinUrl}
@@ -284,6 +286,7 @@ pins.post('/new', async (c) => {
     if (error instanceof DuplicatePinError) {
       return c.html(
         <PinNewPage
+          user={user}
           errors={{ url: ['You have already saved this URL'] }}
           userTags={userTags.map((t) => t.name)}
           url={pinUrl}
@@ -298,6 +301,7 @@ pins.post('/new', async (c) => {
     // Generic error
     return c.html(
       <PinNewPage
+        user={user}
         errors={{ _form: ['Failed to create pin. Please try again.'] }}
         userTags={userTags.map((t) => t.name)}
         url={pinUrl}
@@ -335,6 +339,7 @@ pins.get('/:id/edit', async (c) => {
 
     return c.html(
       <PinEditPage
+        user={user}
         pin={pin}
         flash={flash}
         userTags={userTags.map((t) => t.name)}
@@ -418,6 +423,7 @@ pins.post('/:id/edit', async (c) => {
     if (error instanceof ValidationError) {
       return c.html(
         <PinEditPage
+          user={user}
           pin={pin}
           errors={error.fields}
           userTags={userTags.map((t) => t.name)}
@@ -433,6 +439,7 @@ pins.post('/:id/edit', async (c) => {
     if (error instanceof DuplicatePinError) {
       return c.html(
         <PinEditPage
+          user={user}
           pin={pin}
           errors={{ url: ['You have already saved this URL'] }}
           userTags={userTags.map((t) => t.name)}
@@ -455,6 +462,7 @@ pins.post('/:id/edit', async (c) => {
     // Generic error
     return c.html(
       <PinEditPage
+        user={user}
         pin={pin}
         errors={{ _form: ['Failed to update pin. Please try again.'] }}
         userTags={userTags.map((t) => t.name)}
@@ -527,7 +535,7 @@ pins.get('/:id/delete', async (c) => {
   try {
     const pin = await pinService.getPin(ac, pinId)
 
-    return c.html(<PinDeletePage pin={pin} />)
+    return c.html(<PinDeletePage user={user} pin={pin} />)
   } catch (error) {
     if (
       error instanceof PinNotFoundError ||
