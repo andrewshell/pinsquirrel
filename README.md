@@ -1,6 +1,6 @@
 # PinSquirrel
 
-A pnpm monorepo with React Router 7 web application and shared libraries.
+A pnpm monorepo with a Hono + HTMX web application and shared libraries.
 
 ## Quick Start
 
@@ -11,52 +11,56 @@ pnpm install
 # Start development database
 pnpm db:up
 
-# Start development servers
+# Start development server
 pnpm dev
 
-# Open http://localhost:5173
+# Open http://localhost:8100
 ```
 
 ## Development Commands
 
 ### Core Workflow
+
 ```bash
 pnpm install          # Install dependencies for all workspaces
-pnpm dev               # Start development servers (web app + watch mode for libs)
-pnpm build             # Build all packages
-pnpm test              # Run tests across all workspaces
+pnpm dev              # Start development server
+pnpm build            # Build all packages
+pnpm test             # Run tests across all workspaces
 ```
 
 ### Database Management
+
 ```bash
 pnpm db:up             # Start PostgreSQL database via Docker
 pnpm db:down           # Stop database
 
 # Database operations (run from root)
 pnpm --filter @pinsquirrel/database db:generate    # Generate migrations
-pnpm --filter @pinsquirrel/database db:migrate     # Run migrations  
+pnpm --filter @pinsquirrel/database db:migrate     # Run migrations
 pnpm --filter @pinsquirrel/database db:studio      # Open Drizzle Studio
 ```
 
 ### Code Quality
+
 ```bash
-pnpm typecheck         # Type check all packages (includes React Router type generation)
+pnpm typecheck         # Type check all packages
 pnpm lint              # Run ESLint across all workspaces
 pnpm format            # Format code with Prettier
 pnpm test              # Run all tests
 
 # Run all quality checks
-pnpm typecheck && pnpm lint && pnpm test && pnpm format
+pnpm quality
 ```
 
 ### Workspace-Specific Commands
-```bash
-# Web app
-pnpm --filter @pinsquirrel/web dev           # Start web dev server only
-pnpm --filter @pinsquirrel/web test          # Run web app tests
-pnpm --filter @pinsquirrel/web build         # Build web app
 
-# Services library  
+```bash
+# Hono app
+pnpm --filter @pinsquirrel/hono dev           # Start dev server only
+pnpm --filter @pinsquirrel/hono test          # Run app tests
+pnpm --filter @pinsquirrel/hono build         # Build app
+
+# Services library
 pnpm --filter @pinsquirrel/services test     # Run services tests
 pnpm --filter @pinsquirrel/services dev      # TypeScript watch mode
 
@@ -66,22 +70,23 @@ pnpm --filter @pinsquirrel/database dev      # TypeScript watch mode
 ```
 
 ### Testing
+
 ```bash
 # Run all tests
 pnpm test
 
 # Test specific workspace
-pnpm test --filter @pinsquirrel/web
+pnpm test --filter @pinsquirrel/hono
 pnpm test --filter @pinsquirrel/services
 pnpm test --filter @pinsquirrel/database
 
 # Test with watch mode (great for TDD)
-pnpm --filter @pinsquirrel/web test:watch
+pnpm --filter @pinsquirrel/hono test:watch
 pnpm --filter @pinsquirrel/services test:watch
 pnpm --filter @pinsquirrel/database test:watch
 
 # Test with coverage reports
-pnpm --filter @pinsquirrel/web test:coverage
+pnpm --filter @pinsquirrel/hono test:coverage
 pnpm --filter @pinsquirrel/services test:coverage
 pnpm --filter @pinsquirrel/database test:coverage
 ```
@@ -90,7 +95,7 @@ pnpm --filter @pinsquirrel/database test:coverage
 
 ```
 ├── apps/
-│   └── web/                    # React Router 7 application
+│   └── hono/                   # Hono + HTMX application
 ├── libs/
 │   ├── services/               # Business logic services and validation
 │   ├── database/               # Database layer with Drizzle ORM
@@ -107,11 +112,13 @@ pnpm --filter @pinsquirrel/database test:coverage
 ### Database Configuration
 
 Copy the environment template:
+
 ```bash
 cp .env.example .env
 ```
 
 The default database connection works with `pnpm db:up`:
+
 ```
 DATABASE_URL=postgresql://pinsquirrel:pinsquirrel@localhost:5432/pinsquirrel
 ```
@@ -125,12 +132,13 @@ DATABASE_URL=postgresql://pinsquirrel:pinsquirrel@localhost:5432/pinsquirrel
 ## Production Deployment
 
 ### Build Docker Image
+
 ```bash
 # Build production image (run from repository root)
-docker build -f apps/web/Dockerfile -t your-username/pinsquirrel-web:latest .
+docker build -f apps/hono/Dockerfile -t your-username/pinsquirrel:latest .
 
-# Push to registry
-docker push your-username/pinsquirrel-web:latest
+# Or use the convenience script (builds and pushes to Docker Hub)
+pnpm docker:build-push
 ```
 
 ### Deployment Options
@@ -142,10 +150,10 @@ docker push your-username/pinsquirrel-web:latest
 ## Development Workflow
 
 1. **Start database**: `pnpm db:up`
-2. **Start development**: `pnpm dev`  
-3. **Make changes**: Edit code in `apps/web/`, `libs/services/`, or `libs/database/`
+2. **Start development**: `pnpm dev`
+3. **Make changes**: Edit code in `apps/hono/`, `libs/services/`, or `libs/database/`
 4. **Run tests**: `pnpm test --filter <workspace> -- --watch`
-5. **Quality check**: `pnpm typecheck && pnpm lint && pnpm test`
+5. **Quality check**: `pnpm quality`
 6. **Commit changes**: Follow conventional commits
 
 ## Monorepo Guidelines

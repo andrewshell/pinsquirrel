@@ -489,13 +489,15 @@ pinsquirrel/
   - Created `migrate-and-start.sh` script
   - Updated `scripts/docker-build-push.sh` to build Hono app
 
-- [ ] 7.2 Update CI/CD pipeline
-  - Run tests
+- [x] 7.2 Update CI/CD pipeline
+  - N/A - no existing CI/CD pipeline; manual deployment via `scripts/docker-build-push.sh`
 
-- [ ] 7.36 Deprecate React app
-  - Remove `apps/web` directory
-  - Update documentation (including DEPLOYMENT.md)
-  - Clean up unused dependencies
+- [x] 7.3 Deprecate React app
+  - Removed `apps/web` directory
+  - Updated documentation (CLAUDE.md, README.md, DEPLOYMENT.md)
+  - Cleaned up unused dependencies (322 packages removed)
+  - Updated root package.json scripts and lint-staged config
+  - Updated turbo.json to remove React Router outputs
 
 ### Verification
 

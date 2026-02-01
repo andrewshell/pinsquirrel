@@ -6,9 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a pnpm monorepo with Turbo orchestration:
 
-- `apps/` - Applications and end-user facing packages
-  - `web/` - React Router 7 (Framework mode) application with SSR **(being replaced)**
-  - `hono/` - Hono + HTMX application **(in development)**
+- `apps/` - Applications
+  - `hono/` - Hono + HTMX application (main app)
 - `libs/` - Shared libraries and utilities
   - `services/` - Business logic services and validation
   - `database/` - Database layer with Drizzle ORM for PostgreSQL
@@ -23,18 +22,13 @@ This is a pnpm monorepo with Turbo orchestration:
 
 ### Development
 
-- `pnpm dev` - Start React app (port 8100)
-- `pnpm dev:hono` - Start Hono app (port 8100)
-- `pnpm dev:all` - Start all development servers
+- `pnpm dev` - Start development server (port 8100)
 - `pnpm build` - Build all packages
-- `pnpm build:web` - Build React app only
-- `pnpm build:hono` - Build Hono app only
-- `pnpm start` - Start React app (production)
-- `pnpm start:hono` - Start Hono app (production)
+- `pnpm start` - Start production server
 - `pnpm lint` - Run ESLint across all workspaces
 - `pnpm format` - Run Prettier formatting across all workspaces
 - `pnpm test` - Run tests across all workspaces
-- `pnpm typecheck` - Run TypeScript type checking (includes React Router type generation)
+- `pnpm typecheck` - Run TypeScript type checking
 
 ### Package Management
 
@@ -61,7 +55,7 @@ This is a pnpm monorepo with Turbo orchestration:
 - **ALWAYS run commands from the project root** using `pnpm --filter <workspace>`
 - **NEVER navigate to subdirectories** to run commands unless absolutely necessary
 - If you must navigate to a subdirectory, **ALWAYS return to root** immediately after
-- Use `pnpm --filter @pinsquirrel/web <command>` instead of `cd apps/web && pnpm <command>`
+- Use `pnpm --filter @pinsquirrel/hono <command>` instead of `cd apps/hono && pnpm <command>`
 - Use `pnpm --filter @pinsquirrel/services <command>` instead of `cd libs/services && pnpm <command>`
 - Use `pnpm --filter @pinsquirrel/database <command>` instead of `cd libs/database && pnpm <command>`
 
@@ -135,93 +129,38 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm format
 - All scripts are orchestrated through Turbo
 - Commands automatically handle dependency order
 - Caching is enabled for builds and tests
-- Output directories: `build/**`, `dist/**`, `.react-router/**`
+- Output directories: `build/**`, `dist/**`
 
-## React Router 7 App (apps/web) - Being Replaced
+## Hono App (apps/hono)
 
-The web app uses React Router 7 in Framework mode with SSR enabled:
+The main application using Hono + HTMX:
 
-- **Development**: `pnpm dev --filter @pinsquirrel/web`
-- **Build**: Generates both client and server bundles in `build/`
-- **Start**: `pnpm start --filter @pinsquirrel/web` (requires build first)
-- **TypeScript**: Uses React Router's type generation system
-- **Path Aliases**: `~/*` maps to `app/*` directory
-- **Styling**: Tailwind CSS v4 with Vite integration
-- **Testing**: Vitest with React Testing Library
+- **Development**: `pnpm dev`
+- **Build**: `pnpm build`
+- **Start**: `pnpm start`
 
-### React Router 7 Specific Files
+### Tech Stack
 
-- `react-router.config.ts` - Framework configuration
-- `app/routes.ts` - Route definitions
-- `app/root.tsx` - Root component with document structure
-- `.react-router/types/` - Generated TypeScript types
+| Component     | Technology   | Purpose                                 |
+| ------------- | ------------ | --------------------------------------- |
+| Backend       | Hono         | HTTP routing, middleware, JSX templates |
+| Interactivity | HTMX         | Partial page updates, form handling     |
+| Complex UI    | Vanilla JS   | Dropdowns, tag input autocomplete       |
+| Database      | Drizzle ORM  | PostgreSQL database access              |
+| Styling       | Tailwind CSS | Utility-first CSS                       |
+
+### Key Characteristics
+
+- Server-rendered JSX templates (not React components)
+- HTMX attributes for interactivity (no client-side state management)
+- Database sessions stored in PostgreSQL
+- Traditional page navigation (no client-side routing)
+- Vanilla JS for dropdowns (`dropdown.js`) and tag input (`tag-input-vanilla.js`)
 
 ### Running Tests
 
-- `pnpm test --filter @pinsquirrel/web` - Run all tests once
-- `pnpm test --filter @pinsquirrel/web -- <pattern>` - Run specific test files
-- `pnpm test --filter @pinsquirrel/web -- --watch` - Run tests in watch mode for TDD
-
-## Stack Migration: Hono + HTMX
-
-**STATUS: Active Migration**
-
-We are migrating from React Router 7 to a simpler stack. See `PLAN.md` for full details.
-
-### Why the Migration
-
-- React is overkill for this app's needs (mostly server-rendered forms)
-- Simpler stack = less code, easier maintenance
-- HTMX handles most interactivity without client-side JavaScript
-- Vanilla JS for dropdowns and tag input (no framework needed)
-
-### New Stack
-
-| Component     | Technology           | Purpose                                 |
-| ------------- | -------------------- | --------------------------------------- |
-| Backend       | Hono                 | HTTP routing, middleware, JSX templates |
-| Interactivity | HTMX                 | Partial page updates, form handling     |
-| Complex UI    | Vanilla JS           | Dropdowns, tag input autocomplete       |
-| Database      | Drizzle (unchanged)  | Same libs, no changes                   |
-| Styling       | Tailwind (unchanged) | Same styles                             |
-
-### Parallel Development
-
-Both apps run simultaneously during migration:
-
-- **React app**: `localhost:5173` via `pnpm dev --filter @pinsquirrel/web`
-- **Hono app**: `localhost:8100` via `pnpm dev --filter @pinsquirrel/hono`
-
-Both share the same database and libs - no data migration needed.
-
-### Hono App (apps/hono) - In Development
-
-- **Development**: `pnpm dev --filter @pinsquirrel/hono`
-- **Build**: `pnpm build --filter @pinsquirrel/hono`
-- **Start**: `pnpm start --filter @pinsquirrel/hono`
-
-Key differences from React app:
-
-- Server-rendered JSX templates (not React components)
-- HTMX attributes for interactivity (not React state)
-- Database sessions stored in PostgreSQL
-- No client-side routing - traditional page navigation
-- Vanilla JS for dropdowns (`dropdown.js`) and tag input (`tag-input-vanilla.js`)
-
-### Migration Plan Reference
-
-See `PLAN.md` for:
-
-- Detailed phase breakdown (7 phases)
-- Task checklists for each feature
-- Technical decisions made
-
-### When Working on This Codebase
-
-1. **Check which app you're working on** - most new work should be in `apps/hono`
-2. **The React app (`apps/web`) is being deprecated** - only fix critical bugs there
-3. **All libs remain shared** - changes to services/database/domain affect both apps
-4. **Reference PLAN.md** for current migration status and next tasks
+- `pnpm test --filter @pinsquirrel/hono` - Run all tests once
+- `pnpm test --filter @pinsquirrel/hono -- --watch` - Run tests in watch mode for TDD
 
 ## Services Library (libs/services)
 
@@ -288,7 +227,6 @@ Database layer with Drizzle ORM for PostgreSQL:
 
 - Modern flat ESLint v9 configuration
 - TypeScript ESLint with type-aware rules
-- React-specific rules for web app
 - Accessibility checks enabled
 
 ### Prettier Configuration
@@ -302,7 +240,6 @@ Database layer with Drizzle ORM for PostgreSQL:
 
 - `pnpm typecheck` - Run TypeScript compiler across all packages
 - Strict mode enabled in all TypeScript configs
-- React Router generates types automatically
 
 ## Package Manager
 
@@ -318,7 +255,7 @@ For local development with containerized database:
 # Start development database
 pnpm db:up
 
-# Run development servers (connects to containerized DB)
+# Run development server (connects to containerized DB)
 pnpm dev
 
 # Stop database when done
@@ -332,10 +269,10 @@ pnpm db:down
 ```bash
 # Build from monorepo root (required for proper build context)
 cd /path/to/pinsquirrel
-docker build -f apps/web/Dockerfile -t your-username/pinsquirrel-web:latest .
+docker build -f apps/hono/Dockerfile -t your-username/pinsquirrel:latest .
 
-# Push to Docker Hub
-docker push your-username/pinsquirrel-web:latest
+# Or use the convenience script (builds and pushes to Docker Hub)
+pnpm docker:build-push
 ```
 
 #### Deployment Options
@@ -348,16 +285,16 @@ docker push your-username/pinsquirrel-web:latest
 
 **Option 2: DigitalOcean App Platform**
 
-- Point to repository with `apps/web/Dockerfile`
+- Point to repository with `apps/hono/Dockerfile`
 - Use managed PostgreSQL database
 - Set `DATABASE_URL` environment variable
 
 ### Docker Configuration Files
 
 - `docker-compose.dev.yml` - Development database only
-- `apps/web/Dockerfile` - Production-ready web app image
-- `apps/web/.dockerignore` - Optimized build context
-- `.env.example` / `apps/web/.env.example` - Environment templates
+- `apps/hono/Dockerfile` - Production-ready app image
+- `apps/hono/.dockerignore` - Optimized build context
+- `.env.example` - Environment template
 
 ### Database Connection
 

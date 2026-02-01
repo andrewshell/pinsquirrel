@@ -8,7 +8,7 @@ PinSquirrel uses a **startup migration hook** pattern for production deployments
 
 ### How It Works
 
-1. **Migration Script**: `apps/web/migrate-and-start.sh` runs migrations before starting the app
+1. **Migration Script**: `apps/hono/migrate-and-start.sh` runs migrations before starting the app
 2. **Docker Integration**: The migration script is included in the production Docker image
 3. **Automatic Execution**: Migrations run every time the container starts
 4. **Error Handling**: If migrations fail, the application won't start
@@ -19,14 +19,18 @@ PinSquirrel uses a **startup migration hook** pattern for production deployments
 
 ```bash
 # Build from monorepo root (required for proper build context)
-docker build -f apps/web/Dockerfile -t your-username/pinsquirrel-web:latest .
+docker build -f apps/hono/Dockerfile -t your-username/pinsquirrel:latest .
+
+# Or use the convenience script (builds and pushes to Docker Hub)
+pnpm docker:build-push
 ```
 
 ### What's Included
 
 The production Docker image includes:
 
-- Built React Router 7 application
+- Built Hono application
+- Static assets (CSS, JS, images)
 - Database migrations from `libs/database/src/migrations/`
 - Migration script with proper permissions
 - All necessary dependencies including `drizzle-kit`
@@ -37,7 +41,7 @@ The production Docker image includes:
 
 ```bash
 DATABASE_URL=postgresql://username:password@hostname:5432/database?sslmode=require
-PORT=3000  # Optional, defaults to 3000
+PORT=8100  # Optional, defaults to 8100
 ```
 
 ### Managed Database Configuration
@@ -53,7 +57,7 @@ For managed PostgreSQL databases (DigitalOcean, AWS RDS, etc.):
 ### Option 1: DigitalOcean App Platform
 
 1. Create new app from GitHub repository
-2. Use `apps/web/Dockerfile` as build configuration
+2. Use `apps/hono/Dockerfile` as build configuration
 3. Set `DATABASE_URL` environment variable
 4. Deploy managed PostgreSQL database separately
 
@@ -62,10 +66,10 @@ For managed PostgreSQL databases (DigitalOcean, AWS RDS, etc.):
 ```yaml
 version: '3.8'
 services:
-  pinsquirrel-web:
-    image: your-username/pinsquirrel-web:latest
+  pinsquirrel:
+    image: your-username/pinsquirrel:latest
     ports:
-      - '3000:3000'
+      - '8100:8100'
     environment:
       - DATABASE_URL=postgresql://pinsquirrel:pinsquirrel@postgres:5432/pinsquirrel
     depends_on:
@@ -88,9 +92,9 @@ volumes:
 
 ```bash
 docker run -d \
-  -p 3000:3000 \
+  -p 8100:8100 \
   -e DATABASE_URL="postgresql://user:pass@your-db-host:5432/pinsquirrel?sslmode=require" \
-  your-username/pinsquirrel-web:latest
+  your-username/pinsquirrel:latest
 ```
 
 ## Migration Process Details
@@ -116,8 +120,8 @@ fi
 echo "Database migrations completed successfully."
 
 # Start the application
-echo "Starting PinSquirrel web application..."
-pnpm --filter @pinsquirrel/web start
+echo "Starting PinSquirrel Hono application..."
+pnpm --filter @pinsquirrel/hono start
 ```
 
 ### Migration Safety
@@ -158,7 +162,7 @@ docker logs <container-id>
 # Starting production deployment...
 # Running database migrations...
 # Database migrations completed successfully.
-# Starting PinSquirrel web application...
+# Starting PinSquirrel Hono application...
 ```
 
 ### Common Issues
@@ -180,11 +184,18 @@ docker logs <container-id>
 
 ### Health Checks
 
-Add health check endpoints to monitor:
+The application exposes a health check endpoint:
+
+```bash
+curl http://localhost:8100/health
+# Returns: {"status":"ok"}
+```
+
+Use this endpoint to monitor:
 
 - Application startup success
 - Database connectivity
-- Migration completion status
+- Container readiness
 
 ### Backup Strategy
 
