@@ -29,6 +29,7 @@ function parsePinQueryParams(c: Context) {
   const tag = url.searchParams.get('tag') || undefined
   const search = url.searchParams.get('search') || undefined
   const unreadParam = url.searchParams.get('unread')
+  const notagsParam = url.searchParams.get('notags')
   const pageParam = url.searchParams.get('page')
   const sizeParam = url.searchParams.get('size')
   const sortParam = url.searchParams.get('sort')
@@ -43,6 +44,12 @@ function parsePinQueryParams(c: Context) {
 
   if (search) {
     filter.search = search
+  }
+
+  // Handle notags filter
+  const noTags = notagsParam === 'true'
+  if (noTags) {
+    filter.noTags = true
   }
 
   // Handle unread filter
@@ -84,6 +91,7 @@ function parsePinQueryParams(c: Context) {
     sortBy,
     sortDirection,
     searchParams,
+    noTags,
   }
 }
 
@@ -115,6 +123,7 @@ pins.get('/', async (c) => {
     sortBy,
     sortDirection,
     searchParams,
+    noTags,
   } = parsePinQueryParams(c)
 
   const result = await fetchUserPins(user, filter, page)
@@ -135,6 +144,7 @@ pins.get('/', async (c) => {
       viewSize={viewSize}
       sortBy={sortBy}
       sortDirection={sortDirection}
+      noTags={noTags}
       flash={flash}
     />
   )
