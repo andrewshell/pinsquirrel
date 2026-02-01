@@ -163,6 +163,8 @@ pnpm docker:build-push
 - **Quality gates**: All checks must pass before considering work complete
 - **Inter-package dependencies**: Use `workspace:*` protocol in package.json
 
----
+## Documentation
 
-For more detailed information, see [CLAUDE.md](./CLAUDE.md).
+- [CLAUDE.md](./CLAUDE.md) - Detailed development workflow and codebase architecture
+- [DEPLOYMENT.md](./DEPLOYMENT.md) - Production deployment with Docker and migrations
+- [STYLE.md](./STYLE.md) - Neo Brutalism UI design system and component patterns

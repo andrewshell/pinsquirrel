@@ -303,3 +303,9 @@ All environments use the `DATABASE_URL` environment variable:
 - **Development**: `postgresql://pinsquirrel:pinsquirrel@localhost:5432/pinsquirrel`
 - **Docker deployment**: `postgresql://pinsquirrel:pinsquirrel@postgres:5432/pinsquirrel`
 - **Managed database**: `postgresql://username:password@hostname:25060/database?sslmode=require`
+
+## Related Documentation
+
+- [DEPLOYMENT.md](./DEPLOYMENT.md) - Production deployment guide with Docker and migration details
+- [STYLE.md](./STYLE.md) - Neo Brutalism UI design system and component patterns
+- [README.md](./README.md) - Quick start guide and repository overview
