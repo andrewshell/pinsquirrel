@@ -80,7 +80,7 @@ export const Header: FC<HeaderProps> = ({ user }) => {
                 {/* Search toggle - shows magnifying glass when closed, X when open */}
                 <button
                   type="button"
-                  class="p-2 text-foreground hover:text-accent transition-colors"
+                  class="p-2 text-foreground hover:text-accent transition-colors cursor-pointer"
                   aria-label="Toggle search"
                   data-search="toggle"
                 >
@@ -218,7 +218,7 @@ export const Header: FC<HeaderProps> = ({ user }) => {
             <div data-dropdown="container">
               <button
                 type="button"
-                class="p-2 text-foreground hover:bg-accent/10 transition-colors"
+                class="p-2 text-foreground hover:bg-accent/10 transition-colors cursor-pointer"
                 data-dropdown="toggle"
                 aria-label="Toggle menu"
               >
