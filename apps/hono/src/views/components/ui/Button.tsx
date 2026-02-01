@@ -1,11 +1,6 @@
 import type { FC, PropsWithChildren } from 'hono/jsx'
 
-type ButtonVariant =
-  | 'default'
-  | 'outline'
-  | 'secondary'
-  | 'destructive'
-  | 'ghost'
+type ButtonVariant = 'default' | 'outline' | 'secondary' | 'destructive'
 type ButtonSize = 'sm' | 'default' | 'lg' | 'icon'
 
 interface ButtonProps {
@@ -26,15 +21,13 @@ interface ButtonProps {
 }
 
 const baseClasses =
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap font-bold uppercase border-4 border-foreground neobrutalism-shadow transition-all hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px] active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px] disabled:pointer-events-none disabled:opacity-50'
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap font-bold uppercase border-4 border-foreground neobrutalism-shadow transition-all cursor-pointer hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px] active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px] disabled:pointer-events-none disabled:opacity-50'
 
 const variantClasses: Record<ButtonVariant, string> = {
   default: 'bg-primary text-primary-foreground',
   outline: 'bg-background text-foreground',
   secondary: 'bg-secondary text-secondary-foreground',
   destructive: 'bg-destructive text-destructive-foreground',
-  ghost:
-    'border-transparent shadow-none hover:shadow-none hover:translate-x-0 hover:translate-y-0 hover:bg-accent/10',
 }
 
 const sizeClasses: Record<ButtonSize, string> = {
