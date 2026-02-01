@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.2](https://github.com/andrewshell/pinsquirrel/compare/v2.0.1...v2.0.2) (2026-02-01)
+
+
+### Bug Fixes
+
+* add CJS dependencies for Docker production runtime ([79f27df](https://github.com/andrewshell/pinsquirrel/commit/79f27dfc8f91c3a9afd5bcf47d3731bc12b1d563))
+* mark CJS packages as external in tsup to prevent dynamic require error ([8fa3fd2](https://github.com/andrewshell/pinsquirrel/commit/8fa3fd2d9cb53d98eec54d890e89735e577f0b68))
+
 ## [2.0.1](https://github.com/andrewshell/pinsquirrel/compare/v2.0.0...v2.0.1) (2026-02-01)
 
 
