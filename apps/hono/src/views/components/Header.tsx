@@ -303,12 +303,9 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                         Import
                       </a>
                       <hr class="border-foreground/20" />
-                      <a
-                        href="/signout"
-                        class="block px-4 py-2 text-center font-bold uppercase border-2 border-foreground hover:bg-accent/10 transition-colors"
-                      >
+                      <Button href="/signout" variant="outline" class="w-full">
                         Sign Out
-                      </a>
+                      </Button>
                     </>
                   ) : (
                     <>
