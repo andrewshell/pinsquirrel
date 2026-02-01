@@ -483,14 +483,13 @@ pinsquirrel/
 
 ### Tasks
 
-- [ ] 7.1 Update Docker configuration
+- [x] 7.1 Update Docker configuration
   - New Dockerfile for Hono app
-  - Smaller image (no React/Node SSR overhead)
-  - Create `migrate-and-start.sh` script (like `apps/web/migrate-and-start.sh`)
-  - Ensure startup migration hook runs before app starts
+  - Smaller image (no React/Node SSR overhead) - 340MB vs 430MB (~21% smaller)
+  - Created `migrate-and-start.sh` script
+  - Updated `scripts/docker-build-push.sh` to build Hono app
 
 - [ ] 7.2 Update CI/CD pipeline
-  - Build Hono app
   - Run tests
 
 - [ ] 7.36 Deprecate React app
