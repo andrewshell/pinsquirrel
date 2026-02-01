@@ -11,7 +11,7 @@ interface CheckboxProps {
 }
 
 const checkboxClasses =
-  'h-4 w-4 border-2 border-foreground bg-background focus:ring-2 focus:ring-primary focus:ring-offset-2'
+  'h-4 w-4 border-2 border-foreground bg-background accent-primary focus:ring-2 focus:ring-primary focus:ring-offset-2'
 
 export const Checkbox: FC<CheckboxProps> = ({
   id,
