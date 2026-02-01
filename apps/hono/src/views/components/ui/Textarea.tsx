@@ -12,6 +12,8 @@ interface TextareaProps {
   helpText?: string
   class?: string
   'aria-describedby'?: string
+  // Data attributes for JS integration
+  'data-description-input'?: boolean
 }
 
 const baseClasses =
@@ -29,6 +31,7 @@ export const Textarea: FC<TextareaProps> = ({
   helpText,
   class: className = '',
   'aria-describedby': ariaDescribedBy,
+  'data-description-input': dataDescriptionInput,
 }) => {
   const hasError = Boolean(error)
   const helpId = helpText ? `${id}-help` : undefined
@@ -52,6 +55,7 @@ export const Textarea: FC<TextareaProps> = ({
         aria-invalid={hasError ? 'true' : undefined}
         aria-describedby={describedBy}
         class={classes}
+        data-description-input={dataDescriptionInput ? '' : undefined}
       >
         {value}
       </textarea>

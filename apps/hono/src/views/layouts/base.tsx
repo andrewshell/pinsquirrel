@@ -50,6 +50,7 @@ export const BaseLayout: FC<PropsWithChildren<BaseLayoutProps>> = ({
         <script src="/static/htmx.min.js" />
         <script src="/static/dropdown.js" defer />
         <script src="/static/tag-input-vanilla.js" defer />
+        <script src="/static/metadata-fetch.js" defer />
       </head>
       <body class="bg-background text-foreground min-h-screen flex flex-col">
         {children}

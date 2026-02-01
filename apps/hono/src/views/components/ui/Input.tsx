@@ -13,6 +13,10 @@ interface InputProps {
   class?: string
   autocomplete?: string
   'aria-describedby'?: string
+  // Data attributes for JS integration
+  'data-url-input'?: boolean
+  'data-title-input'?: boolean
+  'data-description-input'?: boolean
 }
 
 const baseClasses =
@@ -31,6 +35,9 @@ export const Input: FC<InputProps> = ({
   class: className = '',
   autocomplete,
   'aria-describedby': ariaDescribedBy,
+  'data-url-input': dataUrlInput,
+  'data-title-input': dataTitleInput,
+  'data-description-input': dataDescriptionInput,
 }) => {
   const hasError = Boolean(error)
   const helpId = helpText ? `${id}-help` : undefined
@@ -56,6 +63,9 @@ export const Input: FC<InputProps> = ({
         aria-invalid={hasError ? 'true' : undefined}
         aria-describedby={describedBy}
         class={classes}
+        data-url-input={dataUrlInput ? '' : undefined}
+        data-title-input={dataTitleInput ? '' : undefined}
+        data-description-input={dataDescriptionInput ? '' : undefined}
       />
       {helpText && (
         <p id={helpId} class="text-xs text-muted-foreground">
