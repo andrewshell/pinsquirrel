@@ -26,7 +26,7 @@ interface ButtonProps {
 }
 
 const baseClasses =
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap font-bold uppercase border-2 border-foreground neobrutalism-shadow transition-all hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px] active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px] disabled:pointer-events-none disabled:opacity-50'
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap font-bold uppercase border-4 border-foreground neobrutalism-shadow transition-all hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px] active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px] disabled:pointer-events-none disabled:opacity-50'
 
 const variantClasses: Record<ButtonVariant, string> = {
   default: 'bg-primary text-primary-foreground',

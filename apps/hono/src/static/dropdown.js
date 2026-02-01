@@ -71,21 +71,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const searchToggle = document.querySelector('[data-search="toggle"]')
   const searchForm = document.querySelector('[data-search="form"]')
   const searchInput = document.querySelector('[data-search="input"]')
-  const searchClose = document.querySelector('[data-search="close"]')
+  const navLinks = document.querySelector('[data-nav="links"]')
+  const iconOpen = document.querySelector('[data-search="icon-open"]')
+  const iconClose = document.querySelector('[data-search="icon-close"]')
 
   if (searchToggle && searchForm) {
     searchToggle.addEventListener('click', () => {
       const isHidden = searchForm.classList.contains('hidden')
       if (isHidden) {
+        // Open search
         searchForm.classList.remove('hidden')
+        searchForm.classList.add('flex')
+        navLinks?.classList.add('hidden')
+        iconOpen?.classList.add('hidden')
+        iconClose?.classList.remove('hidden')
         searchInput?.focus()
       } else {
+        // Close search
         searchForm.classList.add('hidden')
+        searchForm.classList.remove('flex')
+        navLinks?.classList.remove('hidden')
+        iconOpen?.classList.remove('hidden')
+        iconClose?.classList.add('hidden')
       }
-    })
-
-    searchClose?.addEventListener('click', () => {
-      searchForm.classList.add('hidden')
     })
   }
 })

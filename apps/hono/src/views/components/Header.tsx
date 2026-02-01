@@ -30,18 +30,21 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
           <nav class="hidden md:flex items-center space-x-4">
             {user ? (
               <div class="flex items-center space-x-4">
-                <a
-                  href="/pins"
-                  class="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
-                >
-                  Pins
-                </a>
-                <a
-                  href="/tags"
-                  class="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
-                >
-                  Tags
-                </a>
+                {/* Nav links - hidden when search is open */}
+                <div class="flex items-center space-x-4" data-nav="links">
+                  <a
+                    href="/pins"
+                    class="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
+                  >
+                    Pins
+                  </a>
+                  <a
+                    href="/tags"
+                    class="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
+                  >
+                    Tags
+                  </a>
+                </div>
 
                 {/* Search input - visible when toggled */}
                 <form
@@ -54,19 +57,21 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                     type="text"
                     name="search"
                     placeholder="Search pins..."
-                    class="w-64 px-3 py-2 text-sm border-2 border-foreground bg-background focus:outline-none focus:ring-2 focus:ring-accent"
+                    class="w-64 px-3 py-2 text-sm border-4 border-foreground bg-background focus:outline-none focus:ring-2 focus:ring-accent"
                     data-search="input"
                   />
                   <button
-                    type="button"
-                    class="p-2 text-foreground hover:text-accent transition-colors"
-                    aria-label="Close search"
-                    data-search="close"
+                    type="submit"
+                    class="px-3 py-2 bg-primary text-primary-foreground font-medium border-4 border-foreground neobrutalism-shadow
+                           hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
+                           active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
+                           transition-all"
+                    aria-label="Search"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      width="20"
-                      height="20"
+                      width="16"
+                      height="16"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -74,19 +79,20 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                       stroke-linecap="round"
                       stroke-linejoin="round"
                     >
-                      <path d="M18 6 6 18" />
-                      <path d="m6 6 12 12" />
+                      <circle cx="11" cy="11" r="8" />
+                      <path d="m21 21-4.3-4.3" />
                     </svg>
                   </button>
                 </form>
 
-                {/* Search icon - toggles search input */}
+                {/* Search toggle - shows magnifying glass when closed, X when open */}
                 <button
                   type="button"
                   class="p-2 text-foreground hover:text-accent transition-colors"
-                  aria-label="Search"
+                  aria-label="Toggle search"
                   data-search="toggle"
                 >
+                  {/* Magnifying glass icon - visible when search is closed */}
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="20"
@@ -97,16 +103,34 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                     stroke-width="2"
                     stroke-linecap="round"
                     stroke-linejoin="round"
+                    data-search="icon-open"
                   >
                     <circle cx="11" cy="11" r="8" />
                     <path d="m21 21-4.3-4.3" />
+                  </svg>
+                  {/* X icon - visible when search is open */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="hidden"
+                    data-search="icon-close"
+                  >
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
                   </svg>
                 </button>
 
                 {/* Create Pin Button */}
                 <a
                   href="/pins/new"
-                  class="px-3 py-2 bg-primary text-primary-foreground font-medium border-2 border-foreground neobrutalism-shadow
+                  class="px-3 py-2 bg-primary text-primary-foreground font-medium border-4 border-foreground neobrutalism-shadow
                          hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
                          active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
                          transition-all"
@@ -130,12 +154,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
 
                 {/* User Dropdown */}
                 <div class="relative" data-dropdown="container">
-                  <button
-                    type="button"
-                    class="flex items-center gap-2 px-3 py-2 text-sm font-medium border-2 border-foreground bg-background
-                           hover:bg-accent/10 transition-colors"
-                    data-dropdown="toggle"
-                  >
+                  <Button variant="outline" size="sm" data-dropdown="toggle">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="16"
@@ -152,9 +171,9 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                       <path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662" />
                     </svg>
                     {user.username}
-                  </button>
+                  </Button>
                   <div
-                    class="hidden absolute right-0 mt-2 w-48 bg-background border-2 border-foreground shadow-lg z-50"
+                    class="hidden absolute right-0 mt-2 w-48 bg-background border-4 border-foreground shadow-lg z-50"
                     data-dropdown="menu"
                   >
                     <a
@@ -190,7 +209,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
             {user && (
               <a
                 href="/pins/new"
-                class="px-3 py-2 bg-primary text-primary-foreground font-medium border-2 border-foreground neobrutalism-shadow
+                class="px-3 py-2 bg-primary text-primary-foreground font-medium border-4 border-foreground neobrutalism-shadow
                        hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
                        active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
                        transition-all"
@@ -254,11 +273,11 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                           type="text"
                           name="search"
                           placeholder="Search pins..."
-                          class="flex-1 px-3 py-2 text-sm border-2 border-foreground bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                          class="flex-1 px-3 py-2 text-sm border-4 border-foreground bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                         />
                         <button
                           type="submit"
-                          class="px-3 py-2 bg-primary text-primary-foreground border-2 border-foreground"
+                          class="px-3 py-2 bg-primary text-primary-foreground border-4 border-foreground"
                           aria-label="Search"
                         >
                           <svg
@@ -311,13 +330,13 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
                     <>
                       <a
                         href="/signin"
-                        class="block px-4 py-2 text-center font-medium border-2 border-foreground hover:bg-accent/10 transition-colors"
+                        class="block px-4 py-2 text-center font-medium border-4 border-foreground hover:bg-accent/10 transition-colors"
                       >
                         Sign In
                       </a>
                       <a
                         href="/signup"
-                        class="block px-4 py-2 text-center font-medium bg-primary text-primary-foreground border-2 border-foreground"
+                        class="block px-4 py-2 text-center font-medium bg-primary text-primary-foreground border-4 border-foreground"
                       >
                         Sign Up
                       </a>
