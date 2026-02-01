@@ -176,14 +176,16 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
               <div class="flex items-center space-x-2">
                 <a
                   href="/signin"
-                  class="px-4 py-2 text-sm font-medium border-2 border-foreground bg-background
-                         hover:bg-accent/10 transition-colors"
+                  class="px-4 py-2 text-sm font-bold uppercase border-2 border-foreground bg-background neobrutalism-shadow
+                         hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
+                         active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
+                         transition-all"
                 >
                   Sign In
                 </a>
                 <a
                   href="/signup"
-                  class="px-4 py-2 text-sm font-medium border-2 border-foreground bg-primary text-primary-foreground neobrutalism-shadow
+                  class="px-4 py-2 text-sm font-bold uppercase border-2 border-foreground bg-primary text-primary-foreground neobrutalism-shadow
                          hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
                          active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
                          transition-all"

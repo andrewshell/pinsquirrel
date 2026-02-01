@@ -6,6 +6,9 @@ import { secureHeaders } from 'hono/secure-headers'
 import { BaseLayout } from './views/layouts/base'
 import { NotFoundPage } from './views/pages/not-found'
 import { ServerErrorPage } from './views/pages/server-error'
+import { HomePage } from './views/pages/home'
+import { Header } from './views/components/Header'
+import { getSessionManager } from './middleware/session'
 import { healthRoutes } from './routes/health'
 import { authRoutes } from './routes/auth'
 import { pinsRoutes } from './routes/pins'
@@ -37,38 +40,19 @@ app.route('/profile', profileRoutes)
 app.route('/import', importRoutes)
 app.route('/api', apiRoutes)
 
-// Home page (temporary - will redirect to /pins or /signin)
-app.get('/', (c) => {
+// Home page - redirects logged-in users to /pins
+app.get('/', async (c) => {
+  const sessionManager = getSessionManager(c)
+
+  // Redirect logged-in users to their pins page
+  if (sessionManager.isAuthenticated()) {
+    return c.redirect('/pins')
+  }
+
   return c.html(
-    <BaseLayout title="Home">
-      <div class="min-h-screen flex items-center justify-center">
-        <div class="text-center">
-          <h1 class="text-4xl font-bold mb-4">PinSquirrel</h1>
-          <p class="text-muted-foreground mb-8">
-            Your personal bookmark manager
-          </p>
-          <div class="space-x-4">
-            <a
-              href="/signin"
-              class="inline-block px-6 py-3 bg-primary text-primary-foreground font-medium border-2 border-foreground neobrutalism-shadow
-                     hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
-                     active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
-                     transition-all"
-            >
-              Sign In
-            </a>
-            <a
-              href="/signup"
-              class="inline-block px-6 py-3 bg-secondary text-secondary-foreground font-medium border-2 border-foreground neobrutalism-shadow
-                     hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
-                     active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
-                     transition-all"
-            >
-              Sign Up
-            </a>
-          </div>
-        </div>
-      </div>
+    <BaseLayout title="Hoard your links like winter is coming">
+      <Header user={null} />
+      <HomePage />
     </BaseLayout>
   )
 })
