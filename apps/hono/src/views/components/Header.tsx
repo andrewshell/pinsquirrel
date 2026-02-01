@@ -1,5 +1,5 @@
-import type { FC } from 'hono/jsx'
 import type { User } from '@pinsquirrel/domain'
+import type { FC } from 'hono/jsx'
 import { Button } from './ui/Button'
 
 interface HeaderProps {
