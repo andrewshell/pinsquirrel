@@ -2,6 +2,7 @@ import type { User } from '@pinsquirrel/domain'
 import { DefaultLayout } from '../layouts/default'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
+import { Alert, AlertTitle, AlertDescription } from '../components/ui/Alert'
 import {
   FlashMessage as FlashMessageComponent,
   SuccessMessage,
@@ -265,14 +266,14 @@ export function ProfilePage({
                 </ol>
               </div>
 
-              <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                <p class="text-sm text-blue-800 dark:text-blue-200">
-                  <strong>Tip:</strong> Select text on a webpage before clicking
-                  the bookmarklet to use that text as your pin's description.
-                  The selected text will be converted to markdown format
-                  automatically.
-                </p>
-              </div>
+              <Alert variant="info">
+                <AlertTitle>Tip</AlertTitle>
+                <AlertDescription>
+                  Select text on a webpage before clicking the bookmarklet to
+                  use that text as your pin's description. The selected text
+                  will be converted to markdown format automatically.
+                </AlertDescription>
+              </Alert>
             </CardContent>
           </Card>
         </div>
