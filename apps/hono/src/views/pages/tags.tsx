@@ -2,6 +2,7 @@ import type { TagWithCount, User } from '@pinsquirrel/domain'
 import { DefaultLayout } from '../layouts/default'
 import { FlashMessage as FlashMessageComponent } from '../components/FlashMessage'
 import type { FlashMessage } from '../../middleware/session'
+import { Button } from '../components/ui/Button'
 
 export type TagFilterType = 'all' | 'toread'
 
@@ -108,39 +109,25 @@ export function TagsPage({
         >
           {/* Filter buttons */}
           <div class="flex gap-2">
-            <a
+            <Button
               href="/tags"
-              class={`px-4 py-2 font-medium border-2 border-foreground transition-all
-                ${
-                  currentFilter === 'all'
-                    ? 'bg-primary text-primary-foreground neobrutalism-shadow'
-                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                }`}
+              variant={currentFilter === 'all' ? 'default' : 'secondary'}
+              size="sm"
             >
               All
-            </a>
-            <a
+            </Button>
+            <Button
               href="/tags?unread=true"
-              class={`px-4 py-2 font-medium border-2 border-foreground transition-all
-                ${
-                  currentFilter === 'toread'
-                    ? 'bg-primary text-primary-foreground neobrutalism-shadow'
-                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                }`}
+              variant={currentFilter === 'toread' ? 'default' : 'secondary'}
+              size="sm"
             >
               To Read
-            </a>
+            </Button>
           </div>
 
           {/* Merge button - only show if more than 1 tag */}
           {tags.length > 1 && (
-            <a
-              href="/tags/merge"
-              class="inline-flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground font-medium border-2 border-foreground neobrutalism-shadow
-                     hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
-                     active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
-                     transition-all"
-            >
+            <Button href="/tags/merge" variant="secondary" size="sm">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="16"
@@ -157,7 +144,7 @@ export function TagsPage({
                 <path d="m20 22-5-5" />
               </svg>
               Merge Tags
-            </a>
+            </Button>
           )}
         </div>
 

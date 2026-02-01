@@ -1,6 +1,11 @@
 import type { FC, PropsWithChildren } from 'hono/jsx'
 
-type ButtonVariant = 'default' | 'outline' | 'destructive' | 'ghost'
+type ButtonVariant =
+  | 'default'
+  | 'outline'
+  | 'secondary'
+  | 'destructive'
+  | 'ghost'
 type ButtonSize = 'sm' | 'default' | 'lg' | 'icon'
 
 interface ButtonProps {
@@ -26,6 +31,7 @@ const baseClasses =
 const variantClasses: Record<ButtonVariant, string> = {
   default: 'bg-primary text-primary-foreground',
   outline: 'bg-background text-foreground',
+  secondary: 'bg-secondary text-secondary-foreground',
   destructive: 'bg-destructive text-destructive-foreground',
   ghost:
     'border-transparent shadow-none hover:shadow-none hover:translate-x-0 hover:translate-y-0 hover:bg-accent/10',
