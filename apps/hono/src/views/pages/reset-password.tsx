@@ -1,5 +1,6 @@
 import type { FC } from 'hono/jsx'
 import { BaseLayout } from '../layouts/base'
+import { Header } from '../components/Header'
 import { ErrorMessage } from '../components/FlashMessage'
 
 interface ResetPasswordPageProps {
@@ -15,7 +16,8 @@ export const ResetPasswordPage: FC<ResetPasswordPageProps> = ({
 }) => {
   return (
     <BaseLayout title="Reset Password">
-      <div class="min-h-screen flex flex-col items-center justify-center px-4">
+      <Header user={null} />
+      <div class="flex flex-col items-center justify-center px-4 py-16">
         <div class="w-full max-w-md">
           {/* Header */}
           <div class="text-center mb-8">
