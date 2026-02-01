@@ -13,6 +13,9 @@ build/
 coverage/
 *.local.*
 
+# Generated CSS
+apps/hono/src/static/styles.css
+
 # IDE - keep shared config, exclude user-specific files
 .vscode/launch.json
 .vscode/tasks.json
