@@ -57,9 +57,7 @@ export const PinForm: FC<PinFormProps> = ({
 
         {/* URL field */}
         <div class="space-y-2">
-          <Label for="url" required>
-            URL
-          </Label>
+          <Label for="url">URL</Label>
           <Input
             id="url"
             name="url"
@@ -76,9 +74,7 @@ export const PinForm: FC<PinFormProps> = ({
         {/* Title field */}
         <div class="space-y-2">
           <div class="flex items-center justify-between">
-            <Label for="title" required>
-              Title
-            </Label>
+            <Label for="title">Title</Label>
             <button
               type="button"
               data-refresh-button
