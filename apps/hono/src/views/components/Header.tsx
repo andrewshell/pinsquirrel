@@ -1,5 +1,6 @@
 import type { FC } from 'hono/jsx'
 import type { User } from '@pinsquirrel/domain'
+import { Button } from './ui/Button'
 
 interface HeaderProps {
   user: User | null
@@ -174,24 +175,12 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
               </div>
             ) : (
               <div class="flex items-center space-x-2">
-                <a
-                  href="/signin"
-                  class="px-4 py-2 text-sm font-bold uppercase border-2 border-foreground bg-background neobrutalism-shadow
-                         hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
-                         active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
-                         transition-all"
-                >
+                <Button href="/signin" variant="outline" size="sm">
                   Sign In
-                </a>
-                <a
-                  href="/signup"
-                  class="px-4 py-2 text-sm font-bold uppercase border-2 border-foreground bg-primary text-primary-foreground neobrutalism-shadow
-                         hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
-                         active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
-                         transition-all"
-                >
+                </Button>
+                <Button href="/signup" size="sm">
                   Sign Up
-                </a>
+                </Button>
               </div>
             )}
           </nav>

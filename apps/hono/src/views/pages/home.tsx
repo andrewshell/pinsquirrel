@@ -1,4 +1,5 @@
 import type { FC } from 'hono/jsx'
+import { Button } from '../components/ui/Button'
 
 export const HomePage: FC = () => {
   return (
@@ -36,24 +37,10 @@ export const HomePage: FC = () => {
           class="flex flex-col gap-4 justify-center items-center mb-20
                     sm:flex-row"
         >
-          <a
-            href="/signup"
-            class="inline-block px-6 py-3 bg-primary text-primary-foreground font-bold uppercase border-2 border-foreground neobrutalism-shadow
-                   hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
-                   active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
-                   transition-all"
-          >
-            Get Started
-          </a>
-          <a
-            href="/signin"
-            class="inline-block px-6 py-3 bg-background text-foreground font-bold uppercase border-2 border-foreground neobrutalism-shadow
-                   hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
-                   active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
-                   transition-all"
-          >
+          <Button href="/signup">Get Started</Button>
+          <Button href="/signin" variant="outline">
             Sign In
-          </a>
+          </Button>
         </div>
 
         {/* Features */}
