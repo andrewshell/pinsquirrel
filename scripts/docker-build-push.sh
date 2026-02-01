@@ -170,9 +170,11 @@ build_image() {
     fi
     
     # Build and push multi-platform image with all tags
+    # Using --no-cache to ensure fresh builds and avoid CJS bundling issues
     if ! docker buildx build -f "$DOCKERFILE_PATH" \
         --platform linux/amd64,linux/arm64 \
         $tags \
+        --no-cache \
         --push .; then
         log_error "Docker multi-platform build failed"
         exit 1
