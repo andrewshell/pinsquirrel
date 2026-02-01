@@ -42,7 +42,9 @@ WORKDIR /app
 # Copy production dependencies
 COPY --from=production-deps /app/node_modules ./node_modules
 COPY --from=production-deps /app/apps/hono/node_modules ./apps/hono/node_modules
+COPY --from=production-deps /app/libs/adapters/node_modules ./libs/adapters/node_modules
 COPY --from=production-deps /app/libs/database/node_modules ./libs/database/node_modules
+COPY --from=production-deps /app/libs/mailgun/node_modules ./libs/mailgun/node_modules
 
 # Copy built application
 COPY --from=hono-build /app/apps/hono/dist ./apps/hono/dist
