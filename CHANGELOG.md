@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.3](https://github.com/andrewshell/pinsquirrel/compare/v2.0.2...v2.0.3) (2026-02-01)
+
+
+### Bug Fixes
+
+* add --no-cache to Docker buildx to prevent stale builds ([df26c4e](https://github.com/andrewshell/pinsquirrel/commit/df26c4e7dc920fb9f092374463331b07c180e3c0))
+
 ## [2.0.2](https://github.com/andrewshell/pinsquirrel/compare/v2.0.1...v2.0.2) (2026-02-01)
 
 
