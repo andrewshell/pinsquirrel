@@ -1,5 +1,6 @@
 import type { User } from '@pinsquirrel/domain'
 import { DefaultLayout } from '../layouts/default'
+import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import {
   FlashMessage as FlashMessageComponent,
   SuccessMessage,
@@ -56,11 +57,11 @@ export function ProfilePage({
 
         <div class="space-y-6">
           {/* Account Information Card */}
-          <div class="bg-card border-2 border-foreground neobrutalism-shadow p-6">
-            <h2 class="text-xl font-bold text-foreground mb-4">
-              Account Information
-            </h2>
-            <div class="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Account Information</CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-4">
               <div>
                 <label class="block text-sm font-medium text-foreground">
                   Username
@@ -96,141 +97,147 @@ export function ProfilePage({
                   {formatDate(user.updatedAt)}
                 </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Update Email Card */}
-          <div class="bg-card border-2 border-foreground neobrutalism-shadow p-6">
-            <h2 class="text-xl font-bold text-foreground mb-4">Update Email</h2>
-            <form method="post" action="/profile" class="space-y-4">
-              <input type="hidden" name="intent" value="update-email" />
+          <Card>
+            <CardHeader>
+              <CardTitle>Update Email</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form method="post" action="/profile" class="space-y-4">
+                <input type="hidden" name="intent" value="update-email" />
 
-              {formError && <ErrorMessage message={formError} />}
+                {formError && <ErrorMessage message={formError} />}
 
-              {emailSuccess && (
-                <SuccessMessage message="Email updated successfully" />
-              )}
-
-              <div>
-                <label
-                  for="email"
-                  class="block text-sm font-medium text-foreground mb-1"
-                >
-                  New Email Address
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autocomplete="email"
-                  placeholder="Enter new email address"
-                  class={`w-full px-3 py-2 border-2 border-foreground bg-background text-foreground ${
-                    errors?.email ? 'border-red-500' : ''
-                  }`}
-                />
-                {errors?.email && (
-                  <p class="mt-1 text-sm text-red-600">{errors.email[0]}</p>
+                {emailSuccess && (
+                  <SuccessMessage message="Email updated successfully" />
                 )}
-              </div>
 
-              <button
-                type="submit"
-                class="px-6 py-3 bg-primary text-primary-foreground font-medium border-2 border-foreground neobrutalism-shadow
-                       hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
-                       active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
-                       transition-all"
-              >
-                Update Email
-              </button>
-            </form>
-          </div>
+                <div>
+                  <label
+                    for="email"
+                    class="block text-sm font-medium text-foreground mb-1"
+                  >
+                    New Email Address
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autocomplete="email"
+                    placeholder="Enter new email address"
+                    class={`w-full px-3 py-2 border-2 border-foreground bg-background text-foreground ${
+                      errors?.email ? 'border-red-500' : ''
+                    }`}
+                  />
+                  {errors?.email && (
+                    <p class="mt-1 text-sm text-red-600">{errors.email[0]}</p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  class="px-6 py-3 bg-primary text-primary-foreground font-medium border-2 border-foreground neobrutalism-shadow
+                         hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
+                         active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
+                         transition-all"
+                >
+                  Update Email
+                </button>
+              </form>
+            </CardContent>
+          </Card>
 
           {/* Change Password Card */}
-          <div class="bg-card border-2 border-foreground neobrutalism-shadow p-6">
-            <h2 class="text-xl font-bold text-foreground mb-4">
-              Change Password
-            </h2>
-            <form method="post" action="/profile" class="space-y-4">
-              <input type="hidden" name="intent" value="change-password" />
-              <input
-                type="hidden"
-                name="username"
-                value={user.username}
-                autocomplete="username"
-              />
-
-              {passwordSuccess && (
-                <SuccessMessage message="Password changed successfully" />
-              )}
-
-              <div>
-                <label
-                  for="currentPassword"
-                  class="block text-sm font-medium text-foreground mb-1"
-                >
-                  Current Password
-                </label>
+          <Card>
+            <CardHeader>
+              <CardTitle>Change Password</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form method="post" action="/profile" class="space-y-4">
+                <input type="hidden" name="intent" value="change-password" />
                 <input
-                  id="currentPassword"
-                  name="currentPassword"
-                  type="password"
-                  autocomplete="current-password"
-                  class={`w-full px-3 py-2 border-2 border-foreground bg-background text-foreground ${
-                    errors?.currentPassword ? 'border-red-500' : ''
-                  }`}
+                  type="hidden"
+                  name="username"
+                  value={user.username}
+                  autocomplete="username"
                 />
-                {errors?.currentPassword && (
-                  <p class="mt-1 text-sm text-red-600">
-                    {errors.currentPassword[0]}
-                  </p>
-                )}
-              </div>
 
-              <div>
-                <label
-                  for="newPassword"
-                  class="block text-sm font-medium text-foreground mb-1"
+                {passwordSuccess && (
+                  <SuccessMessage message="Password changed successfully" />
+                )}
+
+                <div>
+                  <label
+                    for="currentPassword"
+                    class="block text-sm font-medium text-foreground mb-1"
+                  >
+                    Current Password
+                  </label>
+                  <input
+                    id="currentPassword"
+                    name="currentPassword"
+                    type="password"
+                    autocomplete="current-password"
+                    class={`w-full px-3 py-2 border-2 border-foreground bg-background text-foreground ${
+                      errors?.currentPassword ? 'border-red-500' : ''
+                    }`}
+                  />
+                  {errors?.currentPassword && (
+                    <p class="mt-1 text-sm text-red-600">
+                      {errors.currentPassword[0]}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    for="newPassword"
+                    class="block text-sm font-medium text-foreground mb-1"
+                  >
+                    New Password
+                  </label>
+                  <input
+                    id="newPassword"
+                    name="newPassword"
+                    type="password"
+                    autocomplete="new-password"
+                    class={`w-full px-3 py-2 border-2 border-foreground bg-background text-foreground ${
+                      errors?.newPassword ? 'border-red-500' : ''
+                    }`}
+                  />
+                  {errors?.newPassword ? (
+                    <p class="mt-1 text-sm text-red-600">
+                      {errors.newPassword[0]}
+                    </p>
+                  ) : (
+                    <p class="mt-1 text-sm text-muted-foreground">
+                      Must be at least 8 characters
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  class="px-6 py-3 bg-primary text-primary-foreground font-medium border-2 border-foreground neobrutalism-shadow
+                         hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
+                         active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
+                         transition-all"
                 >
-                  New Password
-                </label>
-                <input
-                  id="newPassword"
-                  name="newPassword"
-                  type="password"
-                  autocomplete="new-password"
-                  class={`w-full px-3 py-2 border-2 border-foreground bg-background text-foreground ${
-                    errors?.newPassword ? 'border-red-500' : ''
-                  }`}
-                />
-                {errors?.newPassword ? (
-                  <p class="mt-1 text-sm text-red-600">
-                    {errors.newPassword[0]}
-                  </p>
-                ) : (
-                  <p class="mt-1 text-sm text-muted-foreground">
-                    Must be at least 8 characters
-                  </p>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                class="px-6 py-3 bg-primary text-primary-foreground font-medium border-2 border-foreground neobrutalism-shadow
-                       hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
-                       active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
-                       transition-all"
-              >
-                Change Password
-              </button>
-            </form>
-          </div>
+                  Change Password
+                </button>
+              </form>
+            </CardContent>
+          </Card>
 
           {/* Bookmarklet Section */}
-          <div class="bg-card border-2 border-foreground neobrutalism-shadow p-6">
-            <h2 class="text-xl font-bold text-foreground mb-4">
-              Quick Pin Bookmarklet
-            </h2>
-            <div class="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Pin Bookmarklet</CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-4">
               <p class="text-sm text-muted-foreground">
                 Drag the bookmarklet below to your bookmarks bar to quickly pin
                 any webpage you're visiting.
@@ -281,8 +288,8 @@ export function ProfilePage({
                   automatically.
                 </p>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Inline script to set bookmarklet href */}
