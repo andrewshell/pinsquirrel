@@ -190,7 +190,10 @@ export const Header: FC<HeaderProps> = ({ user, currentPath = '' }) => {
             {user && (
               <a
                 href="/pins/new"
-                class="px-3 py-2 bg-primary text-primary-foreground font-medium border-2 border-foreground"
+                class="px-3 py-2 bg-primary text-primary-foreground font-medium border-2 border-foreground neobrutalism-shadow
+                       hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
+                       active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
+                       transition-all"
                 aria-label="Create Pin"
               >
                 <svg
