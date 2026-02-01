@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently --kill-others \"tsx watch src/index.ts\" \"pnpm css:watch\"",
-    "build": "tsup src/index.ts --format esm --dts",
+    "build": "tsup",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/**/*.{ts,tsx}",
