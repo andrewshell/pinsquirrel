@@ -167,6 +167,15 @@ export class PinService {
     return pin
   }
 
+  async getUserPins(ac: AccessControl): Promise<Pin[]> {
+    if (!ac.user) {
+      throw new UnauthorizedPinAccessError(
+        'User must be authenticated to export pins'
+      )
+    }
+    return this.pinRepository.findByUserId(ac.user.id)
+  }
+
   /**
    * Get user pins with pagination and filtering
    */

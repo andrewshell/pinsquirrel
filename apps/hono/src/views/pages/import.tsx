@@ -209,6 +209,43 @@ export const ImportPage: FC<ImportPageProps> = ({
             </div>
           </div>
         </div>
+        <div class="mt-8 bg-card border-2 border-foreground neobrutalism-shadow">
+          <div class="p-6 border-b-2 border-foreground">
+            <h2 class="text-2xl font-bold">Export to Pinboard Format</h2>
+          </div>
+
+          <div class="p-6 space-y-4">
+            <p class="text-muted-foreground">
+              Download all your pins as a JSON file in Pinboard format. This
+              file can be re-imported into PinSquirrel or any service that
+              accepts Pinboard exports.
+            </p>
+
+            <a
+              href="/export/pinboard.json"
+              class="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground font-medium border-2 border-foreground neobrutalism-shadow
+                     hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
+                     active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
+                     transition-all"
+            >
+              <svg
+                class="h-4 w-4"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" x2="12" y1="15" y2="3" />
+              </svg>
+              Export Pins
+            </a>
+          </div>
+        </div>
       </div>
     </DefaultLayout>
   )

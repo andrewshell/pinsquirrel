@@ -16,6 +16,7 @@ import { profileRoutes } from './routes/profile'
 import { apiRoutes } from './routes/api'
 import { staticRoutes } from './routes/static'
 import { importRoutes } from './routes/import'
+import { exportRoutes } from './routes/export'
 import { sessionMiddleware } from './middleware/session'
 
 // Create the Hono app
@@ -37,6 +38,7 @@ app.route('/pins', pinsRoutes)
 app.route('/tags', tagsRoutes)
 app.route('/profile', profileRoutes)
 app.route('/import', importRoutes)
+app.route('/export', exportRoutes)
 app.route('/api', apiRoutes)
 
 // Home page - redirects logged-in users to /pins

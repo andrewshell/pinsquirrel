@@ -389,6 +389,29 @@ describe('PinService', () => {
     })
   })
 
+  describe('getUserPins', () => {
+    it('should return all pins for authenticated user', async () => {
+      const mockPins = [
+        mockPin,
+        { ...mockPin, id: 'pin-456', url: 'https://other.com' },
+      ]
+      mockPinRepository.findByUserId.mockResolvedValue(mockPins)
+
+      const result = await pinService.getUserPins(
+        createMockAccessControl(mockUser)
+      )
+
+      expect(result).toEqual(mockPins)
+      expect(mockPinRepository.findByUserId).toHaveBeenCalledWith('user-123')
+    })
+
+    it('should throw UnauthorizedPinAccessError if user is not authenticated', async () => {
+      await expect(
+        pinService.getUserPins(createMockAccessControl(null))
+      ).rejects.toThrow(UnauthorizedPinAccessError)
+    })
+  })
+
   describe('getPin', () => {
     it('should return a pin owned by the user', async () => {
       mockPinRepository.findById.mockResolvedValue(mockPin)

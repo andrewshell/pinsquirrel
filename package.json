@@ -14,6 +14,8 @@
     "quality": "turbo typecheck && turbo lint && turbo test && turbo format",
     "db:up": "docker compose -f docker-compose.dev.yml down && docker compose -f docker-compose.dev.yml up -d postgres",
     "db:down": "docker compose -f docker-compose.dev.yml down",
+    "db:generate": "pnpm --filter @pinsquirrel/database db:generate",
+    "db:migrate": "pnpm --filter @pinsquirrel/database db:migrate",
     "docker:build-push": "./scripts/docker-build-push.sh",
     "docker:build-push-skip-quality": "./scripts/docker-build-push.sh --skip-quality",
     "docker:dry-run": "./scripts/docker-build-push.sh --dry-run --skip-quality",
