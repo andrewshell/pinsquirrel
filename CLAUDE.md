@@ -10,7 +10,7 @@ This is a pnpm monorepo with Turbo orchestration:
   - `hono/` - Hono + HTMX application (main app)
 - `libs/` - Shared libraries and utilities
   - `services/` - Business logic services and validation
-  - `database/` - Database layer with Drizzle ORM for PostgreSQL
+  - `database/` - Database layer with Drizzle ORM for MySQL
   - `domain/` - Domain entities and interfaces
   - `adapters/` - External service adapters
   - `mailgun/` - Email service implementation
@@ -39,7 +39,7 @@ This is a pnpm monorepo with Turbo orchestration:
 
 ### Database Management
 
-- `pnpm db:up` - Start development PostgreSQL database via Docker
+- `pnpm db:up` - Start development MySQL database via Docker
 - `pnpm db:down` - Stop development database
 
 ### Workspace Operations
@@ -146,14 +146,14 @@ The main application using Hono + HTMX:
 | Backend       | Hono         | HTTP routing, middleware, JSX templates |
 | Interactivity | HTMX         | Partial page updates, form handling     |
 | Complex UI    | Vanilla JS   | Dropdowns, tag input autocomplete       |
-| Database      | Drizzle ORM  | PostgreSQL database access              |
+| Database      | Drizzle ORM  | MySQL database access                   |
 | Styling       | Tailwind CSS | Utility-first CSS                       |
 
 ### Key Characteristics
 
 - Server-rendered JSX templates (not React components)
 - HTMX attributes for interactivity (no client-side state management)
-- Database sessions stored in PostgreSQL
+- Database sessions stored in MySQL
 - Traditional page navigation (no client-side routing)
 - Vanilla JS for dropdowns (`dropdown.js`) and tag input (`tag-input-vanilla.js`)
 
@@ -194,7 +194,7 @@ Core domain entities and interfaces:
 
 ## Database Library (libs/database)
 
-Database layer with Drizzle ORM for PostgreSQL:
+Database layer with Drizzle ORM for MySQL:
 
 - **Development**: `pnpm dev --filter @pinsquirrel/database` (TypeScript watch mode)
 - **Build**: `pnpm build --filter @pinsquirrel/database` (creates `dist/`)
@@ -213,8 +213,8 @@ Database layer with Drizzle ORM for PostgreSQL:
 
 ### Database Configuration
 
-- Uses PostgreSQL with connection via `DATABASE_URL` environment variable
-- Default: `postgresql://localhost:5432/pinsquirrel`
+- Uses MySQL with connection via `DATABASE_URL` environment variable
+- Default: `mysql://localhost:3306/pinsquirrel`
 
 ### Running Tests
 
@@ -286,7 +286,7 @@ pnpm docker:build-push
 **Option 2: DigitalOcean App Platform**
 
 - Point to repository with `apps/hono/Dockerfile`
-- Use managed PostgreSQL database
+- Use managed MySQL database
 - Set `DATABASE_URL` environment variable
 
 ### Docker Configuration Files
@@ -300,9 +300,9 @@ pnpm docker:build-push
 
 All environments use the `DATABASE_URL` environment variable:
 
-- **Development**: `postgresql://pinsquirrel:pinsquirrel@localhost:5432/pinsquirrel`
-- **Docker deployment**: `postgresql://pinsquirrel:pinsquirrel@postgres:5432/pinsquirrel`
-- **Managed database**: `postgresql://username:password@hostname:25060/database?sslmode=require`
+- **Development**: `mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel`
+- **Docker deployment**: `mysql://pinsquirrel:pinsquirrel@mysql:3306/pinsquirrel`
+- **Managed database**: `mysql://username:password@hostname:25060/database?sslmode=require`
 
 ## Related Documentation
 

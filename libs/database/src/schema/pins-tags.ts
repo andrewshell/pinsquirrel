@@ -1,14 +1,14 @@
-import { pgTable, text, primaryKey } from 'drizzle-orm/pg-core'
+import { mysqlTable, varchar, primaryKey } from 'drizzle-orm/mysql-core'
 import { pins } from './pins'
 import { tags } from './tags'
 
-export const pinsTags = pgTable(
+export const pinsTags = mysqlTable(
   'pins_tags',
   {
-    pinId: text('pin_id')
+    pinId: varchar('pin_id', { length: 36 })
       .notNull()
       .references(() => pins.id, { onDelete: 'cascade' }),
-    tagId: text('tag_id')
+    tagId: varchar('tag_id', { length: 36 })
       .notNull()
       .references(() => tags.id, { onDelete: 'cascade' }),
   },

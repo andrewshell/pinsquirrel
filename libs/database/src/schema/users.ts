@@ -1,10 +1,14 @@
-import { pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import { mysqlTable, varchar, timestamp } from 'drizzle-orm/mysql-core'
 
-export const users = pgTable('users', {
-  id: text('id').primaryKey(),
-  username: text('username').notNull().unique(),
-  passwordHash: text('password_hash'),
-  emailHash: text('email_hash'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+export const users = mysqlTable('users', {
+  id: varchar('id', { length: 36 }).primaryKey(),
+  username: varchar('username', { length: 255 }).notNull().unique(),
+  passwordHash: varchar('password_hash', { length: 255 }),
+  emailHash: varchar('email_hash', { length: 255 }),
+  createdAt: timestamp('created_at', { mode: 'date', fsp: 3 })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date', fsp: 3 })
+    .defaultNow()
+    .notNull(),
 })

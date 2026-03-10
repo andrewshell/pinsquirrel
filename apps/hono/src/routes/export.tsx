@@ -1,13 +1,9 @@
-import { createHash } from 'node:crypto'
 import { Hono } from 'hono'
 import { AccessControl } from '@pinsquirrel/domain'
 import type { Pin } from '@pinsquirrel/domain'
+import { md5 } from '@pinsquirrel/services'
 import { pinService } from '../lib/services'
 import { getSessionManager, requireAuth } from '../middleware/session'
-
-function md5(input: string): string {
-  return createHash('md5').update(input).digest('hex')
-}
 
 function formatPinboardTime(date: Date): string {
   return date.toISOString().replace('.000Z', 'Z')

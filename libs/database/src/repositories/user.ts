@@ -5,13 +5,13 @@ import type {
   UserRepository,
   Role,
 } from '@pinsquirrel/domain'
-import { eq, and } from 'drizzle-orm'
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import { eq, and, sql } from 'drizzle-orm'
+import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { users } from '../schema/users.js'
 import { userRoles } from '../schema/user-roles.js'
 
 export class DrizzleUserRepository implements UserRepository {
-  constructor(private db: PostgresJsDatabase<Record<string, unknown>>) {}
+  constructor(private db: MySql2Database<Record<string, unknown>>) {}
 
   private async attachRoles(user: User): Promise<User> {
     const roles = await this.db
@@ -72,7 +72,11 @@ export class DrizzleUserRepository implements UserRepository {
     } else if (limit !== undefined) {
       results = await this.db.select().from(users).limit(limit)
     } else if (offset !== undefined) {
-      results = await this.db.select().from(users).offset(offset)
+      results = await this.db
+        .select()
+        .from(users)
+        .limit(2147483647)
+        .offset(offset)
     } else {
       results = await this.db.select().from(users)
     }
@@ -86,20 +90,23 @@ export class DrizzleUserRepository implements UserRepository {
     const id = crypto.randomUUID()
     const now = new Date()
 
-    const result = await this.db
-      .insert(users)
-      .values({
-        id,
-        username: data.username,
-        passwordHash: data.passwordHash,
-        emailHash: data.emailHash || null,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning()
+    await this.db.insert(users).values({
+      id,
+      username: data.username,
+      passwordHash: data.passwordHash,
+      emailHash: data.emailHash || null,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    const [created] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1)
 
     // New users start with empty roles array
-    return { ...result[0], roles: [] } as User
+    return { ...created, roles: [] } as User
   }
 
   async update(id: string, data: UpdateUserData): Promise<User | null> {
@@ -122,19 +129,21 @@ export class DrizzleUserRepository implements UserRepository {
       updateData.emailHash = data.emailHash
     }
 
-    const result = await this.db
-      .update(users)
-      .set(updateData)
-      .where(eq(users.id, id))
-      .returning()
+    await this.db.update(users).set(updateData).where(eq(users.id, id))
 
-    if (!result[0]) return null
-    return await this.attachRoles(result[0] as User)
+    const [updated] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1)
+
+    if (!updated) return null
+    return await this.attachRoles(updated as User)
   }
 
   async delete(id: string): Promise<boolean> {
     const result = await this.db.delete(users).where(eq(users.id, id))
-    return result.rowCount > 0
+    return result[0].affectedRows > 0
   }
 
   // Role management methods
@@ -146,7 +155,7 @@ export class DrizzleUserRepository implements UserRepository {
         role,
         createdAt: new Date(),
       })
-      .onConflictDoNothing() // Ignore if role already exists
+      .onDuplicateKeyUpdate({ set: { createdAt: sql`created_at` } })
   }
 
   async removeRole(userId: string, role: Role): Promise<void> {

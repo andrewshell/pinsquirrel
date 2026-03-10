@@ -1,61 +1,12 @@
 {
   "version": "7",
-  "dialect": "postgresql",
+  "dialect": "mysql",
   "entries": [
     {
       "idx": 0,
-      "version": "7",
-      "when": 1753026950262,
-      "tag": "0000_white_boomer",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1753288624499,
-      "tag": "0001_tiresome_dragon_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1755267149375,
-      "tag": "0002_icy_the_professor",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1755546573910,
-      "tag": "0003_pretty_darkstar",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1758373758976,
-      "tag": "0004_striped_jimmy_woo",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1758376933458,
-      "tag": "0005_fresh_kang",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1759419184513,
-      "tag": "0006_nosy_james_howlett",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1769871171831,
-      "tag": "0007_square_justin_hammer",
+      "version": "5",
+      "when": 1773177345125,
+      "tag": "0000_slimy_taskmaster",
       "breakpoints": true
     }
   ]

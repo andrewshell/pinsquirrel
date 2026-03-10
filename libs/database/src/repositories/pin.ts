@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type {
   CreatePinData,
   Pin,
@@ -12,20 +13,24 @@ import {
   count,
   desc,
   eq,
-  ilike,
+  like,
   inArray,
   isNull,
   or,
   sql,
 } from 'drizzle-orm'
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { pins } from '../schema/pins.js'
 import { pinsTags } from '../schema/pins-tags.js'
 import { tags } from '../schema/tags.js'
 
+function md5(input: string): string {
+  return createHash('md5').update(input).digest('hex')
+}
+
 export class DrizzlePinRepository implements PinRepository {
   constructor(
-    private db: PostgresJsDatabase<Record<string, unknown>>,
+    private db: MySql2Database<Record<string, unknown>>,
     private tagRepository: TagRepository
   ) {}
 
@@ -80,9 +85,9 @@ export class DrizzlePinRepository implements PinRepository {
     if (filter?.search !== undefined && filter.search.trim() !== '') {
       const searchTerm = `%${filter.search}%`
       const searchCondition = or(
-        ilike(pins.url, searchTerm),
-        ilike(pins.title, searchTerm),
-        ilike(pins.description, searchTerm)
+        like(pins.url, searchTerm),
+        like(pins.title, searchTerm),
+        like(pins.description, searchTerm)
       )
       if (searchCondition) {
         conditions.push(searchCondition)
@@ -96,6 +101,7 @@ export class DrizzlePinRepository implements PinRepository {
           id: pins.id,
           userId: pins.userId,
           url: pins.url,
+          urlHash: pins.urlHash,
           title: pins.title,
           description: pins.description,
           readLater: pins.readLater,
@@ -115,7 +121,7 @@ export class DrizzlePinRepository implements PinRepository {
       } else if (options?.limit !== undefined) {
         query = baseQuery.limit(options.limit)
       } else if (options?.offset !== undefined) {
-        query = baseQuery.offset(options.offset)
+        query = baseQuery.limit(2147483647).offset(options.offset)
       }
 
       const results = await query
@@ -131,6 +137,7 @@ export class DrizzlePinRepository implements PinRepository {
           id: pins.id,
           userId: pins.userId,
           url: pins.url,
+          urlHash: pins.urlHash,
           title: pins.title,
           description: pins.description,
           readLater: pins.readLater,
@@ -149,7 +156,7 @@ export class DrizzlePinRepository implements PinRepository {
       } else if (options?.limit !== undefined) {
         query = baseQuery.limit(options.limit)
       } else if (options?.offset !== undefined) {
-        query = baseQuery.offset(options.offset)
+        query = baseQuery.limit(2147483647).offset(options.offset)
       }
 
       const results = await query
@@ -165,6 +172,7 @@ export class DrizzlePinRepository implements PinRepository {
           id: pins.id,
           userId: pins.userId,
           url: pins.url,
+          urlHash: pins.urlHash,
           title: pins.title,
           description: pins.description,
           readLater: pins.readLater,
@@ -183,7 +191,7 @@ export class DrizzlePinRepository implements PinRepository {
       } else if (options?.limit !== undefined) {
         query = baseQuery.limit(options.limit)
       } else if (options?.offset !== undefined) {
-        query = baseQuery.offset(options.offset)
+        query = baseQuery.limit(2147483647).offset(options.offset)
       }
 
       const results = await query
@@ -206,7 +214,7 @@ export class DrizzlePinRepository implements PinRepository {
     } else if (options?.limit !== undefined) {
       query = baseQuery.limit(options.limit)
     } else if (options?.offset !== undefined) {
-      query = baseQuery.offset(options.offset)
+      query = baseQuery.limit(2147483647).offset(options.offset)
     }
 
     const result = await query
@@ -232,9 +240,9 @@ export class DrizzlePinRepository implements PinRepository {
     if (filter?.search !== undefined && filter.search.trim() !== '') {
       const searchTerm = `%${filter.search}%`
       const searchCondition = or(
-        ilike(pins.url, searchTerm),
-        ilike(pins.title, searchTerm),
-        ilike(pins.description, searchTerm)
+        like(pins.url, searchTerm),
+        like(pins.title, searchTerm),
+        like(pins.description, searchTerm)
       )
       if (searchCondition) {
         conditions.push(searchCondition)
@@ -293,19 +301,23 @@ export class DrizzlePinRepository implements PinRepository {
     const id = crypto.randomUUID()
     const now = new Date()
 
+    await this.db.insert(pins).values({
+      id,
+      userId: data.userId,
+      url: data.url,
+      urlHash: md5(data.url),
+      title: data.title,
+      description: data.description,
+      readLater: data.readLater,
+      createdAt: data.createdAt ?? now,
+      updatedAt: data.updatedAt ?? now,
+    })
+
     const [newPin] = await this.db
-      .insert(pins)
-      .values({
-        id,
-        userId: data.userId,
-        url: data.url,
-        title: data.title,
-        description: data.description,
-        readLater: data.readLater,
-        createdAt: data.createdAt ?? now,
-        updatedAt: data.updatedAt ?? now,
-      })
-      .returning()
+      .select()
+      .from(pins)
+      .where(eq(pins.id, id))
+      .limit(1)
 
     // Handle tags if provided
     let pinTags: (typeof tags.$inferSelect)[] = []
@@ -347,11 +359,18 @@ export class DrizzlePinRepository implements PinRepository {
       updatedAt: new Date(),
     }
 
+    // Update urlHash if url changed
+    if (updateFields.url !== undefined) {
+      updateValues.urlHash = md5(updateFields.url)
+    }
+
+    await this.db.update(pins).set(updateValues).where(eq(pins.id, id))
+
     const [updatedPin] = await this.db
-      .update(pins)
-      .set(updateValues)
+      .select()
+      .from(pins)
       .where(eq(pins.id, id))
-      .returning()
+      .limit(1)
 
     // Handle tag updates if provided
     const tagsByPinId = await this.getPinTags([id])
@@ -385,7 +404,7 @@ export class DrizzlePinRepository implements PinRepository {
 
   async delete(id: string): Promise<boolean> {
     const result = await this.db.delete(pins).where(eq(pins.id, id))
-    return result.rowCount > 0
+    return result[0].affectedRows > 0
   }
 
   async updateCreatedAt(id: string, createdAt: Date): Promise<boolean> {
@@ -393,7 +412,7 @@ export class DrizzlePinRepository implements PinRepository {
       .update(pins)
       .set({ createdAt })
       .where(eq(pins.id, id))
-    return result.rowCount > 0
+    return result[0].affectedRows > 0
   }
 
   private async getPinTags(

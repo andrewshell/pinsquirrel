@@ -1,26 +1,23 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest'
-import { drizzle } from 'drizzle-orm/node-postgres'
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { Pool } from 'pg'
+import { drizzle } from 'drizzle-orm/mysql2'
+import type { MySql2Database } from 'drizzle-orm/mysql2'
+import mysql from 'mysql2/promise'
+import type { Pool } from 'mysql2/promise'
 import { DrizzlePasswordResetRepository } from './password-reset.js'
 import type { CreatePasswordResetTokenData } from '@pinsquirrel/domain'
 
 describe('DrizzlePasswordResetRepository - Integration Tests', () => {
-  let testDb: PostgresJsDatabase<Record<string, unknown>>
+  let testDb: MySql2Database<Record<string, unknown>>
   let testPool: Pool
   let repository: DrizzlePasswordResetRepository
 
   const TEST_DATABASE_URL =
     process.env.TEST_DATABASE_URL ||
-    'postgresql://pinsquirrel:pinsquirrel@localhost:5432/pinsquirrel_test'
+    'mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel_test'
 
   beforeAll(async () => {
-    // Create test database connection
-    testPool = new Pool({
-      connectionString: TEST_DATABASE_URL,
-    })
+    testPool = mysql.createPool(TEST_DATABASE_URL)
 
-    // Import the schema and create test database connection
     const { users } = await import('../schema/users.js')
     const { pins } = await import('../schema/pins.js')
     const { tags } = await import('../schema/tags.js')
@@ -29,15 +26,9 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
       '../schema/password-reset-tokens.js'
     )
 
-    const schema = {
-      users,
-      pins,
-      tags,
-      pinsTags,
-      passwordResetTokens,
-    }
+    const schema = { users, pins, tags, pinsTags, passwordResetTokens }
 
-    testDb = drizzle(testPool, { schema })
+    testDb = drizzle(testPool, { schema, mode: 'default' })
   })
 
   afterAll(async () => {
@@ -45,27 +36,26 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
   })
 
   beforeEach(async () => {
-    // Create repository with test database
     repository = new DrizzlePasswordResetRepository(testDb)
 
-    // Clean up any existing test data (respecting foreign key constraints)
     await testPool.query('DELETE FROM pins_tags')
     await testPool.query('DELETE FROM pins')
     await testPool.query('DELETE FROM password_reset_tokens')
+    await testPool.query('DELETE FROM sessions')
     await testPool.query('DELETE FROM tags')
+    await testPool.query('DELETE FROM user_roles')
     await testPool.query('DELETE FROM users')
   })
 
   describe('create', () => {
     it('should create a password reset token', async () => {
-      // First create a test user
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
 
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
@@ -73,7 +63,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
       const tokenData: CreatePasswordResetTokenData = {
         userId,
         tokenHash: 'hashed_token_123',
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
       }
 
       const result = await repository.create(tokenData)
@@ -103,24 +93,22 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
 
-      // Create test user
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
 
-      // Create token directly in database
       const tokenId = crypto.randomUUID()
       const tokenHash = 'hashed_token_123'
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
 
       await testPool.query(
         `
-        INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at, created_at)
+        VALUES (?, ?, ?, ?, NOW())
       `,
         [tokenId, userId, tokenHash, expiresAt]
       )
@@ -133,7 +121,6 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
         tokenHash,
       })
       expect(result?.expiresAt).toBeInstanceOf(Date)
-      // Allow for timezone differences (up to 24 hours)
       expect(
         Math.abs((result?.expiresAt.getTime() || 0) - expiresAt.getTime())
       ).toBeLessThan(86400000)
@@ -150,11 +137,10 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
 
-      // Create test user
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
@@ -186,30 +172,25 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
 
-      // Create test user
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
 
-      // Create multiple tokens for the user
-      const token1Data: CreatePasswordResetTokenData = {
+      await repository.create({
         userId,
         tokenHash: 'token_hash_1',
         expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-      }
+      })
 
-      const token2Data: CreatePasswordResetTokenData = {
+      await repository.create({
         userId,
         tokenHash: 'token_hash_2',
         expiresAt: new Date(Date.now() + 30 * 60 * 1000),
-      }
-
-      await repository.create(token1Data)
-      await repository.create(token2Data)
+      })
 
       const result = await repository.findByUserId(userId)
 
@@ -229,16 +210,14 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
 
-      // Create test user
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
 
-      // Create multiple tokens
       await repository.create({
         userId,
         tokenHash: 'token_hash_1',
@@ -268,22 +247,19 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
 
-      // Create test user
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
 
-      const tokenData: CreatePasswordResetTokenData = {
+      await repository.create({
         userId,
         tokenHash: 'valid_token_hash',
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes future
-      }
-
-      await repository.create(tokenData)
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      })
       const result = await repository.isValidToken('valid_token_hash')
 
       expect(result).toBe(true)
@@ -293,22 +269,19 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
 
-      // Create test user
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
 
-      const tokenData: CreatePasswordResetTokenData = {
+      await repository.create({
         userId,
         tokenHash: 'expired_token_hash',
-        expiresAt: new Date(Date.now() - 60 * 1000), // 1 minute past
-      }
-
-      await repository.create(tokenData)
+        expiresAt: new Date(Date.now() - 60 * 1000),
+      })
       const result = await repository.isValidToken('expired_token_hash')
 
       expect(result).toBe(false)
@@ -325,37 +298,32 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
 
-      // Create test user
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
 
-      // Create expired token
       await repository.create({
         userId,
         tokenHash: 'expired_token',
-        expiresAt: new Date(Date.now() - 60 * 1000), // 1 minute past
+        expiresAt: new Date(Date.now() - 60 * 1000),
       })
 
-      // Create valid token
       await repository.create({
         userId,
         tokenHash: 'valid_token',
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes future
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
       })
 
       const deletedCount = await repository.deleteExpiredTokens()
       expect(deletedCount).toBe(1)
 
-      // Valid token should still exist
       const validToken = await repository.findByTokenHash('valid_token')
       expect(validToken).not.toBeNull()
 
-      // Expired token should be gone
       const expiredToken = await repository.findByTokenHash('expired_token')
       expect(expiredToken).toBeNull()
     })
@@ -371,22 +339,20 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
 
-      // Create test user
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
 
-      const tokenData: CreatePasswordResetTokenData = {
+      const createdToken = await repository.create({
         userId,
         tokenHash: 'token_to_delete',
         expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-      }
+      })
 
-      const createdToken = await repository.create(tokenData)
       const deleteResult = await repository.delete(createdToken.id)
 
       expect(deleteResult).toBe(true)

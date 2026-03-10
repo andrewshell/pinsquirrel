@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest'
-import { drizzle } from 'drizzle-orm/node-postgres'
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { Pool } from 'pg'
+import { drizzle } from 'drizzle-orm/mysql2'
+import type { MySql2Database } from 'drizzle-orm/mysql2'
+import mysql from 'mysql2/promise'
+import type { Pool } from 'mysql2/promise'
 import { DrizzlePinRepository } from './pin.js'
 import { DrizzleTagRepository } from './tag.js'
 import { DrizzleUserRepository } from './user.js'
@@ -24,7 +25,6 @@ const createTestPinData = async (
     tagNames?: string[]
   }
 ): Promise<CreatePinData> => {
-  // Timestamps are managed by repository, not included in CreatePinData
   return {
     userId: data.userId,
     url: data.url,
@@ -38,7 +38,7 @@ const createTestPinData = async (
 // Helper function to create test update data with proper format
 const createTestUpdateData = async (
   tagRepository: DrizzleTagRepository,
-  existingPin: Pin, // The current pin to be updated
+  existingPin: Pin,
   updates: {
     url?: string
     title?: string
@@ -47,8 +47,6 @@ const createTestUpdateData = async (
     tagNames?: string[]
   } = {}
 ): Promise<UpdatePinData> => {
-  // Return complete UpdatePinData with all required fields
-  // (timestamps managed by repository)
   return {
     id: existingPin.id,
     userId: existingPin.userId,
@@ -65,7 +63,7 @@ const createTestUpdateData = async (
 }
 
 describe('DrizzlePinRepository - Integration Tests', () => {
-  let testDb: PostgresJsDatabase<Record<string, unknown>>
+  let testDb: MySql2Database<Record<string, unknown>>
   let testPool: Pool
   let pinRepository: DrizzlePinRepository
   let tagRepository: DrizzleTagRepository
@@ -74,13 +72,11 @@ describe('DrizzlePinRepository - Integration Tests', () => {
 
   const TEST_DATABASE_URL =
     process.env.TEST_DATABASE_URL ||
-    'postgresql://pinsquirrel:pinsquirrel@localhost:5432/pinsquirrel_test'
+    'mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel_test'
 
   beforeAll(async () => {
     // Create test database connection
-    testPool = new Pool({
-      connectionString: TEST_DATABASE_URL,
-    })
+    testPool = mysql.createPool(TEST_DATABASE_URL)
 
     // Import the schema and create test database connection
     const { users } = await import('../schema/users.js')
@@ -99,7 +95,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       passwordResetTokens,
     }
 
-    testDb = drizzle(testPool, { schema })
+    testDb = drizzle(testPool, { schema, mode: 'default' })
 
     // Create repositories
     userRepository = new DrizzleUserRepository(testDb)
@@ -116,7 +112,9 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     await testPool.query('DELETE FROM pins_tags')
     await testPool.query('DELETE FROM pins')
     await testPool.query('DELETE FROM password_reset_tokens')
+    await testPool.query('DELETE FROM sessions')
     await testPool.query('DELETE FROM tags')
+    await testPool.query('DELETE FROM user_roles')
     await testPool.query('DELETE FROM users')
 
     // Create a unique test user for each test
@@ -144,20 +142,20 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       // Insert test pin
       await testPool.query(
         `
-        INSERT INTO pins (id, user_id, url, title, description, read_later, created_at, updated_at)
-        VALUES ($2, $1, 'https://example.com', 'Test Pin', 'Test Description', false, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+        INSERT INTO pins (id, user_id, url, url_hash, title, description, read_later, created_at, updated_at)
+        VALUES (?, ?, 'https://example.com', MD5('https://example.com'), 'Test Pin', 'Test Description', false, '2023-01-01T00:00:00', '2023-01-01T00:00:00')
       `,
-        [testUser.id, testPinId]
+        [testPinId, testUser.id]
       )
 
       // Associate tags
       await testPool.query(
         `
         INSERT INTO pins_tags (pin_id, tag_id) VALUES
-        ($1, $2),
-        ($1, $3)
+        (?, ?),
+        (?, ?)
       `,
-        [testPinId, tag1.id, tag2.id]
+        [testPinId, tag1.id, testPinId, tag2.id]
       )
 
       const result = await pinRepository.findById(testPinId)
@@ -196,20 +194,20 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       // Create pins for test user
       await testPool.query(
         `
-        INSERT INTO pins (id, user_id, url, title, created_at, updated_at) VALUES
-        ($2, $1, 'https://example1.com', 'Pin 1', '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z'),
-        ($3, $1, 'https://example2.com', 'Pin 2', '2023-01-02T00:00:00Z', '2023-01-02T00:00:00Z')
+        INSERT INTO pins (id, user_id, url, url_hash, title, created_at, updated_at) VALUES
+        (?, ?, 'https://example1.com', MD5('https://example1.com'), 'Pin 1', '2023-01-01T00:00:00', '2023-01-01T00:00:00'),
+        (?, ?, 'https://example2.com', MD5('https://example2.com'), 'Pin 2', '2023-01-02T00:00:00', '2023-01-02T00:00:00')
       `,
-        [testUser.id, pin1Id, pin2Id]
+        [pin1Id, testUser.id, pin2Id, testUser.id]
       )
 
       // Create pin for other user
       await testPool.query(
         `
-        INSERT INTO pins (id, user_id, url, title, created_at, updated_at) VALUES
-        ($2, $1, 'https://example3.com', 'Pin 3', '2023-01-03T00:00:00Z', '2023-01-03T00:00:00Z')
+        INSERT INTO pins (id, user_id, url, url_hash, title, created_at, updated_at) VALUES
+        (?, ?, 'https://example3.com', MD5('https://example3.com'), 'Pin 3', '2023-01-03T00:00:00', '2023-01-03T00:00:00')
       `,
-        [otherUser.id, pin3Id]
+        [pin3Id, otherUser.id]
       )
 
       const result = await pinRepository.findByUserId(testUser.id)
@@ -233,12 +231,12 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       // Create pins with different creation times
       await testPool.query(
         `
-        INSERT INTO pins (id, user_id, url, title, created_at, updated_at) VALUES
-        ($2, $1, 'https://example1.com', 'Pin 1', '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z'),
-        ($3, $1, 'https://example2.com', 'Pin 2', '2023-01-03T00:00:00Z', '2023-01-03T00:00:00Z'),
-        ($4, $1, 'https://example3.com', 'Pin 3', '2023-01-02T00:00:00Z', '2023-01-02T00:00:00Z')
+        INSERT INTO pins (id, user_id, url, url_hash, title, created_at, updated_at) VALUES
+        (?, ?, 'https://example1.com', MD5('https://example1.com'), 'Pin 1', '2023-01-01T00:00:00', '2023-01-01T00:00:00'),
+        (?, ?, 'https://example2.com', MD5('https://example2.com'), 'Pin 2', '2023-01-03T00:00:00', '2023-01-03T00:00:00'),
+        (?, ?, 'https://example3.com', MD5('https://example3.com'), 'Pin 3', '2023-01-02T00:00:00', '2023-01-02T00:00:00')
       `,
-        [testUser.id, pin1Id, pin2Id, pin3Id]
+        [pin1Id, testUser.id, pin2Id, testUser.id, pin3Id, testUser.id]
       )
 
       const result = await pinRepository.findByUserId(testUser.id)
@@ -270,24 +268,24 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       // Create pins
       await testPool.query(
         `
-        INSERT INTO pins (id, user_id, url, title, created_at, updated_at) VALUES
-        ($2, $1, 'https://example1.com', 'Pin 1', '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z'),
-        ($3, $1, 'https://example2.com', 'Pin 2', '2023-01-02T00:00:00Z', '2023-01-02T00:00:00Z'),
-        ($4, $1, 'https://example3.com', 'Pin 3', '2023-01-03T00:00:00Z', '2023-01-03T00:00:00Z')
+        INSERT INTO pins (id, user_id, url, url_hash, title, created_at, updated_at) VALUES
+        (?, ?, 'https://example1.com', MD5('https://example1.com'), 'Pin 1', '2023-01-01T00:00:00', '2023-01-01T00:00:00'),
+        (?, ?, 'https://example2.com', MD5('https://example2.com'), 'Pin 2', '2023-01-02T00:00:00', '2023-01-02T00:00:00'),
+        (?, ?, 'https://example3.com', MD5('https://example3.com'), 'Pin 3', '2023-01-03T00:00:00', '2023-01-03T00:00:00')
       `,
-        [testUser.id, pin1Id, pin2Id, pin3Id]
+        [pin1Id, testUser.id, pin2Id, testUser.id, pin3Id, testUser.id]
       )
 
       // Associate tags
       await testPool.query(
         `
         INSERT INTO pins_tags (pin_id, tag_id) VALUES
-        ($1, $3),
-        ($2, $3),
-        ($2, $4),
-        ($1, $4)
+        (?, ?),
+        (?, ?),
+        (?, ?),
+        (?, ?)
       `,
-        [pin1Id, pin2Id, tag1.id, tag2.id]
+        [pin1Id, tag1.id, pin2Id, tag1.id, pin2Id, tag2.id, pin1Id, tag2.id]
       )
 
       const result = await pinRepository.findByUserId(testUser.id, {
@@ -317,23 +315,31 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       const pinId1 = crypto.randomUUID()
       const pinId2 = crypto.randomUUID()
       const pinId3 = crypto.randomUUID()
+      const url1 = `https://example${pinId1.slice(0, 8)}.com`
+      const url2 = `https://example${pinId2.slice(0, 8)}.com`
+      const url3 = `https://example${pinId3.slice(0, 8)}.com`
 
       // Create pins with different read later status
       await testPool.query(
         `
-        INSERT INTO pins (id, user_id, url, title, read_later, created_at, updated_at) VALUES
-        ($2, $1, $5, 'Pin 1', true, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z'),
-        ($3, $1, $6, 'Pin 2', true, '2023-01-02T00:00:00Z', '2023-01-02T00:00:00Z'),
-        ($4, $1, $7, 'Pin 3', false, '2023-01-03T00:00:00Z', '2023-01-03T00:00:00Z')
+        INSERT INTO pins (id, user_id, url, url_hash, title, read_later, created_at, updated_at) VALUES
+        (?, ?, ?, MD5(?), 'Pin 1', true, '2023-01-01T00:00:00', '2023-01-01T00:00:00'),
+        (?, ?, ?, MD5(?), 'Pin 2', true, '2023-01-02T00:00:00', '2023-01-02T00:00:00'),
+        (?, ?, ?, MD5(?), 'Pin 3', false, '2023-01-03T00:00:00', '2023-01-03T00:00:00')
       `,
         [
-          testUser.id,
           pinId1,
+          testUser.id,
+          url1,
+          url1,
           pinId2,
+          testUser.id,
+          url2,
+          url2,
           pinId3,
-          `https://example${pinId1.slice(0, 8)}.com`,
-          `https://example${pinId2.slice(0, 8)}.com`,
-          `https://example${pinId3.slice(0, 8)}.com`,
+          testUser.id,
+          url3,
+          url3,
         ]
       )
 
@@ -345,23 +351,11 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       })
 
       expect(readLaterPins).toHaveLength(2)
-      expect(
-        readLaterPins.find(
-          p => p.url === `https://example${pinId1.slice(0, 8)}.com`
-        )
-      ).toBeDefined()
-      expect(
-        readLaterPins.find(
-          p => p.url === `https://example${pinId2.slice(0, 8)}.com`
-        )
-      ).toBeDefined()
+      expect(readLaterPins.find(p => p.url === url1)).toBeDefined()
+      expect(readLaterPins.find(p => p.url === url2)).toBeDefined()
 
       expect(notReadLaterPins).toHaveLength(1)
-      expect(
-        notReadLaterPins.find(
-          p => p.url === `https://example${pinId3.slice(0, 8)}.com`
-        )
-      ).toBeDefined()
+      expect(notReadLaterPins.find(p => p.url === url3)).toBeDefined()
     })
   })
 
@@ -372,10 +366,10 @@ describe('DrizzlePinRepository - Integration Tests', () => {
 
       await testPool.query(
         `
-        INSERT INTO pins (id, user_id, url, title, created_at, updated_at) VALUES
-        ($2, $1, $3, 'Test Pin', '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+        INSERT INTO pins (id, user_id, url, url_hash, title, created_at, updated_at) VALUES
+        (?, ?, ?, MD5(?), 'Test Pin', '2023-01-01T00:00:00', '2023-01-01T00:00:00')
       `,
-        [testUser.id, pinId, testUrl]
+        [pinId, testUser.id, testUrl, testUrl]
       )
 
       const result = await pinRepository.findByUserIdAndUrl(
@@ -552,7 +546,6 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     })
 
     it('should return null when pin not found', async () => {
-      // For nonexistent pin test, we can create a fake existing pin structure
       const fakeExistingPin = {
         id: 'nonexistent-id',
         userId: testUser.id,
@@ -676,7 +669,6 @@ describe('DrizzlePinRepository - Integration Tests', () => {
 
   describe('countByUserId', () => {
     beforeEach(async () => {
-      // Create test pins with different readLater values
       await pinRepository.create({
         userId: testUser.id,
         url: 'https://normal-pin.com',
@@ -727,7 +719,6 @@ describe('DrizzlePinRepository - Integration Tests', () => {
 
   describe('searchPins', () => {
     beforeEach(async () => {
-      // Create test pins with different URLs, titles, and descriptions
       await pinRepository.create({
         userId: testUser.id,
         url: 'https://example.com/react-tutorial',
@@ -843,14 +834,14 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       const result = await pinRepository.findByUserId(testUser.id, {
         search: '',
       })
-      expect(result).toHaveLength(4) // Should return all pins when search is empty
+      expect(result).toHaveLength(4)
     })
 
     it('should handle null search query gracefully', async () => {
       const result = await pinRepository.findByUserId(testUser.id, {
         search: undefined,
       })
-      expect(result).toHaveLength(4) // Should return all pins when search is undefined
+      expect(result).toHaveLength(4)
     })
 
     it('should combine search with other filters', async () => {
@@ -919,13 +910,11 @@ describe('DrizzlePinRepository - Integration Tests', () => {
 
   describe('noTags filtering', () => {
     beforeEach(async () => {
-      // Create some pins with and without tags
       await tagRepository.create({
         userId: testUser.id,
         name: 'tag1',
       })
 
-      // Pin with tags
       const taggedPinData = await createTestPinData(tagRepository, {
         userId: testUser.id,
         url: 'https://tagged.com',
@@ -934,7 +923,6 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       })
       await pinRepository.create(taggedPinData)
 
-      // Pins without tags
       const untaggedPin1Data = await createTestPinData(tagRepository, {
         userId: testUser.id,
         url: 'https://untagged1.com',
@@ -962,7 +950,6 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       expect(result.find(p => p.url === 'https://untagged2.com')).toBeDefined()
       expect(result.find(p => p.url === 'https://tagged.com')).toBeUndefined()
 
-      // Verify that untagged pins have empty tags arrays
       result.forEach(pin => {
         expect(pin.tagNames).toEqual([])
       })
@@ -977,7 +964,6 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     })
 
     it('should combine noTags filter with other filters', async () => {
-      // Find untagged pins that are also marked as read later
       const result = await pinRepository.findByUserId(testUser.id, {
         noTags: true,
         readLater: true,
@@ -1010,7 +996,6 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     })
 
     it('should return empty array when no untagged pins exist', async () => {
-      // Add tags to all existing pins
       const pins = await pinRepository.findByUserId(testUser.id, {})
       for (const pin of pins) {
         if (pin.tagNames.length === 0) {
@@ -1029,7 +1014,6 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     })
 
     it('should return 0 count when no untagged pins exist', async () => {
-      // Add tags to all existing pins
       const pins = await pinRepository.findByUserId(testUser.id, {})
       for (const pin of pins) {
         if (pin.tagNames.length === 0) {

@@ -4,11 +4,11 @@ import type {
   PasswordResetRepository,
 } from '@pinsquirrel/domain'
 import { eq, and, gt, lt } from 'drizzle-orm'
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { passwordResetTokens } from '../schema/password-reset-tokens'
 
 export class DrizzlePasswordResetRepository implements PasswordResetRepository {
-  constructor(private db: PostgresJsDatabase<Record<string, unknown>>) {}
+  constructor(private db: MySql2Database<Record<string, unknown>>) {}
 
   async findById(id: string): Promise<PasswordResetToken | null> {
     const result = await this.db
@@ -45,18 +45,21 @@ export class DrizzlePasswordResetRepository implements PasswordResetRepository {
     const id = crypto.randomUUID()
     const now = new Date()
 
-    const result = await this.db
-      .insert(passwordResetTokens)
-      .values({
-        id,
-        userId: data.userId,
-        tokenHash: data.tokenHash,
-        expiresAt: data.expiresAt,
-        createdAt: now,
-      })
-      .returning()
+    await this.db.insert(passwordResetTokens).values({
+      id,
+      userId: data.userId,
+      tokenHash: data.tokenHash,
+      expiresAt: data.expiresAt,
+      createdAt: now,
+    })
 
-    return result[0]
+    const [created] = await this.db
+      .select()
+      .from(passwordResetTokens)
+      .where(eq(passwordResetTokens.id, id))
+      .limit(1)
+
+    return created
   }
 
   async update(
@@ -77,27 +80,32 @@ export class DrizzlePasswordResetRepository implements PasswordResetRepository {
       return await this.findById(id)
     }
 
-    const result = await this.db
+    await this.db
       .update(passwordResetTokens)
       .set(updateData)
       .where(eq(passwordResetTokens.id, id))
-      .returning()
 
-    return result[0] || null
+    const [updated] = await this.db
+      .select()
+      .from(passwordResetTokens)
+      .where(eq(passwordResetTokens.id, id))
+      .limit(1)
+
+    return updated || null
   }
 
   async delete(id: string): Promise<boolean> {
     const result = await this.db
       .delete(passwordResetTokens)
       .where(eq(passwordResetTokens.id, id))
-    return result.rowCount > 0
+    return result[0].affectedRows > 0
   }
 
   async deleteByUserId(userId: string): Promise<boolean> {
     const result = await this.db
       .delete(passwordResetTokens)
       .where(eq(passwordResetTokens.userId, userId))
-    return result.rowCount > 0
+    return result[0].affectedRows > 0
   }
 
   async deleteExpiredTokens(): Promise<number> {
@@ -105,7 +113,7 @@ export class DrizzlePasswordResetRepository implements PasswordResetRepository {
     const result = await this.db
       .delete(passwordResetTokens)
       .where(lt(passwordResetTokens.expiresAt, now))
-    return result.rowCount
+    return result[0].affectedRows
   }
 
   async isValidToken(tokenHash: string): Promise<boolean> {

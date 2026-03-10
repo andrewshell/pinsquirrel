@@ -1,5 +1,5 @@
 import { eq, and, inArray, count, isNull } from 'drizzle-orm'
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import type { MySql2Database } from 'drizzle-orm/mysql2'
 import type {
   Tag,
   TagRepository,
@@ -12,7 +12,7 @@ import { pinsTags } from '../schema/pins-tags.js'
 import { pins } from '../schema/pins.js'
 
 export class DrizzleTagRepository implements TagRepository {
-  constructor(private db: PostgresJsDatabase<Record<string, unknown>>) {}
+  constructor(private db: MySql2Database<Record<string, unknown>>) {}
 
   async findById(id: string): Promise<Tag | null> {
     const result = await this.db
@@ -72,7 +72,7 @@ export class DrizzleTagRepository implements TagRepository {
     const tagsToCreate = uniqueNames.filter(name => !existingTagNames.has(name))
 
     // Create missing tags
-    let createdTags: (typeof tags.$inferSelect)[] = []
+    const createdTags: (typeof tags.$inferSelect)[] = []
     if (tagsToCreate.length > 0) {
       const now = new Date()
       const tagValues = tagsToCreate.map(name => ({
@@ -83,7 +83,15 @@ export class DrizzleTagRepository implements TagRepository {
         updatedAt: now,
       }))
 
-      createdTags = await this.db.insert(tags).values(tagValues).returning()
+      await this.db.insert(tags).values(tagValues)
+
+      // Select back the created tags
+      const createdTagIds = tagValues.map(t => t.id)
+      const selected = await this.db
+        .select()
+        .from(tags)
+        .where(inArray(tags.id, createdTagIds))
+      createdTags.push(...selected)
     }
 
     // Return all tags (existing + created)
@@ -158,7 +166,7 @@ export class DrizzleTagRepository implements TagRepository {
     } else if (limit !== undefined) {
       query = baseQuery.limit(limit)
     } else if (offset !== undefined) {
-      query = baseQuery.offset(offset)
+      query = baseQuery.limit(2147483647).offset(offset)
     } else {
       query = baseQuery
     }
@@ -171,16 +179,19 @@ export class DrizzleTagRepository implements TagRepository {
     const id = crypto.randomUUID()
     const now = new Date()
 
+    await this.db.insert(tags).values({
+      id,
+      userId: data.userId,
+      name: data.name.toLowerCase(),
+      createdAt: now,
+      updatedAt: now,
+    })
+
     const [newTag] = await this.db
-      .insert(tags)
-      .values({
-        id,
-        userId: data.userId,
-        name: data.name.toLowerCase(),
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning()
+      .select()
+      .from(tags)
+      .where(eq(tags.id, id))
+      .limit(1)
 
     return this.mapToTag(newTag)
   }
@@ -194,11 +205,13 @@ export class DrizzleTagRepository implements TagRepository {
       updateValues.name = data.name.toLowerCase()
     }
 
+    await this.db.update(tags).set(updateValues).where(eq(tags.id, id))
+
     const result = await this.db
-      .update(tags)
-      .set(updateValues)
+      .select()
+      .from(tags)
       .where(eq(tags.id, id))
-      .returning()
+      .limit(1)
 
     if (result.length === 0) {
       return null
@@ -209,7 +222,7 @@ export class DrizzleTagRepository implements TagRepository {
 
   async delete(id: string): Promise<boolean> {
     const result = await this.db.delete(tags).where(eq(tags.id, id))
-    return result.rowCount > 0
+    return result[0].affectedRows > 0
   }
 
   async mergeTags(
@@ -278,7 +291,6 @@ export class DrizzleTagRepository implements TagRepository {
       await tx.delete(pinsTags).where(inArray(pinsTags.tagId, sourceTagIds))
 
       // Delete source tags that have no remaining pin associations
-      // (This query will only delete tags that have zero associations after the above deletion)
       for (const sourceTagId of sourceTagIds) {
         const remainingAssociations = await tx
           .select({ tagId: pinsTags.tagId })
@@ -315,7 +327,7 @@ export class DrizzleTagRepository implements TagRepository {
         .delete(tags)
         .where(and(eq(tags.userId, userId), inArray(tags.id, tagIdsToDelete)))
 
-      return result.rowCount
+      return result[0].affectedRows
     })
   }
 

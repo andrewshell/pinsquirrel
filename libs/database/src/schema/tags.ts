@@ -1,16 +1,25 @@
-import { pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import {
+  mysqlTable,
+  varchar,
+  timestamp,
+  uniqueIndex,
+} from 'drizzle-orm/mysql-core'
 import { users } from './users'
 
-export const tags = pgTable(
+export const tags = mysqlTable(
   'tags',
   {
-    id: text('id').primaryKey(),
-    userId: text('user_id')
+    id: varchar('id', { length: 36 }).primaryKey(),
+    userId: varchar('user_id', { length: 36 })
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    name: text('name').notNull(),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    name: varchar('name', { length: 255 }).notNull(),
+    createdAt: timestamp('created_at', { mode: 'date', fsp: 3 })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { mode: 'date', fsp: 3 })
+      .defaultNow()
+      .notNull(),
   },
   table => ({
     userIdNameIdx: uniqueIndex('tags_user_id_name_idx').on(

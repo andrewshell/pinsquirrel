@@ -1,26 +1,23 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest'
-import { drizzle } from 'drizzle-orm/node-postgres'
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { Pool } from 'pg'
+import { drizzle } from 'drizzle-orm/mysql2'
+import type { MySql2Database } from 'drizzle-orm/mysql2'
+import mysql from 'mysql2/promise'
+import type { Pool } from 'mysql2/promise'
 import { DrizzleSessionRepository } from './session.js'
 import type { CreateSessionData } from '@pinsquirrel/domain'
 
 describe('DrizzleSessionRepository - Integration Tests', () => {
-  let testDb: PostgresJsDatabase<Record<string, unknown>>
+  let testDb: MySql2Database<Record<string, unknown>>
   let testPool: Pool
   let repository: DrizzleSessionRepository
 
   const TEST_DATABASE_URL =
     process.env.TEST_DATABASE_URL ||
-    'postgresql://pinsquirrel:pinsquirrel@localhost:5432/pinsquirrel_test'
+    'mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel_test'
 
   beforeAll(async () => {
-    // Create test database connection
-    testPool = new Pool({
-      connectionString: TEST_DATABASE_URL,
-    })
+    testPool = mysql.createPool(TEST_DATABASE_URL)
 
-    // Import the schema and create test database connection
     const { users } = await import('../schema/users.js')
     const { pins } = await import('../schema/pins.js')
     const { tags } = await import('../schema/tags.js')
@@ -39,7 +36,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       sessions,
     }
 
-    testDb = drizzle(testPool, { schema })
+    testDb = drizzle(testPool, { schema, mode: 'default' })
   })
 
   afterAll(async () => {
@@ -47,35 +44,33 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
   })
 
   beforeEach(async () => {
-    // Create repository with test database
     repository = new DrizzleSessionRepository(testDb)
 
-    // Clean up any existing test data (respecting foreign key constraints)
     await testPool.query('DELETE FROM pins_tags')
     await testPool.query('DELETE FROM pins')
     await testPool.query('DELETE FROM password_reset_tokens')
     await testPool.query('DELETE FROM sessions')
     await testPool.query('DELETE FROM tags')
+    await testPool.query('DELETE FROM user_roles')
     await testPool.query('DELETE FROM users')
   })
 
   describe('create', () => {
     it('should create a session', async () => {
-      // First create a test user
       const userId = crypto.randomUUID()
       const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
 
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
 
       const sessionData: CreateSessionData = {
         userId,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       }
 
       const result = await repository.create(sessionData)
@@ -96,7 +91,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
@@ -133,7 +128,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
@@ -143,10 +138,10 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
 
       await testPool.query(
         `
-        INSERT INTO sessions (id, user_id, data, expires_at)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO sessions (id, user_id, data, expires_at, created_at)
+        VALUES (?, ?, NULL, ?, NOW())
       `,
-        [sessionId, userId, null, expiresAt]
+        [sessionId, userId, expiresAt]
       )
 
       const result = await repository.findById(sessionId)
@@ -173,12 +168,11 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
 
-      // Create multiple sessions for the user
       await repository.create({
         userId,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -207,7 +201,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
@@ -233,7 +227,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
@@ -267,7 +261,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
@@ -298,12 +292,11 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
 
-      // Create multiple sessions
       await repository.create({
         userId,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -334,14 +327,14 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
 
       const session = await repository.create({
         userId,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours future
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       })
 
       const result = await repository.isValidSession(session.id)
@@ -355,14 +348,14 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
 
       const session = await repository.create({
         userId,
-        expiresAt: new Date(Date.now() - 60 * 1000), // 1 minute past
+        expiresAt: new Date(Date.now() - 60 * 1000),
       })
 
       const result = await repository.isValidSession(session.id)
@@ -383,31 +376,27 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId, username]
       )
 
-      // Create expired session
       const expiredSession = await repository.create({
         userId,
-        expiresAt: new Date(Date.now() - 60 * 1000), // 1 minute past
+        expiresAt: new Date(Date.now() - 60 * 1000),
       })
 
-      // Create valid session
       const validSession = await repository.create({
         userId,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours future
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       })
 
       const deletedCount = await repository.deleteExpiredSessions()
       expect(deletedCount).toBe(1)
 
-      // Valid session should still exist
       const foundValidSession = await repository.findById(validSession.id)
       expect(foundValidSession).not.toBeNull()
 
-      // Expired session should be gone
       const foundExpiredSession = await repository.findById(expiredSession.id)
       expect(foundExpiredSession).toBeNull()
     })
@@ -428,14 +417,14 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId1, username1]
       )
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', NOW(), NOW())
+        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
       `,
         [userId2, username2]
       )

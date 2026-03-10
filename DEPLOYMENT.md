@@ -40,17 +40,16 @@ The production Docker image includes:
 ### Required Environment Variables
 
 ```bash
-DATABASE_URL=postgresql://username:password@hostname:5432/database?sslmode=require
+DATABASE_URL=mysql://username:password@hostname:3306/database
 PORT=8100  # Optional, defaults to 8100
 ```
 
 ### Managed Database Configuration
 
-For managed PostgreSQL databases (DigitalOcean, AWS RDS, etc.):
+For managed MySQL databases (DigitalOcean, AWS RDS, etc.):
 
-- Ensure SSL is enabled (typically required)
 - Use connection pooling if provided by your host
-- Set `sslmode=require` in the DATABASE_URL
+- Configure SSL at the client/server level if required by your provider
 
 ## Deployment Options
 
@@ -59,7 +58,7 @@ For managed PostgreSQL databases (DigitalOcean, AWS RDS, etc.):
 1. Create new app from GitHub repository
 2. Use `apps/hono/Dockerfile` as build configuration
 3. Set `DATABASE_URL` environment variable
-4. Deploy managed PostgreSQL database separately
+4. Deploy managed MySQL database separately
 
 ### Option 2: Docker Compose with Dockge
 
@@ -71,21 +70,22 @@ services:
     ports:
       - '8100:8100'
     environment:
-      - DATABASE_URL=postgresql://pinsquirrel:pinsquirrel@postgres:5432/pinsquirrel
+      - DATABASE_URL=mysql://pinsquirrel:pinsquirrel@mysql:3306/pinsquirrel
     depends_on:
-      - postgres
+      - mysql
 
-  postgres:
-    image: postgres:16
+  mysql:
+    image: mysql:8
     environment:
-      - POSTGRES_DB=pinsquirrel
-      - POSTGRES_USER=pinsquirrel
-      - POSTGRES_PASSWORD=pinsquirrel
+      - MYSQL_DATABASE=pinsquirrel
+      - MYSQL_USER=pinsquirrel
+      - MYSQL_PASSWORD=pinsquirrel
+      - MYSQL_ROOT_PASSWORD=pinsquirrel
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
 
 volumes:
-  postgres_data:
+  mysql_data:
 ```
 
 ### Option 3: Self-hosted with External Database
@@ -93,7 +93,7 @@ volumes:
 ```bash
 docker run -d \
   -p 8100:8100 \
-  -e DATABASE_URL="postgresql://user:pass@your-db-host:5432/pinsquirrel?sslmode=require" \
+  -e DATABASE_URL="mysql://user:pass@your-db-host:3306/pinsquirrel" \
   your-username/pinsquirrel:latest
 ```
 
@@ -141,7 +141,7 @@ If migrations fail during startup:
 
    ```bash
    # Test connection string
-   psql "postgresql://user:pass@host:5432/db?sslmode=require"
+   mysql -h host -P 3306 -u user -p db
    ```
 
 2. **Verify database permissions**:
@@ -169,7 +169,7 @@ docker logs <container-id>
 
 1. **Database URL Connection String**:
    - Ensure proper encoding of special characters
-   - Verify SSL configuration for managed databases
+   - Configure SSL if required by your database provider
    - Check firewall rules and network connectivity
 
 2. **Permission Issues**:

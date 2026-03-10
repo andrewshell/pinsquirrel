@@ -5,11 +5,11 @@ import type {
   SessionRepository,
 } from '@pinsquirrel/domain'
 import { eq, lt } from 'drizzle-orm'
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { sessions } from '../schema/sessions'
 
 export class DrizzleSessionRepository implements SessionRepository {
-  constructor(private db: PostgresJsDatabase<Record<string, unknown>>) {}
+  constructor(private db: MySql2Database<Record<string, unknown>>) {}
 
   async findById(id: string): Promise<Session | null> {
     const result = await this.db
@@ -35,18 +35,21 @@ export class DrizzleSessionRepository implements SessionRepository {
     const id = crypto.randomUUID()
     const now = new Date()
 
-    const result = await this.db
-      .insert(sessions)
-      .values({
-        id,
-        userId: data.userId,
-        data: data.data ?? null,
-        expiresAt: data.expiresAt,
-        createdAt: now,
-      })
-      .returning()
+    await this.db.insert(sessions).values({
+      id,
+      userId: data.userId,
+      data: data.data ?? null,
+      expiresAt: data.expiresAt,
+      createdAt: now,
+    })
 
-    return result[0]
+    const [created] = await this.db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.id, id))
+      .limit(1)
+
+    return created
   }
 
   async update(id: string, data: UpdateSessionData): Promise<Session | null> {
@@ -64,25 +67,27 @@ export class DrizzleSessionRepository implements SessionRepository {
       return await this.findById(id)
     }
 
-    const result = await this.db
-      .update(sessions)
-      .set(updateData)
-      .where(eq(sessions.id, id))
-      .returning()
+    await this.db.update(sessions).set(updateData).where(eq(sessions.id, id))
 
-    return result[0] || null
+    const [updated] = await this.db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.id, id))
+      .limit(1)
+
+    return updated || null
   }
 
   async delete(id: string): Promise<boolean> {
     const result = await this.db.delete(sessions).where(eq(sessions.id, id))
-    return result.rowCount > 0
+    return result[0].affectedRows > 0
   }
 
   async deleteByUserId(userId: string): Promise<boolean> {
     const result = await this.db
       .delete(sessions)
       .where(eq(sessions.userId, userId))
-    return result.rowCount > 0
+    return result[0].affectedRows > 0
   }
 
   async deleteExpiredSessions(): Promise<number> {
@@ -90,7 +95,7 @@ export class DrizzleSessionRepository implements SessionRepository {
     const result = await this.db
       .delete(sessions)
       .where(lt(sessions.expiresAt, now))
-    return result.rowCount
+    return result[0].affectedRows
   }
 
   async isValidSession(id: string): Promise<boolean> {

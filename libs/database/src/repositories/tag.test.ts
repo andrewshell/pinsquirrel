@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest'
-import { drizzle } from 'drizzle-orm/node-postgres'
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { Pool } from 'pg'
+import { drizzle } from 'drizzle-orm/mysql2'
+import type { MySql2Database } from 'drizzle-orm/mysql2'
+import mysql from 'mysql2/promise'
+import type { Pool } from 'mysql2/promise'
 import { DrizzleTagRepository } from './tag.js'
 import { DrizzleUserRepository } from './user.js'
 import type { User } from '@pinsquirrel/domain'
 
 describe('DrizzleTagRepository - Integration Tests', () => {
-  let testDb: PostgresJsDatabase<Record<string, unknown>>
+  let testDb: MySql2Database<Record<string, unknown>>
   let testPool: Pool
   let tagRepository: DrizzleTagRepository
   let userRepository: DrizzleUserRepository
@@ -15,15 +16,11 @@ describe('DrizzleTagRepository - Integration Tests', () => {
 
   const TEST_DATABASE_URL =
     process.env.TEST_DATABASE_URL ||
-    'postgresql://pinsquirrel:pinsquirrel@localhost:5432/pinsquirrel_test'
+    'mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel_test'
 
   beforeAll(async () => {
-    // Create test database connection
-    testPool = new Pool({
-      connectionString: TEST_DATABASE_URL,
-    })
+    testPool = mysql.createPool(TEST_DATABASE_URL)
 
-    // Import the schema and create test database connection
     const { users } = await import('../schema/users.js')
     const { pins } = await import('../schema/pins.js')
     const { tags } = await import('../schema/tags.js')
@@ -32,17 +29,10 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       '../schema/password-reset-tokens.js'
     )
 
-    const schema = {
-      users,
-      pins,
-      tags,
-      pinsTags,
-      passwordResetTokens,
-    }
+    const schema = { users, pins, tags, pinsTags, passwordResetTokens }
 
-    testDb = drizzle(testPool, { schema })
+    testDb = drizzle(testPool, { schema, mode: 'default' })
 
-    // Create repositories
     userRepository = new DrizzleUserRepository(testDb)
     tagRepository = new DrizzleTagRepository(testDb)
   })
@@ -52,14 +42,14 @@ describe('DrizzleTagRepository - Integration Tests', () => {
   })
 
   beforeEach(async () => {
-    // Clean up any existing test data (respecting foreign key constraints)
     await testPool.query('DELETE FROM pins_tags')
     await testPool.query('DELETE FROM pins')
     await testPool.query('DELETE FROM password_reset_tokens')
+    await testPool.query('DELETE FROM sessions')
     await testPool.query('DELETE FROM tags')
+    await testPool.query('DELETE FROM user_roles')
     await testPool.query('DELETE FROM users')
 
-    // Create a unique test user for each test
     testUser = await userRepository.create({
       username: `testuser-${crypto.randomUUID().slice(0, 8)}`,
       passwordHash: 'hashed_password',
@@ -71,13 +61,12 @@ describe('DrizzleTagRepository - Integration Tests', () => {
     it('should find tag by id', async () => {
       const testTagId = crypto.randomUUID()
 
-      // Insert test tag
       await testPool.query(
         `
         INSERT INTO tags (id, user_id, name, created_at, updated_at)
-        VALUES ($2, $1, 'test-tag', '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+        VALUES (?, ?, 'test-tag', '2023-01-01T00:00:00', '2023-01-01T00:00:00')
       `,
-        [testUser.id, testTagId]
+        [testTagId, testUser.id]
       )
 
       const result = await tagRepository.findById(testTagId)
@@ -96,7 +85,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
 
   describe('findByUserId', () => {
     it('should find all tags for a user', async () => {
-      // Create another user to ensure we only get tags for the correct user
       const otherUser = await userRepository.create({
         username: `otheruser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'password',
@@ -107,23 +95,21 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       const tag2Id = crypto.randomUUID()
       const tag3Id = crypto.randomUUID()
 
-      // Create tags for test user
       await testPool.query(
         `
         INSERT INTO tags (id, user_id, name, created_at, updated_at) VALUES
-        ($2, $1, 'tag1', '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z'),
-        ($3, $1, 'tag2', '2023-01-02T00:00:00Z', '2023-01-02T00:00:00Z')
+        (?, ?, 'tag1', '2023-01-01T00:00:00', '2023-01-01T00:00:00'),
+        (?, ?, 'tag2', '2023-01-02T00:00:00', '2023-01-02T00:00:00')
       `,
-        [testUser.id, tag1Id, tag2Id]
+        [tag1Id, testUser.id, tag2Id, testUser.id]
       )
 
-      // Create tag for other user
       await testPool.query(
         `
         INSERT INTO tags (id, user_id, name, created_at, updated_at) VALUES
-        ($2, $1, 'tag3', '2023-01-03T00:00:00Z', '2023-01-03T00:00:00Z')
+        (?, ?, 'tag3', '2023-01-03T00:00:00', '2023-01-03T00:00:00')
       `,
-        [otherUser.id, tag3Id]
+        [tag3Id, otherUser.id]
       )
 
       const result = await tagRepository.findByUserId(testUser.id)
@@ -148,9 +134,9 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO tags (id, user_id, name, created_at, updated_at)
-        VALUES ($2, $1, $3, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+        VALUES (?, ?, ?, '2023-01-01T00:00:00', '2023-01-01T00:00:00')
       `,
-        [testUser.id, tagId, tagName]
+        [tagId, testUser.id, tagName]
       )
 
       const result = await tagRepository.findByUserIdAndName(
@@ -183,9 +169,9 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO tags (id, user_id, name, created_at, updated_at)
-        VALUES ($2, $1, $3, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+        VALUES (?, ?, ?, '2023-01-01T00:00:00', '2023-01-01T00:00:00')
       `,
-        [otherUser.id, tagId, tagName]
+        [tagId, otherUser.id, tagName]
       )
 
       const result = await tagRepository.findByUserIdAndName(
@@ -202,9 +188,9 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO tags (id, user_id, name, created_at, updated_at)
-        VALUES ($2, $1, $3, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+        VALUES (?, ?, ?, '2023-01-01T00:00:00', '2023-01-01T00:00:00')
       `,
-        [testUser.id, tagId, tagName.toLowerCase()]
+        [tagId, testUser.id, tagName.toLowerCase()]
       )
 
       const result = await tagRepository.findByUserIdAndName(
@@ -228,7 +214,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       expect(result.find(t => t.name === 'new-tag-1')).toBeDefined()
       expect(result.find(t => t.name === 'new-tag-2')).toBeDefined()
 
-      // Verify they were saved
       const saved1 = await tagRepository.findByUserIdAndName(
         testUser.id,
         'new-tag-1'
@@ -242,7 +227,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
     })
 
     it('should return existing tags without creating duplicates', async () => {
-      // Create existing tag
       const existing = await tagRepository.create({
         userId: testUser.id,
         name: 'existing-tag',
@@ -262,7 +246,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       expect(existingResult!.id).toBe(existing.id)
       expect(newResult).toBeDefined()
 
-      // Verify no duplicate was created
       const allTags = await tagRepository.findByUserId(testUser.id)
       expect(allTags).toHaveLength(2)
     })
@@ -300,7 +283,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       expect(result.createdAt).toBeInstanceOf(Date)
       expect(result.updatedAt).toBeInstanceOf(Date)
 
-      // Verify it was saved
       const saved = await tagRepository.findById(result.id)
       expect(saved).toEqual(result)
     })
@@ -319,7 +301,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
     let existingTagId: string
 
     beforeEach(async () => {
-      // Create a tag to update
       const tag = await tagRepository.create({
         userId: testUser.id,
         name: 'original-name',
@@ -339,7 +320,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       expect(result).not.toBeNull()
       expect(result!.name).toBe('updated-name')
 
-      // Verify it was updated in database
       const updated = await tagRepository.findById(existingTagId)
       expect(updated!.name).toBe('updated-name')
     })
@@ -352,7 +332,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
         name: originalTag!.name,
       }
 
-      // Wait a bit to ensure updatedAt changes
       await new Promise(resolve => setTimeout(resolve, 10))
 
       const result = await tagRepository.update(existingTagId, updateData)
@@ -384,7 +363,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
 
       expect(result).toBe(true)
 
-      // Verify it was deleted
       const deleted = await tagRepository.findById(tag.id)
       expect(deleted).toBeNull()
     })
@@ -411,7 +389,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
 
       const result = await tagRepository.findAll()
 
-      // Find our specific tags in the results
       const ourTag1 = result.find(t => t.id === tag1.id)
       const ourTag2 = result.find(t => t.id === tag2.id)
 
@@ -424,7 +401,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
 
   describe('list', () => {
     it('should return tags with limit', async () => {
-      // Create some test tags for this user
       for (let i = 1; i <= 5; i++) {
         await tagRepository.create({
           userId: testUser.id,
@@ -437,7 +413,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
     })
 
     it('should return tags with offset', async () => {
-      // Create some test tags for this user
       for (let i = 1; i <= 5; i++) {
         await tagRepository.create({
           userId: testUser.id,
@@ -450,7 +425,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
     })
 
     it('should return tags with both limit and offset', async () => {
-      // Create some test tags for this user
       for (let i = 1; i <= 5; i++) {
         await tagRepository.create({
           userId: testUser.id,
@@ -463,7 +437,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
     })
 
     it('should return all tags when no limit or offset provided', async () => {
-      // Create some test tags for this user
       for (let i = 1; i <= 3; i++) {
         await tagRepository.create({
           userId: testUser.id,
@@ -478,7 +451,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
 
   describe('findByUserIdWithPinCount', () => {
     it('should return tags with pin counts', async () => {
-      // Create tags
       const tag1 = await tagRepository.create({
         userId: testUser.id,
         name: 'tag1',
@@ -492,52 +464,43 @@ describe('DrizzleTagRepository - Integration Tests', () => {
         name: 'tag3',
       })
 
-      // Create pins and associate with tags
       await testPool.query(
         `
-        INSERT INTO pins (id, user_id, url, title, created_at, updated_at) VALUES
-        ('pin1', $1, 'https://example.com/1', 'Pin 1', NOW(), NOW()),
-        ('pin2', $1, 'https://example.com/2', 'Pin 2', NOW(), NOW()),
-        ('pin3', $1, 'https://example.com/3', 'Pin 3', NOW(), NOW()),
-        ('pin4', $1, 'https://example.com/4', 'Pin 4', NOW(), NOW())
+        INSERT INTO pins (id, user_id, url, url_hash, title, created_at, updated_at) VALUES
+        ('pin1', ?, 'https://example.com/1', MD5('https://example.com/1'), 'Pin 1', NOW(), NOW()),
+        ('pin2', ?, 'https://example.com/2', MD5('https://example.com/2'), 'Pin 2', NOW(), NOW()),
+        ('pin3', ?, 'https://example.com/3', MD5('https://example.com/3'), 'Pin 3', NOW(), NOW()),
+        ('pin4', ?, 'https://example.com/4', MD5('https://example.com/4'), 'Pin 4', NOW(), NOW())
       `,
-        [testUser.id]
+        [testUser.id, testUser.id, testUser.id, testUser.id]
       )
 
-      // Associate pins with tags
       await testPool.query(
         `
         INSERT INTO pins_tags (pin_id, tag_id) VALUES
-        ('pin1', $1),
-        ('pin2', $1),
-        ('pin3', $1),
-        ('pin1', $2),
-        ('pin2', $2),
-        ('pin4', $3)
+        ('pin1', ?),
+        ('pin2', ?),
+        ('pin3', ?),
+        ('pin1', ?),
+        ('pin2', ?),
+        ('pin4', ?)
       `,
-        [tag1.id, tag2.id, tag3.id]
+        [tag1.id, tag1.id, tag1.id, tag2.id, tag2.id, tag3.id]
       )
 
       const result = await tagRepository.findByUserIdWithPinCount(testUser.id)
 
       expect(result).toHaveLength(3)
-
-      // Results should be sorted alphabetically
       expect(result[0].name).toBe('tag1')
       expect(result[1].name).toBe('tag2')
       expect(result[2].name).toBe('tag3')
-
-      // Check pin counts
-      expect(result[0].pinCount).toBe(3) // tag1 has pins 1, 2, 3
-      expect(result[1].pinCount).toBe(2) // tag2 has pins 1, 2
-      expect(result[2].pinCount).toBe(1) // tag3 has pin 4
+      expect(result[0].pinCount).toBe(3)
+      expect(result[1].pinCount).toBe(2)
+      expect(result[2].pinCount).toBe(1)
     })
 
     it('should return tags with zero pin count when no pins associated', async () => {
-      await tagRepository.create({
-        userId: testUser.id,
-        name: 'lonely-tag',
-      })
+      await tagRepository.create({ userId: testUser.id, name: 'lonely-tag' })
 
       const result = await tagRepository.findByUserIdWithPinCount(testUser.id)
 
@@ -552,22 +515,14 @@ describe('DrizzleTagRepository - Integration Tests', () => {
     })
 
     it('should only return tags for the specified user', async () => {
-      // Create another user
       const otherUser = await userRepository.create({
         username: `otheruser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'hashed_password',
         emailHash: 'other@example.com',
       })
 
-      // Create tags for both users
-      await tagRepository.create({
-        userId: testUser.id,
-        name: 'user1-tag',
-      })
-      await tagRepository.create({
-        userId: otherUser.id,
-        name: 'user2-tag',
-      })
+      await tagRepository.create({ userId: testUser.id, name: 'user1-tag' })
+      await tagRepository.create({ userId: otherUser.id, name: 'user2-tag' })
 
       const result = await tagRepository.findByUserIdWithPinCount(testUser.id)
 
@@ -579,7 +534,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
 
   describe('mergeTags', () => {
     it('should merge multiple tags into destination tag', async () => {
-      // Create test tags
       const sourceTag1 = await tagRepository.create({
         userId: testUser.id,
         name: 'source-tag-1',
@@ -593,67 +547,68 @@ describe('DrizzleTagRepository - Integration Tests', () => {
         name: 'destination-tag',
       })
 
-      // Create test pins and associate them with source tags
       const pin1Id = crypto.randomUUID()
       const pin2Id = crypto.randomUUID()
       const pin3Id = crypto.randomUUID()
 
       await testPool.query(
         `
-        INSERT INTO pins (id, user_id, url, title, description, read_later, created_at, updated_at) VALUES
-        ($1, $2, 'https://example1.com', 'Pin 1', 'Description 1', false, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z'),
-        ($3, $2, 'https://example2.com', 'Pin 2', 'Description 2', false, '2023-01-02T00:00:00Z', '2023-01-02T00:00:00Z'),
-        ($4, $2, 'https://example3.com', 'Pin 3', 'Description 3', false, '2023-01-03T00:00:00Z', '2023-01-03T00:00:00Z')
+        INSERT INTO pins (id, user_id, url, url_hash, title, description, read_later, created_at, updated_at) VALUES
+        (?, ?, 'https://example1.com', MD5('https://example1.com'), 'Pin 1', 'Description 1', false, '2023-01-01T00:00:00', '2023-01-01T00:00:00'),
+        (?, ?, 'https://example2.com', MD5('https://example2.com'), 'Pin 2', 'Description 2', false, '2023-01-02T00:00:00', '2023-01-02T00:00:00'),
+        (?, ?, 'https://example3.com', MD5('https://example3.com'), 'Pin 3', 'Description 3', false, '2023-01-03T00:00:00', '2023-01-03T00:00:00')
       `,
-        [pin1Id, testUser.id, pin2Id, pin3Id]
+        [pin1Id, testUser.id, pin2Id, testUser.id, pin3Id, testUser.id]
       )
 
-      // Associate pins with source tags
       await testPool.query(
         `
         INSERT INTO pins_tags (pin_id, tag_id) VALUES
-        ($1, $2),
-        ($1, $3),
-        ($4, $2),
-        ($5, $3)
+        (?, ?),
+        (?, ?),
+        (?, ?),
+        (?, ?)
       `,
-        [pin1Id, sourceTag1.id, sourceTag2.id, pin2Id, pin3Id]
+        [
+          pin1Id,
+          sourceTag1.id,
+          pin1Id,
+          sourceTag2.id,
+          pin2Id,
+          sourceTag1.id,
+          pin3Id,
+          sourceTag2.id,
+        ]
       )
 
-      // Perform merge
       await tagRepository.mergeTags(
         testUser.id,
         [sourceTag1.id, sourceTag2.id],
         destinationTag.id
       )
 
-      // Verify pins now have destination tag
-      const pinTagAssociations = await testPool.query(
-        'SELECT pin_id, tag_id FROM pins_tags WHERE tag_id = $1 ORDER BY pin_id',
+      const [pinTagRows] = await testPool.query(
+        'SELECT pin_id, tag_id FROM pins_tags WHERE tag_id = ? ORDER BY pin_id',
         [destinationTag.id]
       )
 
-      expect(pinTagAssociations.rows).toHaveLength(3)
-      expect(
-        pinTagAssociations.rows.map((r: { pin_id: string }) => r.pin_id)
-      ).toEqual(expect.arrayContaining([pin1Id, pin2Id, pin3Id]))
+      expect(pinTagRows).toHaveLength(3)
+      const pinIds = (pinTagRows as { pin_id: string }[]).map(r => r.pin_id)
+      expect(pinIds).toEqual(expect.arrayContaining([pin1Id, pin2Id, pin3Id]))
 
-      // Verify source tags no longer have pin associations
-      const sourceTagAssociations = await testPool.query(
-        'SELECT pin_id FROM pins_tags WHERE tag_id = ANY($1)',
-        [[sourceTag1.id, sourceTag2.id]]
+      const [sourceTagRows] = await testPool.query(
+        'SELECT pin_id FROM pins_tags WHERE tag_id IN (?, ?)',
+        [sourceTag1.id, sourceTag2.id]
       )
 
-      expect(sourceTagAssociations.rows).toHaveLength(0)
+      expect(sourceTagRows).toHaveLength(0)
 
-      // Verify source tags are deleted (they had no remaining associations)
       const remainingTags = await tagRepository.findByUserId(testUser.id)
       expect(remainingTags).toHaveLength(1)
       expect(remainingTags[0].id).toBe(destinationTag.id)
     })
 
     it('should handle pins that already have destination tag', async () => {
-      // Create test tags
       const sourceTag = await tagRepository.create({
         userId: testUser.id,
         name: 'source-tag',
@@ -663,44 +618,41 @@ describe('DrizzleTagRepository - Integration Tests', () => {
         name: 'destination-tag',
       })
 
-      // Create test pin
       const pinId = crypto.randomUUID()
 
       await testPool.query(
         `
-        INSERT INTO pins (id, user_id, url, title, description, read_later, created_at, updated_at) VALUES
-        ($1, $2, 'https://example.com', 'Pin 1', 'Description 1', false, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+        INSERT INTO pins (id, user_id, url, url_hash, title, description, read_later, created_at, updated_at) VALUES
+        (?, ?, 'https://example.com', MD5('https://example.com'), 'Pin 1', 'Description 1', false, '2023-01-01T00:00:00', '2023-01-01T00:00:00')
       `,
         [pinId, testUser.id]
       )
 
-      // Associate pin with both source and destination tags
       await testPool.query(
         `
         INSERT INTO pins_tags (pin_id, tag_id) VALUES
-        ($1, $2),
-        ($1, $3)
+        (?, ?),
+        (?, ?)
       `,
-        [pinId, sourceTag.id, destinationTag.id]
+        [pinId, sourceTag.id, pinId, destinationTag.id]
       )
 
-      // Perform merge
       await tagRepository.mergeTags(
         testUser.id,
         [sourceTag.id],
         destinationTag.id
       )
 
-      // Verify pin still has only one association with destination tag (no duplicates)
-      const pinTagAssociations = await testPool.query(
-        'SELECT tag_id FROM pins_tags WHERE pin_id = $1',
+      const [pinTagRows] = await testPool.query(
+        'SELECT tag_id FROM pins_tags WHERE pin_id = ?',
         [pinId]
       )
 
-      expect(pinTagAssociations.rows).toHaveLength(1)
-      expect(pinTagAssociations.rows[0].tag_id).toBe(destinationTag.id)
+      expect(pinTagRows).toHaveLength(1)
+      expect((pinTagRows as { tag_id: string }[])[0].tag_id).toBe(
+        destinationTag.id
+      )
 
-      // Verify source tag is deleted
       const remainingTags = await tagRepository.findByUserId(testUser.id)
       expect(remainingTags).toHaveLength(1)
       expect(remainingTags[0].id).toBe(destinationTag.id)
@@ -733,7 +685,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
     })
 
     it('should throw error if tag does not exist or does not belong to user', async () => {
-      // Create another user
       const otherUser = await userRepository.create({
         username: `otheruser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'hashed_password',
@@ -744,20 +695,17 @@ describe('DrizzleTagRepository - Integration Tests', () => {
         userId: otherUser.id,
         name: 'other-user-tag',
       })
-
       const testUserTag = await tagRepository.create({
         userId: testUser.id,
         name: 'test-user-tag',
       })
 
-      // Try to merge with tag from another user
       await expect(
         tagRepository.mergeTags(testUser.id, [otherUserTag.id], testUserTag.id)
       ).rejects.toThrow(
         `Tag with ID ${otherUserTag.id} not found or does not belong to user`
       )
 
-      // Try to merge with nonexistent tag
       const nonexistentTagId = crypto.randomUUID()
       await expect(
         tagRepository.mergeTags(testUser.id, [testUserTag.id], nonexistentTagId)
@@ -767,9 +715,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
     })
 
     it('should keep source tag if it has other pin associations not being merged', async () => {
-      // This test creates a more complex scenario where some pins have multiple tags
-      // and source tags might have pins that also have other tags not involved in the merge
-
       const sourceTag = await tagRepository.create({
         userId: testUser.id,
         name: 'source-tag',
@@ -783,111 +728,92 @@ describe('DrizzleTagRepository - Integration Tests', () => {
         name: 'unrelated-tag',
       })
 
-      // Create test pins
-      const pin1Id = crypto.randomUUID() // Has sourceTag only
-      const pin2Id = crypto.randomUUID() // Has sourceTag + unrelatedTag (sourceTag should be deleted)
+      const pin1Id = crypto.randomUUID()
+      const pin2Id = crypto.randomUUID()
 
       await testPool.query(
         `
-        INSERT INTO pins (id, user_id, url, title, description, read_later, created_at, updated_at) VALUES
-        ($1, $2, 'https://example1.com', 'Pin 1', 'Description 1', false, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z'),
-        ($3, $2, 'https://example2.com', 'Pin 2', 'Description 2', false, '2023-01-02T00:00:00Z', '2023-01-02T00:00:00Z')
+        INSERT INTO pins (id, user_id, url, url_hash, title, description, read_later, created_at, updated_at) VALUES
+        (?, ?, 'https://example1.com', MD5('https://example1.com'), 'Pin 1', 'Description 1', false, '2023-01-01T00:00:00', '2023-01-01T00:00:00'),
+        (?, ?, 'https://example2.com', MD5('https://example2.com'), 'Pin 2', 'Description 2', false, '2023-01-02T00:00:00', '2023-01-02T00:00:00')
       `,
-        [pin1Id, testUser.id, pin2Id]
+        [pin1Id, testUser.id, pin2Id, testUser.id]
       )
 
-      // Associate pins with tags
       await testPool.query(
         `
         INSERT INTO pins_tags (pin_id, tag_id) VALUES
-        ($1, $2),
-        ($3, $2),
-        ($3, $4)
+        (?, ?),
+        (?, ?),
+        (?, ?)
       `,
-        [pin1Id, sourceTag.id, pin2Id, unrelatedTag.id]
+        [pin1Id, sourceTag.id, pin2Id, sourceTag.id, pin2Id, unrelatedTag.id]
       )
 
-      // Perform merge
       await tagRepository.mergeTags(
         testUser.id,
         [sourceTag.id],
         destinationTag.id
       )
 
-      // Verify all pins now have destination tag
-      const destinationTagAssociations = await testPool.query(
-        'SELECT pin_id FROM pins_tags WHERE tag_id = $1 ORDER BY pin_id',
+      const [destTagRows] = await testPool.query(
+        'SELECT pin_id FROM pins_tags WHERE tag_id = ? ORDER BY pin_id',
         [destinationTag.id]
       )
 
-      expect(destinationTagAssociations.rows).toHaveLength(2)
-      expect(
-        destinationTagAssociations.rows.map((r: { pin_id: string }) => r.pin_id)
-      ).toEqual(expect.arrayContaining([pin1Id, pin2Id]))
+      expect(destTagRows).toHaveLength(2)
+      const pinIds = (destTagRows as { pin_id: string }[]).map(r => r.pin_id)
+      expect(pinIds).toEqual(expect.arrayContaining([pin1Id, pin2Id]))
 
-      // Verify source tag is deleted since it has no remaining associations
       const remainingTags = await tagRepository.findByUserId(testUser.id)
-      expect(remainingTags).toHaveLength(2) // destinationTag + unrelatedTag
+      expect(remainingTags).toHaveLength(2)
       expect(remainingTags.find(t => t.id === destinationTag.id)).toBeDefined()
       expect(remainingTags.find(t => t.id === unrelatedTag.id)).toBeDefined()
       expect(remainingTags.find(t => t.id === sourceTag.id)).toBeUndefined()
 
-      // Verify pin2 still has unrelatedTag
-      const pin2Associations = await testPool.query(
-        'SELECT tag_id FROM pins_tags WHERE pin_id = $1',
+      const [pin2Rows] = await testPool.query(
+        'SELECT tag_id FROM pins_tags WHERE pin_id = ?',
         [pin2Id]
       )
 
-      expect(pin2Associations.rows).toHaveLength(2)
-      expect(
-        pin2Associations.rows.map((r: { tag_id: string }) => r.tag_id)
-      ).toEqual(expect.arrayContaining([destinationTag.id, unrelatedTag.id]))
+      expect(pin2Rows).toHaveLength(2)
+      const tagIds = (pin2Rows as { tag_id: string }[]).map(r => r.tag_id)
+      expect(tagIds).toEqual(
+        expect.arrayContaining([destinationTag.id, unrelatedTag.id])
+      )
     })
   })
 
   describe('deleteTagsWithNoPins', () => {
     it('should delete tags with no pin associations', async () => {
-      // Create tags - some with pins, some without
       const tagWithPins = await tagRepository.create({
         userId: testUser.id,
         name: 'tag-with-pins',
       })
-      await tagRepository.create({
-        userId: testUser.id,
-        name: 'empty-tag-1',
-      })
-      await tagRepository.create({
-        userId: testUser.id,
-        name: 'empty-tag-2',
-      })
+      await tagRepository.create({ userId: testUser.id, name: 'empty-tag-1' })
+      await tagRepository.create({ userId: testUser.id, name: 'empty-tag-2' })
 
-      // Create a pin and associate it with tagWithPins
       const pinId = crypto.randomUUID()
       await testPool.query(
         `
-        INSERT INTO pins (id, user_id, url, title, description, read_later, created_at, updated_at) VALUES
-        ($1, $2, 'https://example.com', 'Test Pin', 'Description', false, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+        INSERT INTO pins (id, user_id, url, url_hash, title, description, read_later, created_at, updated_at) VALUES
+        (?, ?, 'https://example.com', MD5('https://example.com'), 'Test Pin', 'Description', false, '2023-01-01T00:00:00', '2023-01-01T00:00:00')
       `,
         [pinId, testUser.id]
       )
 
       await testPool.query(
-        `
-        INSERT INTO pins_tags (pin_id, tag_id) VALUES ($1, $2)
-      `,
+        'INSERT INTO pins_tags (pin_id, tag_id) VALUES (?, ?)',
         [pinId, tagWithPins.id]
       )
 
-      // Verify initial state
       const allTagsBefore = await tagRepository.findByUserId(testUser.id)
       expect(allTagsBefore).toHaveLength(3)
 
-      // Delete tags with no pins
       const deletedCount = await tagRepository.deleteTagsWithNoPins(testUser.id)
 
       expect(deletedCount).toBe(2)
 
-      // Verify only tag with pins remains
       const remainingTags = await tagRepository.findByUserId(testUser.id)
       expect(remainingTags).toHaveLength(1)
       expect(remainingTags[0].id).toBe(tagWithPins.id)
@@ -895,35 +821,29 @@ describe('DrizzleTagRepository - Integration Tests', () => {
     })
 
     it('should return 0 when no tags need deletion', async () => {
-      // Create tag with pins
       const tag = await tagRepository.create({
         userId: testUser.id,
         name: 'tag-with-pins',
       })
 
-      // Create a pin and associate it with tag
       const pinId = crypto.randomUUID()
       await testPool.query(
         `
-        INSERT INTO pins (id, user_id, url, title, description, read_later, created_at, updated_at) VALUES
-        ($1, $2, 'https://example.com', 'Test Pin', 'Description', false, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+        INSERT INTO pins (id, user_id, url, url_hash, title, description, read_later, created_at, updated_at) VALUES
+        (?, ?, 'https://example.com', MD5('https://example.com'), 'Test Pin', 'Description', false, '2023-01-01T00:00:00', '2023-01-01T00:00:00')
       `,
         [pinId, testUser.id]
       )
 
       await testPool.query(
-        `
-        INSERT INTO pins_tags (pin_id, tag_id) VALUES ($1, $2)
-      `,
+        'INSERT INTO pins_tags (pin_id, tag_id) VALUES (?, ?)',
         [pinId, tag.id]
       )
 
-      // Delete tags with no pins - should be 0
       const deletedCount = await tagRepository.deleteTagsWithNoPins(testUser.id)
 
       expect(deletedCount).toBe(0)
 
-      // Verify tag still exists
       const remainingTags = await tagRepository.findByUserId(testUser.id)
       expect(remainingTags).toHaveLength(1)
       expect(remainingTags[0].id).toBe(tag.id)
@@ -935,14 +855,12 @@ describe('DrizzleTagRepository - Integration Tests', () => {
     })
 
     it('should only delete tags belonging to specified user', async () => {
-      // Create another user
       const otherUser = await userRepository.create({
         username: `otheruser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: 'hashed_password',
         emailHash: 'other@example.com',
       })
 
-      // Create empty tags for both users
       await tagRepository.create({
         userId: testUser.id,
         name: 'test-user-empty-tag',
@@ -952,54 +870,44 @@ describe('DrizzleTagRepository - Integration Tests', () => {
         name: 'other-user-empty-tag',
       })
 
-      // Delete empty tags for test user only
       const deletedCount = await tagRepository.deleteTagsWithNoPins(testUser.id)
 
       expect(deletedCount).toBe(1)
 
-      // Verify test user's empty tag is deleted
       const testUserTags = await tagRepository.findByUserId(testUser.id)
       expect(testUserTags).toHaveLength(0)
 
-      // Verify other user's empty tag still exists
       const otherUserTags = await tagRepository.findByUserId(otherUser.id)
       expect(otherUserTags).toHaveLength(1)
       expect(otherUserTags[0].id).toBe(otherUserEmptyTag.id)
     })
 
     it('should handle tags that lose all pins during transaction', async () => {
-      // Create tag with pin
       const tag = await tagRepository.create({
         userId: testUser.id,
         name: 'tag-that-will-be-emptied',
       })
 
-      // Create pin and associate with tag
       const pinId = crypto.randomUUID()
       await testPool.query(
         `
-        INSERT INTO pins (id, user_id, url, title, description, read_later, created_at, updated_at) VALUES
-        ($1, $2, 'https://example.com', 'Test Pin', 'Description', false, '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+        INSERT INTO pins (id, user_id, url, url_hash, title, description, read_later, created_at, updated_at) VALUES
+        (?, ?, 'https://example.com', MD5('https://example.com'), 'Test Pin', 'Description', false, '2023-01-01T00:00:00', '2023-01-01T00:00:00')
       `,
         [pinId, testUser.id]
       )
 
       await testPool.query(
-        `
-        INSERT INTO pins_tags (pin_id, tag_id) VALUES ($1, $2)
-      `,
+        'INSERT INTO pins_tags (pin_id, tag_id) VALUES (?, ?)',
         [pinId, tag.id]
       )
 
-      // Manually remove the pin association to simulate it becoming empty
-      await testPool.query('DELETE FROM pins_tags WHERE tag_id = $1', [tag.id])
+      await testPool.query('DELETE FROM pins_tags WHERE tag_id = ?', [tag.id])
 
-      // Now delete tags with no pins
       const deletedCount = await tagRepository.deleteTagsWithNoPins(testUser.id)
 
       expect(deletedCount).toBe(1)
 
-      // Verify tag is deleted
       const remainingTags = await tagRepository.findByUserId(testUser.id)
       expect(remainingTags).toHaveLength(0)
     })

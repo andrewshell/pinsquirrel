@@ -1,19 +1,20 @@
 services:
-  postgres:
-    image: postgres:16-alpine
+  mysql:
+    image: mysql:8
     environment:
-      POSTGRES_DB: pinsquirrel
-      POSTGRES_USER: pinsquirrel
-      POSTGRES_PASSWORD: pinsquirrel
+      MYSQL_DATABASE: pinsquirrel
+      MYSQL_USER: pinsquirrel
+      MYSQL_PASSWORD: pinsquirrel
+      MYSQL_ROOT_PASSWORD: pinsquirrel
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pinsquirrel -d pinsquirrel"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
       timeout: 5s
       retries: 5
 
 volumes:
-  postgres_data:
+  mysql_data:

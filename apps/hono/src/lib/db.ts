@@ -9,7 +9,7 @@ import {
 
 // Create database client
 export const db = createDatabaseClient(
-  process.env.DATABASE_URL || 'postgresql://localhost:5432/pinsquirrel'
+  process.env.DATABASE_URL || 'mysql://localhost:3306/pinsquirrel'
 )
 
 // Create repository instances

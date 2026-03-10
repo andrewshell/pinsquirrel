@@ -1,23 +1,22 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest'
-import { drizzle } from 'drizzle-orm/node-postgres'
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { Pool } from 'pg'
+import { drizzle } from 'drizzle-orm/mysql2'
+import type { MySql2Database } from 'drizzle-orm/mysql2'
+import mysql from 'mysql2/promise'
+import type { Pool } from 'mysql2/promise'
 import { DrizzleUserRepository } from './user.js'
 
 describe('DrizzleUserRepository - Integration Tests', () => {
-  let testDb: PostgresJsDatabase<Record<string, unknown>>
+  let testDb: MySql2Database<Record<string, unknown>>
   let testPool: Pool
   let repository: DrizzleUserRepository
 
   const TEST_DATABASE_URL =
     process.env.TEST_DATABASE_URL ||
-    'postgresql://pinsquirrel:pinsquirrel@localhost:5432/pinsquirrel_test'
+    'mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel_test'
 
   beforeAll(async () => {
     // Create test database connection
-    testPool = new Pool({
-      connectionString: TEST_DATABASE_URL,
-    })
+    testPool = mysql.createPool(TEST_DATABASE_URL)
 
     // Import the schema and create test database connection
     const { users } = await import('../schema/users.js')
@@ -36,7 +35,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       passwordResetTokens,
     }
 
-    testDb = drizzle(testPool, { schema })
+    testDb = drizzle(testPool, { schema, mode: 'default' })
   })
 
   afterAll(async () => {
@@ -51,7 +50,9 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     await testPool.query('DELETE FROM pins_tags')
     await testPool.query('DELETE FROM pins')
     await testPool.query('DELETE FROM password_reset_tokens')
+    await testPool.query('DELETE FROM sessions')
     await testPool.query('DELETE FROM tags')
+    await testPool.query('DELETE FROM user_roles')
     await testPool.query('DELETE FROM users')
   })
 
@@ -64,7 +65,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+        VALUES (?, ?, 'hashed_password', 'hashed_email', '2023-01-01T00:00:00', '2023-01-01T00:00:00')
       `,
         [userId, username]
       )
@@ -93,7 +94,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'specific_email_hash', '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+        VALUES (?, ?, 'hashed_password', 'specific_email_hash', '2023-01-01T00:00:00', '2023-01-01T00:00:00')
       `,
         [testUserId, testUsername]
       )
@@ -118,7 +119,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES ($1, $2, 'hashed_password', 'hashed_email', '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z')
+        VALUES (?, ?, 'hashed_password', 'hashed_email', '2023-01-01T00:00:00', '2023-01-01T00:00:00')
       `,
         [userId, username]
       )
@@ -145,10 +146,10 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       await testPool.query(
         `
         INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at) VALUES
-        ($1, $3, 'hash1', 'email1', '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z'),
-        ($2, $4, 'hash2', 'email2', '2023-01-02T00:00:00Z', '2023-01-02T00:00:00Z')
+        (?, ?, 'hash1', 'email1', '2023-01-01T00:00:00', '2023-01-01T00:00:00'),
+        (?, ?, 'hash2', 'email2', '2023-01-02T00:00:00', '2023-01-02T00:00:00')
       `,
-        [user1Id, user2Id, user1Name, user2Name]
+        [user1Id, user1Name, user2Id, user2Name]
       )
 
       const result = await repository.findAll()
@@ -164,8 +165,6 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     })
 
     it('should return empty array when no users exist', async () => {
-      // This test can't be reliable in a shared database, so we'll skip this specific assertion
-      // Just verify that findAll returns an array
       const result = await repository.findAll()
       expect(Array.isArray(result)).toBe(true)
     })
@@ -173,7 +172,6 @@ describe('DrizzleUserRepository - Integration Tests', () => {
 
   describe('list', () => {
     it('should return users with limit', async () => {
-      // Create test users for this test
       await Promise.all([
         repository.create({
           username: `user1-${crypto.randomUUID().slice(0, 8)}`,
@@ -197,7 +195,6 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     })
 
     it('should return users with offset', async () => {
-      // Create test users for this test
       await Promise.all([
         repository.create({
           username: `user1-${crypto.randomUUID().slice(0, 8)}`,
@@ -221,7 +218,6 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     })
 
     it('should return users with both limit and offset', async () => {
-      // Create test users for this test
       await Promise.all([
         repository.create({
           username: `user1-${crypto.randomUUID().slice(0, 8)}`,
@@ -245,7 +241,6 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     })
 
     it('should return all users when no limit or offset provided', async () => {
-      // Create test users for this test
       await Promise.all([
         repository.create({
           username: `user1-${crypto.randomUUID().slice(0, 8)}`,
@@ -269,7 +264,6 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     })
 
     it('should return all users when called with undefined for both parameters', async () => {
-      // Create test users for this test
       await Promise.all([
         repository.create({
           username: `user1-${crypto.randomUUID().slice(0, 8)}`,

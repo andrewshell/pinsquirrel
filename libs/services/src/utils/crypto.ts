@@ -54,3 +54,7 @@ export function hashToken(token: string): string {
   hash.update(token)
   return hash.digest('hex')
 }
+
+export function md5(input: string): string {
+  return createHash('md5').update(input).digest('hex')
+}

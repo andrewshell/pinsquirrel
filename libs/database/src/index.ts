@@ -1,5 +1,5 @@
 // Re-export drizzle as createDatabaseClient for stable API
-export { drizzle as createDatabaseClient } from 'drizzle-orm/node-postgres'
+export { drizzle as createDatabaseClient } from 'drizzle-orm/mysql2'
 
 // Repository implementations
 export { DrizzleUserRepository } from './repositories/user.js'

@@ -14,13 +14,13 @@ healthRoutes.get('/db', async (c) => {
   try {
     const db = createDatabaseClient(
       process.env.DATABASE_URL ||
-        'postgresql://pinsquirrel:pinsquirrel@localhost:5432/pinsquirrel'
+        'mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel'
     )
 
     // Simple query to test database connection
     const result = await db.execute(sql`SELECT 1 as health_check`)
 
-    if (result.rows.length > 0) {
+    if (Array.isArray(result[0]) && result[0].length > 0) {
       return c.json({
         status: 'ok',
         database: 'connected',
