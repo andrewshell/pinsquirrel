@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.0.0](https://github.com/andrewshell/pinsquirrel/compare/v2.1.0...v3.0.0) (2026-03-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* Database engine changed from PostgreSQL to MySQL. Requires a MySQL 8 instance and updated DATABASE_URL connection strings.
+
+### Features
+
+* mark database migration as breaking change ([14a3d69](https://github.com/andrewshell/pinsquirrel/commit/14a3d6981aac75f83da7692f34d46f0fafffbac6))
+* migrate database from PostgreSQL to MySQL ([5676c05](https://github.com/andrewshell/pinsquirrel/commit/5676c05032890085b24c7bb7c6d6b5b268ecd7a1))
+
 ## [2.1.0](https://github.com/andrewshell/pinsquirrel/compare/v2.0.3...v2.1.0) (2026-03-10)
 
 
