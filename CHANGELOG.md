@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/andrewshell/pinsquirrel/compare/v2.0.3...v2.1.0) (2026-03-10)
+
+
+### Features
+
+* add pin export in Pinboard JSON format ([2c2f2d0](https://github.com/andrewshell/pinsquirrel/commit/2c2f2d09c6283624f7bf419a640da65c4ebd0e39))
+
 ## [2.0.3](https://github.com/andrewshell/pinsquirrel/compare/v2.0.2...v2.0.3) (2026-02-01)
 
 
