@@ -4,6 +4,7 @@ export { MetadataService } from './services/metadata.js'
 export { PinService } from './services/pin.js'
 export { TagService } from './services/tag.js'
 export { UserService } from './services/user.js'
+export { ApiKeyService } from './services/api-key.js'
 
 // Utilities
 export { md5 } from './utils/crypto.js'

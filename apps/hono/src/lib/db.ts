@@ -1,5 +1,6 @@
 import {
   createDatabaseClient,
+  DrizzleApiKeyRepository,
   DrizzlePasswordResetRepository,
   DrizzlePinRepository,
   DrizzleSessionRepository,
@@ -18,3 +19,4 @@ export const tagRepository = new DrizzleTagRepository(db)
 export const pinRepository = new DrizzlePinRepository(db, tagRepository)
 export const passwordResetRepository = new DrizzlePasswordResetRepository(db)
 export const sessionRepository = new DrizzleSessionRepository(db)
+export const apiKeyRepository = new DrizzleApiKeyRepository(db)
