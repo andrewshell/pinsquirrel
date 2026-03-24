@@ -22,6 +22,7 @@ export type {
   CreateSessionData,
   UpdateSessionData,
 } from './entities/session.js'
+export type { ApiKey, CreateApiKeyData } from './entities/api-key.js'
 export { Pagination, type PaginationOptions } from './entities/pagination.js'
 export { AccessControl, type AccessGateable } from './entities/access.js'
 
@@ -32,6 +33,7 @@ export type { PinRepository, PinFilter } from './interfaces/pin-repository.js'
 export type { TagRepository } from './interfaces/tag-repository.js'
 export type { PasswordResetRepository } from './interfaces/password-reset-repository.js'
 export type { SessionRepository } from './interfaces/session-repository.js'
+export type { ApiKeyRepository } from './interfaces/api-key-repository.js'
 export type { EmailService } from './interfaces/email-service.js'
 export type { HttpFetcher } from './interfaces/http-fetcher.js'
 export type { HtmlParser, MetadataResult } from './interfaces/html-parser.js'
@@ -70,3 +72,10 @@ export {
 } from './errors/metadata.js'
 export { ValidationError } from './errors/validation.js'
 export type { FieldErrors } from './errors/validation.js'
+export {
+  ApiKeyError,
+  ApiKeyNotFoundError,
+  ApiKeyLimitExceededError,
+  InvalidApiKeyError,
+  UnauthorizedApiKeyAccessError,
+} from './errors/api-key.js'

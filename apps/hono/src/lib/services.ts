@@ -2,6 +2,7 @@ import { CheerioHtmlParser, NodeHttpFetcher } from '@pinsquirrel/adapters'
 import type { EmailService } from '@pinsquirrel/domain'
 import { MailgunEmailService } from '@pinsquirrel/mailgun'
 import {
+  ApiKeyService,
   AuthenticationService,
   MetadataService,
   PinService,
@@ -9,6 +10,7 @@ import {
   UserService,
 } from '@pinsquirrel/services'
 import {
+  apiKeyRepository,
   userRepository,
   tagRepository,
   pinRepository,
@@ -39,6 +41,7 @@ export const authService = new AuthenticationService(
 export const pinService = new PinService(pinRepository)
 export const tagService = new TagService(tagRepository)
 export const userService = new UserService(userRepository)
+export const apiKeyService = new ApiKeyService(apiKeyRepository)
 export const metadataService = new MetadataService(httpFetcher, htmlParser)
 
 // Export repositories for special cases
