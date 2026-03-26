@@ -23,13 +23,14 @@ export const DefaultLayout: FC<PropsWithChildren<DefaultLayoutProps>> = ({
   children,
   title,
   user,
+  currentPath,
   width = 'wide',
 }) => {
   const containerClass = `${widthClasses[width]} mx-auto px-4 py-6`
 
   return (
     <BaseLayout title={title}>
-      <Header user={user} />
+      <Header user={user} currentPath={currentPath} />
       <main class="flex-1">
         <div class={containerClass}>{children}</div>
       </main>

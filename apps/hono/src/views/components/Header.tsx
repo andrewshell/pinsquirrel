@@ -4,11 +4,32 @@ import { Button } from './ui/Button'
 
 interface HeaderProps {
   user: User | null
+  currentPath?: string
 }
 
-export const Header: FC<HeaderProps> = ({ user }) => {
+export const Header: FC<HeaderProps> = ({ user, currentPath }) => {
+  const htmxAttrs =
+    currentPath === '/pins'
+      ? {
+          'hx-get': '/pins',
+          'hx-target': '#pins-content',
+          'hx-swap': 'innerHTML',
+          'hx-push-url': 'true',
+        }
+      : {}
   return (
     <header class="w-full bg-background border-b-4 border-foreground">
+      <noscript>
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              [data-search="form"] { display: flex !important; }
+              [data-search="toggle"] { display: none !important; }
+              [data-nav="links"] { display: none !important; }
+            `,
+          }}
+        />
+      </noscript>
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-center h-20">
           {/* Logo/Brand */}
@@ -51,6 +72,7 @@ export const Header: FC<HeaderProps> = ({ user }) => {
                   method="get"
                   class="hidden items-center gap-2"
                   data-search="form"
+                  {...htmxAttrs}
                 >
                   <input
                     type="text"
@@ -252,6 +274,7 @@ export const Header: FC<HeaderProps> = ({ user }) => {
                         action="/pins"
                         method="get"
                         class="flex items-center gap-2 mb-4"
+                        {...htmxAttrs}
                       >
                         <input
                           type="text"
