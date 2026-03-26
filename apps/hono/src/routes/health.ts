@@ -1,54 +1,34 @@
 import { Hono } from 'hono'
-import { createDatabaseClient } from '@pinsquirrel/database'
 import { sql } from 'drizzle-orm'
+import { db } from '../lib/db.js'
 
 const healthRoutes = new Hono()
 
-// Basic health check
-healthRoutes.get('/', (c) => {
-  return c.json({ status: 'ok', timestamp: new Date().toISOString() })
-})
+healthRoutes.get('/', async (c) => {
+  let database: 'connected' | 'disconnected' = 'disconnected'
+  let error: string | undefined
 
-// Health check with database connectivity test
-healthRoutes.get('/db', async (c) => {
   try {
-    const db = createDatabaseClient(
-      process.env.DATABASE_URL ||
-        'mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel'
-    )
-
-    // Simple query to test database connection
     const result = await db.execute(sql`SELECT 1 as health_check`)
-
     if (Array.isArray(result[0]) && result[0].length > 0) {
-      return c.json({
-        status: 'ok',
-        database: 'connected',
-        timestamp: new Date().toISOString(),
-      })
+      database = 'connected'
     }
-
-    return c.json(
-      {
-        status: 'error',
-        database: 'query failed',
-        timestamp: new Date().toISOString(),
-      },
-      500
-    )
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error'
-    return c.json(
-      {
-        status: 'error',
-        database: 'disconnected',
-        error: errorMessage,
-        timestamp: new Date().toISOString(),
-      },
-      500
-    )
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Unknown error'
   }
+
+  const status = database === 'connected' ? 'ok' : 'degraded'
+
+  return c.json(
+    {
+      status,
+      database,
+      ...(error ? { error } : {}),
+      uptime: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
+    },
+    status === 'ok' ? 200 : 503
+  )
 })
 
 export { healthRoutes }
