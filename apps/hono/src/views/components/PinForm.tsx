@@ -44,10 +44,13 @@ export const PinForm: FC<PinFormProps> = ({
     : null
 
   return (
-    <>
+    <div id="pin-form-container">
       <form
         method="post"
         action={action}
+        hx-post={action}
+        hx-target="#pin-form-container"
+        hx-swap="innerHTML"
         class="space-y-4"
         novalidate
         data-metadata-fetch
@@ -168,6 +171,6 @@ export const PinForm: FC<PinFormProps> = ({
           Originally pinned on {createdDate}
         </div>
       )}
-    </>
+    </div>
   )
 }

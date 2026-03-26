@@ -12,6 +12,7 @@ import {
 import { pinService, tagService } from '../lib/services'
 import { getSessionManager, requireAuth } from '../middleware/session'
 import { PinCard, PinDeleteConfirm } from '../views/components/PinCard'
+import { PinForm } from '../views/components/PinForm'
 import { PinDeletePage } from '../views/pages/pin-delete'
 import { PinEditPage } from '../views/pages/pin-edit'
 import { PinNewPage } from '../views/pages/pin-new'
@@ -292,14 +293,35 @@ pins.post('/new', async (c) => {
 
     // Redirect to pins list with success message
     sessionManager.setFlash('success', 'Pin created successfully!')
+    if (c.req.header('HX-Request')) {
+      c.header('HX-Redirect', '/pins')
+      return c.body(null)
+    }
     return c.redirect('/pins')
   } catch (error) {
+    const isHtmx = !!c.req.header('HX-Request')
+    const userTagNames = userTags.map((t) => t.name)
+
+    const formProps = {
+      action: '/pins/new' as const,
+      submitLabel: 'Create Pin' as const,
+      url: pinUrl,
+      title,
+      description: description || '',
+      readLater,
+      tags: tagsInput,
+      userTags: userTagNames,
+    }
+
     if (error instanceof ValidationError) {
+      if (isHtmx) {
+        return c.html(<PinForm {...formProps} errors={error.fields} />)
+      }
       return c.html(
         <PinNewPage
           user={user}
           errors={error.fields}
-          userTags={userTags.map((t) => t.name)}
+          userTags={userTagNames}
           url={pinUrl}
           title={title}
           description={description || ''}
@@ -310,11 +332,15 @@ pins.post('/new', async (c) => {
     }
 
     if (error instanceof DuplicatePinError) {
+      const errors = { url: ['You have already saved this URL'] }
+      if (isHtmx) {
+        return c.html(<PinForm {...formProps} errors={errors} />)
+      }
       return c.html(
         <PinNewPage
           user={user}
-          errors={{ url: ['You have already saved this URL'] }}
-          userTags={userTags.map((t) => t.name)}
+          errors={errors}
+          userTags={userTagNames}
           url={pinUrl}
           title={title}
           description={description || ''}
@@ -325,11 +351,15 @@ pins.post('/new', async (c) => {
     }
 
     // Generic error
+    const errors = { _form: ['Failed to create pin. Please try again.'] }
+    if (isHtmx) {
+      return c.html(<PinForm {...formProps} errors={errors} />, 500)
+    }
     return c.html(
       <PinNewPage
         user={user}
-        errors={{ _form: ['Failed to create pin. Please try again.'] }}
-        userTags={userTags.map((t) => t.name)}
+        errors={errors}
+        userTags={userTagNames}
         url={pinUrl}
         title={title}
         description={description || ''}
@@ -436,6 +466,10 @@ pins.post('/:id/edit', async (c) => {
 
     // Redirect to pins list with success message
     sessionManager.setFlash('success', 'Pin updated successfully!')
+    if (c.req.header('HX-Request')) {
+      c.header('HX-Redirect', '/pins')
+      return c.body(null)
+    }
     return c.redirect('/pins')
   } catch (error) {
     // Get the pin for re-rendering the form (may fail if not found)
@@ -446,13 +480,31 @@ pins.post('/:id/edit', async (c) => {
       return c.text('Pin not found', 404)
     }
 
+    const isHtmx = !!c.req.header('HX-Request')
+    const userTagNames = userTags.map((t) => t.name)
+
+    const formProps = {
+      action: `/pins/${pinId}/edit`,
+      submitLabel: 'Update Pin' as const,
+      url: pinUrl,
+      title,
+      description: description || '',
+      readLater,
+      tags: tagsInput,
+      userTags: userTagNames,
+      createdAt: pin.createdAt,
+    }
+
     if (error instanceof ValidationError) {
+      if (isHtmx) {
+        return c.html(<PinForm {...formProps} errors={error.fields} />)
+      }
       return c.html(
         <PinEditPage
           user={user}
           pin={pin}
           errors={error.fields}
-          userTags={userTags.map((t) => t.name)}
+          userTags={userTagNames}
           url={pinUrl}
           title={title}
           description={description || ''}
@@ -463,12 +515,16 @@ pins.post('/:id/edit', async (c) => {
     }
 
     if (error instanceof DuplicatePinError) {
+      const errors = { url: ['You have already saved this URL'] }
+      if (isHtmx) {
+        return c.html(<PinForm {...formProps} errors={errors} />)
+      }
       return c.html(
         <PinEditPage
           user={user}
           pin={pin}
-          errors={{ url: ['You have already saved this URL'] }}
-          userTags={userTags.map((t) => t.name)}
+          errors={errors}
+          userTags={userTagNames}
           url={pinUrl}
           title={title}
           description={description || ''}
@@ -486,12 +542,16 @@ pins.post('/:id/edit', async (c) => {
     }
 
     // Generic error
+    const errors = { _form: ['Failed to update pin. Please try again.'] }
+    if (isHtmx) {
+      return c.html(<PinForm {...formProps} errors={errors} />, 500)
+    }
     return c.html(
       <PinEditPage
         user={user}
         pin={pin}
-        errors={{ _form: ['Failed to update pin. Please try again.'] }}
-        userTags={userTags.map((t) => t.name)}
+        errors={errors}
+        userTags={userTagNames}
         url={pinUrl}
         title={title}
         description={description || ''}

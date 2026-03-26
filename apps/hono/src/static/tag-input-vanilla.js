@@ -10,6 +10,17 @@ document.addEventListener('DOMContentLoaded', () => {
     .forEach(initTagInput)
 })
 
+document.addEventListener('htmx:afterSettle', (event) => {
+  const target = event.detail.target
+  const containers = target.querySelectorAll
+    ? target.querySelectorAll('[data-tag-input="container"]')
+    : []
+  containers.forEach(initTagInput)
+  if (target.matches && target.matches('[data-tag-input="container"]')) {
+    initTagInput(target)
+  }
+})
+
 function initTagInput(container) {
   const initialTags = JSON.parse(container.dataset.initialTags || '[]')
   const allTags = JSON.parse(container.dataset.allTags || '[]')
