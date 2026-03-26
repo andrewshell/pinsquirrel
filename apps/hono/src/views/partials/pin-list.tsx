@@ -14,7 +14,7 @@ interface PinListPartialProps {
 function buildPageUrl(page: number, currentParams: string): string {
   const params = new URLSearchParams(currentParams)
   params.set('page', String(page))
-  return `/pins/partial?${params.toString()}`
+  return `/pins/content?${params.toString()}`
 }
 
 const EmptyState: FC<{ hasFilters: boolean }> = ({ hasFilters }) => {
@@ -72,7 +72,7 @@ const PaginationControls: FC<{
           <a
             href={buildPageUrl(pagination.page - 1, searchParams)}
             hx-get={buildPageUrl(pagination.page - 1, searchParams)}
-            hx-target="#pin-list"
+            hx-target="#pins-content"
             hx-swap="innerHTML"
             hx-push-url={`/pins?${new URLSearchParams(searchParams).toString()}&page=${pagination.page - 1}`}
             class="px-3 py-1 text-sm font-medium border-2 border-foreground bg-background
@@ -86,7 +86,7 @@ const PaginationControls: FC<{
           <a
             href={buildPageUrl(pagination.page + 1, searchParams)}
             hx-get={buildPageUrl(pagination.page + 1, searchParams)}
-            hx-target="#pin-list"
+            hx-target="#pins-content"
             hx-swap="innerHTML"
             hx-push-url={`/pins?${new URLSearchParams(searchParams).toString()}&page=${pagination.page + 1}`}
             class="px-3 py-1 text-sm font-medium border-2 border-foreground bg-background

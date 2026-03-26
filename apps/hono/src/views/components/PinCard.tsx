@@ -92,7 +92,7 @@ export const PinDeleteConfirm: FC<PinDeleteConfirmProps> = ({
             <button
               type="submit"
               hx-delete={`/pins/${pin.id}${searchParams ? `?${searchParams}` : ''}`}
-              hx-target="#pin-list"
+              hx-target="#pins-content"
               hx-swap="innerHTML"
               class="text-destructive hover:text-destructive/80 font-bold hover:underline"
             >

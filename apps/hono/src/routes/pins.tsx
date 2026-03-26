@@ -16,7 +16,6 @@ import { PinDeletePage } from '../views/pages/pin-delete'
 import { PinEditPage } from '../views/pages/pin-edit'
 import { PinNewPage } from '../views/pages/pin-new'
 import { PinsPage } from '../views/pages/pins'
-import { PinListPartial } from '../views/partials/pin-list'
 import { PinsContentPartial } from '../views/partials/pins-content'
 
 const pins = new Hono()
@@ -147,32 +146,6 @@ pins.get('/', async (c) => {
       sortDirection={sortDirection}
       noTags={noTags}
       flash={flash}
-    />
-  )
-})
-
-// GET /pins/partial - Return just the pin list HTML for HTMX
-pins.get('/partial', async (c) => {
-  const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    // For HTMX requests, return a redirect indicator
-    c.header('HX-Redirect', '/signin')
-    return c.body(null, 204)
-  }
-
-  const { filter, page, viewSize, searchParams } = parsePinQueryParams(c)
-
-  const result = await fetchUserPins(user, filter, page)
-
-  return c.html(
-    <PinListPartial
-      pins={result.pins}
-      pagination={result.pagination}
-      totalCount={result.totalCount}
-      searchParams={searchParams}
-      viewSize={viewSize}
     />
   )
 })
@@ -629,16 +602,33 @@ pins.delete('/:id', async (c) => {
   try {
     await pinService.deletePin(ac, pinId)
 
-    const { filter, page, viewSize, searchParams } = parsePinQueryParams(c)
+    const {
+      tag,
+      search,
+      readFilter,
+      filter,
+      page,
+      viewSize,
+      sortBy,
+      sortDirection,
+      searchParams,
+      noTags,
+    } = parsePinQueryParams(c)
     const result = await fetchUserPins(user, filter, page)
 
     return c.html(
-      <PinListPartial
+      <PinsContentPartial
         pins={result.pins}
         pagination={result.pagination}
         totalCount={result.totalCount}
         searchParams={searchParams}
+        activeTag={tag}
+        searchQuery={search}
+        readFilter={readFilter}
         viewSize={viewSize}
+        sortBy={sortBy}
+        sortDirection={sortDirection}
+        noTags={noTags}
       />
     )
   } catch (error) {
