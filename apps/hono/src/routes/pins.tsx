@@ -11,7 +11,7 @@ import {
 } from '@pinsquirrel/domain'
 import { pinService, tagService } from '../lib/services'
 import { getSessionManager, requireAuth } from '../middleware/session'
-import { PinCard } from '../views/components/PinCard'
+import { PinCard, PinDeleteConfirm } from '../views/components/PinCard'
 import { PinDeletePage } from '../views/pages/pin-delete'
 import { PinEditPage } from '../views/pages/pin-edit'
 import { PinNewPage } from '../views/pages/pin-new'
@@ -573,7 +573,122 @@ pins.post('/:id/toggle-read', async (c) => {
   )
 })
 
-// GET /pins/:id/delete - Show delete confirmation
+// GET /pins/:id/delete-confirm - Inline delete confirmation (HTMX)
+pins.get('/:id/delete-confirm', async (c) => {
+  const sessionManager = getSessionManager(c)
+  const user = await sessionManager.getUser()
+
+  if (!user) {
+    c.header('HX-Redirect', '/signin')
+    return c.body(null, 204)
+  }
+
+  const pinId = c.req.param('id')
+  const ac = new AccessControl(user)
+  const url = new URL(c.req.url)
+  const viewSize = (url.searchParams.get('view') || 'expanded') as
+    | 'expanded'
+    | 'compact'
+  url.searchParams.delete('view')
+  const searchParams = url.searchParams.toString()
+
+  try {
+    const pin = await pinService.getPin(ac, pinId)
+
+    return c.html(
+      <PinDeleteConfirm
+        pin={pin}
+        viewSize={viewSize}
+        searchParams={searchParams}
+      />
+    )
+  } catch (error) {
+    if (
+      error instanceof PinNotFoundError ||
+      error instanceof UnauthorizedPinAccessError
+    ) {
+      return c.text('Pin not found', 404)
+    }
+    throw error
+  }
+})
+
+// DELETE /pins/:id - Delete a pin (HTMX, returns refreshed list)
+pins.delete('/:id', async (c) => {
+  const sessionManager = getSessionManager(c)
+  const user = await sessionManager.getUser()
+
+  if (!user) {
+    c.header('HX-Redirect', '/signin')
+    return c.body(null, 204)
+  }
+
+  const pinId = c.req.param('id')
+  const ac = new AccessControl(user)
+
+  try {
+    await pinService.deletePin(ac, pinId)
+
+    const { filter, page, viewSize, searchParams } = parsePinQueryParams(c)
+    const result = await fetchUserPins(user, filter, page)
+
+    return c.html(
+      <PinListPartial
+        pins={result.pins}
+        pagination={result.pagination}
+        totalCount={result.totalCount}
+        searchParams={searchParams}
+        viewSize={viewSize}
+      />
+    )
+  } catch (error) {
+    if (
+      error instanceof PinNotFoundError ||
+      error instanceof UnauthorizedPinAccessError
+    ) {
+      return c.text('Pin not found', 404)
+    }
+    throw error
+  }
+})
+
+// GET /pins/:id/card - Return a single pin card (HTMX, for cancel)
+pins.get('/:id/card', async (c) => {
+  const sessionManager = getSessionManager(c)
+  const user = await sessionManager.getUser()
+
+  if (!user) {
+    c.header('HX-Redirect', '/signin')
+    return c.body(null, 204)
+  }
+
+  const pinId = c.req.param('id')
+  const ac = new AccessControl(user)
+  const url = new URL(c.req.url)
+  const viewSize = (url.searchParams.get('view') || 'expanded') as
+    | 'expanded'
+    | 'compact'
+  url.searchParams.delete('view')
+  const searchParams = url.searchParams.toString()
+
+  try {
+    const pin = await pinService.getPin(ac, pinId)
+
+    return c.html(
+      <PinCard pin={pin} viewSize={viewSize} searchParams={searchParams} />
+    )
+  } catch (error) {
+    if (
+      error instanceof PinNotFoundError ||
+      error instanceof UnauthorizedPinAccessError
+    ) {
+      return c.text('Pin not found', 404)
+    }
+    throw error
+  }
+})
+
+// GET /pins/:id/delete - Show delete confirmation (full page, non-JS fallback)
 pins.get('/:id/delete', async (c) => {
   const sessionManager = getSessionManager(c)
   const user = await sessionManager.getUser()

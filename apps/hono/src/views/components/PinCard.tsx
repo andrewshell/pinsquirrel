@@ -51,6 +51,69 @@ function buildActionUrl(
   return `/pins/${pinId}/${action}${searchParams ? `?${searchParams}` : ''}`
 }
 
+// Build delete-confirm URL with view size
+function buildDeleteConfirmUrl(
+  pinId: string,
+  viewSize: string,
+  searchParams: string
+): string {
+  const params = new URLSearchParams(searchParams)
+  params.set('view', viewSize)
+  return `/pins/${pinId}/delete-confirm?${params.toString()}`
+}
+
+interface PinDeleteConfirmProps {
+  pin: Pin
+  viewSize: string
+  searchParams: string
+}
+
+export const PinDeleteConfirm: FC<PinDeleteConfirmProps> = ({
+  pin,
+  viewSize,
+  searchParams,
+}) => {
+  const cardParams = new URLSearchParams(searchParams)
+  cardParams.set('view', viewSize)
+  const cardUrl = `/pins/${pin.id}/card?${cardParams.toString()}`
+
+  return (
+    <div
+      id={`pin-${pin.id}`}
+      role="article"
+      class="py-2 bg-destructive/10 border-2 border-destructive px-2"
+    >
+      <div class="flex items-center justify-between gap-2 text-sm">
+        <span>
+          Delete &ldquo;<strong>{pin.title}</strong>&rdquo;?
+        </span>
+        <div class="flex gap-2 flex-shrink-0">
+          <form method="post" action={`/pins/${pin.id}/delete`}>
+            <button
+              type="submit"
+              hx-delete={`/pins/${pin.id}${searchParams ? `?${searchParams}` : ''}`}
+              hx-target="#pin-list"
+              hx-swap="innerHTML"
+              class="text-destructive hover:text-destructive/80 font-bold hover:underline"
+            >
+              confirm
+            </button>
+          </form>
+          <a
+            href="/pins"
+            hx-get={cardUrl}
+            hx-target={`#pin-${pin.id}`}
+            hx-swap="outerHTML"
+            class="text-accent hover:text-accent/80 font-bold hover:underline"
+          >
+            cancel
+          </a>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export const PinCard: FC<PinCardProps> = ({
   pin,
   viewSize = 'expanded',
@@ -113,6 +176,9 @@ export const PinCard: FC<PinCardProps> = ({
               </a>
               <a
                 href={buildActionUrl(pin.id, 'delete', searchParams)}
+                hx-get={buildDeleteConfirmUrl(pin.id, viewSize, searchParams)}
+                hx-target={`#pin-${pin.id}`}
+                hx-swap="outerHTML"
                 class="text-destructive hover:text-destructive/80 font-bold hover:underline"
               >
                 delete
@@ -197,6 +263,9 @@ export const PinCard: FC<PinCardProps> = ({
             </a>
             <a
               href={buildActionUrl(pin.id, 'delete', searchParams)}
+              hx-get={buildDeleteConfirmUrl(pin.id, viewSize, searchParams)}
+              hx-target={`#pin-${pin.id}`}
+              hx-swap="outerHTML"
               class="text-destructive hover:text-destructive/80 font-bold hover:underline"
             >
               delete
