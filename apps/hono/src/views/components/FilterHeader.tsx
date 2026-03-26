@@ -114,7 +114,7 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
               >
                 <a
                   href={`/pins?${buildReadFilterUrl(searchParams, 'all')}`}
-                  hx-get={`/pins/content?${buildReadFilterUrl(searchParams, 'all')}`}
+                  hx-get={`/pins?${buildReadFilterUrl(searchParams, 'all')}`}
                   hx-target="#pins-content"
                   hx-swap="innerHTML"
                   hx-push-url={`/pins?${buildReadFilterUrl(searchParams, 'all')}`}
@@ -124,7 +124,7 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
                 </a>
                 <a
                   href={`/pins?${buildReadFilterUrl(searchParams, 'unread')}`}
-                  hx-get={`/pins/content?${buildReadFilterUrl(searchParams, 'unread')}`}
+                  hx-get={`/pins?${buildReadFilterUrl(searchParams, 'unread')}`}
                   hx-target="#pins-content"
                   hx-swap="innerHTML"
                   hx-push-url={`/pins?${buildReadFilterUrl(searchParams, 'unread')}`}
@@ -134,7 +134,7 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
                 </a>
                 <a
                   href={`/pins?${buildReadFilterUrl(searchParams, 'read')}`}
-                  hx-get={`/pins/content?${buildReadFilterUrl(searchParams, 'read')}`}
+                  hx-get={`/pins?${buildReadFilterUrl(searchParams, 'read')}`}
                   hx-target="#pins-content"
                   hx-swap="innerHTML"
                   hx-push-url={`/pins?${buildReadFilterUrl(searchParams, 'read')}`}
@@ -166,7 +166,7 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
                 <span>{activeTag}</span>
                 <a
                   href={`/pins?${buildClearFilterUrl(searchParams, 'tag')}`}
-                  hx-get={`/pins/content?${buildClearFilterUrl(searchParams, 'tag')}`}
+                  hx-get={`/pins?${buildClearFilterUrl(searchParams, 'tag')}`}
                   hx-target="#pins-content"
                   hx-swap="innerHTML"
                   hx-push-url={`/pins?${buildClearFilterUrl(searchParams, 'tag')}`}
@@ -212,7 +212,7 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
                 <span>"{searchQuery}"</span>
                 <a
                   href={`/pins?${buildClearFilterUrl(searchParams, 'search')}`}
-                  hx-get={`/pins/content?${buildClearFilterUrl(searchParams, 'search')}`}
+                  hx-get={`/pins?${buildClearFilterUrl(searchParams, 'search')}`}
                   hx-target="#pins-content"
                   hx-swap="innerHTML"
                   hx-push-url={`/pins?${buildClearFilterUrl(searchParams, 'search')}`}
@@ -258,7 +258,7 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
                 <span>Untagged</span>
                 <a
                   href={`/pins?${buildClearFilterUrl(searchParams, 'notags')}`}
-                  hx-get={`/pins/content?${buildClearFilterUrl(searchParams, 'notags')}`}
+                  hx-get={`/pins?${buildClearFilterUrl(searchParams, 'notags')}`}
                   hx-target="#pins-content"
                   hx-swap="innerHTML"
                   hx-push-url={`/pins?${buildClearFilterUrl(searchParams, 'notags')}`}

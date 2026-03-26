@@ -105,12 +105,17 @@ async function fetchUserPins(user: User, filter: PinFilter, page: number) {
   })
 }
 
-// GET /pins - List all pins with filtering and pagination (full page)
+// GET /pins - List all pins with filtering and pagination
 pins.get('/', async (c) => {
   const sessionManager = getSessionManager(c)
   const user = await sessionManager.getUser()
+  const isHtmx = !!c.req.header('HX-Request')
 
   if (!user) {
+    if (isHtmx) {
+      c.header('HX-Redirect', '/signin')
+      return c.body(null, 204)
+    }
     return c.redirect('/signin')
   }
 
@@ -129,7 +134,24 @@ pins.get('/', async (c) => {
 
   const result = await fetchUserPins(user, filter, page)
 
-  // Get flash message if any
+  if (isHtmx) {
+    return c.html(
+      <PinsContentPartial
+        pins={result.pins}
+        pagination={result.pagination}
+        totalCount={result.totalCount}
+        searchParams={searchParams}
+        activeTag={tag}
+        searchQuery={search}
+        readFilter={readFilter}
+        viewSize={viewSize}
+        sortBy={sortBy}
+        sortDirection={sortDirection}
+        noTags={noTags}
+      />
+    )
+  }
+
   const flash = sessionManager.getFlash()
 
   return c.html(
@@ -147,48 +169,6 @@ pins.get('/', async (c) => {
       sortDirection={sortDirection}
       noTags={noTags}
       flash={flash}
-    />
-  )
-})
-
-// GET /pins/content - Return filters + view settings + pin list for HTMX
-pins.get('/content', async (c) => {
-  const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    c.header('HX-Redirect', '/signin')
-    return c.body(null, 204)
-  }
-
-  const {
-    tag,
-    search,
-    readFilter,
-    filter,
-    page,
-    viewSize,
-    sortBy,
-    sortDirection,
-    searchParams,
-    noTags,
-  } = parsePinQueryParams(c)
-
-  const result = await fetchUserPins(user, filter, page)
-
-  return c.html(
-    <PinsContentPartial
-      pins={result.pins}
-      pagination={result.pagination}
-      totalCount={result.totalCount}
-      searchParams={searchParams}
-      activeTag={tag}
-      searchQuery={search}
-      readFilter={readFilter}
-      viewSize={viewSize}
-      sortBy={sortBy}
-      sortDirection={sortDirection}
-      noTags={noTags}
     />
   )
 })

@@ -92,7 +92,7 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
         >
           <a
             href={`/pins?${buildViewSettingUrl(searchParams, 'sort', 'created')}`}
-            hx-get={`/pins/content?${buildViewSettingUrl(searchParams, 'sort', 'created')}`}
+            hx-get={`/pins?${buildViewSettingUrl(searchParams, 'sort', 'created')}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
             hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'sort', 'created')}`}
@@ -102,7 +102,7 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
           </a>
           <a
             href={`/pins?${buildViewSettingUrl(searchParams, 'sort', 'title')}`}
-            hx-get={`/pins/content?${buildViewSettingUrl(searchParams, 'sort', 'title')}`}
+            hx-get={`/pins?${buildViewSettingUrl(searchParams, 'sort', 'title')}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
             hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'sort', 'title')}`}
@@ -142,7 +142,7 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
         >
           <a
             href={`/pins?${buildViewSettingUrl(searchParams, 'direction', 'asc')}`}
-            hx-get={`/pins/content?${buildViewSettingUrl(searchParams, 'direction', 'asc')}`}
+            hx-get={`/pins?${buildViewSettingUrl(searchParams, 'direction', 'asc')}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
             hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'direction', 'asc')}`}
@@ -152,7 +152,7 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
           </a>
           <a
             href={`/pins?${buildViewSettingUrl(searchParams, 'direction', 'desc')}`}
-            hx-get={`/pins/content?${buildViewSettingUrl(searchParams, 'direction', 'desc')}`}
+            hx-get={`/pins?${buildViewSettingUrl(searchParams, 'direction', 'desc')}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
             hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'direction', 'desc')}`}
@@ -192,7 +192,7 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
         >
           <a
             href={`/pins?${buildViewSettingUrl(searchParams, 'size', 'expanded')}`}
-            hx-get={`/pins/content?${buildViewSettingUrl(searchParams, 'size', 'expanded')}`}
+            hx-get={`/pins?${buildViewSettingUrl(searchParams, 'size', 'expanded')}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
             hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'size', 'expanded')}`}
@@ -202,7 +202,7 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
           </a>
           <a
             href={`/pins?${buildViewSettingUrl(searchParams, 'size', 'compact')}`}
-            hx-get={`/pins/content?${buildViewSettingUrl(searchParams, 'size', 'compact')}`}
+            hx-get={`/pins?${buildViewSettingUrl(searchParams, 'size', 'compact')}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
             hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'size', 'compact')}`}

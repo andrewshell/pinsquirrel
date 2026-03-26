@@ -156,7 +156,7 @@ export const PinCard: FC<PinCardProps> = ({
                     <>
                       <a
                         href={`/pins?${buildTagUrl(tagName, searchParams)}`}
-                        hx-get={`/pins/content?${buildTagUrl(tagName, searchParams)}`}
+                        hx-get={`/pins?${buildTagUrl(tagName, searchParams)}`}
                         hx-target="#pins-content"
                         hx-swap="innerHTML"
                         hx-push-url={`/pins?${buildTagUrl(tagName, searchParams)}`}
@@ -243,7 +243,7 @@ export const PinCard: FC<PinCardProps> = ({
               <>
                 <a
                   href={`/pins?${buildTagUrl(tagName, searchParams)}`}
-                  hx-get={`/pins/content?${buildTagUrl(tagName, searchParams)}`}
+                  hx-get={`/pins?${buildTagUrl(tagName, searchParams)}`}
                   hx-target="#pins-content"
                   hx-swap="innerHTML"
                   hx-push-url={`/pins?${buildTagUrl(tagName, searchParams)}`}

@@ -71,7 +71,7 @@ const PaginationControls: FC<{
         {pagination.hasPrevious && (
           <a
             href={`/pins?${buildPageUrl(pagination.page - 1, searchParams)}`}
-            hx-get={`/pins/content?${buildPageUrl(pagination.page - 1, searchParams)}`}
+            hx-get={`/pins?${buildPageUrl(pagination.page - 1, searchParams)}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
             hx-push-url={`/pins?${buildPageUrl(pagination.page - 1, searchParams)}`}
@@ -85,7 +85,7 @@ const PaginationControls: FC<{
         {pagination.hasNext && (
           <a
             href={`/pins?${buildPageUrl(pagination.page + 1, searchParams)}`}
-            hx-get={`/pins/content?${buildPageUrl(pagination.page + 1, searchParams)}`}
+            hx-get={`/pins?${buildPageUrl(pagination.page + 1, searchParams)}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
             hx-push-url={`/pins?${buildPageUrl(pagination.page + 1, searchParams)}`}
