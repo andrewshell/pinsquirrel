@@ -1,6 +1,11 @@
 import { Hono } from 'hono'
-import { InvalidCredentialsError, ValidationError } from '@pinsquirrel/domain'
-import { authService } from '../lib/services'
+import {
+  AccessControl,
+  ApiKeyLimitExceededError,
+  InvalidCredentialsError,
+  ValidationError,
+} from '@pinsquirrel/domain'
+import { apiKeyService, authService } from '../lib/services'
 import { getSessionManager, requireAuth } from '../middleware/session'
 import { ProfilePage } from '../views/pages/profile'
 
@@ -21,7 +26,11 @@ profile.get('/', async (c) => {
   // Get flash message if any
   const flash = sessionManager.getFlash()
 
-  return c.html(<ProfilePage user={user} flash={flash} />)
+  // Fetch user's API keys
+  const ac = new AccessControl(user)
+  const apiKeys = await apiKeyService.listApiKeys(ac, user.id)
+
+  return c.html(<ProfilePage user={user} flash={flash} apiKeys={apiKeys} />)
 })
 
 // POST /profile - Handle form submissions
@@ -62,6 +71,32 @@ profile.post('/', async (c) => {
       )
     }
 
+    if (intent === 'create-api-key') {
+      const name = getString(formData['name'])
+      const ac = new AccessControl(user)
+
+      const { rawKey } = await apiKeyService.createApiKey(ac, {
+        userId: user.id,
+        name,
+      })
+
+      const apiKeys = await apiKeyService.listApiKeys(ac, user.id)
+
+      return c.html(
+        <ProfilePage user={user} apiKeys={apiKeys} newApiKey={rawKey} />
+      )
+    }
+
+    if (intent === 'revoke-api-key') {
+      const keyId = getString(formData['keyId'])
+      const ac = new AccessControl(user)
+
+      await apiKeyService.revokeApiKey(ac, keyId)
+
+      sessionManager.setFlash('success', 'API key revoked successfully!')
+      return c.redirect('/profile')
+    }
+
     if (intent === 'change-password') {
       const currentPassword = getString(formData['currentPassword'])
       const newPassword = getString(formData['newPassword'])
@@ -81,14 +116,33 @@ profile.post('/', async (c) => {
       400
     )
   } catch (error) {
+    // Fetch API keys for error rendering (needed if the error came from an API key action)
+    const ac = new AccessControl(user)
+    const apiKeys = await apiKeyService.listApiKeys(ac, user.id)
+
     if (error instanceof ValidationError) {
-      return c.html(<ProfilePage user={user} errors={error.fields} />, 400)
+      return c.html(
+        <ProfilePage user={user} apiKeys={apiKeys} errors={error.fields} />,
+        400
+      )
+    }
+
+    if (error instanceof ApiKeyLimitExceededError) {
+      return c.html(
+        <ProfilePage
+          user={user}
+          apiKeys={apiKeys}
+          errors={{ _form: [error.message] }}
+        />,
+        400
+      )
     }
 
     if (error instanceof InvalidCredentialsError) {
       return c.html(
         <ProfilePage
           user={user}
+          apiKeys={apiKeys}
           errors={{ currentPassword: ['Current password is incorrect'] }}
         />,
         400
@@ -99,6 +153,7 @@ profile.post('/', async (c) => {
     return c.html(
       <ProfilePage
         user={user}
+        apiKeys={apiKeys}
         errors={{ _form: ['An unexpected error occurred. Please try again.'] }}
       />,
       500

@@ -1,9 +1,10 @@
-import type { User } from '@pinsquirrel/domain'
+import type { ApiKey, User } from '@pinsquirrel/domain'
 import type { FlashMessage } from '../../middleware/session'
 import {
   ErrorMessage,
   FlashMessage as FlashMessageComponent,
   SuccessMessage,
+  WarningMessage,
 } from '../components/FlashMessage'
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/Alert'
 import { Button } from '../components/ui/Button'
@@ -16,6 +17,8 @@ interface ProfilePageProps {
   errors?: Record<string, string[]>
   emailSuccess?: boolean
   passwordSuccess?: boolean
+  apiKeys?: ApiKey[]
+  newApiKey?: string
 }
 
 function formatDate(date: Date | string): string {
@@ -34,6 +37,8 @@ export function ProfilePage({
   errors,
   emailSuccess,
   passwordSuccess,
+  apiKeys,
+  newApiKey,
 }: ProfilePageProps) {
   const formError = errors?._form?.[0]
 
@@ -219,6 +224,123 @@ export function ProfilePage({
 
               <Button type="submit">Change Password</Button>
             </form>
+          </CardContent>
+        </Card>
+
+        {/* API Keys Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>API Keys</CardTitle>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            <p class="text-sm text-muted-foreground">
+              API keys allow external applications to access your PinSquirrel
+              data. Keep your keys secret — treat them like passwords.
+            </p>
+
+            {/* New key display */}
+            {newApiKey && (
+              <div class="space-y-2">
+                <SuccessMessage message="API key created successfully!" />
+                <div class="bg-muted p-4 border-2 border-foreground neobrutalism-shadow">
+                  <p class="text-sm font-medium text-foreground mb-2">
+                    Your new API key:
+                  </p>
+                  <div class="flex items-center gap-2">
+                    <code
+                      id="api-key-value"
+                      class="flex-1 text-sm font-mono bg-background p-2 border-2 border-foreground break-all"
+                    >
+                      {newApiKey}
+                    </code>
+                    <button
+                      type="button"
+                      onclick="navigator.clipboard.writeText(document.getElementById('api-key-value').textContent);this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000)"
+                      class="px-3 py-2 text-sm font-bold border-2 border-foreground bg-primary text-primary-foreground neobrutalism-shadow hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <WarningMessage
+                    message="This key will not be shown again. Copy it now and store it securely."
+                    className="mt-2"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Create key form */}
+            <form method="post" action="/profile" class="space-y-3">
+              <input type="hidden" name="intent" value="create-api-key" />
+              <div>
+                <label
+                  for="api-key-name"
+                  class="block text-sm font-medium text-foreground mb-1"
+                >
+                  Key Name
+                </label>
+                <input
+                  id="api-key-name"
+                  name="name"
+                  type="text"
+                  placeholder="e.g., Chrome Extension"
+                  class={`w-full px-3 py-2 border-2 border-foreground bg-background text-foreground ${
+                    errors?.name ? 'border-red-500' : ''
+                  }`}
+                />
+                {errors?.name && (
+                  <p class="mt-1 text-sm text-red-600">{errors.name[0]}</p>
+                )}
+              </div>
+              <Button type="submit">Create API Key</Button>
+            </form>
+
+            {/* Existing keys list */}
+            {apiKeys && apiKeys.length > 0 ? (
+              <div class="space-y-3">
+                <h4 class="text-sm font-medium text-foreground">
+                  Your API Keys
+                </h4>
+                {apiKeys.map((key) => (
+                  <div class="flex items-center justify-between p-3 border-2 border-foreground bg-background">
+                    <div class="space-y-1">
+                      <div class="text-sm font-medium text-foreground">
+                        {key.name}
+                      </div>
+                      <div class="text-xs text-muted-foreground font-mono">
+                        {key.keyPrefix}...
+                      </div>
+                      <div class="text-xs text-muted-foreground">
+                        Created {formatDate(key.createdAt)}
+                        {key.lastUsedAt && (
+                          <span> · Last used {formatDate(key.lastUsedAt)}</span>
+                        )}
+                      </div>
+                    </div>
+                    <form method="post" action="/profile">
+                      <input
+                        type="hidden"
+                        name="intent"
+                        value="revoke-api-key"
+                      />
+                      <input type="hidden" name="keyId" value={key.id} />
+                      <button
+                        type="submit"
+                        class="px-3 py-1 text-sm font-bold border-2 border-foreground bg-destructive text-white neobrutalism-shadow hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
+                      >
+                        Revoke
+                      </button>
+                    </form>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              !newApiKey && (
+                <p class="text-sm text-muted-foreground italic">
+                  No API keys yet. Create one to get started.
+                </p>
+              )
+            )}
           </CardContent>
         </Card>
 
