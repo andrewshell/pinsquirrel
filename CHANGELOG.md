@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.1.0](https://github.com/andrewshell/pinsquirrel/compare/v3.0.0...v3.1.0) (2026-03-26)
+
+
+### Features
+
+* API Key Infrastructure ([#25](https://github.com/andrewshell/pinsquirrel/issues/25)) ([b0d8be1](https://github.com/andrewshell/pinsquirrel/commit/b0d8be1d6fb0068abd43e05c34c70e0a7ac69210))
+* Form Validation Errors Without Full Reload ([ff50d68](https://github.com/andrewshell/pinsquirrel/commit/ff50d68fd6f2eb4b8b7f7b1de72b8d793950c1ec))
+* Implementing API key UI on profile page ([d740e4e](https://github.com/andrewshell/pinsquirrel/commit/d740e4e96119316b50224a8d18e90231a70a3851))
+* Improved /health endpoint ([b1f1b2b](https://github.com/andrewshell/pinsquirrel/commit/b1f1b2b6bb99c53c2571f14c029981fc5538324f))
+* Improved duplicate url error to include link to edit ([6423d29](https://github.com/andrewshell/pinsquirrel/commit/6423d2977fcd850a8f38692fea6f8278062b45f6))
+* Improved HTMX delete pin flow ([1cc6237](https://github.com/andrewshell/pinsquirrel/commit/1cc62373d8b5f33269481793d806830c81760039))
+* Improved search from pin page ([8ae2f8b](https://github.com/andrewshell/pinsquirrel/commit/8ae2f8bec6bdea91445f21d2e1813e21a509c34c))
+* Leverage HTMX with the filters for improved experience ([a9997a4](https://github.com/andrewshell/pinsquirrel/commit/a9997a4dddc467875fb5ee088a08591b848565d0))
+* Simplify calls to content to use pins instead ([c799463](https://github.com/andrewshell/pinsquirrel/commit/c7994634f1c96adc67334ae4cf3d8901ad8db159))
+* Simplify calls to replace content ([87eee6f](https://github.com/andrewshell/pinsquirrel/commit/87eee6f8d58e4b3699aa3992e8ab7481a6a0e216))
+
 ## [3.0.0](https://github.com/andrewshell/pinsquirrel/compare/v2.1.0...v3.0.0) (2026-03-10)
 
 
