@@ -14,7 +14,7 @@ interface PinListPartialProps {
 function buildPageUrl(page: number, currentParams: string): string {
   const params = new URLSearchParams(currentParams)
   params.set('page', String(page))
-  return `/pins/content?${params.toString()}`
+  return params.toString()
 }
 
 const EmptyState: FC<{ hasFilters: boolean }> = ({ hasFilters }) => {
@@ -70,11 +70,11 @@ const PaginationControls: FC<{
       <div class="flex gap-2">
         {pagination.hasPrevious && (
           <a
-            href={buildPageUrl(pagination.page - 1, searchParams)}
-            hx-get={buildPageUrl(pagination.page - 1, searchParams)}
+            href={`/pins?${buildPageUrl(pagination.page - 1, searchParams)}`}
+            hx-get={`/pins/content?${buildPageUrl(pagination.page - 1, searchParams)}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
-            hx-push-url={`/pins?${new URLSearchParams(searchParams).toString()}&page=${pagination.page - 1}`}
+            hx-push-url={`/pins?${buildPageUrl(pagination.page - 1, searchParams)}`}
             class="px-3 py-1 text-sm font-medium border-2 border-foreground bg-background
                    hover:bg-accent/10 transition-colors"
           >
@@ -84,11 +84,11 @@ const PaginationControls: FC<{
 
         {pagination.hasNext && (
           <a
-            href={buildPageUrl(pagination.page + 1, searchParams)}
-            hx-get={buildPageUrl(pagination.page + 1, searchParams)}
+            href={`/pins?${buildPageUrl(pagination.page + 1, searchParams)}`}
+            hx-get={`/pins/content?${buildPageUrl(pagination.page + 1, searchParams)}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
-            hx-push-url={`/pins?${new URLSearchParams(searchParams).toString()}&page=${pagination.page + 1}`}
+            hx-push-url={`/pins?${buildPageUrl(pagination.page + 1, searchParams)}`}
             class="px-3 py-1 text-sm font-medium border-2 border-foreground bg-background
                    hover:bg-accent/10 transition-colors"
           >

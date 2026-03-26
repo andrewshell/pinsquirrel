@@ -39,7 +39,8 @@ function getDomain(url: string): string {
 function buildTagUrl(tagName: string, currentParams: string): string {
   const params = new URLSearchParams(currentParams)
   params.set('tag', tagName)
-  return `/pins?${params.toString()}`
+  params.delete('page')
+  return params.toString()
 }
 
 // Build action URL preserving query params
@@ -154,7 +155,11 @@ export const PinCard: FC<PinCardProps> = ({
                   {pin.tagNames.map((tagName, index) => (
                     <>
                       <a
-                        href={buildTagUrl(tagName, searchParams)}
+                        href={`/pins?${buildTagUrl(tagName, searchParams)}`}
+                        hx-get={`/pins/content?${buildTagUrl(tagName, searchParams)}`}
+                        hx-target="#pins-content"
+                        hx-swap="innerHTML"
+                        hx-push-url={`/pins?${buildTagUrl(tagName, searchParams)}`}
                         class="text-accent hover:text-accent/80 hover:underline"
                       >
                         {tagName}
@@ -237,7 +242,11 @@ export const PinCard: FC<PinCardProps> = ({
             {pin.tagNames.map((tagName, index) => (
               <>
                 <a
-                  href={buildTagUrl(tagName, searchParams)}
+                  href={`/pins?${buildTagUrl(tagName, searchParams)}`}
+                  hx-get={`/pins/content?${buildTagUrl(tagName, searchParams)}`}
+                  hx-target="#pins-content"
+                  hx-swap="innerHTML"
+                  hx-push-url={`/pins?${buildTagUrl(tagName, searchParams)}`}
                   class="text-accent hover:text-accent/80 hover:underline cursor-pointer"
                 >
                   {tagName}
