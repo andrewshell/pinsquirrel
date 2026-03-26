@@ -298,9 +298,9 @@ export function ProfilePage({
             {/* Existing keys list */}
             {apiKeys && apiKeys.length > 0 ? (
               <div class="space-y-3">
-                <h4 class="text-sm font-medium text-foreground">
+                <h3 class="text-sm font-medium text-foreground">
                   Your API Keys
-                </h4>
+                </h3>
                 {apiKeys.map((key) => (
                   <div class="flex items-center justify-between p-3 border-2 border-foreground bg-background">
                     <div class="space-y-1">
@@ -374,7 +374,7 @@ export function ProfilePage({
             </div>
 
             <div class="space-y-2 text-sm text-muted-foreground">
-              <h4 class="font-medium text-foreground">How to use:</h4>
+              <h3 class="font-medium text-foreground">How to use:</h3>
               <ol class="list-decimal list-inside space-y-1 ml-4">
                 <li>
                   Drag the bookmarklet above to your browser's bookmarks bar

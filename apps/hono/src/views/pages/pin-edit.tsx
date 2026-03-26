@@ -68,6 +68,7 @@ export const PinEditPage: FC<PinEditPageProps> = ({
       )}
 
       {/* Form Card */}
+      <h1 class="sr-only">Edit Pin</h1>
       <Card>
         <CardHeader>
           <CardTitle>Edit Pin</CardTitle>

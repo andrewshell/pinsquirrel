@@ -151,7 +151,7 @@ export function TagMergePage({
               id="merge-summary"
               class="hidden mb-6 p-4 bg-muted/50 border-2 border-muted"
             >
-              <h3 class="font-semibold text-foreground mb-2">Merge Summary</h3>
+              <h2 class="font-semibold text-foreground mb-2">Merge Summary</h2>
               <ul class="list-disc list-inside space-y-1 text-sm text-foreground">
                 <li>
                   <span id="merge-summary-tag-count">0</span> source tag(s) will

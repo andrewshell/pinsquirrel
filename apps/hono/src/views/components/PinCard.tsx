@@ -134,7 +134,7 @@ export const PinCard: FC<PinCardProps> = ({
             {/* Left: Title, Domain, Tags */}
             <div class="flex items-baseline gap-2 flex-wrap flex-1 min-w-0">
               {/* Title */}
-              <h3 class="inline">
+              <h2 class="inline">
                 <a
                   href={pin.url}
                   target="_blank"
@@ -144,7 +144,7 @@ export const PinCard: FC<PinCardProps> = ({
                   {pin.readLater && '• '}
                   {pin.title}
                 </a>
-              </h3>
+              </h2>
 
               {/* Domain only */}
               <span class="text-muted-foreground">({getDomain(pin.url)})</span>
@@ -205,7 +205,7 @@ export const PinCard: FC<PinCardProps> = ({
       {/* Main content */}
       <div class="flex-1 min-w-0">
         {/* Title as link */}
-        <h3 class="mb-1">
+        <h2 class="mb-1">
           <a
             href={pin.url}
             target="_blank"
@@ -215,7 +215,7 @@ export const PinCard: FC<PinCardProps> = ({
             {pin.readLater && '• '}
             {pin.title}
           </a>
-        </h3>
+        </h2>
 
         {/* URL as link */}
         <div class="text-sm mb-1">

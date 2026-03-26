@@ -64,6 +64,7 @@ export const PinNewPage: FC<PinNewPageProps> = ({
       )}
 
       {/* Form Card */}
+      <h1 class="sr-only">Create New Pin</h1>
       <Card>
         <CardHeader>
           <CardTitle>Create New Pin</CardTitle>

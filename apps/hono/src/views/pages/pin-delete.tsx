@@ -19,6 +19,7 @@ interface PinDeletePageProps {
 export const PinDeletePage: FC<PinDeletePageProps> = ({ user, pin }) => {
   return (
     <DefaultLayout title="Delete Pin" user={user} width="form">
+      <h1 class="sr-only">Delete Pin</h1>
       <Card>
         <CardHeader>
           <CardTitle>Delete Pin</CardTitle>

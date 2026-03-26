@@ -111,7 +111,7 @@ export const TermsPage: FC<TermsPageProps> = ({ user }) => {
                     Questions about these terms? Drop us a line at{' '}
                     <a
                       href="mailto:andrew@pinsquirrel.com"
-                      class="text-foreground hover:underline"
+                      class="text-foreground underline"
                     >
                       andrew@pinsquirrel.com
                     </a>

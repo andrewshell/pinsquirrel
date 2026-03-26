@@ -47,6 +47,7 @@ export const PinsPage: FC<PinsPageProps> = ({
         />
       )}
 
+      <h1 class="sr-only">Pins</h1>
       <div id="pins-content">
         <PinsContentPartial
           pins={pins}

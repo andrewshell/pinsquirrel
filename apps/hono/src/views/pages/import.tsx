@@ -94,9 +94,9 @@ export const ImportPage: FC<ImportPageProps> = ({
                     <line x1="12" x2="12.01" y1="16" y2="16" />
                   </svg>
                   <div>
-                    <h3 class="font-semibold text-red-800 dark:text-red-200">
+                    <h2 class="font-semibold text-red-800 dark:text-red-200">
                       Import Failed
-                    </h3>
+                    </h2>
                     <p class="text-red-700 dark:text-red-300">{formError}</p>
                   </div>
                 </div>
@@ -121,9 +121,9 @@ export const ImportPage: FC<ImportPageProps> = ({
                     <polyline points="22 4 12 14.01 9 11.01" />
                   </svg>
                   <div>
-                    <h3 class="font-semibold text-green-800 dark:text-green-200">
+                    <h2 class="font-semibold text-green-800 dark:text-green-200">
                       Import Successful
-                    </h3>
+                    </h2>
                     <p class="text-green-700 dark:text-green-300">{message}</p>
                   </div>
                 </div>
@@ -199,7 +199,7 @@ export const ImportPage: FC<ImportPageProps> = ({
                   <line x1="12" x2="12.01" y1="16" y2="16" />
                 </svg>
                 <div>
-                  <h3 class="font-semibold text-foreground">Note</h3>
+                  <h2 class="font-semibold text-foreground">Note</h2>
                   <p class="text-muted-foreground">
                     This import will add new pins to your collection. Existing
                     pins will not be affected. Duplicate URLs will be skipped.

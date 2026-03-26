@@ -1,7 +1,6 @@
 # Neo Brutalism Style Guide
 
 > PinSquirrel UI Component Reference
-> Last Updated: 2026-02-01
 
 This guide defines the Neo Brutalism design system used throughout the Hono app. Use these patterns to maintain visual consistency when creating new components.
 
@@ -18,29 +17,24 @@ Neo Brutalism is characterized by:
 
 ## 2. Color System
 
-Colors are defined using OKLch color space for perceptual uniformity.
+Colors are defined using OKLch color space for perceptual uniformity. All CSS custom properties (light mode, dark mode, and theme mappings) are defined in `apps/hono/src/styles/app.css`. Refer to that file for the authoritative color values.
 
-### Semantic Colors (CSS Variables)
+### Semantic Color Names
 
-```css
-/* Light Mode */
---background: oklch(1 0 0); /* Pure white */
---foreground: oklch(0 0 0); /* Pure black */
---card: oklch(1 0 0); /* White */
---primary: oklch(0.7 0.3 200); /* Vibrant cyan/blue */
---primary-foreground: oklch(0 0 0); /* Black text on primary */
---secondary: oklch(0.8 0.2 280); /* Soft purple */
---muted: oklch(0.9 0 0); /* Light gray */
---muted-foreground: oklch(0.3 0 0); /* Dark gray text */
---accent: oklch(0.7 0.3 200); /* Same as primary */
---destructive: oklch(0.65 0.3 15); /* Vibrant red */
+| Variable               | Purpose                         |
+| ---------------------- | ------------------------------- |
+| `--background`         | Page background                 |
+| `--foreground`         | Default text                    |
+| `--card`               | Card background                 |
+| `--primary`            | Primary action buttons, accents |
+| `--primary-foreground` | Text on primary backgrounds     |
+| `--secondary`          | Secondary elements              |
+| `--muted`              | Subdued backgrounds             |
+| `--muted-foreground`   | Subdued text                    |
+| `--accent`             | Links and accents               |
+| `--destructive`        | Danger/delete actions           |
 
-/* Dark Mode */
---background: oklch(0 0 0); /* Pure black */
---foreground: oklch(1 0 0); /* Pure white */
---muted: oklch(0.2 0 0); /* Dark gray */
---muted-foreground: oklch(0.7 0 0); /* Light gray text */
-```
+> **Accessibility:** All text colors meet WCAG 2 AA minimum contrast ratios (4.5:1 for normal text, 3:1 for large text). Light and dark modes use different lightness values for the same semantic color to maintain contrast against their respective backgrounds.
 
 ### Usage Patterns
 
@@ -76,11 +70,7 @@ For flash messages and alerts, use Tailwind's color palette with dark mode varia
 
 ## 3. Typography
 
-### Font Family
-
-```css
---font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-```
+The font family is set via `--font-sans` in `apps/hono/src/styles/app.css`.
 
 ### Font Weights
 
@@ -119,35 +109,15 @@ For flash messages and alerts, use Tailwind's color palette with dark mode varia
 
 ## 4. Shadow System
 
-Five shadow utilities for the Neo Brutalism effect:
+Five shadow utilities are defined in `apps/hono/src/styles/app.css` under `@layer utilities`:
 
-```css
-.neobrutalism-shadow {
-  box-shadow: 4px 4px 0 0 var(--foreground); /* Default */
-}
-.neobrutalism-shadow-sm {
-  box-shadow: 2px 2px 0 0 var(--foreground); /* Small/inputs */
-}
-.neobrutalism-shadow-lg {
-  box-shadow: 8px 8px 0 0 var(--foreground); /* Large/hero */
-}
-.neobrutalism-shadow-hover {
-  box-shadow: 6px 6px 0 0 var(--foreground); /* Hover state */
-}
-.neobrutalism-shadow-pressed {
-  box-shadow: 2px 2px 0 0 var(--foreground); /* Active/pressed */
-}
-```
-
-### When to Use Each
-
-| Shadow                        | Use Case                             |
-| ----------------------------- | ------------------------------------ |
-| `neobrutalism-shadow`         | Buttons, cards, primary containers   |
-| `neobrutalism-shadow-sm`      | Input fields, small elements         |
-| `neobrutalism-shadow-lg`      | Hero sections, featured cards        |
-| `neobrutalism-shadow-hover`   | Button hover state (with translate)  |
-| `neobrutalism-shadow-pressed` | Button active state (with translate) |
+| Class                         | Effect     | Use Case                             |
+| ----------------------------- | ---------- | ------------------------------------ |
+| `neobrutalism-shadow`         | 4px offset | Buttons, cards, primary containers   |
+| `neobrutalism-shadow-sm`      | 2px offset | Input fields, small elements         |
+| `neobrutalism-shadow-lg`      | 8px offset | Hero sections, featured cards        |
+| `neobrutalism-shadow-hover`   | 6px offset | Button hover state (with translate)  |
+| `neobrutalism-shadow-pressed` | 2px offset | Button active state (with translate) |
 
 ## 5. Border Patterns
 

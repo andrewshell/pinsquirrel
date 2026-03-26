@@ -57,9 +57,9 @@ export const HomePage: FC = () => {
               />
             </div>
             <div>
-              <h3 class="font-bold text-foreground mb-3 text-lg uppercase tracking-tight">
+              <h2 class="font-bold text-foreground mb-3 text-lg uppercase tracking-tight">
                 Hoard Everything
-              </h3>
+              </h2>
               <p class="text-sm text-foreground font-medium leading-relaxed">
                 Links, images, articles, markdown - if it exists on the
                 internet, you can stash it. Because that random blog post WILL
@@ -77,9 +77,9 @@ export const HomePage: FC = () => {
               />
             </div>
             <div>
-              <h3 class="font-bold text-foreground mb-3 text-lg uppercase tracking-tight">
+              <h2 class="font-bold text-foreground mb-3 text-lg uppercase tracking-tight">
                 Find Your Shit
-              </h3>
+              </h2>
               <p class="text-sm text-foreground font-medium leading-relaxed">
                 Our search doesn't judge your 3am research spirals. Tag it,
                 forget it, then magically find it six months later when you
@@ -97,9 +97,9 @@ export const HomePage: FC = () => {
               />
             </div>
             <div>
-              <h3 class="font-bold text-foreground mb-3 text-lg uppercase tracking-tight">
+              <h2 class="font-bold text-foreground mb-3 text-lg uppercase tracking-tight">
                 Your Secret Stash
-              </h3>
+              </h2>
               <p class="text-sm text-foreground font-medium leading-relaxed">
                 We don't care what you're hoarding and neither does anyone else.
                 No tracking, no judging, just pure unadulterated link chaos

@@ -45,16 +45,16 @@ function getFontSizeClass(pinCount: number, pinCounts: number[]): string {
   }
 }
 
-function getOpacityClass(pinCount: number): string {
+function getFontWeightClass(pinCount: number): string {
   if (pinCount === 1) {
-    return 'opacity-50'
+    return 'font-normal'
   }
 
   if (pinCount <= 5) {
-    return 'opacity-75'
+    return 'font-medium'
   }
 
-  return 'opacity-100'
+  return 'font-semibold'
 }
 
 function buildTagUrl(tagName: string, currentFilter: TagFilterType): string {
@@ -164,7 +164,7 @@ export function TagsPage({
           {untaggedPinsCount > 0 && (
             <a
               href={buildUntaggedUrl(currentFilter)}
-              class={`${getFontSizeClass(untaggedPinsCount, pinCounts)} ${getOpacityClass(untaggedPinsCount)} text-accent hover:text-accent/80 hover:underline transition-all duration-200 font-medium italic`}
+              class={`${getFontSizeClass(untaggedPinsCount, pinCounts)} ${getFontWeightClass(untaggedPinsCount)} text-accent hover:text-accent/80 hover:underline transition-all duration-200 italic`}
               title={`Untagged pins (${untaggedPinsCount} pin${untaggedPinsCount === 1 ? '' : 's'})`}
               aria-label={`View untagged pins (${untaggedPinsCount} pin${untaggedPinsCount === 1 ? '' : 's'})`}
             >
@@ -175,14 +175,14 @@ export function TagsPage({
           {/* Tag links */}
           {sortedTags.map((tag) => {
             const fontSizeClass = getFontSizeClass(tag.pinCount, pinCounts)
-            const opacityClass = getOpacityClass(tag.pinCount)
+            const fontWeightClass = getFontWeightClass(tag.pinCount)
             const tagUrl = buildTagUrl(tag.name, currentFilter)
 
             return (
               <a
                 key={tag.id}
                 href={tagUrl}
-                class={`${fontSizeClass} ${opacityClass} text-accent hover:text-accent/80 hover:underline transition-all duration-200 font-medium`}
+                class={`${fontSizeClass} ${fontWeightClass} text-accent hover:text-accent/80 hover:underline transition-all duration-200`}
                 title={`${tag.name} (${tag.pinCount} pin${tag.pinCount === 1 ? '' : 's'})`}
                 aria-label={`View pins tagged with ${tag.name} (${tag.pinCount} pin${tag.pinCount === 1 ? '' : 's'})`}
               >
