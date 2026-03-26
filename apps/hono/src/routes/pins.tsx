@@ -312,14 +312,16 @@ pins.post('/new', async (c) => {
     }
 
     if (error instanceof DuplicatePinError) {
-      const errors = { url: ['You have already saved this URL'] }
+      const duplicatePinId = error.existingPin?.id
       if (isHtmx) {
-        return c.html(<PinForm {...formProps} errors={errors} />)
+        return c.html(
+          <PinForm {...formProps} duplicatePinId={duplicatePinId} />
+        )
       }
       return c.html(
         <PinNewPage
           user={user}
-          errors={errors}
+          duplicatePinId={duplicatePinId}
           userTags={userTagNames}
           url={pinUrl}
           title={title}
@@ -495,15 +497,17 @@ pins.post('/:id/edit', async (c) => {
     }
 
     if (error instanceof DuplicatePinError) {
-      const errors = { url: ['You have already saved this URL'] }
+      const duplicatePinId = error.existingPin?.id
       if (isHtmx) {
-        return c.html(<PinForm {...formProps} errors={errors} />)
+        return c.html(
+          <PinForm {...formProps} duplicatePinId={duplicatePinId} />
+        )
       }
       return c.html(
         <PinEditPage
           user={user}
           pin={pin}
-          errors={errors}
+          duplicatePinId={duplicatePinId}
           userTags={userTagNames}
           url={pinUrl}
           title={title}

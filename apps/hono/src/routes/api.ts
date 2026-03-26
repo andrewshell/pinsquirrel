@@ -1,6 +1,10 @@
 import { Hono } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
-import { metadataService, metadataErrorUtils } from '../lib/services'
+import {
+  metadataService,
+  metadataErrorUtils,
+  pinRepository,
+} from '../lib/services'
 import { getSessionManager, requireAuth } from '../middleware/session'
 
 const api = new Hono()
@@ -40,6 +44,46 @@ api.get('/metadata', async (c) => {
 
     return c.json({ error: message }, statusCode)
   }
+})
+
+// GET /api/check-url - Check if a URL is already saved
+api.get('/check-url', async (c) => {
+  const sessionManager = getSessionManager(c)
+  const user = await sessionManager.getUser()
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const url = new URL(c.req.url)
+  const targetUrl = url.searchParams.get('url')
+
+  if (!targetUrl) {
+    return c.json({ error: 'Missing url parameter' }, 400)
+  }
+
+  const existingPin = await pinRepository.findByUserIdAndUrl(user.id, targetUrl)
+
+  const exclude = url.searchParams.get('exclude')
+  const isDuplicate = existingPin && existingPin.id !== exclude
+
+  const isHtmx = c.req.header('HX-Request') === 'true'
+
+  if (isHtmx) {
+    if (isDuplicate) {
+      return c.html(
+        `<p class="text-sm text-red-600 font-medium">This URL is already saved. <a href="/pins/${existingPin.id}/edit" class="underline hover:text-red-800 dark:hover:text-red-200">Edit instead?</a></p><script>document.getElementById('url').classList.add('border-red-500')</script>`
+      )
+    }
+    return c.html(
+      `<script>document.getElementById('url').classList.remove('border-red-500')</script>`
+    )
+  }
+
+  if (isDuplicate) {
+    return c.json({ exists: true, pinId: existingPin.id })
+  }
+  return c.json({ exists: false })
 })
 
 export { api as apiRoutes }

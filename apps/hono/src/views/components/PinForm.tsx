@@ -17,6 +17,8 @@ interface PinFormProps {
   readLater?: boolean
   tags?: string
   // Other
+  pinId?: string
+  duplicatePinId?: string
   userTags: string[]
   errors?: Record<string, string[]>
   createdAt?: Date
@@ -30,6 +32,8 @@ export const PinForm: FC<PinFormProps> = ({
   description = '',
   readLater = false,
   tags = '',
+  pinId,
+  duplicatePinId,
   userTags,
   errors,
   createdAt,
@@ -68,10 +72,36 @@ export const PinForm: FC<PinFormProps> = ({
             required
             value={url}
             placeholder="https://example.com"
-            error={errors?.url?.join('. ')}
+            error={duplicatePinId ? undefined : errors?.url?.join('. ')}
             helpText="Enter the web address you want to save as a pin"
             data-url-input
+            hx-get="/api/check-url"
+            hx-trigger="change"
+            hx-target="#url-check-result"
+            hx-swap="innerHTML"
+            hx-params="url"
+            hx-vals={pinId ? JSON.stringify({ exclude: pinId }) : undefined}
           />
+          <div id="url-check-result">
+            {duplicatePinId && (
+              <p class="text-sm text-red-600 font-medium">
+                This URL is already saved.{' '}
+                <a
+                  href={`/pins/${duplicatePinId}/edit`}
+                  class="underline hover:text-red-800 dark:hover:text-red-200"
+                >
+                  Edit instead?
+                </a>
+              </p>
+            )}
+            {duplicatePinId && (
+              <script
+                dangerouslySetInnerHTML={{
+                  __html: `document.getElementById('url').classList.add('border-red-500')`,
+                }}
+              />
+            )}
+          </div>
         </div>
 
         {/* Title field */}

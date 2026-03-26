@@ -18,6 +18,7 @@ interface PinEditPageProps {
   description?: string
   readLater?: boolean
   tags?: string
+  duplicatePinId?: string
   // Query params to preserve on redirect
   returnParams?: string
 }
@@ -33,6 +34,7 @@ export const PinEditPage: FC<PinEditPageProps> = ({
   description,
   readLater,
   tags,
+  duplicatePinId,
   returnParams = '',
 }) => {
   // Use form values if provided (after validation error), otherwise use pin values
@@ -74,6 +76,7 @@ export const PinEditPage: FC<PinEditPageProps> = ({
           <PinForm
             action={`/pins/${pin.id}/edit`}
             submitLabel="Update Pin"
+            pinId={pin.id}
             url={formUrl}
             title={formTitle}
             description={formDescription}
@@ -81,6 +84,7 @@ export const PinEditPage: FC<PinEditPageProps> = ({
             tags={formTags}
             userTags={userTags}
             errors={errors}
+            duplicatePinId={duplicatePinId}
             createdAt={pin.createdAt}
           />
         </CardContent>

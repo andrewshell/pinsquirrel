@@ -17,6 +17,13 @@ interface InputProps {
   'data-url-input'?: boolean
   'data-title-input'?: boolean
   'data-description-input'?: boolean
+  // HTMX attributes
+  'hx-get'?: string
+  'hx-trigger'?: string
+  'hx-target'?: string
+  'hx-swap'?: string
+  'hx-params'?: string
+  'hx-vals'?: string
 }
 
 const baseClasses =
@@ -38,6 +45,12 @@ export const Input: FC<InputProps> = ({
   'data-url-input': dataUrlInput,
   'data-title-input': dataTitleInput,
   'data-description-input': dataDescriptionInput,
+  'hx-get': hxGet,
+  'hx-trigger': hxTrigger,
+  'hx-target': hxTarget,
+  'hx-swap': hxSwap,
+  'hx-params': hxParams,
+  'hx-vals': hxVals,
 }) => {
   const hasError = Boolean(error)
   const helpId = helpText ? `${id}-help` : undefined
@@ -66,6 +79,12 @@ export const Input: FC<InputProps> = ({
         data-url-input={dataUrlInput ? '' : undefined}
         data-title-input={dataTitleInput ? '' : undefined}
         data-description-input={dataDescriptionInput ? '' : undefined}
+        hx-get={hxGet}
+        hx-trigger={hxTrigger}
+        hx-target={hxTarget}
+        hx-swap={hxSwap}
+        hx-params={hxParams}
+        hx-vals={hxVals}
       />
       {helpText && (
         <p id={helpId} class="text-xs text-muted-foreground">

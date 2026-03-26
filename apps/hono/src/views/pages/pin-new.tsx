@@ -17,6 +17,7 @@ interface PinNewPageProps {
   description?: string
   readLater?: boolean
   tags?: string
+  duplicatePinId?: string
   // Query params to preserve on redirect
   returnParams?: string
 }
@@ -31,6 +32,7 @@ export const PinNewPage: FC<PinNewPageProps> = ({
   description = '',
   readLater = false,
   tags = '',
+  duplicatePinId,
   returnParams = '',
 }) => {
   const backUrl = returnParams ? `/pins?${returnParams}` : '/pins'
@@ -77,6 +79,7 @@ export const PinNewPage: FC<PinNewPageProps> = ({
             tags={tags}
             userTags={userTags}
             errors={errors}
+            duplicatePinId={duplicatePinId}
           />
         </CardContent>
       </Card>
