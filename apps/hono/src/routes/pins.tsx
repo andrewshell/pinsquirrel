@@ -17,6 +17,7 @@ import { PinEditPage } from '../views/pages/pin-edit'
 import { PinNewPage } from '../views/pages/pin-new'
 import { PinsPage } from '../views/pages/pins'
 import { PinListPartial } from '../views/partials/pin-list'
+import { PinsContentPartial } from '../views/partials/pins-content'
 
 const pins = new Hono()
 
@@ -172,6 +173,48 @@ pins.get('/partial', async (c) => {
       totalCount={result.totalCount}
       searchParams={searchParams}
       viewSize={viewSize}
+    />
+  )
+})
+
+// GET /pins/content - Return filters + view settings + pin list for HTMX
+pins.get('/content', async (c) => {
+  const sessionManager = getSessionManager(c)
+  const user = await sessionManager.getUser()
+
+  if (!user) {
+    c.header('HX-Redirect', '/signin')
+    return c.body(null, 204)
+  }
+
+  const {
+    tag,
+    search,
+    readFilter,
+    filter,
+    page,
+    viewSize,
+    sortBy,
+    sortDirection,
+    searchParams,
+    noTags,
+  } = parsePinQueryParams(c)
+
+  const result = await fetchUserPins(user, filter, page)
+
+  return c.html(
+    <PinsContentPartial
+      pins={result.pins}
+      pagination={result.pagination}
+      totalCount={result.totalCount}
+      searchParams={searchParams}
+      activeTag={tag}
+      searchQuery={search}
+      readFilter={readFilter}
+      viewSize={viewSize}
+      sortBy={sortBy}
+      sortDirection={sortDirection}
+      noTags={noTags}
     />
   )
 })

@@ -1,9 +1,7 @@
 import type { FC } from 'hono/jsx'
 import type { Pin, Pagination, User } from '@pinsquirrel/domain'
 import { DefaultLayout } from '../layouts/default'
-import { PinListPartial } from '../partials/pin-list'
-import { FilterHeader } from '../components/FilterHeader'
-import { ViewSettings } from '../components/ViewSettings'
+import { PinsContentPartial } from '../partials/pins-content'
 import { FlashMessage } from '../components/FlashMessage'
 import type { FlashType } from '../../middleware/session'
 
@@ -49,29 +47,19 @@ export const PinsPage: FC<PinsPageProps> = ({
         />
       )}
 
-      <FilterHeader
-        activeTag={activeTag}
-        searchQuery={searchQuery}
-        readFilter={readFilter}
-        searchParams={searchParams}
-        noTags={noTags}
-      />
-
-      <ViewSettings
-        sortBy={sortBy}
-        sortDirection={sortDirection}
-        viewSize={viewSize}
-        searchParams={searchParams}
-      />
-
-      {/* Pin list - content loaded via server render, updates via HTMX */}
-      <div id="pin-list">
-        <PinListPartial
+      <div id="pins-content">
+        <PinsContentPartial
           pins={pins}
           pagination={pagination}
           totalCount={totalCount}
           searchParams={searchParams}
+          activeTag={activeTag}
+          searchQuery={searchQuery}
+          readFilter={readFilter}
           viewSize={viewSize}
+          sortBy={sortBy}
+          sortDirection={sortDirection}
+          noTags={noTags}
         />
       </div>
     </DefaultLayout>

@@ -172,3 +172,9 @@ body {
     box-shadow: 2px 2px 0 0 theme(colors.foreground);
   }
 }
+
+/* HTMX loading indicator — dims pin list while a request is in flight */
+#pins-content.is-loading {
+  opacity: 0.5;
+  transition: opacity 200ms ease-in-out;
+}

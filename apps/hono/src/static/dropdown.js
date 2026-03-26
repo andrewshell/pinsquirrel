@@ -51,6 +51,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   })
 
+  // Close all dropdowns after HTMX swap (since page doesn't reload)
+  document.body.addEventListener('htmx:afterSwap', () => {
+    document
+      .querySelectorAll('[data-dropdown="menu"][data-open="true"]')
+      .forEach((menu) => {
+        menu.dataset.open = 'false'
+        menu.classList.add('hidden')
+      })
+  })
+
+  // Add loading indicator to #pins-content during HTMX requests
+  document.body.addEventListener('htmx:beforeRequest', (e) => {
+    const target = e.detail.target
+    if (target && target.id === 'pins-content') {
+      target.classList.add('is-loading')
+    }
+  })
+  document.body.addEventListener('htmx:afterRequest', (e) => {
+    const target = e.detail.target
+    if (target && target.id === 'pins-content') {
+      target.classList.remove('is-loading')
+    }
+  })
+
   // Close on escape key
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
