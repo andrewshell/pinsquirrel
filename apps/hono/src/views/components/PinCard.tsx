@@ -82,7 +82,7 @@ export const PinDeleteConfirm: FC<PinDeleteConfirmProps> = ({
     <div
       id={`pin-${pin.id}`}
       role="article"
-      class="py-2 bg-destructive/10 border-2 border-destructive px-2"
+      class="py-2 border-2 border-destructive px-2"
     >
       <div class="flex items-center justify-between gap-2 text-sm">
         <span>
@@ -105,7 +105,7 @@ export const PinDeleteConfirm: FC<PinDeleteConfirmProps> = ({
             hx-get={cardUrl}
             hx-target={`#pin-${pin.id}`}
             hx-swap="outerHTML"
-            class="text-accent hover:text-accent/80 font-bold hover:underline"
+            class="text-primary hover:text-primary/80 font-bold hover:underline"
           >
             cancel
           </a>
@@ -139,7 +139,7 @@ export const PinCard: FC<PinCardProps> = ({
                   href={pin.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  class={`text-accent hover:text-accent/80 ${pin.readLater ? 'font-bold' : ''}`}
+                  class={`text-primary hover:text-primary/80 ${pin.readLater ? 'font-bold' : ''}`}
                 >
                   {pin.readLater && '• '}
                   {pin.title}
@@ -160,7 +160,7 @@ export const PinCard: FC<PinCardProps> = ({
                         hx-target="#pins-content"
                         hx-swap="innerHTML"
                         hx-push-url={`/pins?${buildTagUrl(tagName, searchParams)}`}
-                        class="text-accent hover:text-accent/80 hover:underline"
+                        class="text-primary hover:text-primary/80 hover:underline"
                       >
                         {tagName}
                       </a>
@@ -175,7 +175,7 @@ export const PinCard: FC<PinCardProps> = ({
             <div class="flex gap-2 text-muted-foreground flex-shrink-0">
               <a
                 href={buildActionUrl(pin.id, 'edit', searchParams)}
-                class="text-accent hover:text-accent/80 font-bold hover:underline"
+                class="text-primary hover:text-primary/80 font-bold hover:underline"
               >
                 edit
               </a>
@@ -210,7 +210,7 @@ export const PinCard: FC<PinCardProps> = ({
             href={pin.url}
             target="_blank"
             rel="noopener noreferrer"
-            class={`text-accent hover:text-accent/80 text-base ${pin.readLater ? 'font-bold' : ''}`}
+            class={`text-primary hover:text-primary/80 text-base ${pin.readLater ? 'font-bold' : ''}`}
           >
             {pin.readLater && '• '}
             {pin.title}
@@ -247,7 +247,7 @@ export const PinCard: FC<PinCardProps> = ({
                   hx-target="#pins-content"
                   hx-swap="innerHTML"
                   hx-push-url={`/pins?${buildTagUrl(tagName, searchParams)}`}
-                  class="text-accent hover:text-accent/80 hover:underline cursor-pointer"
+                  class="text-primary hover:text-primary/80 hover:underline cursor-pointer"
                 >
                   {tagName}
                 </a>
@@ -266,7 +266,7 @@ export const PinCard: FC<PinCardProps> = ({
           <div class="flex gap-2">
             <a
               href={buildActionUrl(pin.id, 'edit', searchParams)}
-              class="text-accent hover:text-accent/80 font-bold hover:underline"
+              class="text-primary hover:text-primary/80 font-bold hover:underline"
             >
               edit
             </a>
@@ -284,7 +284,7 @@ export const PinCard: FC<PinCardProps> = ({
             {pin.readLater && (
               <button
                 type="button"
-                class="text-accent hover:text-accent/80 font-bold hover:underline"
+                class="text-primary hover:text-primary/80 font-bold hover:underline"
                 hx-post={`/pins/${pin.id}/toggle-read`}
                 hx-swap="outerHTML"
                 hx-target={`#pin-${pin.id}`}

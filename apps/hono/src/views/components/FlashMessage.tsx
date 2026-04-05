@@ -11,14 +11,14 @@ interface FlashMessageProps {
 function getFlashStyles(type: FlashType): string {
   switch (type) {
     case 'success':
-      return 'text-green-700 bg-green-50 dark:text-green-200 dark:bg-green-950'
+      return 'text-green-700 dark:text-green-200'
     case 'error':
-      return 'text-red-700 bg-red-50 dark:text-red-200 dark:bg-red-950'
+      return 'text-red-700 dark:text-red-200'
     case 'warning':
-      return 'text-yellow-700 bg-yellow-50 dark:text-yellow-100 dark:bg-yellow-900'
+      return 'text-yellow-700 dark:text-yellow-100'
     case 'info':
     default:
-      return 'text-blue-700 bg-blue-50 dark:text-blue-200 dark:bg-blue-900/20'
+      return 'text-blue-700 dark:text-blue-200'
   }
 }
 
@@ -46,8 +46,7 @@ export const SuccessMessage: FC<{ message: string; className?: string }> = ({
 }) => (
   <div
     class={`p-3 text-sm border-2 border-foreground neobrutalism-shadow
-            text-green-700 bg-green-50
-            dark:text-green-200 dark:bg-green-950
+            text-green-700 dark:text-green-200
             ${className}`}
     role="status"
   >
@@ -62,8 +61,7 @@ export const ErrorMessage: FC<{ message: string; className?: string }> = ({
 }) => (
   <div
     class={`p-3 text-sm border-2 border-foreground neobrutalism-shadow
-            text-red-700 bg-red-50
-            dark:text-red-200 dark:bg-red-950
+            text-red-700 dark:text-red-200
             ${className}`}
     role="alert"
   >
@@ -78,8 +76,7 @@ export const WarningMessage: FC<{ message: string; className?: string }> = ({
 }) => (
   <div
     class={`p-3 text-sm border-2 border-foreground neobrutalism-shadow
-            text-yellow-700 bg-yellow-50
-            dark:text-yellow-100 dark:bg-yellow-900
+            text-yellow-700 dark:text-yellow-100
             ${className}`}
     role="status"
   >
@@ -94,8 +91,7 @@ export const InfoMessage: FC<{ message: string; className?: string }> = ({
 }) => (
   <div
     class={`p-3 text-sm border-2 border-foreground neobrutalism-shadow
-            text-blue-700 bg-blue-50
-            dark:text-blue-200 dark:bg-blue-900/20
+            text-blue-700 dark:text-blue-200
             ${className}`}
     role="status"
   >

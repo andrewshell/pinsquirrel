@@ -54,13 +54,13 @@ export const Header: FC<HeaderProps> = ({ user, currentPath }) => {
                 <div class="flex items-center space-x-4" data-nav="links">
                   <a
                     href="/pins"
-                    class="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
+                    class="text-base font-bold text-foreground hover:text-primary uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
                   >
                     Pins
                   </a>
                   <a
                     href="/tags"
-                    class="text-base font-bold text-foreground hover:text-accent uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
+                    class="text-base font-bold text-foreground hover:text-primary uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
                   >
                     Tags
                   </a>
@@ -102,7 +102,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath }) => {
                 {/* Search toggle - shows magnifying glass when closed, X when open */}
                 <button
                   type="button"
-                  class="p-2 text-foreground hover:text-accent transition-colors cursor-pointer"
+                  class="p-2 text-foreground hover:text-primary transition-colors cursor-pointer"
                   aria-label="Toggle search"
                   data-search="toggle"
                 >

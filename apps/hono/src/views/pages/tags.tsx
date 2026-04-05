@@ -164,7 +164,7 @@ export function TagsPage({
           {untaggedPinsCount > 0 && (
             <a
               href={buildUntaggedUrl(currentFilter)}
-              class={`${getFontSizeClass(untaggedPinsCount, pinCounts)} ${getFontWeightClass(untaggedPinsCount)} text-accent hover:text-accent/80 hover:underline transition-all duration-200 italic`}
+              class={`${getFontSizeClass(untaggedPinsCount, pinCounts)} ${getFontWeightClass(untaggedPinsCount)} text-primary hover:text-primary/80 hover:underline transition-all duration-200 italic`}
               title={`Untagged pins (${untaggedPinsCount} pin${untaggedPinsCount === 1 ? '' : 's'})`}
               aria-label={`View untagged pins (${untaggedPinsCount} pin${untaggedPinsCount === 1 ? '' : 's'})`}
             >
@@ -182,7 +182,7 @@ export function TagsPage({
               <a
                 key={tag.id}
                 href={tagUrl}
-                class={`${fontSizeClass} ${fontWeightClass} text-accent hover:text-accent/80 hover:underline transition-all duration-200`}
+                class={`${fontSizeClass} ${fontWeightClass} text-primary hover:text-primary/80 hover:underline transition-all duration-200`}
                 title={`${tag.name} (${tag.pinCount} pin${tag.pinCount === 1 ? '' : 's'})`}
                 aria-label={`View pins tagged with ${tag.name} (${tag.pinCount} pin${tag.pinCount === 1 ? '' : 's'})`}
               >

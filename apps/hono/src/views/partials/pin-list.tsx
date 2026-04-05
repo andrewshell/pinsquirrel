@@ -26,7 +26,7 @@ const EmptyState: FC<{ hasFilters: boolean }> = ({ hasFilters }) => {
         </p>
         <a
           href="/pins"
-          class="text-accent hover:text-accent/80 hover:underline font-medium"
+          class="text-primary hover:text-primary/80 hover:underline font-medium"
         >
           Clear all filters
         </a>
