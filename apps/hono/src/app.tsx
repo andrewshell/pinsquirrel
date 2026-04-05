@@ -25,10 +25,12 @@ const app = new Hono()
 // Middleware
 app.use('*', logger())
 app.use('*', secureHeaders())
-app.use('*', sessionMiddleware())
 
-// Serve static files
+// Serve static files (must run before session middleware so CSS/JS load
+// even if the database is unavailable)
 app.use('/static/*', serveStatic({ root: './src' }))
+
+app.use('*', sessionMiddleware())
 
 // Routes
 app.route('/health', healthRoutes)
@@ -62,13 +64,34 @@ app.notFound((c) => {
   return c.html(<NotFoundPage />, 404)
 })
 
+// Detect MySQL/network errors coming from mysql2 (possibly nested in `cause`)
+function isDatabaseConnectionError(err: unknown): boolean {
+  const dbCodes = new Set([
+    'ECONNREFUSED',
+    'ENOTFOUND',
+    'ETIMEDOUT',
+    'PROTOCOL_CONNECTION_LOST',
+    'ER_ACCESS_DENIED_ERROR',
+    'ER_BAD_DB_ERROR',
+  ])
+  const visited = new Set<unknown>()
+  let cur: unknown = err
+  while (cur && typeof cur === 'object' && !visited.has(cur)) {
+    visited.add(cur)
+    const code = (cur as { code?: unknown }).code
+    if (typeof code === 'string' && dbCodes.has(code)) return true
+    cur = (cur as { cause?: unknown }).cause
+  }
+  return false
+}
+
 // Error handler for 500 errors
 app.onError((err, c) => {
   console.error('Server error:', err)
-  return c.html(
-    <ServerErrorPage message="Something went wrong. Please try again later." />,
-    500
-  )
+  const message = isDatabaseConnectionError(err)
+    ? 'Unable to connect to the database. If you are running locally, make sure Docker is running and start the database with `pnpm db:up`.'
+    : 'Something went wrong. Please try again later.'
+  return c.html(<ServerErrorPage message={message} />, 500)
 })
 
 export { app }
