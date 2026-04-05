@@ -144,7 +144,7 @@ export function ProfilePage({
                   }`}
                 />
                 {errors?.email && (
-                  <p class="mt-1 text-sm text-red-600">{errors.email[0]}</p>
+                  <p class="mt-1 text-sm text-destructive">{errors.email[0]}</p>
                 )}
               </div>
 
@@ -189,7 +189,7 @@ export function ProfilePage({
                   }`}
                 />
                 {errors?.currentPassword && (
-                  <p class="mt-1 text-sm text-red-600">
+                  <p class="mt-1 text-sm text-destructive">
                     {errors.currentPassword[0]}
                   </p>
                 )}
@@ -212,7 +212,7 @@ export function ProfilePage({
                   }`}
                 />
                 {errors?.newPassword ? (
-                  <p class="mt-1 text-sm text-red-600">
+                  <p class="mt-1 text-sm text-destructive">
                     {errors.newPassword[0]}
                   </p>
                 ) : (
@@ -289,7 +289,7 @@ export function ProfilePage({
                   }`}
                 />
                 {errors?.name && (
-                  <p class="mt-1 text-sm text-red-600">{errors.name[0]}</p>
+                  <p class="mt-1 text-sm text-destructive">{errors.name[0]}</p>
                 )}
               </div>
               <Button type="submit">Create API Key</Button>

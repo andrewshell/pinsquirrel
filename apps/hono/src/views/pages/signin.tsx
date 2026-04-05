@@ -91,7 +91,7 @@ export const SignInPage: FC<SignInPageProps> = ({
                          ${errors?.username ? 'border-red-500' : ''}`}
                 />
                 {errors?.username && (
-                  <p class="text-sm text-red-600 font-medium">
+                  <p class="text-sm text-destructive font-medium">
                     {errors.username.join('. ')}
                   </p>
                 )}
@@ -121,7 +121,7 @@ export const SignInPage: FC<SignInPageProps> = ({
                          ${errors?.password ? 'border-red-500' : ''}`}
                 />
                 {errors?.password && (
-                  <p class="text-sm text-red-600 font-medium">
+                  <p class="text-sm text-destructive font-medium">
                     {errors.password.join('. ')}
                   </p>
                 )}

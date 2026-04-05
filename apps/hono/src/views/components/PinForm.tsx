@@ -84,7 +84,7 @@ export const PinForm: FC<PinFormProps> = ({
           />
           <div id="url-check-result">
             {duplicatePinId && (
-              <p class="text-sm text-red-600 font-medium">
+              <p class="text-sm text-destructive font-medium">
                 This URL is already saved.{' '}
                 <a
                   href={`/pins/${duplicatePinId}/edit`}

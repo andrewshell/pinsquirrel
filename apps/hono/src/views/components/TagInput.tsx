@@ -88,7 +88,7 @@ export const TagInput: FC<TagInputProps> = ({
         suggestions.
       </p>
 
-      {error && <p class="text-sm text-red-600 font-medium">{error}</p>}
+      {error && <p class="text-sm text-destructive font-medium">{error}</p>}
     </div>
   )
 }

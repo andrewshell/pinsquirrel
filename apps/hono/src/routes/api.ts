@@ -72,7 +72,7 @@ api.get('/check-url', async (c) => {
   if (isHtmx) {
     if (isDuplicate) {
       return c.html(
-        `<p class="text-sm text-red-600 font-medium">This URL is already saved. <a href="/pins/${existingPin.id}/edit" class="underline hover:text-red-800 dark:hover:text-red-200">Edit instead?</a></p><script>document.getElementById('url').classList.add('border-red-500')</script>`
+        `<p class="text-sm text-destructive font-medium">This URL is already saved. <a href="/pins/${existingPin.id}/edit" class="underline hover:text-destructive/80">Edit instead?</a></p><script>document.getElementById('url').classList.add('border-red-500')</script>`
       )
     }
     return c.html(

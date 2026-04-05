@@ -95,7 +95,7 @@ export const ForgotPasswordPage: FC<ForgotPasswordPageProps> = ({
                              ${errors?.email ? 'border-red-500' : ''}`}
                     />
                     {errors?.email && (
-                      <p class="text-sm text-red-600 font-medium">
+                      <p class="text-sm text-destructive font-medium">
                         {errors.email.join('. ')}
                       </p>
                     )}

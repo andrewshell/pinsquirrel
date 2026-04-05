@@ -65,7 +65,7 @@ export const Textarea: FC<TextareaProps> = ({
         </p>
       )}
       {hasError && (
-        <p id={errorId} class="text-sm text-red-600 font-medium">
+        <p id={errorId} class="text-sm text-destructive font-medium">
           {error}
         </p>
       )}

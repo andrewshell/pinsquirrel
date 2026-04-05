@@ -13,7 +13,7 @@
 
 html,
 body {
-  @apply bg-white dark:bg-gray-950 overflow-x-hidden;
+  @apply bg-background overflow-x-hidden;
 
   @media (prefers-color-scheme: dark) {
     color-scheme: dark;
@@ -76,7 +76,7 @@ body {
   --accent: oklch(0.4 0.17 200);
   --accent-foreground: oklch(0 0 0);
   --destructive: oklch(0.4855 0.1992 29.23);
-  --destructive-foreground: oklch(0 0 0);
+  --destructive-foreground: oklch(1 0 0);
   --border: oklch(0 0 0);
   --input: oklch(1 0 0);
   --ring: oklch(0.4 0.17 200);

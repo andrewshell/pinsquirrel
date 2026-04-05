@@ -94,7 +94,7 @@ export const ResetPasswordPage: FC<ResetPasswordPageProps> = ({
                              ${errors?.newPassword ? 'border-red-500' : ''}`}
                     />
                     {errors?.newPassword && (
-                      <p class="text-sm text-red-600 font-medium">
+                      <p class="text-sm text-destructive font-medium">
                         {errors.newPassword.join('. ')}
                       </p>
                     )}
@@ -121,7 +121,7 @@ export const ResetPasswordPage: FC<ResetPasswordPageProps> = ({
                              ${errors?.confirmPassword ? 'border-red-500' : ''}`}
                     />
                     {errors?.confirmPassword && (
-                      <p class="text-sm text-red-600 font-medium">
+                      <p class="text-sm text-destructive font-medium">
                         {errors.confirmPassword.join('. ')}
                       </p>
                     )}

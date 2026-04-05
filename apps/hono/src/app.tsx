@@ -16,6 +16,7 @@ import { tagsRoutes } from './routes/tags'
 import { profileRoutes } from './routes/profile'
 import { apiRoutes } from './routes/api'
 import { staticRoutes } from './routes/static'
+import { styleRoutes } from './routes/style'
 import { importRoutes } from './routes/import'
 import { exportRoutes } from './routes/export'
 import { sessionMiddleware } from './middleware/session'
@@ -38,6 +39,7 @@ app.use('*', csrf())
 app.route('/health', healthRoutes)
 app.route('/', authRoutes)
 app.route('/', staticRoutes)
+app.route('/', styleRoutes)
 app.route('/pins', pinsRoutes)
 app.route('/tags', tagsRoutes)
 app.route('/profile', profileRoutes)
