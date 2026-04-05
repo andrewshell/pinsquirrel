@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
+import { csrf } from 'hono/csrf'
 import { logger } from 'hono/logger'
 import { secureHeaders } from 'hono/secure-headers'
 
@@ -31,6 +32,7 @@ app.use('*', secureHeaders())
 app.use('/static/*', serveStatic({ root: './src' }))
 
 app.use('*', sessionMiddleware())
+app.use('*', csrf())
 
 // Routes
 app.route('/health', healthRoutes)
