@@ -45,6 +45,9 @@ export const PinEditPage: FC<PinEditPageProps> = ({
   const formTags = tags ?? pin.tagNames.join(', ')
 
   const backUrl = returnParams ? `/pins?${returnParams}` : '/pins'
+  const formAction = returnParams
+    ? `/pins/${pin.id}/edit?${returnParams}`
+    : `/pins/${pin.id}/edit`
 
   return (
     <DefaultLayout title="Edit Pin" user={user} width="form">
@@ -75,7 +78,7 @@ export const PinEditPage: FC<PinEditPageProps> = ({
         </CardHeader>
         <CardContent>
           <PinForm
-            action={`/pins/${pin.id}/edit`}
+            action={formAction}
             submitLabel="Update Pin"
             pinId={pin.id}
             url={formUrl}

@@ -365,6 +365,9 @@ pins.get('/:id/edit', async (c) => {
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
 
+  const url = new URL(c.req.url)
+  const returnParams = url.search.replace(/^\?/, '')
+
   try {
     // Fetch the pin and user's tags
     const [pin, userTags] = await Promise.all([
@@ -381,6 +384,7 @@ pins.get('/:id/edit', async (c) => {
         pin={pin}
         flash={flash}
         userTags={userTags.map((t) => t.name)}
+        returnParams={returnParams}
       />
     )
   } catch (error) {
@@ -405,6 +409,11 @@ pins.post('/:id/edit', async (c) => {
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
+
+  const requestUrl = new URL(c.req.url)
+  const returnParams = requestUrl.search.replace(/^\?/, '')
+  const redirectTarget = returnParams ? `/pins?${returnParams}` : '/pins'
+  const editAction = `/pins/${pinId}/edit${returnParams ? `?${returnParams}` : ''}`
 
   // Parse form data
   const formData = await c.req.parseBody()
@@ -449,10 +458,10 @@ pins.post('/:id/edit', async (c) => {
     // Redirect to pins list with success message
     sessionManager.setFlash('success', 'Pin updated successfully!')
     if (c.req.header('HX-Request')) {
-      c.header('HX-Redirect', '/pins')
+      c.header('HX-Redirect', redirectTarget)
       return c.body(null)
     }
-    return c.redirect('/pins')
+    return c.redirect(redirectTarget)
   } catch (error) {
     // Get the pin for re-rendering the form (may fail if not found)
     let pin
@@ -466,7 +475,7 @@ pins.post('/:id/edit', async (c) => {
     const userTagNames = userTags.map((t) => t.name)
 
     const formProps = {
-      action: `/pins/${pinId}/edit`,
+      action: editAction,
       submitLabel: 'Update Pin' as const,
       url: pinUrl,
       title,
@@ -492,6 +501,7 @@ pins.post('/:id/edit', async (c) => {
           description={description || ''}
           readLater={readLater}
           tags={tagsInput}
+          returnParams={returnParams}
         />
       )
     }
@@ -514,6 +524,7 @@ pins.post('/:id/edit', async (c) => {
           description={description || ''}
           readLater={readLater}
           tags={tagsInput}
+          returnParams={returnParams}
         />
       )
     }
@@ -541,6 +552,7 @@ pins.post('/:id/edit', async (c) => {
         description={description || ''}
         readLater={readLater}
         tags={tagsInput}
+        returnParams={returnParams}
       />,
       500
     )
