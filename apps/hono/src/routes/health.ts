@@ -14,7 +14,8 @@ healthRoutes.get('/', async (c) => {
       database = 'connected'
     }
   } catch (e) {
-    error = e instanceof Error ? e.message : 'Unknown error'
+    console.error('[HEALTH] DB check failed:', e)
+    error = 'database unavailable'
   }
 
   const status = database === 'connected' ? 'ok' : 'degraded'
