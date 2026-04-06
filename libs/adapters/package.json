@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@pinsquirrel/domain": "workspace:*",
-    "cheerio": "^1.1.2"
+    "cheerio": "^1.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

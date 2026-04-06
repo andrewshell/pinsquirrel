@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@pinsquirrel/domain": "workspace:*",
-    "mailgun.js": "^12.0.3"
+    "mailgun.js": "^12.7.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

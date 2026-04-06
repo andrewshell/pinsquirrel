@@ -36,6 +36,12 @@
   "dependencies": {
     "tsx": "^4.20.6"
   },
+  "pnpm": {
+    "overrides": {
+      "axios": ">=1.13.5",
+      "undici": ">=7.24.0"
+    }
+  },
   "lint-staged": {
     "apps/hono/src/**/*.{ts,tsx}": "pnpm --filter @pinsquirrel/hono eslint --fix",
     "libs/services/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/services eslint --fix",
