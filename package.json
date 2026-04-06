@@ -24,8 +24,8 @@
   "devDependencies": {
     "eslint": "^9.37.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.3",
-    "prettier": "^3.6.2",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.1",
     "turbo": "latest",
     "vitest": "^3.2.4"
   },
@@ -34,7 +34,7 @@
   },
   "packageManager": "pnpm@10.18.1+sha512.77a884a165cbba2d8d1c19e3b4880eee6d2fcabd0d879121e282196b80042351d5eb3ca0935fa599da1dc51265cc68816ad2bddd2a2de5ea9fdf92adbec7cd34",
   "dependencies": {
-    "tsx": "^4.20.6"
+    "tsx": "^4.21.0"
   },
   "pnpm": {
     "overrides": {
