@@ -21,6 +21,21 @@ jobs:
 
   quality:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: pinsquirrel
+          MYSQL_DATABASE: pinsquirrel_test
+          MYSQL_USER: pinsquirrel
+          MYSQL_PASSWORD: pinsquirrel
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -30,3 +45,5 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm run quality
+        env:
+          TEST_DATABASE_URL: mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel_test
