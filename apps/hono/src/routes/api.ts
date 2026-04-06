@@ -1,5 +1,4 @@
 import { Hono } from 'hono'
-import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import {
   metadataService,
   metadataErrorUtils,
@@ -36,13 +35,9 @@ api.get('/metadata', async (c) => {
       description: metadata.description || '',
     })
   } catch (error) {
-    // Use the service's error mapping methods
-    const statusCode = metadataErrorUtils.getHttpStatusForError(
-      error as Error
-    ) as ContentfulStatusCode
     const message = metadataErrorUtils.getUserFriendlyMessage(error as Error)
 
-    return c.json({ error: message }, statusCode)
+    return c.json({ error: message })
   }
 })
 

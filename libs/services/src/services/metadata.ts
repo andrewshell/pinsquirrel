@@ -80,7 +80,7 @@ export class MetadataService {
       return 408 // Request Timeout
     }
     if (error instanceof HttpError) {
-      return error.status >= 400 && error.status < 500 ? 404 : 500
+      return error.status >= 400 && error.status < 500 ? 422 : 502
     }
     if (error instanceof ParseError) {
       return 500 // Internal Server Error
@@ -102,9 +102,13 @@ export class MetadataService {
       return 'Request timeout'
     }
     if (error instanceof HttpError) {
-      return error.status === 404
-        ? 'Failed to fetch URL content'
-        : 'Failed to fetch metadata'
+      if (error.status === 403) {
+        return 'Site blocked the request (bot protection)'
+      }
+      if (error.status === 404) {
+        return 'Page not found at this URL'
+      }
+      return `Remote server error (HTTP ${String(error.status)})`
     }
     if (error instanceof ParseError) {
       return 'Failed to parse metadata'

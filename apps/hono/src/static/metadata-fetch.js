@@ -84,7 +84,7 @@ function initMetadataFetch(form) {
       )
       const data = await response.json()
 
-      if (response.ok) {
+      if (response.ok && !data.error) {
         // Set title (always for manual refresh, only if empty for auto)
         if (overwrite || originalTitle.trim() === '') {
           titleInput.value = data.title || ''

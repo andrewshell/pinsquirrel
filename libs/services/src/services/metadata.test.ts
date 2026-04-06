@@ -156,31 +156,31 @@ describe('MetadataService', () => {
       expect(MetadataService.getHttpStatusForError(error)).toBe(408)
     })
 
-    it('should return 404 for HttpError with 4xx status', () => {
+    it('should return 422 for HttpError with 4xx status', () => {
       const error = new HttpError(404, 'https://example.com')
-      expect(MetadataService.getHttpStatusForError(error)).toBe(404)
+      expect(MetadataService.getHttpStatusForError(error)).toBe(422)
 
       const error403 = new HttpError(403, 'https://example.com')
-      expect(MetadataService.getHttpStatusForError(error403)).toBe(404)
+      expect(MetadataService.getHttpStatusForError(error403)).toBe(422)
 
       const error400 = new HttpError(400, 'https://example.com')
-      expect(MetadataService.getHttpStatusForError(error400)).toBe(404)
+      expect(MetadataService.getHttpStatusForError(error400)).toBe(422)
     })
 
-    it('should return 500 for HttpError with 5xx status', () => {
+    it('should return 502 for HttpError with 5xx status', () => {
       const error = new HttpError(500, 'https://example.com')
-      expect(MetadataService.getHttpStatusForError(error)).toBe(500)
+      expect(MetadataService.getHttpStatusForError(error)).toBe(502)
 
       const error503 = new HttpError(503, 'https://example.com')
-      expect(MetadataService.getHttpStatusForError(error503)).toBe(500)
+      expect(MetadataService.getHttpStatusForError(error503)).toBe(502)
     })
 
-    it('should return 500 for HttpError with other status codes', () => {
+    it('should return 502 for HttpError with other status codes', () => {
       const error300 = new HttpError(300, 'https://example.com')
-      expect(MetadataService.getHttpStatusForError(error300)).toBe(500)
+      expect(MetadataService.getHttpStatusForError(error300)).toBe(502)
 
       const error200 = new HttpError(200, 'https://example.com')
-      expect(MetadataService.getHttpStatusForError(error200)).toBe(500)
+      expect(MetadataService.getHttpStatusForError(error200)).toBe(502)
     })
 
     it('should return 500 for ParseError', () => {
@@ -219,27 +219,29 @@ describe('MetadataService', () => {
       )
     })
 
-    it('should return "Failed to fetch URL content" for HttpError with 404 status', () => {
+    it('should return "Page not found at this URL" for HttpError with 404 status', () => {
       const error = new HttpError(404, 'https://example.com')
       expect(MetadataService.getUserFriendlyMessage(error)).toBe(
-        'Failed to fetch URL content'
+        'Page not found at this URL'
       )
     })
 
-    it('should return "Failed to fetch metadata" for HttpError with non-404 status', () => {
-      const error500 = new HttpError(500, 'https://example.com')
-      expect(MetadataService.getUserFriendlyMessage(error500)).toBe(
-        'Failed to fetch metadata'
-      )
-
+    it('should return bot protection message for HttpError with 403 status', () => {
       const error403 = new HttpError(403, 'https://example.com')
       expect(MetadataService.getUserFriendlyMessage(error403)).toBe(
-        'Failed to fetch metadata'
+        'Site blocked the request (bot protection)'
+      )
+    })
+
+    it('should return remote server error for other HttpError statuses', () => {
+      const error500 = new HttpError(500, 'https://example.com')
+      expect(MetadataService.getUserFriendlyMessage(error500)).toBe(
+        'Remote server error (HTTP 500)'
       )
 
       const error200 = new HttpError(200, 'https://example.com')
       expect(MetadataService.getUserFriendlyMessage(error200)).toBe(
-        'Failed to fetch metadata'
+        'Remote server error (HTTP 200)'
       )
     })
 
