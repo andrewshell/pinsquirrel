@@ -25,6 +25,7 @@
   "dependencies": {
     "@pinsquirrel/domain": "workspace:*",
     "dotenv": "^17.4.1",
+    "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "drizzle-seed": "^0.3.1",
     "mysql2": "^3.20.0"
@@ -33,7 +34,6 @@
     "@eslint/js": "^10",
     "@types/node": "^24.12.2",
     "@vitest/coverage-v8": "^4.1.2",
-    "drizzle-kit": "^0.31.10",
     "eslint": "^10",
     "prettier": "^3.8.1",
     "tsx": "^4.21.0",
