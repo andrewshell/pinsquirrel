@@ -28,6 +28,7 @@ vi.mock('../utils/crypto.js', () => ({
   hashEmail: vi.fn().mockImplementation((email: string) => `hashed_${email}`),
   generateSecureToken: vi.fn().mockReturnValue('mock-token'),
   hashToken: vi.fn().mockImplementation((token: string) => `hashed_${token}`),
+  getDummyHash: vi.fn().mockReturnValue('dummy_salt:dummy_key'),
 }))
 
 import { verifyPassword } from '../utils/crypto.js'
@@ -256,6 +257,7 @@ describe('AuthenticationService', () => {
 
     it('should throw InvalidCredentialsError for non-existent user', async () => {
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(verifyPassword).mockResolvedValue(false)
 
       const loginInput = {
         username: 'nonexistent',
@@ -264,6 +266,33 @@ describe('AuthenticationService', () => {
 
       await expect(authService.login(loginInput)).rejects.toThrow(
         InvalidCredentialsError
+      )
+      // verifyPassword should still be called (timing side-channel mitigation)
+      expect(verifyPassword).toHaveBeenCalledWith(
+        'password123',
+        'dummy_salt:dummy_key'
+      )
+    })
+
+    it('should throw InvalidCredentialsError for user without password hash', async () => {
+      const userWithoutPassword = { ...mockUser, passwordHash: null }
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(
+        userWithoutPassword
+      )
+      vi.mocked(verifyPassword).mockResolvedValue(false)
+
+      const loginInput = {
+        username: 'testuser',
+        password: 'password123',
+      }
+
+      await expect(authService.login(loginInput)).rejects.toThrow(
+        InvalidCredentialsError
+      )
+      // Should use dummy hash when passwordHash is null
+      expect(verifyPassword).toHaveBeenCalledWith(
+        'password123',
+        'dummy_salt:dummy_key'
       )
     })
 

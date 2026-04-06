@@ -18,6 +18,7 @@ import {
 import {
   hashPassword,
   verifyPassword,
+  getDummyHash,
   hashEmail,
   generateSecureToken,
   hashToken,
@@ -139,20 +140,10 @@ export class AuthenticationService {
     }
 
     const user = await this.userRepository.findByUsername(input.username)
-    if (!user) {
-      throw new InvalidCredentialsError()
-    }
+    const passwordHash = user?.passwordHash ?? getDummyHash()
+    const isValidPassword = await verifyPassword(input.password, passwordHash)
 
-    // Check if user has completed email verification (set password)
-    if (!user.passwordHash) {
-      throw new EmailVerificationRequiredError()
-    }
-
-    const isValidPassword = await verifyPassword(
-      input.password,
-      user.passwordHash
-    )
-    if (!isValidPassword) {
+    if (!user || !user.passwordHash || !isValidPassword) {
       throw new InvalidCredentialsError()
     }
 

@@ -6,6 +6,13 @@ const scryptAsync = promisify(scrypt)
 const SALT_LENGTH = 32
 const KEY_LENGTH = 64
 
+// Precomputed dummy hash for timing-safe login (random salt + random key, same format)
+const DUMMY_HASH = `${randomBytes(SALT_LENGTH).toString('base64')}:${randomBytes(KEY_LENGTH).toString('base64')}`
+
+export function getDummyHash(): string {
+  return DUMMY_HASH
+}
+
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(SALT_LENGTH)
   const derivedKey = (await scryptAsync(password, salt, KEY_LENGTH)) as Buffer

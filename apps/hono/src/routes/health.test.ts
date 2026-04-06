@@ -44,7 +44,7 @@ describe('Health Routes', () => {
       expect(res.status).toBe(503)
       expect(json.status).toBe('degraded')
       expect(json.database).toBe('disconnected')
-      expect(json.error).toBe('Connection refused')
+      expect(json.error).toBe('database unavailable')
       expect(json.uptime).toBeTypeOf('number')
       expect(json.timestamp).toBeDefined()
     })
