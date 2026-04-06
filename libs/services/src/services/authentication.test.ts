@@ -9,7 +9,6 @@ import type {
 } from '@pinsquirrel/domain'
 import {
   InvalidCredentialsError,
-  UserAlreadyExistsError,
   InvalidResetTokenError,
   ResetTokenExpiredError,
   TooManyResetRequestsError,
@@ -85,6 +84,8 @@ describe('AuthenticationService', () => {
     mockEmailService = {
       sendPasswordResetEmail: vi.fn(),
       sendSignupNotificationEmail: vi.fn(),
+      sendEmailAlreadyRegisteredEmail: vi.fn(),
+      sendUsernameTakenEmail: vi.fn(),
     }
 
     authService = new AuthenticationService(
@@ -106,7 +107,7 @@ describe('AuthenticationService', () => {
         email: 'test@example.com',
       }
 
-      const result = await authService.register(registerInput)
+      await authService.register(registerInput)
 
       expect(mockUserRepository.findByUsername).toHaveBeenCalledWith('testuser')
       expect(mockUserRepository.findByEmailHash).toHaveBeenCalledWith(
@@ -121,20 +122,87 @@ describe('AuthenticationService', () => {
         mockUser.id,
         'User'
       )
-      expect(result).toEqual(mockUser)
     })
 
-    it('should throw UserAlreadyExistsError if username is taken', async () => {
+    it('should not throw when username is already taken', async () => {
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
+      vi.mocked(mockEmailService.sendUsernameTakenEmail).mockResolvedValue()
+
+      const registerInput = {
+        username: 'testuser',
+        email: 'new@example.com',
+        signupUrl: 'http://localhost/signup',
+      }
+
+      await authService.register(registerInput)
+
+      expect(mockEmailService.sendUsernameTakenEmail).toHaveBeenCalledWith(
+        'new@example.com',
+        'testuser',
+        'http://localhost/signup'
+      )
+      expect(mockUserRepository.create).not.toHaveBeenCalled()
+    })
+
+    it('should not throw when email is already registered', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(mockUser)
+      vi.mocked(
+        mockEmailService.sendEmailAlreadyRegisteredEmail
+      ).mockResolvedValue()
+
+      const registerInput = {
+        username: 'newuser',
+        email: 'test@example.com',
+        signinUrl: 'http://localhost/signin',
+      }
+
+      await authService.register(registerInput)
+
+      expect(
+        mockEmailService.sendEmailAlreadyRegisteredEmail
+      ).toHaveBeenCalledWith('test@example.com', 'http://localhost/signin')
+      expect(mockUserRepository.create).not.toHaveBeenCalled()
+    })
+
+    it('should send already-registered email when both username and email exist', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(mockUser)
+      vi.mocked(
+        mockEmailService.sendEmailAlreadyRegisteredEmail
+      ).mockResolvedValue()
 
       const registerInput = {
         username: 'testuser',
         email: 'test@example.com',
+        signinUrl: 'http://localhost/signin',
       }
 
-      await expect(authService.register(registerInput)).rejects.toThrow(
-        UserAlreadyExistsError
+      await authService.register(registerInput)
+
+      expect(
+        mockEmailService.sendEmailAlreadyRegisteredEmail
+      ).toHaveBeenCalledWith('test@example.com', 'http://localhost/signin')
+      expect(mockEmailService.sendUsernameTakenEmail).not.toHaveBeenCalled()
+      expect(mockUserRepository.create).not.toHaveBeenCalled()
+    })
+
+    it('should not fail registration if conflict notification email throws', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
+      vi.mocked(mockEmailService.sendUsernameTakenEmail).mockRejectedValue(
+        new Error('Email service failed')
       )
+
+      const registerInput = {
+        username: 'testuser',
+        email: 'new@example.com',
+        signupUrl: 'http://localhost/signup',
+      }
+
+      // Should not throw even though email sending fails
+      await authService.register(registerInput)
 
       expect(mockUserRepository.create).not.toHaveBeenCalled()
     })
@@ -178,14 +246,13 @@ describe('AuthenticationService', () => {
         notifyEmail: 'admin@example.com',
       }
 
-      const result = await authService.register(registerInput)
+      await authService.register(registerInput)
 
       expect(mockEmailService.sendSignupNotificationEmail).toHaveBeenCalledWith(
         'admin@example.com',
         'testuser',
         'test@example.com'
       )
-      expect(result).toEqual(mockUser)
     })
 
     it('should not send signup notification when notifyEmail is not provided', async () => {
@@ -222,9 +289,8 @@ describe('AuthenticationService', () => {
       }
 
       // Should not throw even though email sending fails
-      const result = await authService.register(registerInput)
+      await authService.register(registerInput)
 
-      expect(result).toEqual(mockUser)
       expect(mockEmailService.sendSignupNotificationEmail).toHaveBeenCalled()
     })
   })

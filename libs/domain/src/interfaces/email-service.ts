@@ -10,4 +10,15 @@ export interface EmailService {
     username: string,
     userEmail: string
   ): Promise<void>
+
+  sendEmailAlreadyRegisteredEmail(
+    email: string,
+    signinUrl: string
+  ): Promise<void>
+
+  sendUsernameTakenEmail(
+    email: string,
+    username: string,
+    signupUrl: string
+  ): Promise<void>
 }

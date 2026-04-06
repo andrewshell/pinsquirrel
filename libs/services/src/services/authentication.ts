@@ -7,7 +7,6 @@ import type {
 import { Role } from '@pinsquirrel/domain'
 import {
   InvalidCredentialsError,
-  UserAlreadyExistsError,
   EmailVerificationRequiredError,
   InvalidResetTokenError,
   ResetTokenExpiredError,
@@ -41,7 +40,9 @@ export class AuthenticationService {
     email: string
     resetUrl?: string
     notifyEmail?: string
-  }): Promise<User> {
+    signinUrl?: string
+    signupUrl?: string
+  }): Promise<void> {
     // Validate inputs at service boundary
     const errors: Record<string, string[]> = {}
 
@@ -61,20 +62,44 @@ export class AuthenticationService {
       throw new ValidationError(errors)
     }
 
-    // Check if username already exists
+    // Check for existing username and email
     const existingUserByUsername = await this.userRepository.findByUsername(
       input.username
     )
-    if (existingUserByUsername) {
-      throw new UserAlreadyExistsError(input.username)
-    }
-
-    // Check if email already exists
     const emailHash = hashEmail(input.email)
     const existingUserByEmail =
       await this.userRepository.findByEmailHash(emailHash)
+
+    // Handle conflicts without revealing which field conflicted
     if (existingUserByEmail) {
-      throw new UserAlreadyExistsError('Email already registered')
+      // Email already registered — notify the email owner privately
+      if (this.emailService && input.signinUrl) {
+        try {
+          await this.emailService.sendEmailAlreadyRegisteredEmail(
+            input.email,
+            input.signinUrl
+          )
+        } catch {
+          // Don't fail if notification email fails
+        }
+      }
+      return
+    }
+
+    if (existingUserByUsername) {
+      // Username taken — notify the provided email privately
+      if (this.emailService && input.signupUrl) {
+        try {
+          await this.emailService.sendUsernameTakenEmail(
+            input.email,
+            input.username,
+            input.signupUrl
+          )
+        } catch {
+          // Don't fail if notification email fails
+        }
+      }
+      return
     }
 
     // Create user without password (they'll set it via email verification)
@@ -96,7 +121,6 @@ export class AuthenticationService {
         })
       } catch {
         // Don't fail registration if email sending fails
-        // Silently ignore email errors during registration
       }
     }
 
@@ -110,11 +134,8 @@ export class AuthenticationService {
         )
       } catch {
         // Don't fail registration if notification email fails
-        // Silently ignore email errors during registration
       }
     }
-
-    return user
   }
 
   async login(input: { username: string; password: string }): Promise<User> {

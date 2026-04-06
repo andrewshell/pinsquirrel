@@ -4,6 +4,8 @@ import Mailgun from 'mailgun.js'
 import {
   createPasswordResetEmailTemplate,
   createSignupNotificationEmailTemplate,
+  createEmailAlreadyRegisteredTemplate,
+  createUsernameTakenTemplate,
 } from './templates.js'
 import type { MailgunConfig } from './types.js'
 
@@ -98,6 +100,79 @@ export class MailgunEmailService implements EmailService {
 
       throw new EmailSendError(
         `Failed to send signup notification email: ${errorMessage}`
+      )
+    }
+  }
+
+  async sendEmailAlreadyRegisteredEmail(
+    email: string,
+    signinUrl: string
+  ): Promise<void> {
+    if (!email || !signinUrl) {
+      throw new EmailSendError(
+        'Invalid email parameters: email and signinUrl are required'
+      )
+    }
+
+    try {
+      const { html, text } = createEmailAlreadyRegisteredTemplate(signinUrl)
+
+      const from = this.config.fromName
+        ? `${this.config.fromName} <${this.config.fromEmail}>`
+        : this.config.fromEmail
+
+      const messageData = {
+        from,
+        to: [email],
+        subject: 'PinSquirrel Account Already Exists',
+        html,
+        text,
+      }
+
+      await this.mailgun.messages.create(this.config.domain, messageData)
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred'
+
+      throw new EmailSendError(
+        `Failed to send already-registered email: ${errorMessage}`
+      )
+    }
+  }
+
+  async sendUsernameTakenEmail(
+    email: string,
+    username: string,
+    signupUrl: string
+  ): Promise<void> {
+    if (!email || !username || !signupUrl) {
+      throw new EmailSendError(
+        'Invalid email parameters: email, username, and signupUrl are required'
+      )
+    }
+
+    try {
+      const { html, text } = createUsernameTakenTemplate(username, signupUrl)
+
+      const from = this.config.fromName
+        ? `${this.config.fromName} <${this.config.fromEmail}>`
+        : this.config.fromEmail
+
+      const messageData = {
+        from,
+        to: [email],
+        subject: 'PinSquirrel Username Unavailable',
+        html,
+        text,
+      }
+
+      await this.mailgun.messages.create(this.config.domain, messageData)
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred'
+
+      throw new EmailSendError(
+        `Failed to send username-taken email: ${errorMessage}`
       )
     }
   }

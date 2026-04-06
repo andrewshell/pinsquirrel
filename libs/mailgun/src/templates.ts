@@ -184,3 +184,182 @@ This is an automated notification from PinSquirrel.
 
   return { html, text }
 }
+
+export function createEmailAlreadyRegisteredTemplate(signinUrl: string): {
+  html: string
+  text: string
+} {
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Account Already Exists - PinSquirrel</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f9f9f9;
+            padding: 30px;
+            border-radius: 8px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .footer {
+            margin-top: 30px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Account Already Exists</h1>
+        </div>
+
+        <p>Hello,</p>
+
+        <p>Someone tried to create a new PinSquirrel account using your email address. If this was you, you already have an account. You can sign in or reset your password instead.</p>
+
+        <p style="text-align: center;">
+            <a href="${signinUrl}" class="button">Sign In</a>
+        </p>
+
+        <p>If you didn't attempt to register, you can safely ignore this email.</p>
+
+        <div class="footer">
+            <p>Best regards,<br>Andrew from PinSquirrel</p>
+            <p><small>This is an automated email. Please do not reply to this message.</small></p>
+        </div>
+    </div>
+</body>
+</html>`.trim()
+
+  const text = `
+Account Already Exists
+
+Hello,
+
+Someone tried to create a new PinSquirrel account using your email address. If this was you, you already have an account. You can sign in or reset your password instead.
+
+Sign in: ${signinUrl}
+
+If you didn't attempt to register, you can safely ignore this email.
+
+Best regards,
+Andrew from PinSquirrel
+
+This is an automated email. Please do not reply to this message.
+`.trim()
+
+  return { html, text }
+}
+
+export function createUsernameTakenTemplate(
+  username: string,
+  signupUrl: string
+): {
+  html: string
+  text: string
+} {
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Username Unavailable - PinSquirrel</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f9f9f9;
+            padding: 30px;
+            border-radius: 8px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .footer {
+            margin-top: 30px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Username Unavailable</h1>
+        </div>
+
+        <p>Hello,</p>
+
+        <p>We received your registration request for PinSquirrel, but the username <strong>${username}</strong> is already taken. Please try registering again with a different username.</p>
+
+        <p style="text-align: center;">
+            <a href="${signupUrl}" class="button">Try Again</a>
+        </p>
+
+        <p>If you didn't attempt to register, you can safely ignore this email.</p>
+
+        <div class="footer">
+            <p>Best regards,<br>Andrew from PinSquirrel</p>
+            <p><small>This is an automated email. Please do not reply to this message.</small></p>
+        </div>
+    </div>
+</body>
+</html>`.trim()
+
+  const text = `
+Username Unavailable
+
+Hello,
+
+We received your registration request for PinSquirrel, but the username "${username}" is already taken. Please try registering again with a different username.
+
+Sign up: ${signupUrl}
+
+If you didn't attempt to register, you can safely ignore this email.
+
+Best regards,
+Andrew from PinSquirrel
+
+This is an automated email. Please do not reply to this message.
+`.trim()
+
+  return { html, text }
+}

@@ -4,7 +4,6 @@ import {
   InvalidCredentialsError,
   EmailVerificationRequiredError,
   MissingRoleError,
-  UserAlreadyExistsError,
   InvalidResetTokenError,
   ResetTokenExpiredError,
 } from '@pinsquirrel/domain'
@@ -131,13 +130,15 @@ auth.post('/signup', async (c) => {
       email,
       resetUrl,
       notifyEmail: process.env.NOTIFY_EMAIL || undefined,
+      signinUrl: `${url.origin}/signin`,
+      signupUrl: `${url.origin}/signup`,
     })
 
-    // Return success page - user needs to check email to set password
+    // Always show success - conflicts are communicated privately via email
     return c.html(
       <SignUpPage
         success={true}
-        message="Account created! Check your email to set your password and complete registration."
+        message="Check your email to set your password and complete registration."
       />
     )
   } catch (error) {
@@ -145,8 +146,6 @@ auth.post('/signup', async (c) => {
 
     if (error instanceof ValidationError) {
       errors = error.fields
-    } else if (error instanceof UserAlreadyExistsError) {
-      errors = { username: ['Username is already taken'] }
     } else {
       // Log unexpected errors for debugging
       console.error('[SIGNUP ERROR]', error)
