@@ -22,9 +22,8 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
     const { pins } = await import('../schema/pins.js')
     const { tags } = await import('../schema/tags.js')
     const { pinsTags } = await import('../schema/pins-tags.js')
-    const { passwordResetTokens } = await import(
-      '../schema/password-reset-tokens.js'
-    )
+    const { passwordResetTokens } =
+      await import('../schema/password-reset-tokens.js')
     const { sessions } = await import('../schema/sessions.js')
 
     const schema = {
