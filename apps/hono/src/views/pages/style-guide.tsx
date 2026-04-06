@@ -423,7 +423,7 @@ export const StyleGuidePage: FC<StyleGuidePageProps> = ({ user }) => {
             Delete confirmation (destructive background tint)
           </p>
           <PinDeleteConfirm
-            pin={samplePins[0]!}
+            pin={samplePins[0]}
             viewSize="expanded"
             searchParams=""
           />
