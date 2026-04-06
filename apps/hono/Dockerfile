@@ -1,5 +1,5 @@
 # Build context should be the monorepo root
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 RUN corepack enable
 WORKDIR /app
 
@@ -35,7 +35,7 @@ COPY libs/services/package.json ./libs/services/
 RUN npm_config_ignore_scripts=true pnpm install --frozen-lockfile --prod
 
 # Final runtime image
-FROM node:22-alpine AS runtime
+FROM node:24-alpine AS runtime
 RUN corepack enable
 WORKDIR /app
 
