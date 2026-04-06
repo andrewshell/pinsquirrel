@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.1](https://github.com/andrewshell/pinsquirrel/compare/v3.2.0...v3.2.1) (2026-04-06)
+
+
+### Bug Fixes
+
+* **build:** disable DTS generation to fix TypeScript 6 baseUrl deprecation ([365a6e7](https://github.com/andrewshell/pinsquirrel/commit/365a6e727e23f8fddfe2a5ff4e4f276a80a047ea))
+* **database:** move drizzle-kit to dependencies for production migrations ([4b597c6](https://github.com/andrewshell/pinsquirrel/commit/4b597c6a3c3a962fb209f56e2b211ce290bc7b16))
+
 ## [3.2.0](https://github.com/andrewshell/pinsquirrel/compare/v3.1.0...v3.2.0) (2026-04-06)
 
 
