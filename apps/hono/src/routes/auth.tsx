@@ -99,7 +99,7 @@ auth.post('/signin', async (c) => {
 
     return c.redirect(destination)
   } catch (error) {
-    let errors: Record<string, string[]> = {}
+    let errors: Record<string, string[]>
 
     if (error instanceof ValidationError) {
       errors = error.fields
@@ -186,7 +186,7 @@ auth.post(
         />
       )
     } catch (error) {
-      let errors: Record<string, string[]> = {}
+      let errors: Record<string, string[]>
 
       if (error instanceof ValidationError) {
         errors = error.fields
