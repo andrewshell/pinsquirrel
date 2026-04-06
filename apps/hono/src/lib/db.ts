@@ -7,9 +7,10 @@ import {
   DrizzleTagRepository,
   DrizzleUserRepository,
 } from '@pinsquirrel/database'
+import type { MySql2Database } from 'drizzle-orm/mysql2'
 
 // Create database client
-export const db = createDatabaseClient(
+export const db: MySql2Database = createDatabaseClient(
   process.env.DATABASE_URL || 'mysql://localhost:3306/pinsquirrel'
 )
 
