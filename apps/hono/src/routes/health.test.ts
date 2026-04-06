@@ -10,6 +10,16 @@ vi.mock('../lib/db', () => ({
   },
 }))
 
+vi.mock('../lib/logger', () => ({
+  logger: {
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  },
+  safeError: (e: unknown) => e,
+}))
+
 import { healthRoutes } from './health'
 
 describe('Health Routes', () => {

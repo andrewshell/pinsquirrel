@@ -5,13 +5,15 @@ import { EmailSendError } from '@pinsquirrel/domain'
 
 // Mock mailgun.js
 vi.mock('mailgun.js', () => ({
-  default: vi.fn(() => ({
-    client: vi.fn(() => ({
-      messages: {
-        create: vi.fn(),
-      },
-    })),
-  })),
+  default: vi.fn(function () {
+    return {
+      client: vi.fn(() => ({
+        messages: {
+          create: vi.fn(),
+        },
+      })),
+    }
+  }),
 }))
 
 describe('MailgunEmailService', () => {

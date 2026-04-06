@@ -7,6 +7,7 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{js,ts}'],
     exclude: ['node_modules', 'dist'],
     globalSetup: './src/test-setup.ts',
+    fileParallelism: false,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -16,8 +17,8 @@ export default defineConfig({
         'drizzle/',
         '**/*.config.*',
         '**/*.test.*',
-        '**/*.spec.*'
-      ]
-    }
-  }
+        '**/*.spec.*',
+      ],
+    },
+  },
 })

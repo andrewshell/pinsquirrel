@@ -27,7 +27,7 @@
     "lint-staged": "^16.2.3",
     "prettier": "^3.6.2",
     "turbo": "latest",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.2"
   },
   "engines": {
     "node": ">=24.0.0"
