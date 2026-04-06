@@ -1,5 +1,33 @@
 # Changelog
 
+## [3.2.0](https://github.com/andrewshell/pinsquirrel/compare/v3.1.0...v3.2.0) (2026-04-06)
+
+
+### Features
+
+* add brute-force rate limiting on auth endpoints ([14ded1c](https://github.com/andrewshell/pinsquirrel/commit/14ded1c13dfdfaf4f4121fa44f97a406182082c7))
+
+
+### Bug Fixes
+
+* add CI dependency scanning and surface email-delivery failures ([d5a2bfa](https://github.com/andrewshell/pinsquirrel/commit/d5a2bfa071bd3f27d56e5ded5e9c90e33488b04e))
+* add MySQL service container to CI for database tests ([b70a0f6](https://github.com/andrewshell/pinsquirrel/commit/b70a0f65f1242b6924ace8818b054fa171939c75))
+* Adding csrf middleware ([bded72d](https://github.com/andrewshell/pinsquirrel/commit/bded72db4124187e917caa906a3a03f26f321c99))
+* **api:** return 200 with error payload from metadata endpoint ([f738e02](https://github.com/andrewshell/pinsquirrel/commit/f738e028d8491fa040cbdfa698bcb88539f2b08d))
+* Changing colors for WCAG 2.2 AAA accessibility standards ([2477bad](https://github.com/andrewshell/pinsquirrel/commit/2477bada219d1b4f328566793e9ba66ec164b8a3))
+* **deps:** align TypeScript to ^6.0.2 in all workspace packages ([4e97ee8](https://github.com/andrewshell/pinsquirrel/commit/4e97ee8119446cdeda90c94e270ca6eba082db92))
+* don't output error messages in health endpoint ([db7d0a0](https://github.com/andrewshell/pinsquirrel/commit/db7d0a0db87802d162fd7ecab0022a37bd699dfc))
+* Improved design for error messages ([4bceffe](https://github.com/andrewshell/pinsquirrel/commit/4bceffe3730896272aa442cf9e138424798d5c41))
+* maintain filters when editing ([8c42459](https://github.com/andrewshell/pinsquirrel/commit/8c4245940037a867d708885fa003760781aefc1b))
+* mitigate login timing side-channel for username enumeration ([207f365](https://github.com/andrewshell/pinsquirrel/commit/207f3653672c2dd84f3800f1cb008aa0701416cf))
+* prevent username/email enumeration on signup endpoint ([3b9c48f](https://github.com/andrewshell/pinsquirrel/commit/3b9c48facff459bcab481197091db7187d7d2a0c))
+* raise minimum password length from 8 to 12 characters ([e3f9a3e](https://github.com/andrewshell/pinsquirrel/commit/e3f9a3e01fc1d8ba64b5960de511ce1181034b4a))
+* remove unnecessary non-null assertion in style guide ([04a869e](https://github.com/andrewshell/pinsquirrel/commit/04a869e8af53a2e3010ab64bb369eb4a9bdc7d90))
+* replace unstructured console logs with pino structured logger ([d97c329](https://github.com/andrewshell/pinsquirrel/commit/d97c32914a204d91a1638cc7512ba949cd3cd5bb))
+* style page and improved brightness for colors ([d2add31](https://github.com/andrewshell/pinsquirrel/commit/d2add315db5d6cde7e93f5fa694d9550af080141))
+* upgrade dependencies to resolve high security vulnerabilities ([133e1cb](https://github.com/andrewshell/pinsquirrel/commit/133e1cbccb7486121e101bf7cbe062968a4a9709))
+* using theme colors and fixing some contrast issues ([9c752d0](https://github.com/andrewshell/pinsquirrel/commit/9c752d0c58895ec832bd846c1365f4028c472bba))
+
 ## [3.1.0](https://github.com/andrewshell/pinsquirrel/compare/v3.0.0...v3.1.0) (2026-03-26)
 
 
