@@ -42,7 +42,7 @@ export class AuthenticationService {
     notifyEmail?: string
     signinUrl?: string
     signupUrl?: string
-  }): Promise<void> {
+  }): Promise<{ emailFailed: boolean }> {
     // Validate inputs at service boundary
     const errors: Record<string, string[]> = {}
 
@@ -83,7 +83,7 @@ export class AuthenticationService {
           // Don't fail if notification email fails
         }
       }
-      return
+      return { emailFailed: false }
     }
 
     if (existingUserByUsername) {
@@ -99,7 +99,7 @@ export class AuthenticationService {
           // Don't fail if notification email fails
         }
       }
-      return
+      return { emailFailed: false }
     }
 
     // Create user without password (they'll set it via email verification)
@@ -113,6 +113,7 @@ export class AuthenticationService {
     await this.userRepository.addRole(user.id, Role.User)
 
     // Auto-trigger password reset email for verification if URL provided
+    let emailFailed = false
     if (input.resetUrl && this.passwordResetRepository && this.emailService) {
       try {
         await this.requestPasswordReset({
@@ -120,7 +121,7 @@ export class AuthenticationService {
           resetUrl: input.resetUrl,
         })
       } catch {
-        // Don't fail registration if email sending fails
+        emailFailed = true
       }
     }
 
@@ -136,6 +137,8 @@ export class AuthenticationService {
         // Don't fail registration if notification email fails
       }
     }
+
+    return { emailFailed }
   }
 
   async login(input: { username: string; password: string }): Promise<User> {

@@ -8,6 +8,7 @@ interface SignUpPageProps {
   email?: string
   success?: boolean
   message?: string
+  showResendLink?: boolean
 }
 
 export const SignUpPage: FC<SignUpPageProps> = ({
@@ -16,6 +17,7 @@ export const SignUpPage: FC<SignUpPageProps> = ({
   email = '',
   success = false,
   message,
+  showResendLink = false,
 }) => {
   return (
     <DefaultLayout title="Sign Up" user={null}>
@@ -47,10 +49,22 @@ export const SignUpPage: FC<SignUpPageProps> = ({
                   <SuccessMessage message={message} className="mb-4" />
                 )}
                 <p class="text-muted-foreground mb-4">
-                  We've sent you an email with a link to set your password.
-                  Check your inbox (and spam folder) and click the link to
-                  complete your registration.
+                  {showResendLink
+                    ? 'If you don\u2019t receive an email, you can request a new one.'
+                    : 'We\u2019ve sent you an email with a link to set your password. Check your inbox (and spam folder) and click the link to complete your registration.'}
                 </p>
+                {showResendLink && (
+                  <a
+                    href="/forgot-password"
+                    class="block w-full px-4 py-2 mb-4 text-center bg-primary text-primary-foreground font-medium
+                           border-2 border-foreground neobrutalism-shadow
+                           hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
+                           active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
+                           transition-all"
+                  >
+                    Resend Verification Email
+                  </a>
+                )}
                 <a
                   href="/signin"
                   class="block w-full px-4 py-2 text-center bg-secondary text-secondary-foreground font-medium

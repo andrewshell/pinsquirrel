@@ -158,7 +158,7 @@ auth.post(
     const resetUrl = `${url.origin}/reset-password`
 
     try {
-      await authService.register({
+      const result = await authService.register({
         username,
         email,
         resetUrl,
@@ -166,6 +166,17 @@ auth.post(
         signinUrl: `${url.origin}/signin`,
         signupUrl: `${url.origin}/signup`,
       })
+
+      if (result.emailFailed) {
+        logger.error('Verification email failed to send during signup')
+        return c.html(
+          <SignUpPage
+            success={true}
+            message="Your account was created, but we had trouble sending the verification email."
+            showResendLink={true}
+          />
+        )
+      }
 
       // Always show success - conflicts are communicated privately via email
       return c.html(

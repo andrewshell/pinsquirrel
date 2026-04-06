@@ -273,6 +273,46 @@ describe('AuthenticationService', () => {
       ).not.toHaveBeenCalled()
     })
 
+    it('should return emailFailed false on successful registration', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.addRole).mockResolvedValue()
+
+      const result = await authService.register({
+        username: 'testuser',
+        email: 'test@example.com',
+      })
+
+      expect(result).toEqual({ emailFailed: false })
+    })
+
+    it('should return emailFailed true when verification email fails', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      // First call (register check) returns null, second call (requestPasswordReset) returns user
+      vi.mocked(mockUserRepository.findByEmailHash)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(mockUser)
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.addRole).mockResolvedValue()
+      vi.mocked(mockPasswordResetRepository.findByUserId).mockResolvedValue([])
+      vi.mocked(mockPasswordResetRepository.create).mockResolvedValue(
+        mockPasswordResetToken
+      )
+      vi.mocked(mockEmailService.sendPasswordResetEmail).mockRejectedValue(
+        new Error('Email service unavailable')
+      )
+
+      const result = await authService.register({
+        username: 'testuser',
+        email: 'test@example.com',
+        resetUrl: 'http://localhost/reset-password',
+      })
+
+      expect(result).toEqual({ emailFailed: true })
+      expect(mockUserRepository.create).toHaveBeenCalled()
+    })
+
     it('should not fail registration if signup notification email fails', async () => {
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
       vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
