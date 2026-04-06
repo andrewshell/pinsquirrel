@@ -9,6 +9,13 @@ import {
 } from '@pinsquirrel/domain'
 import { authService } from '../lib/services'
 import { getSessionManager } from '../middleware/session'
+import {
+  signinLimiter,
+  signinRateLimitKey,
+  signupLimiter,
+  forgotPasswordLimiter,
+  rateLimitByIp,
+} from '../middleware/rate-limit'
 import { SignInPage } from '../views/pages/signin'
 import { SignUpPage } from '../views/pages/signup'
 import { ForgotPasswordPage } from '../views/pages/forgot-password'
@@ -53,8 +60,26 @@ auth.post('/signin', async (c) => {
   const keepSignedIn = formData.keepSignedIn === 'true'
   const redirectTo = formData.redirectTo as string | undefined
 
+  const rateLimitKey = signinRateLimitKey(c, username || '')
+  if (signinLimiter.isLimited(rateLimitKey)) {
+    return c.html(
+      <SignInPage
+        errors={{
+          _form: [
+            'Too many failed sign-in attempts. Please try again in 15 minutes.',
+          ],
+        }}
+        redirectTo={redirectTo}
+        username={username}
+      />,
+      429
+    )
+  }
+
   try {
     const user = await authService.login({ username, password })
+
+    signinLimiter.reset(rateLimitKey)
 
     // Create session
     await sessionManager.create(user.id, keepSignedIn)
@@ -78,6 +103,7 @@ auth.post('/signin', async (c) => {
     if (error instanceof ValidationError) {
       errors = error.fields
     } else if (error instanceof InvalidCredentialsError) {
+      signinLimiter.hit(rateLimitKey)
       errors = { _form: ['Invalid username or password'] }
     } else if (error instanceof EmailVerificationRequiredError) {
       errors = { _form: [error.message] }
@@ -114,50 +140,57 @@ auth.get('/signup', (c) => {
 })
 
 // POST /signup - Process sign-up form
-auth.post('/signup', async (c) => {
-  const formData = await c.req.parseBody()
+auth.post(
+  '/signup',
+  rateLimitByIp(
+    signupLimiter,
+    'Too many sign-up attempts. Please try again later.'
+  ),
+  async (c) => {
+    const formData = await c.req.parseBody()
 
-  const username = formData.username as string
-  const email = formData.email as string
+    const username = formData.username as string
+    const email = formData.email as string
 
-  // Build the reset URL for password verification email
-  const url = new URL(c.req.url)
-  const resetUrl = `${url.origin}/reset-password`
+    // Build the reset URL for password verification email
+    const url = new URL(c.req.url)
+    const resetUrl = `${url.origin}/reset-password`
 
-  try {
-    await authService.register({
-      username,
-      email,
-      resetUrl,
-      notifyEmail: process.env.NOTIFY_EMAIL || undefined,
-      signinUrl: `${url.origin}/signin`,
-      signupUrl: `${url.origin}/signup`,
-    })
+    try {
+      await authService.register({
+        username,
+        email,
+        resetUrl,
+        notifyEmail: process.env.NOTIFY_EMAIL || undefined,
+        signinUrl: `${url.origin}/signin`,
+        signupUrl: `${url.origin}/signup`,
+      })
 
-    // Always show success - conflicts are communicated privately via email
-    return c.html(
-      <SignUpPage
-        success={true}
-        message="Check your email to set your password and complete registration."
-      />
-    )
-  } catch (error) {
-    let errors: Record<string, string[]> = {}
+      // Always show success - conflicts are communicated privately via email
+      return c.html(
+        <SignUpPage
+          success={true}
+          message="Check your email to set your password and complete registration."
+        />
+      )
+    } catch (error) {
+      let errors: Record<string, string[]> = {}
 
-    if (error instanceof ValidationError) {
-      errors = error.fields
-    } else {
-      // Log unexpected errors for debugging
-      console.error('[SIGNUP ERROR]', error)
-      errors = { _form: ['An unexpected error occurred. Please try again.'] }
+      if (error instanceof ValidationError) {
+        errors = error.fields
+      } else {
+        // Log unexpected errors for debugging
+        console.error('[SIGNUP ERROR]', error)
+        errors = { _form: ['An unexpected error occurred. Please try again.'] }
+      }
+
+      return c.html(
+        <SignUpPage errors={errors} username={username} email={email} />,
+        400
+      )
     }
-
-    return c.html(
-      <SignUpPage errors={errors} username={username} email={email} />,
-      400
-    )
   }
-})
+)
 
 // GET /forgot-password - Render forgot password form
 auth.get('/forgot-password', (c) => {
@@ -172,62 +205,69 @@ auth.get('/forgot-password', (c) => {
 })
 
 // POST /forgot-password - Process forgot password form
-auth.post('/forgot-password', async (c) => {
-  const sessionManager = getSessionManager(c)
+auth.post(
+  '/forgot-password',
+  rateLimitByIp(
+    forgotPasswordLimiter,
+    'Too many password reset requests. Please try again later.'
+  ),
+  async (c) => {
+    const sessionManager = getSessionManager(c)
 
-  // Already logged in, redirect to home
-  if (sessionManager.isAuthenticated()) {
-    return c.redirect('/pins')
-  }
-
-  const formData = await c.req.parseBody()
-  const email = formData.email as string
-
-  // Build the reset URL
-  const url = new URL(c.req.url)
-  const resetBaseUrl = `${url.origin}/reset-password`
-
-  try {
-    // Request password reset - service handles validation
-    await authService.requestPasswordReset({
-      email,
-      resetUrl: resetBaseUrl,
-    })
-
-    // Always show success message to avoid revealing whether email exists
-    return c.html(<ForgotPasswordPage success={true} />)
-  } catch (error) {
-    if (error instanceof ValidationError) {
-      return c.html(
-        <ForgotPasswordPage errors={error.fields} email={email} />,
-        400
-      )
+    // Already logged in, redirect to home
+    if (sessionManager.isAuthenticated()) {
+      return c.redirect('/pins')
     }
 
-    // Check for rate limiting error
-    if (error instanceof Error && error.message.includes('Too many')) {
+    const formData = await c.req.parseBody()
+    const email = formData.email as string
+
+    // Build the reset URL
+    const url = new URL(c.req.url)
+    const resetBaseUrl = `${url.origin}/reset-password`
+
+    try {
+      // Request password reset - service handles validation
+      await authService.requestPasswordReset({
+        email,
+        resetUrl: resetBaseUrl,
+      })
+
+      // Always show success message to avoid revealing whether email exists
+      return c.html(<ForgotPasswordPage success={true} />)
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return c.html(
+          <ForgotPasswordPage errors={error.fields} email={email} />,
+          400
+        )
+      }
+
+      // Check for rate limiting error
+      if (error instanceof Error && error.message.includes('Too many')) {
+        return c.html(
+          <ForgotPasswordPage
+            errors={{
+              _form: [
+                'Too many password reset requests. Please try again later.',
+              ],
+            }}
+            email={email}
+          />,
+          429
+        )
+      }
+
       return c.html(
         <ForgotPasswordPage
-          errors={{
-            _form: [
-              'Too many password reset requests. Please try again later.',
-            ],
-          }}
+          errors={{ _form: ['An error occurred. Please try again later.'] }}
           email={email}
         />,
-        429
+        500
       )
     }
-
-    return c.html(
-      <ForgotPasswordPage
-        errors={{ _form: ['An error occurred. Please try again later.'] }}
-        email={email}
-      />,
-      500
-    )
   }
-})
+)
 
 // GET /reset-password/:token - Render reset password form
 auth.get('/reset-password/:token', async (c) => {
