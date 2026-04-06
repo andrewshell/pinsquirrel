@@ -8,6 +8,7 @@ import {
   ResetTokenExpiredError,
 } from '@pinsquirrel/domain'
 import { authService } from '../lib/services'
+import { logger, safeError } from '../lib/logger.js'
 import { getSessionManager } from '../middleware/session'
 import {
   signinLimiter,
@@ -111,7 +112,7 @@ auth.post('/signin', async (c) => {
       errors = { _form: [error.message] }
     } else {
       // Log unexpected errors for debugging
-      console.error('[SIGNIN ERROR]', error)
+      logger.error({ err: safeError(error) }, 'Signin failed')
       errors = { _form: ['An unexpected error occurred. Please try again.'] }
     }
 
@@ -180,7 +181,7 @@ auth.post(
         errors = error.fields
       } else {
         // Log unexpected errors for debugging
-        console.error('[SIGNUP ERROR]', error)
+        logger.error({ err: safeError(error) }, 'Signup failed')
         errors = { _form: ['An unexpected error occurred. Please try again.'] }
       }
 

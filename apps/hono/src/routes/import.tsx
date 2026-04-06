@@ -3,6 +3,7 @@ import { AccessControl, DuplicatePinError } from '@pinsquirrel/domain'
 import { pinService, pinRepository } from '../lib/services'
 import { getSessionManager, requireAuth } from '../middleware/session'
 import { ImportPage } from '../views/pages/import'
+import { logger, safeError } from '../lib/logger.js'
 
 interface PinboardPin {
   href: string
@@ -121,10 +122,10 @@ importRoute.post('/', async (c) => {
       )
     }
 
-    console.log(`Starting Pinboard import for user ${user.username}`, {
-      userId: user.id,
-      pinCount: pinboardData.length,
-    })
+    logger.info(
+      { userId: user.id, pinCount: pinboardData.length },
+      'Pinboard import started'
+    )
 
     // Import the pins
     let importedCount = 0
@@ -186,34 +187,40 @@ importRoute.post('/', async (c) => {
                   pinboardTimestamp
                 )
 
-                console.log(
-                  `Updated createdAt for duplicate pin from ${error.existingPin.createdAt.toISOString()} to ${pinboardTimestamp.toISOString()}: ${pinboardPin.href}`
+                logger.debug(
+                  { userId: user.id, pinId: error.existingPin.id },
+                  'Updated createdAt for duplicate pin'
                 )
               }
             } catch (updateError) {
-              console.error(
-                `Failed to update duplicate pin: ${pinboardPin.href}`,
-                updateError
+              logger.error(
+                { userId: user.id, err: safeError(updateError) },
+                'Failed to update duplicate pin timestamp'
               )
             }
           }
 
           skippedCount++
-          console.debug(`Skipped duplicate pin: ${pinboardPin.href}`)
         } else {
-          console.error(`Failed to import pin: ${pinboardPin.href}`, error)
+          logger.error(
+            { userId: user.id, err: safeError(error) },
+            'Failed to import pin'
+          )
           // Continue with next pin instead of failing entire import
         }
       }
     }
 
-    console.log(`Completed Pinboard import for user ${user.username}`, {
-      userId: user.id,
-      imported: importedCount,
-      skipped: skippedCount,
-      total: pinboardData.length,
-      tags: allTagNames.size,
-    })
+    logger.info(
+      {
+        userId: user.id,
+        imported: importedCount,
+        skipped: skippedCount,
+        total: pinboardData.length,
+        tags: allTagNames.size,
+      },
+      'Pinboard import completed'
+    )
 
     // Build success message with skipped count if applicable
     let successMessage = `Successfully imported ${importedCount} pins`
@@ -226,7 +233,10 @@ importRoute.post('/', async (c) => {
     sessionManager.setFlash('success', successMessage)
     return c.redirect('/pins')
   } catch (error) {
-    console.error('Import failed with unexpected error', error)
+    logger.error(
+      { userId: user.id, err: safeError(error) },
+      'Import failed with unexpected error'
+    )
     return c.html(
       <ImportPage
         user={user}

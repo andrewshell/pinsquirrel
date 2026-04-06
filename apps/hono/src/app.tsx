@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { csrf } from 'hono/csrf'
-import { logger } from 'hono/logger'
+import { logger, safeError } from './lib/logger.js'
 import { secureHeaders } from 'hono/secure-headers'
 
 import { NotFoundPage } from './views/pages/not-found'
@@ -25,7 +25,19 @@ import { sessionMiddleware } from './middleware/session'
 const app = new Hono()
 
 // Middleware
-app.use('*', logger())
+app.use('*', async (c, next) => {
+  const start = Date.now()
+  await next()
+  logger.info(
+    {
+      method: c.req.method,
+      path: c.req.path,
+      status: c.res.status,
+      duration: Date.now() - start,
+    },
+    'request'
+  )
+})
 app.use('*', secureHeaders())
 
 // Serve static files (must run before session middleware so CSS/JS load
@@ -91,7 +103,7 @@ function isDatabaseConnectionError(err: unknown): boolean {
 
 // Error handler for 500 errors
 app.onError((err, c) => {
-  console.error('Server error:', err)
+  logger.error({ err: safeError(err) }, 'Unhandled server error')
   const message = isDatabaseConnectionError(err)
     ? 'Unable to connect to the database. If you are running locally, make sure Docker is running and start the database with `pnpm db:up`.'
     : 'Something went wrong. Please try again later.'

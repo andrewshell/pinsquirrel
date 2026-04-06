@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { sql } from 'drizzle-orm'
 import { db } from '../lib/db.js'
+import { logger, safeError } from '../lib/logger.js'
 
 const healthRoutes = new Hono()
 
@@ -14,7 +15,7 @@ healthRoutes.get('/', async (c) => {
       database = 'connected'
     }
   } catch (e) {
-    console.error('[HEALTH] DB check failed:', e)
+    logger.error({ err: safeError(e) }, 'Health check: database unavailable')
     error = 'database unavailable'
   }
 
