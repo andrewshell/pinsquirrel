@@ -308,14 +308,14 @@ describe('AuthenticationService', () => {
 
       const loginInput = {
         username: 'testuser',
-        password: 'password123',
+        password: 'password12345',
       }
 
       const result = await authService.login(loginInput)
 
       expect(mockUserRepository.findByUsername).toHaveBeenCalledWith('testuser')
       expect(verifyPassword).toHaveBeenCalledWith(
-        'password123',
+        'password12345',
         '$2b$10$validhash'
       )
       expect(result).toEqual(userWithPassword)
@@ -327,7 +327,7 @@ describe('AuthenticationService', () => {
 
       const loginInput = {
         username: 'nonexistent',
-        password: 'password123',
+        password: 'password12345',
       }
 
       await expect(authService.login(loginInput)).rejects.toThrow(
@@ -335,7 +335,7 @@ describe('AuthenticationService', () => {
       )
       // verifyPassword should still be called (timing side-channel mitigation)
       expect(verifyPassword).toHaveBeenCalledWith(
-        'password123',
+        'password12345',
         'dummy_salt:dummy_key'
       )
     })
@@ -349,7 +349,7 @@ describe('AuthenticationService', () => {
 
       const loginInput = {
         username: 'testuser',
-        password: 'password123',
+        password: 'password12345',
       }
 
       await expect(authService.login(loginInput)).rejects.toThrow(
@@ -357,7 +357,7 @@ describe('AuthenticationService', () => {
       )
       // Should use dummy hash when passwordHash is null
       expect(verifyPassword).toHaveBeenCalledWith(
-        'password123',
+        'password12345',
         'dummy_salt:dummy_key'
       )
     })
@@ -389,7 +389,7 @@ describe('AuthenticationService', () => {
 
       const loginInput = {
         username: 'testuser',
-        password: 'password123',
+        password: 'password12345',
       }
 
       await expect(authService.login(loginInput)).rejects.toThrow(
@@ -400,7 +400,7 @@ describe('AuthenticationService', () => {
     it('should throw validation error for invalid username', async () => {
       const loginInput = {
         username: 'ab', // too short
-        password: 'password123',
+        password: 'password12345',
       }
 
       await expect(authService.login(loginInput)).rejects.toThrow(
@@ -415,7 +415,7 @@ describe('AuthenticationService', () => {
       }
 
       await expect(authService.login(loginInput)).rejects.toThrow(
-        'Password must be at least 8 characters'
+        'Password must be at least 12 characters'
       )
     })
   })
@@ -429,7 +429,7 @@ describe('AuthenticationService', () => {
       await authService.changePassword({
         userId: '123',
         currentPassword: 'currentpass123',
-        newPassword: 'newpass123',
+        newPassword: 'newpass1234567',
       })
 
       expect(mockUserRepository.findById).toHaveBeenCalledWith('123')
@@ -439,7 +439,7 @@ describe('AuthenticationService', () => {
       )
       expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
         username: mockUser.username,
-        passwordHash: 'hashed_newpass123',
+        passwordHash: 'hashed_newpass1234567',
         emailHash: mockUser.emailHash,
       })
     })
@@ -452,7 +452,7 @@ describe('AuthenticationService', () => {
         authService.changePassword({
           userId: '123',
           currentPassword: 'wrongpass123',
-          newPassword: 'newpass123',
+          newPassword: 'newpass1234567',
         })
       ).rejects.toThrow(InvalidCredentialsError)
 
@@ -466,7 +466,7 @@ describe('AuthenticationService', () => {
         authService.changePassword({
           userId: '999',
           currentPassword: 'currentpass123',
-          newPassword: 'newpass123',
+          newPassword: 'newpass1234567',
         })
       ).rejects.toThrow(InvalidCredentialsError)
     })
@@ -476,9 +476,9 @@ describe('AuthenticationService', () => {
         authService.changePassword({
           userId: '123',
           currentPassword: 'short', // too short
-          newPassword: 'newpass123',
+          newPassword: 'newpass1234567',
         })
-      ).rejects.toThrow('Password must be at least 8 characters')
+      ).rejects.toThrow('Password must be at least 12 characters')
     })
 
     it('should throw validation error for invalid new password', async () => {
@@ -488,7 +488,7 @@ describe('AuthenticationService', () => {
           currentPassword: 'currentpass123',
           newPassword: 'short', // too short
         })
-      ).rejects.toThrow('Password must be at least 8 characters')
+      ).rejects.toThrow('Password must be at least 12 characters')
     })
   })
 
@@ -742,7 +742,7 @@ describe('AuthenticationService', () => {
           token: 'mock-token',
           newPassword: 'short',
         })
-      ).rejects.toThrow('Password must be at least 8 characters')
+      ).rejects.toThrow('Password must be at least 12 characters')
     })
 
     it('should handle user deleted after token creation', async () => {

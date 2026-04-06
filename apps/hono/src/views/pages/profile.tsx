@@ -217,7 +217,7 @@ export function ProfilePage({
                   </p>
                 ) : (
                   <p class="mt-1 text-sm text-muted-foreground">
-                    Must be at least 8 characters
+                    Must be at least 12 characters
                   </p>
                 )}
               </div>

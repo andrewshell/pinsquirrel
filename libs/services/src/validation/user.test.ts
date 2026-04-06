@@ -19,12 +19,13 @@ describe('User Validation Schemas', () => {
 
   describe('passwordSchema', () => {
     it('should accept valid passwords', () => {
-      expect(passwordSchema.parse('password123')).toBe('password123')
-      expect(passwordSchema.parse('P@ssw0rd!')).toBe('P@ssw0rd!')
+      expect(passwordSchema.parse('password12345')).toBe('password12345')
+      expect(passwordSchema.parse('P@ssw0rd!abcd')).toBe('P@ssw0rd!abcd')
     })
 
     it('should reject invalid passwords', () => {
       expect(() => passwordSchema.parse('short')).toThrow() // too short
+      expect(() => passwordSchema.parse('only11chars')).toThrow() // under 12
       expect(() => passwordSchema.parse('a'.repeat(101))).toThrow() // too long
     })
   })
