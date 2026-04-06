@@ -38,8 +38,7 @@
   },
   "pnpm": {
     "overrides": {
-      "axios": ">=1.13.5",
-      "undici": ">=7.24.0"
+      "axios": ">=1.13.5"
     }
   },
   "lint-staged": {
