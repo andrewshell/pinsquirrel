@@ -12,8 +12,6 @@
     "types": ["node", "vitest/globals"],
     "outDir": "./dist",
     "rootDir": "./src",
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx"

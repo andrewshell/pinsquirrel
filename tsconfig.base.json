@@ -10,8 +10,6 @@
     "sourceMap": true,
     "types": ["node", "vitest/globals"],
     "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   }
 }
