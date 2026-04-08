@@ -71,6 +71,7 @@ const samplePins: Pin[] = [
     description:
       'An in-depth exploration of how squirrels cache food for winter, including the cognitive mapping they use to relocate hidden stashes.',
     readLater: false,
+    isPrivate: false,
     tagNames: ['squirrels', 'biology', 'winter'],
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 26),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 26),
@@ -82,6 +83,7 @@ const samplePins: Pin[] = [
     title: 'A read-later pin with no tags',
     description: null,
     readLater: true,
+    isPrivate: false,
     tagNames: [],
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),

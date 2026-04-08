@@ -6,6 +6,7 @@ export interface Pin extends AccessGateable {
   title: string
   description: string | null
   readLater: boolean
+  isPrivate: boolean
   tagNames: string[]
   createdAt: Date
   updatedAt: Date

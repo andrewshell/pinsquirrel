@@ -5,6 +5,7 @@ interface PinCardProps {
   pin: Pin
   viewSize?: 'expanded' | 'compact'
   searchParams?: string
+  baseUrl?: string
 }
 
 // Format relative time
@@ -36,47 +37,55 @@ function getDomain(url: string): string {
 }
 
 // Build tag filter URL
-function buildTagUrl(tagName: string, currentParams: string): string {
+function buildTagUrl(
+  tagName: string,
+  currentParams: string,
+  baseUrl: string
+): string {
   const params = new URLSearchParams(currentParams)
   params.set('tag', tagName)
   params.delete('page')
-  return params.toString()
+  return `${baseUrl}?${params.toString()}`
 }
 
 // Build action URL preserving query params
 function buildActionUrl(
   pinId: string,
   action: 'edit' | 'delete',
-  searchParams: string
+  searchParams: string,
+  baseUrl: string
 ): string {
-  return `/pins/${pinId}/${action}${searchParams ? `?${searchParams}` : ''}`
+  return `${baseUrl}/${pinId}/${action}${searchParams ? `?${searchParams}` : ''}`
 }
 
 // Build delete-confirm URL with view size
 function buildDeleteConfirmUrl(
   pinId: string,
   viewSize: string,
-  searchParams: string
+  searchParams: string,
+  baseUrl: string
 ): string {
   const params = new URLSearchParams(searchParams)
   params.set('view', viewSize)
-  return `/pins/${pinId}/delete-confirm?${params.toString()}`
+  return `${baseUrl}/${pinId}/delete-confirm?${params.toString()}`
 }
 
 interface PinDeleteConfirmProps {
   pin: Pin
   viewSize: string
   searchParams: string
+  baseUrl?: string
 }
 
 export const PinDeleteConfirm: FC<PinDeleteConfirmProps> = ({
   pin,
   viewSize,
   searchParams,
+  baseUrl = '/pins',
 }) => {
   const cardParams = new URLSearchParams(searchParams)
   cardParams.set('view', viewSize)
-  const cardUrl = `/pins/${pin.id}/card?${cardParams.toString()}`
+  const cardUrl = `${baseUrl}/${pin.id}/card?${cardParams.toString()}`
 
   return (
     <div
@@ -89,10 +98,10 @@ export const PinDeleteConfirm: FC<PinDeleteConfirmProps> = ({
           Delete &ldquo;<strong>{pin.title}</strong>&rdquo;?
         </span>
         <div class="flex gap-2 flex-shrink-0">
-          <form method="post" action={`/pins/${pin.id}/delete`}>
+          <form method="post" action={`${baseUrl}/${pin.id}/delete`}>
             <button
               type="submit"
-              hx-delete={`/pins/${pin.id}${searchParams ? `?${searchParams}` : ''}`}
+              hx-delete={`${baseUrl}/${pin.id}${searchParams ? `?${searchParams}` : ''}`}
               hx-target="#pins-content"
               hx-swap="innerHTML"
               class="text-destructive hover:text-destructive/80 font-bold hover:underline"
@@ -101,7 +110,7 @@ export const PinDeleteConfirm: FC<PinDeleteConfirmProps> = ({
             </button>
           </form>
           <a
-            href="/pins"
+            href={baseUrl}
             hx-get={cardUrl}
             hx-target={`#pin-${pin.id}`}
             hx-swap="outerHTML"
@@ -119,6 +128,7 @@ export const PinCard: FC<PinCardProps> = ({
   pin,
   viewSize = 'expanded',
   searchParams = '',
+  baseUrl = '/pins',
 }) => {
   // Compact view rendering
   if (viewSize === 'compact') {
@@ -155,11 +165,15 @@ export const PinCard: FC<PinCardProps> = ({
                   {pin.tagNames.map((tagName, index) => (
                     <>
                       <a
-                        href={`/pins?${buildTagUrl(tagName, searchParams)}`}
-                        hx-get={`/pins?${buildTagUrl(tagName, searchParams)}`}
+                        href={buildTagUrl(tagName, searchParams, baseUrl)}
+                        hx-get={buildTagUrl(tagName, searchParams, baseUrl)}
                         hx-target="#pins-content"
                         hx-swap="innerHTML"
-                        hx-push-url={`/pins?${buildTagUrl(tagName, searchParams)}`}
+                        hx-push-url={buildTagUrl(
+                          tagName,
+                          searchParams,
+                          baseUrl
+                        )}
                         class="text-primary hover:text-primary/80 hover:underline"
                       >
                         {tagName}
@@ -174,14 +188,19 @@ export const PinCard: FC<PinCardProps> = ({
             {/* Right: Actions */}
             <div class="flex gap-2 text-muted-foreground flex-shrink-0">
               <a
-                href={buildActionUrl(pin.id, 'edit', searchParams)}
+                href={buildActionUrl(pin.id, 'edit', searchParams, baseUrl)}
                 class="text-primary hover:text-primary/80 font-bold hover:underline"
               >
                 edit
               </a>
               <a
-                href={buildActionUrl(pin.id, 'delete', searchParams)}
-                hx-get={buildDeleteConfirmUrl(pin.id, viewSize, searchParams)}
+                href={buildActionUrl(pin.id, 'delete', searchParams, baseUrl)}
+                hx-get={buildDeleteConfirmUrl(
+                  pin.id,
+                  viewSize,
+                  searchParams,
+                  baseUrl
+                )}
                 hx-target={`#pin-${pin.id}`}
                 hx-swap="outerHTML"
                 class="text-destructive hover:text-destructive/80 font-bold hover:underline"
@@ -242,11 +261,11 @@ export const PinCard: FC<PinCardProps> = ({
             {pin.tagNames.map((tagName, index) => (
               <>
                 <a
-                  href={`/pins?${buildTagUrl(tagName, searchParams)}`}
-                  hx-get={`/pins?${buildTagUrl(tagName, searchParams)}`}
+                  href={buildTagUrl(tagName, searchParams, baseUrl)}
+                  hx-get={buildTagUrl(tagName, searchParams, baseUrl)}
                   hx-target="#pins-content"
                   hx-swap="innerHTML"
-                  hx-push-url={`/pins?${buildTagUrl(tagName, searchParams)}`}
+                  hx-push-url={buildTagUrl(tagName, searchParams, baseUrl)}
                   class="text-primary hover:text-primary/80 hover:underline cursor-pointer"
                 >
                   {tagName}
@@ -265,14 +284,19 @@ export const PinCard: FC<PinCardProps> = ({
           {/* Actions */}
           <div class="flex gap-2">
             <a
-              href={buildActionUrl(pin.id, 'edit', searchParams)}
+              href={buildActionUrl(pin.id, 'edit', searchParams, baseUrl)}
               class="text-primary hover:text-primary/80 font-bold hover:underline"
             >
               edit
             </a>
             <a
-              href={buildActionUrl(pin.id, 'delete', searchParams)}
-              hx-get={buildDeleteConfirmUrl(pin.id, viewSize, searchParams)}
+              href={buildActionUrl(pin.id, 'delete', searchParams, baseUrl)}
+              hx-get={buildDeleteConfirmUrl(
+                pin.id,
+                viewSize,
+                searchParams,
+                baseUrl
+              )}
               hx-target={`#pin-${pin.id}`}
               hx-swap="outerHTML"
               class="text-destructive hover:text-destructive/80 font-bold hover:underline"
@@ -285,7 +309,7 @@ export const PinCard: FC<PinCardProps> = ({
               <button
                 type="button"
                 class="text-primary hover:text-primary/80 font-bold hover:underline"
-                hx-post={`/pins/${pin.id}/toggle-read`}
+                hx-post={`${baseUrl}/${pin.id}/toggle-read`}
                 hx-swap="outerHTML"
                 hx-target={`#pin-${pin.id}`}
               >

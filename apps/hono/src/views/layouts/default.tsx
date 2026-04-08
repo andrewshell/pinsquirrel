@@ -17,6 +17,7 @@ interface DefaultLayoutProps {
   user: User | null
   currentPath?: string
   width?: ContentWidth
+  privateMode?: boolean
 }
 
 export const DefaultLayout: FC<PropsWithChildren<DefaultLayoutProps>> = ({
@@ -25,12 +26,13 @@ export const DefaultLayout: FC<PropsWithChildren<DefaultLayoutProps>> = ({
   user,
   currentPath,
   width = 'wide',
+  privateMode = false,
 }) => {
   const containerClass = `${widthClasses[width]} mx-auto px-4 py-6`
 
   return (
-    <BaseLayout title={title}>
-      <Header user={user} currentPath={currentPath} />
+    <BaseLayout title={title} privateMode={privateMode}>
+      <Header user={user} currentPath={currentPath} privateMode={privateMode} />
       <main class="flex-1">
         <div class={containerClass}>{children}</div>
       </main>

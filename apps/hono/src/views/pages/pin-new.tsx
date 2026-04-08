@@ -16,10 +16,13 @@ interface PinNewPageProps {
   title?: string
   description?: string
   readLater?: boolean
+  isPrivate?: boolean
   tags?: string
   duplicatePinId?: string
   // Query params to preserve on redirect
   returnParams?: string
+  baseUrl?: string
+  privateMode?: boolean
 }
 
 export const PinNewPage: FC<PinNewPageProps> = ({
@@ -31,18 +34,22 @@ export const PinNewPage: FC<PinNewPageProps> = ({
   title = '',
   description = '',
   readLater = false,
+  isPrivate = false,
   tags = '',
   duplicatePinId,
   returnParams = '',
+  baseUrl = '/pins',
+  privateMode = false,
 }) => {
-  const backUrl = returnParams ? `/pins?${returnParams}` : '/pins'
+  const backUrl = returnParams ? `${baseUrl}?${returnParams}` : baseUrl
 
   return (
     <DefaultLayout
       title="Create New Pin"
       user={user}
-      currentPath="/pins/new"
+      currentPath={`${baseUrl}/new`}
       width="form"
+      privateMode={privateMode}
     >
       {/* Back link */}
       <div class="mb-6">
@@ -71,12 +78,13 @@ export const PinNewPage: FC<PinNewPageProps> = ({
         </CardHeader>
         <CardContent>
           <PinForm
-            action="/pins/new"
+            action={`${baseUrl}/new`}
             submitLabel="Create Pin"
             url={url}
             title={title}
             description={description}
             readLater={readLater}
+            isPrivate={isPrivate}
             tags={tags}
             userTags={userTags}
             errors={errors}

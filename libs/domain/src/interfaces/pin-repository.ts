@@ -2,6 +2,7 @@ import type { Pin, CreatePinData, UpdatePinData } from '../entities/pin.js'
 
 export interface PinFilter {
   readLater?: boolean
+  isPrivate?: boolean
   tag?: string
   tagId?: string
   url?: string

@@ -40,7 +40,10 @@ exportRoute.get('/pinboard.json', async (c) => {
   }
 
   const ac = new AccessControl(user)
-  const pins = await pinService.getUserPins(ac)
+  const allPins = await pinService.getUserPins(ac)
+
+  // Exclude private pins from export
+  const pins = allPins.filter((pin) => !pin.isPrivate)
 
   const pinboardData = pins.map((pin) => ({
     href: pin.url,

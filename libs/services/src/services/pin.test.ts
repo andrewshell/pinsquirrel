@@ -31,6 +31,7 @@ describe('PinService', () => {
     title: 'Example',
     description: 'Description',
     readLater: false,
+    isPrivate: false,
     tagNames: ['javascript'],
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
@@ -87,6 +88,7 @@ describe('PinService', () => {
           title: 'Example',
           description: 'Description',
           readLater: false,
+          isPrivate: false,
           tagNames: ['javascript'],
         }
       )
@@ -102,6 +104,7 @@ describe('PinService', () => {
         title: 'Example',
         description: 'Description',
         readLater: false,
+        isPrivate: false,
         tagNames: ['javascript'],
       })
     })
@@ -116,6 +119,7 @@ describe('PinService', () => {
           title: 'Example',
           description: null,
           readLater: false,
+          isPrivate: false,
           tagNames: [],
         })
       ).rejects.toThrow(DuplicatePinError)
@@ -129,6 +133,7 @@ describe('PinService', () => {
           title: 'Example',
           description: null,
           readLater: false,
+          isPrivate: false,
           tagNames: [],
         })
       ).rejects.toThrow('Must be a valid URL')
@@ -146,6 +151,7 @@ describe('PinService', () => {
           title: 'Example',
           description: null,
           readLater: false,
+          isPrivate: false,
           tagNames: [],
         }
       )
@@ -165,6 +171,7 @@ describe('PinService', () => {
           title: 'Example',
           description: null,
           readLater: false,
+          isPrivate: false,
           tagNames: [],
         }
       )
@@ -190,6 +197,7 @@ describe('PinService', () => {
           title: 'Updated Title',
           description: 'Description',
           readLater: false,
+          isPrivate: false,
           tagNames: ['javascript'],
         }
       )
@@ -202,6 +210,7 @@ describe('PinService', () => {
         title: 'Updated Title', // updated field
         description: 'Description', // from existing pin
         readLater: false, // from existing pin
+        isPrivate: false, // from existing pin
         tagNames: ['javascript'], // from existing pin
       })
     })
@@ -218,6 +227,7 @@ describe('PinService', () => {
           title: 'Updated',
           description: null,
           readLater: false,
+          isPrivate: false,
           tagNames: [],
         })
       ).rejects.toThrow(UnauthorizedPinAccessError)
@@ -234,6 +244,7 @@ describe('PinService', () => {
           title: 'Updated',
           description: null,
           readLater: false,
+          isPrivate: false,
           tagNames: [],
         })
       ).rejects.toThrow(PinNotFoundError)
@@ -254,6 +265,7 @@ describe('PinService', () => {
           title: 'Example',
           description: 'Description',
           readLater: false,
+          isPrivate: false,
           tagNames: ['javascript'],
         })
       ).rejects.toThrow(DuplicatePinError)
@@ -275,6 +287,7 @@ describe('PinService', () => {
           title: 'Updated Title',
           description: 'Description',
           readLater: false,
+          isPrivate: false,
           tagNames: ['javascript'],
         }
       )
@@ -299,6 +312,7 @@ describe('PinService', () => {
           title: 'Updated Title',
           description: 'Description',
           readLater: false,
+          isPrivate: false,
           tagNames: [],
         }
       )
@@ -315,6 +329,7 @@ describe('PinService', () => {
           title: 'Example',
           description: null,
           readLater: false,
+          isPrivate: false,
           tagNames: [],
         })
       ).rejects.toThrow('Must be a valid URL')
@@ -336,6 +351,7 @@ describe('PinService', () => {
           title: 'Updated with Tags',
           description: 'Description',
           readLater: false,
+          isPrivate: false,
           tagNames: ['javascript', 'typescript'],
         }
       )
@@ -355,6 +371,7 @@ describe('PinService', () => {
           title: 'Updated Title',
           description: 'Description',
           readLater: false,
+          isPrivate: false,
           tagNames: ['javascript'],
         })
       ).rejects.toThrow(PinNotFoundError)

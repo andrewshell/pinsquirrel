@@ -3,6 +3,7 @@ import { html } from 'hono/html'
 
 interface BaseLayoutProps {
   title: string
+  privateMode?: boolean
 }
 
 // Script to detect system dark mode preference and apply .dark class
@@ -38,9 +39,11 @@ const darkModeScript = html`
 export const BaseLayout: FC<PropsWithChildren<BaseLayoutProps>> = ({
   children,
   title,
+  privateMode = false,
 }) => {
+  const htmlClass = privateMode ? 'private-mode' : ''
   return html`<!doctype html>
-    <html lang="en">
+    <html lang="en" class="${htmlClass}">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -70,6 +73,9 @@ export const BaseLayout: FC<PropsWithChildren<BaseLayoutProps>> = ({
         <script src="/static/tag-input-vanilla.js" defer></script>
         <script src="/static/tag-select.js" defer></script>
         <script src="/static/metadata-fetch.js" defer></script>
+        ${privateMode
+          ? html`<script src="/static/private-mode.js" defer></script>`
+          : ''}
       </head>
       <body class="bg-background text-foreground min-h-screen flex flex-col">
         ${children}

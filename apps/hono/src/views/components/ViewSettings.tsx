@@ -5,6 +5,7 @@ interface ViewSettingsProps {
   sortDirection: 'asc' | 'desc'
   viewSize: 'expanded' | 'compact'
   searchParams: string
+  baseUrl?: string
 }
 
 // Build URL with updated view setting
@@ -60,6 +61,7 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
   sortDirection,
   viewSize,
   searchParams,
+  baseUrl = '/pins',
 }) => {
   return (
     <div class="flex items-center gap-3 mb-4">
@@ -91,21 +93,21 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
           data-dropdown="menu"
         >
           <a
-            href={`/pins?${buildViewSettingUrl(searchParams, 'sort', 'created')}`}
-            hx-get={`/pins?${buildViewSettingUrl(searchParams, 'sort', 'created')}`}
+            href={`${baseUrl}?${buildViewSettingUrl(searchParams, 'sort', 'created')}`}
+            hx-get={`${baseUrl}?${buildViewSettingUrl(searchParams, 'sort', 'created')}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
-            hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'sort', 'created')}`}
+            hx-push-url={`${baseUrl}?${buildViewSettingUrl(searchParams, 'sort', 'created')}`}
             class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
           >
             Created
           </a>
           <a
-            href={`/pins?${buildViewSettingUrl(searchParams, 'sort', 'title')}`}
-            hx-get={`/pins?${buildViewSettingUrl(searchParams, 'sort', 'title')}`}
+            href={`${baseUrl}?${buildViewSettingUrl(searchParams, 'sort', 'title')}`}
+            hx-get={`${baseUrl}?${buildViewSettingUrl(searchParams, 'sort', 'title')}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
-            hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'sort', 'title')}`}
+            hx-push-url={`${baseUrl}?${buildViewSettingUrl(searchParams, 'sort', 'title')}`}
             class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
           >
             Title
@@ -141,21 +143,21 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
           data-dropdown="menu"
         >
           <a
-            href={`/pins?${buildViewSettingUrl(searchParams, 'direction', 'asc')}`}
-            hx-get={`/pins?${buildViewSettingUrl(searchParams, 'direction', 'asc')}`}
+            href={`${baseUrl}?${buildViewSettingUrl(searchParams, 'direction', 'asc')}`}
+            hx-get={`${baseUrl}?${buildViewSettingUrl(searchParams, 'direction', 'asc')}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
-            hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'direction', 'asc')}`}
+            hx-push-url={`${baseUrl}?${buildViewSettingUrl(searchParams, 'direction', 'asc')}`}
             class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
           >
             Ascending
           </a>
           <a
-            href={`/pins?${buildViewSettingUrl(searchParams, 'direction', 'desc')}`}
-            hx-get={`/pins?${buildViewSettingUrl(searchParams, 'direction', 'desc')}`}
+            href={`${baseUrl}?${buildViewSettingUrl(searchParams, 'direction', 'desc')}`}
+            hx-get={`${baseUrl}?${buildViewSettingUrl(searchParams, 'direction', 'desc')}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
-            hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'direction', 'desc')}`}
+            hx-push-url={`${baseUrl}?${buildViewSettingUrl(searchParams, 'direction', 'desc')}`}
             class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
           >
             Descending
@@ -191,21 +193,21 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
           data-dropdown="menu"
         >
           <a
-            href={`/pins?${buildViewSettingUrl(searchParams, 'size', 'expanded')}`}
-            hx-get={`/pins?${buildViewSettingUrl(searchParams, 'size', 'expanded')}`}
+            href={`${baseUrl}?${buildViewSettingUrl(searchParams, 'size', 'expanded')}`}
+            hx-get={`${baseUrl}?${buildViewSettingUrl(searchParams, 'size', 'expanded')}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
-            hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'size', 'expanded')}`}
+            hx-push-url={`${baseUrl}?${buildViewSettingUrl(searchParams, 'size', 'expanded')}`}
             class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
           >
             Expanded
           </a>
           <a
-            href={`/pins?${buildViewSettingUrl(searchParams, 'size', 'compact')}`}
-            hx-get={`/pins?${buildViewSettingUrl(searchParams, 'size', 'compact')}`}
+            href={`${baseUrl}?${buildViewSettingUrl(searchParams, 'size', 'compact')}`}
+            hx-get={`${baseUrl}?${buildViewSettingUrl(searchParams, 'size', 'compact')}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
-            hx-push-url={`/pins?${buildViewSettingUrl(searchParams, 'size', 'compact')}`}
+            hx-push-url={`${baseUrl}?${buildViewSettingUrl(searchParams, 'size', 'compact')}`}
             class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
           >
             Compact

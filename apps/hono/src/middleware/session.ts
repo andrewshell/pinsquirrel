@@ -7,6 +7,7 @@ import { sessionRepository, userRepository } from '../lib/db'
 const SESSION_COOKIE_NAME = '__session'
 const SESSION_DURATION_PERSISTENT = 30 * 24 * 60 * 60 * 1000 // 30 days
 const SESSION_DURATION_TEMPORARY = 24 * 60 * 60 * 1000 // 24 hours (for browser session)
+const PRIVATE_MODE_DURATION = 15 * 60 * 1000 // 15 minutes
 
 // Flash message types
 export type FlashType = 'success' | 'error' | 'info' | 'warning'
@@ -20,6 +21,7 @@ export interface SessionData {
     type: FlashType
     message: string
   }
+  privateUnlockedAt?: number
   [key: string]: unknown
 }
 
@@ -51,6 +53,11 @@ export interface SessionManager {
 
   // Check if user is authenticated
   isAuthenticated(): boolean
+
+  // Private mode methods
+  unlockPrivateMode(): void
+  lockPrivateMode(): void
+  isPrivateUnlocked(): boolean
 }
 
 // Variables stored in context
@@ -188,6 +195,27 @@ export function sessionMiddleware(): MiddlewareHandler {
           sessionModified = true
         }
         return flash
+      },
+
+      unlockPrivateMode() {
+        if (sessionData) {
+          sessionData = { ...sessionData, privateUnlockedAt: Date.now() }
+          sessionModified = true
+        }
+      },
+
+      lockPrivateMode() {
+        if (sessionData) {
+          sessionData = { ...sessionData, privateUnlockedAt: undefined }
+          sessionModified = true
+        }
+      },
+
+      isPrivateUnlocked() {
+        if (!sessionData?.privateUnlockedAt) return false
+        return (
+          Date.now() - sessionData.privateUnlockedAt < PRIVATE_MODE_DURATION
+        )
       },
     }
 

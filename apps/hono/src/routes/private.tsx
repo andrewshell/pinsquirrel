@@ -1,16 +1,15 @@
 import { Hono } from 'hono'
-import type { Context } from 'hono'
 import {
   AccessControl,
-  type PinFilter,
-  type User,
   ValidationError,
   DuplicatePinError,
   PinNotFoundError,
   UnauthorizedPinAccessError,
+  InvalidCredentialsError,
 } from '@pinsquirrel/domain'
-import { pinService, tagService } from '../lib/services'
+import { authService, pinService, tagService } from '../lib/services'
 import { getSessionManager, requireAuth } from '../middleware/session'
+import { requirePrivateUnlock } from '../middleware/private-mode'
 import { PinCard, PinDeleteConfirm } from '../views/components/PinCard'
 import { PinForm } from '../views/components/PinForm'
 import { PinDeletePage } from '../views/pages/pin-delete'
@@ -18,99 +17,80 @@ import { PinEditPage } from '../views/pages/pin-edit'
 import { PinNewPage } from '../views/pages/pin-new'
 import { PinsPage } from '../views/pages/pins'
 import { PinsContentPartial } from '../views/partials/pins-content'
+import { PrivateUnlockPage } from '../views/pages/private-unlock'
+import { parsePinQueryParams, fetchUserPins } from './pins'
 
-const pins = new Hono()
+const BASE_URL = '/private/pins'
 
-// Apply auth middleware to all pin routes
-pins.use('*', requireAuth())
+const privateRouter = new Hono()
 
-// Helper to parse pin query parameters
-export function parsePinQueryParams(c: Context) {
-  const url = new URL(c.req.url)
-  const tag = url.searchParams.get('tag') || undefined
-  const search = url.searchParams.get('search') || undefined
-  const unreadParam = url.searchParams.get('unread')
-  const notagsParam = url.searchParams.get('notags')
-  const pageParam = url.searchParams.get('page')
-  const sizeParam = url.searchParams.get('size')
-  const sortParam = url.searchParams.get('sort')
-  const directionParam = url.searchParams.get('direction')
+// All private routes require authentication
+privateRouter.use('*', requireAuth())
 
-  // Build filter — exclude private pins from normal view
-  const filter: PinFilter = { isPrivate: false }
+// GET /private/unlock — Password form
+privateRouter.get('/unlock', async (c) => {
+  const sessionManager = getSessionManager(c)
+  const user = await sessionManager.getUser()
 
-  if (tag) {
-    filter.tag = tag
+  if (!user) {
+    return c.redirect('/signin')
   }
 
-  if (search) {
-    filter.search = search
+  // If already unlocked, redirect to private pins
+  if (sessionManager.isPrivateUnlocked()) {
+    return c.redirect(BASE_URL)
   }
 
-  // Handle notags filter
-  const noTags = notagsParam === 'true'
-  if (noTags) {
-    filter.noTags = true
+  return c.html(<PrivateUnlockPage user={user} />)
+})
+
+// POST /private/unlock — Verify password and unlock
+privateRouter.post('/unlock', async (c) => {
+  const sessionManager = getSessionManager(c)
+  const user = await sessionManager.getUser()
+
+  if (!user) {
+    return c.redirect('/signin')
   }
 
-  // Handle unread filter
-  let readFilter: 'all' | 'unread' | 'read' = 'all'
-  if (unreadParam === 'true') {
-    filter.readLater = true
-    readFilter = 'unread'
-  } else if (unreadParam === 'false') {
-    filter.readLater = false
-    readFilter = 'read'
+  const formData = await c.req.parseBody()
+  const password =
+    typeof formData.password === 'string' ? formData.password : ''
+
+  try {
+    await authService.login({ username: user.username, password })
+    sessionManager.unlockPrivateMode()
+    return c.redirect(BASE_URL)
+  } catch (error) {
+    if (
+      error instanceof InvalidCredentialsError ||
+      error instanceof ValidationError
+    ) {
+      return c.html(<PrivateUnlockPage user={user} error="Invalid password." />)
+    }
+    throw error
+  }
+})
+
+// POST /private/lock — Lock private mode and redirect
+privateRouter.post('/lock', (c) => {
+  const sessionManager = getSessionManager(c)
+  sessionManager.lockPrivateMode()
+
+  // For beacon requests (tab close), return 204
+  if (c.req.header('Content-Type')?.includes('text/plain')) {
+    return c.body(null, 204)
   }
 
-  // Handle sort settings
-  const sortBy: 'created' | 'title' =
-    sortParam === 'title' ? 'title' : 'created'
-  const sortDirection: 'asc' | 'desc' =
-    directionParam === 'asc' ? 'asc' : 'desc'
+  return c.redirect('/pins')
+})
 
-  filter.sortBy = sortBy
-  filter.sortDirection = sortDirection
+// All pin routes below require private unlock
+privateRouter.use('/pins/*', requirePrivateUnlock())
+privateRouter.use('/pins', requirePrivateUnlock())
 
-  // Parse page number
-  const page = pageParam ? parseInt(pageParam, 10) : 1
-
-  // Parse view size
-  const viewSize: 'expanded' | 'compact' =
-    sizeParam === 'compact' ? 'compact' : 'expanded'
-
-  // Build search params string for preserving filters (exclude page for base params)
-  const searchParams = url.search.replace(/^\?/, '')
-
-  return {
-    tag,
-    search,
-    readFilter,
-    filter,
-    page,
-    viewSize,
-    sortBy,
-    sortDirection,
-    searchParams,
-    noTags,
-  }
-}
-
-// Helper to fetch pins for a user
-export async function fetchUserPins(
-  user: User,
-  filter: PinFilter,
-  page: number
-) {
-  const ac = new AccessControl(user)
-  return pinService.getUserPinsWithPagination(ac, filter, {
-    page,
-    pageSize: 25,
-  })
-}
-
-// GET /pins - List all pins with filtering and pagination
-pins.get('/', async (c) => {
+// GET /private/pins — List private pins
+privateRouter.get('/pins', async (c) => {
   const sessionManager = getSessionManager(c)
   const user = await sessionManager.getUser()
   const isHtmx = !!c.req.header('HX-Request')
@@ -136,6 +116,9 @@ pins.get('/', async (c) => {
     noTags,
   } = parsePinQueryParams(c)
 
+  // Override to show only private pins
+  filter.isPrivate = true
+
   const result = await fetchUserPins(user, filter, page)
 
   if (isHtmx) {
@@ -152,7 +135,7 @@ pins.get('/', async (c) => {
         sortBy={sortBy}
         sortDirection={sortDirection}
         noTags={noTags}
-        baseUrl="/pins"
+        baseUrl={BASE_URL}
       />
     )
   }
@@ -174,13 +157,14 @@ pins.get('/', async (c) => {
       sortDirection={sortDirection}
       noTags={noTags}
       flash={flash}
-      baseUrl="/pins"
+      baseUrl={BASE_URL}
+      privateMode
     />
   )
 })
 
-// GET /pins/new - Show pin creation form
-pins.get('/new', async (c) => {
+// GET /private/pins/new — Create private pin form
+privateRouter.get('/pins/new', async (c) => {
   const sessionManager = getSessionManager(c)
   const user = await sessionManager.getUser()
 
@@ -189,32 +173,7 @@ pins.get('/new', async (c) => {
   }
 
   const ac = new AccessControl(user)
-
-  // Get URL params for bookmarklet integration
-  const url = new URL(c.req.url)
-  const prefillUrl = url.searchParams.get('url') || ''
-  const prefillTitle = url.searchParams.get('title') || ''
-  const prefillDescription = url.searchParams.get('description') || ''
-  const prefillTag = url.searchParams.get('tag') || ''
-
-  // Check if URL already exists for this user (bookmarklet redirect to edit)
-  if (prefillUrl) {
-    const existingPins = await pinService.getUserPinsWithPagination(
-      ac,
-      { url: prefillUrl },
-      { page: 1, pageSize: 1 }
-    )
-
-    if (existingPins.pins.length > 0) {
-      // URL already exists, redirect to edit form
-      return c.redirect(`/pins/${existingPins.pins[0].id}/edit`)
-    }
-  }
-
-  // Fetch user's existing tags for display
   const userTags = await tagService.getUserTags(ac, user.id)
-
-  // Get flash message if any
   const flash = sessionManager.getFlash()
 
   return c.html(
@@ -222,16 +181,15 @@ pins.get('/new', async (c) => {
       user={user}
       flash={flash}
       userTags={userTags.map((t) => t.name)}
-      url={prefillUrl}
-      title={prefillTitle}
-      description={prefillDescription}
-      tags={prefillTag}
+      isPrivate
+      baseUrl={BASE_URL}
+      privateMode
     />
   )
 })
 
-// POST /pins/new - Create a new pin
-pins.post('/new', async (c) => {
+// POST /private/pins/new — Create a private pin
+privateRouter.post('/pins/new', async (c) => {
   const sessionManager = getSessionManager(c)
   const user = await sessionManager.getUser()
 
@@ -240,11 +198,8 @@ pins.post('/new', async (c) => {
   }
 
   const ac = new AccessControl(user)
-
-  // Parse form data
   const formData = await c.req.parseBody()
 
-  // Helper to safely extract string from form data (handles File | string | array)
   const getString = (value: unknown): string => {
     if (typeof value === 'string') return value
     if (Array.isArray(value)) return getString(value[0])
@@ -255,48 +210,44 @@ pins.post('/new', async (c) => {
   const title = getString(formData.title)
   const description = getString(formData.description) || null
   const readLater = getString(formData.readLater) === 'true'
-  const isPrivate = getString(formData.isPrivate) === 'true'
   const tagsInput = getString(formData.tags)
 
-  // Parse tags from comma-separated string
   const tagNames = tagsInput
     .split(',')
     .map((t) => t.trim())
     .filter((t) => t.length > 0)
 
-  // Fetch user's tags for re-rendering form on error
   const userTags = await tagService.getUserTags(ac, user.id)
 
   try {
-    // Create the pin using service
     await pinService.createPin(ac, {
       userId: user.id,
       url: pinUrl,
       title,
       description,
       readLater,
-      isPrivate,
+      isPrivate: true,
       tagNames,
     })
 
-    // Redirect to pins list with success message
-    sessionManager.setFlash('success', 'Pin created successfully!')
+    sessionManager.setFlash('success', 'Private pin created successfully!')
     if (c.req.header('HX-Request')) {
-      c.header('HX-Redirect', '/pins')
+      c.header('HX-Redirect', BASE_URL)
       return c.body(null)
     }
-    return c.redirect('/pins')
+    return c.redirect(BASE_URL)
   } catch (error) {
     const isHtmx = !!c.req.header('HX-Request')
     const userTagNames = userTags.map((t) => t.name)
 
     const formProps = {
-      action: '/pins/new' as const,
+      action: `${BASE_URL}/new` as const,
       submitLabel: 'Create Pin' as const,
       url: pinUrl,
       title,
       description: description || '',
       readLater,
+      isPrivate: true,
       tags: tagsInput,
       userTags: userTagNames,
     }
@@ -314,7 +265,10 @@ pins.post('/new', async (c) => {
           title={title}
           description={description || ''}
           readLater={readLater}
+          isPrivate
           tags={tagsInput}
+          baseUrl={BASE_URL}
+          privateMode
         />
       )
     }
@@ -335,12 +289,14 @@ pins.post('/new', async (c) => {
           title={title}
           description={description || ''}
           readLater={readLater}
+          isPrivate
           tags={tagsInput}
+          baseUrl={BASE_URL}
+          privateMode
         />
       )
     }
 
-    // Generic error
     const errors = { _form: ['Failed to create pin. Please try again.'] }
     if (isHtmx) {
       return c.html(<PinForm {...formProps} errors={errors} />, 500)
@@ -354,15 +310,18 @@ pins.post('/new', async (c) => {
         title={title}
         description={description || ''}
         readLater={readLater}
+        isPrivate
         tags={tagsInput}
+        baseUrl={BASE_URL}
+        privateMode
       />,
       500
     )
   }
 })
 
-// GET /pins/:id/edit - Show pin edit form
-pins.get('/:id/edit', async (c) => {
+// GET /private/pins/:id/edit
+privateRouter.get('/pins/:id/edit', async (c) => {
   const sessionManager = getSessionManager(c)
   const user = await sessionManager.getUser()
 
@@ -372,18 +331,15 @@ pins.get('/:id/edit', async (c) => {
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
-
   const url = new URL(c.req.url)
   const returnParams = url.search.replace(/^\?/, '')
 
   try {
-    // Fetch the pin and user's tags
     const [pin, userTags] = await Promise.all([
       pinService.getPin(ac, pinId),
       tagService.getUserTags(ac, user.id),
     ])
 
-    // Get flash message if any
     const flash = sessionManager.getFlash()
 
     return c.html(
@@ -393,6 +349,8 @@ pins.get('/:id/edit', async (c) => {
         flash={flash}
         userTags={userTags.map((t) => t.name)}
         returnParams={returnParams}
+        baseUrl={BASE_URL}
+        privateMode
       />
     )
   } catch (error) {
@@ -406,8 +364,8 @@ pins.get('/:id/edit', async (c) => {
   }
 })
 
-// POST /pins/:id/edit - Update a pin
-pins.post('/:id/edit', async (c) => {
+// POST /private/pins/:id/edit
+privateRouter.post('/pins/:id/edit', async (c) => {
   const sessionManager = getSessionManager(c)
   const user = await sessionManager.getUser()
 
@@ -417,16 +375,13 @@ pins.post('/:id/edit', async (c) => {
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
-
   const requestUrl = new URL(c.req.url)
   const returnParams = requestUrl.search.replace(/^\?/, '')
-  const redirectTarget = returnParams ? `/pins?${returnParams}` : '/pins'
-  const editAction = `/pins/${pinId}/edit${returnParams ? `?${returnParams}` : ''}`
+  const redirectTarget = returnParams ? `${BASE_URL}?${returnParams}` : BASE_URL
+  const editAction = `${BASE_URL}/${pinId}/edit${returnParams ? `?${returnParams}` : ''}`
 
-  // Parse form data
   const formData = await c.req.parseBody()
 
-  // Helper to safely extract string from form data
   const getString = (value: unknown): string => {
     if (typeof value === 'string') return value
     if (Array.isArray(value)) return getString(value[0])
@@ -440,20 +395,16 @@ pins.post('/:id/edit', async (c) => {
   const isPrivate = getString(formData.isPrivate) === 'true'
   const tagsInput = getString(formData.tags)
 
-  // Parse tags from comma-separated string
   const tagNames = tagsInput
     .split(',')
     .map((t) => t.trim())
     .filter((t) => t.length > 0)
 
-  // Fetch user's tags for re-rendering form on error
   const userTags = await tagService.getUserTags(ac, user.id)
 
   try {
-    // Get existing pin to get userId
     const existingPin = await pinService.getPin(ac, pinId)
 
-    // Update the pin using service
     await pinService.updatePin(ac, {
       id: pinId,
       userId: existingPin.userId,
@@ -465,7 +416,6 @@ pins.post('/:id/edit', async (c) => {
       tagNames,
     })
 
-    // Redirect to pins list with success message
     sessionManager.setFlash('success', 'Pin updated successfully!')
     if (c.req.header('HX-Request')) {
       c.header('HX-Redirect', redirectTarget)
@@ -473,7 +423,6 @@ pins.post('/:id/edit', async (c) => {
     }
     return c.redirect(redirectTarget)
   } catch (error) {
-    // Get the pin for re-rendering the form (may fail if not found)
     let pin
     try {
       pin = await pinService.getPin(ac, pinId)
@@ -491,6 +440,7 @@ pins.post('/:id/edit', async (c) => {
       title,
       description: description || '',
       readLater,
+      isPrivate,
       tags: tagsInput,
       userTags: userTagNames,
       createdAt: pin.createdAt,
@@ -510,8 +460,11 @@ pins.post('/:id/edit', async (c) => {
           title={title}
           description={description || ''}
           readLater={readLater}
+          isPrivate={isPrivate}
           tags={tagsInput}
           returnParams={returnParams}
+          baseUrl={BASE_URL}
+          privateMode
         />
       )
     }
@@ -533,8 +486,11 @@ pins.post('/:id/edit', async (c) => {
           title={title}
           description={description || ''}
           readLater={readLater}
+          isPrivate={isPrivate}
           tags={tagsInput}
           returnParams={returnParams}
+          baseUrl={BASE_URL}
+          privateMode
         />
       )
     }
@@ -546,7 +502,6 @@ pins.post('/:id/edit', async (c) => {
       return c.text('Pin not found', 404)
     }
 
-    // Generic error
     const errors = { _form: ['Failed to update pin. Please try again.'] }
     if (isHtmx) {
       return c.html(<PinForm {...formProps} errors={errors} />, 500)
@@ -561,16 +516,19 @@ pins.post('/:id/edit', async (c) => {
         title={title}
         description={description || ''}
         readLater={readLater}
+        isPrivate={isPrivate}
         tags={tagsInput}
         returnParams={returnParams}
+        baseUrl={BASE_URL}
+        privateMode
       />,
       500
     )
   }
 })
 
-// POST /pins/:id/toggle-read - Toggle read later status (HTMX)
-pins.post('/:id/toggle-read', async (c) => {
+// POST /private/pins/:id/toggle-read
+privateRouter.post('/pins/:id/toggle-read', async (c) => {
   const sessionManager = getSessionManager(c)
   const user = await sessionManager.getUser()
 
@@ -581,11 +539,8 @@ pins.post('/:id/toggle-read', async (c) => {
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
-
-  // Get the current pin to toggle its status
   const existingPin = await pinService.getPin(ac, pinId)
 
-  // Toggle the readLater status
   const updatedPin = await pinService.updatePin(ac, {
     id: existingPin.id,
     userId: existingPin.userId,
@@ -597,7 +552,6 @@ pins.post('/:id/toggle-read', async (c) => {
     tagNames: existingPin.tagNames,
   })
 
-  // Get search params from referer or request for preserving filters
   const referer = c.req.header('Referer') || ''
   let searchParams = ''
   try {
@@ -607,19 +561,18 @@ pins.post('/:id/toggle-read', async (c) => {
     // Ignore invalid referer
   }
 
-  // Return updated PinCard for HTMX to swap
   return c.html(
     <PinCard
       pin={updatedPin}
       viewSize="expanded"
       searchParams={searchParams}
-      baseUrl="/pins"
+      baseUrl={BASE_URL}
     />
   )
 })
 
-// GET /pins/:id/delete-confirm - Inline delete confirmation (HTMX)
-pins.get('/:id/delete-confirm', async (c) => {
+// GET /private/pins/:id/delete-confirm
+privateRouter.get('/pins/:id/delete-confirm', async (c) => {
   const sessionManager = getSessionManager(c)
   const user = await sessionManager.getUser()
 
@@ -639,13 +592,12 @@ pins.get('/:id/delete-confirm', async (c) => {
 
   try {
     const pin = await pinService.getPin(ac, pinId)
-
     return c.html(
       <PinDeleteConfirm
         pin={pin}
         viewSize={viewSize}
         searchParams={searchParams}
-        baseUrl="/pins"
+        baseUrl={BASE_URL}
       />
     )
   } catch (error) {
@@ -659,8 +611,8 @@ pins.get('/:id/delete-confirm', async (c) => {
   }
 })
 
-// DELETE /pins/:id - Delete a pin (HTMX, returns refreshed list)
-pins.delete('/:id', async (c) => {
+// DELETE /private/pins/:id
+privateRouter.delete('/pins/:id', async (c) => {
   const sessionManager = getSessionManager(c)
   const user = await sessionManager.getUser()
 
@@ -687,6 +639,8 @@ pins.delete('/:id', async (c) => {
       searchParams,
       noTags,
     } = parsePinQueryParams(c)
+
+    filter.isPrivate = true
     const result = await fetchUserPins(user, filter, page)
 
     return c.html(
@@ -702,7 +656,7 @@ pins.delete('/:id', async (c) => {
         sortBy={sortBy}
         sortDirection={sortDirection}
         noTags={noTags}
-        baseUrl="/pins"
+        baseUrl={BASE_URL}
       />
     )
   } catch (error) {
@@ -716,8 +670,8 @@ pins.delete('/:id', async (c) => {
   }
 })
 
-// GET /pins/:id/card - Return a single pin card (HTMX, for cancel)
-pins.get('/:id/card', async (c) => {
+// GET /private/pins/:id/card
+privateRouter.get('/pins/:id/card', async (c) => {
   const sessionManager = getSessionManager(c)
   const user = await sessionManager.getUser()
 
@@ -737,13 +691,12 @@ pins.get('/:id/card', async (c) => {
 
   try {
     const pin = await pinService.getPin(ac, pinId)
-
     return c.html(
       <PinCard
         pin={pin}
         viewSize={viewSize}
         searchParams={searchParams}
-        baseUrl="/pins"
+        baseUrl={BASE_URL}
       />
     )
   } catch (error) {
@@ -757,8 +710,8 @@ pins.get('/:id/card', async (c) => {
   }
 })
 
-// GET /pins/:id/delete - Show delete confirmation (full page, non-JS fallback)
-pins.get('/:id/delete', async (c) => {
+// GET /private/pins/:id/delete — Full page delete confirmation
+privateRouter.get('/pins/:id/delete', async (c) => {
   const sessionManager = getSessionManager(c)
   const user = await sessionManager.getUser()
 
@@ -771,8 +724,9 @@ pins.get('/:id/delete', async (c) => {
 
   try {
     const pin = await pinService.getPin(ac, pinId)
-
-    return c.html(<PinDeletePage user={user} pin={pin} />)
+    return c.html(
+      <PinDeletePage user={user} pin={pin} baseUrl={BASE_URL} privateMode />
+    )
   } catch (error) {
     if (
       error instanceof PinNotFoundError ||
@@ -784,8 +738,8 @@ pins.get('/:id/delete', async (c) => {
   }
 })
 
-// POST /pins/:id/delete - Delete a pin
-pins.post('/:id/delete', async (c) => {
+// POST /private/pins/:id/delete
+privateRouter.post('/pins/:id/delete', async (c) => {
   const sessionManager = getSessionManager(c)
   const user = await sessionManager.getUser()
 
@@ -798,9 +752,8 @@ pins.post('/:id/delete', async (c) => {
 
   try {
     await pinService.deletePin(ac, pinId)
-
     sessionManager.setFlash('success', 'Pin deleted successfully!')
-    return c.redirect('/pins')
+    return c.redirect(BASE_URL)
   } catch (error) {
     if (
       error instanceof PinNotFoundError ||
@@ -812,4 +765,4 @@ pins.post('/:id/delete', async (c) => {
   }
 })
 
-export { pins as pinsRoutes }
+export { privateRouter as privateRoutes }

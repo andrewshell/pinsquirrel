@@ -17,10 +17,13 @@ interface PinEditPageProps {
   title?: string
   description?: string
   readLater?: boolean
+  isPrivate?: boolean
   tags?: string
   duplicatePinId?: string
   // Query params to preserve on redirect
   returnParams?: string
+  baseUrl?: string
+  privateMode?: boolean
 }
 
 export const PinEditPage: FC<PinEditPageProps> = ({
@@ -33,24 +36,33 @@ export const PinEditPage: FC<PinEditPageProps> = ({
   title,
   description,
   readLater,
+  isPrivate,
   tags,
   duplicatePinId,
   returnParams = '',
+  baseUrl = '/pins',
+  privateMode = false,
 }) => {
   // Use form values if provided (after validation error), otherwise use pin values
   const formUrl = url ?? pin.url
   const formTitle = title ?? pin.title
   const formDescription = description ?? (pin.description || '')
   const formReadLater = readLater ?? pin.readLater
+  const formIsPrivate = isPrivate ?? pin.isPrivate
   const formTags = tags ?? pin.tagNames.join(', ')
 
-  const backUrl = returnParams ? `/pins?${returnParams}` : '/pins'
+  const backUrl = returnParams ? `${baseUrl}?${returnParams}` : baseUrl
   const formAction = returnParams
-    ? `/pins/${pin.id}/edit?${returnParams}`
-    : `/pins/${pin.id}/edit`
+    ? `${baseUrl}/${pin.id}/edit?${returnParams}`
+    : `${baseUrl}/${pin.id}/edit`
 
   return (
-    <DefaultLayout title="Edit Pin" user={user} width="form">
+    <DefaultLayout
+      title="Edit Pin"
+      user={user}
+      width="form"
+      privateMode={privateMode}
+    >
       {/* Back link */}
       <div class="mb-6">
         <a
@@ -85,6 +97,7 @@ export const PinEditPage: FC<PinEditPageProps> = ({
             title={formTitle}
             description={formDescription}
             readLater={formReadLater}
+            isPrivate={formIsPrivate}
             tags={formTags}
             userTags={userTags}
             errors={errors}

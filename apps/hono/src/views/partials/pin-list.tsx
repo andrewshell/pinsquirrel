@@ -8,6 +8,7 @@ interface PinListPartialProps {
   totalCount: number
   searchParams: string
   viewSize?: 'expanded' | 'compact'
+  baseUrl?: string
 }
 
 // Build pagination URL
@@ -17,7 +18,10 @@ function buildPageUrl(page: number, currentParams: string): string {
   return params.toString()
 }
 
-const EmptyState: FC<{ hasFilters: boolean }> = ({ hasFilters }) => {
+const EmptyState: FC<{ hasFilters: boolean; baseUrl: string }> = ({
+  hasFilters,
+  baseUrl,
+}) => {
   if (hasFilters) {
     return (
       <div class="text-center py-12">
@@ -25,7 +29,7 @@ const EmptyState: FC<{ hasFilters: boolean }> = ({ hasFilters }) => {
           No pins match your current filters.
         </p>
         <a
-          href="/pins"
+          href={baseUrl}
           class="text-primary hover:text-primary/80 hover:underline font-medium"
         >
           Clear all filters
@@ -40,7 +44,7 @@ const EmptyState: FC<{ hasFilters: boolean }> = ({ hasFilters }) => {
         You haven't saved any pins yet.
       </p>
       <a
-        href="/pins/new"
+        href={`${baseUrl}/new`}
         class="inline-block px-6 py-3 bg-primary text-primary-foreground font-medium
                border-2 border-foreground neobrutalism-shadow
                hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
@@ -57,7 +61,8 @@ const PaginationControls: FC<{
   pagination: Pagination
   totalCount: number
   searchParams: string
-}> = ({ pagination, totalCount, searchParams }) => {
+  baseUrl: string
+}> = ({ pagination, totalCount, searchParams, baseUrl }) => {
   if (pagination.totalPages <= 1) return null
 
   return (
@@ -70,11 +75,11 @@ const PaginationControls: FC<{
       <div class="flex gap-2">
         {pagination.hasPrevious && (
           <a
-            href={`/pins?${buildPageUrl(pagination.page - 1, searchParams)}`}
-            hx-get={`/pins?${buildPageUrl(pagination.page - 1, searchParams)}`}
+            href={`${baseUrl}?${buildPageUrl(pagination.page - 1, searchParams)}`}
+            hx-get={`${baseUrl}?${buildPageUrl(pagination.page - 1, searchParams)}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
-            hx-push-url={`/pins?${buildPageUrl(pagination.page - 1, searchParams)}`}
+            hx-push-url={`${baseUrl}?${buildPageUrl(pagination.page - 1, searchParams)}`}
             class="px-3 py-1 text-sm font-medium border-2 border-foreground bg-background
                    hover:bg-accent/10 transition-colors"
           >
@@ -84,11 +89,11 @@ const PaginationControls: FC<{
 
         {pagination.hasNext && (
           <a
-            href={`/pins?${buildPageUrl(pagination.page + 1, searchParams)}`}
-            hx-get={`/pins?${buildPageUrl(pagination.page + 1, searchParams)}`}
+            href={`${baseUrl}?${buildPageUrl(pagination.page + 1, searchParams)}`}
+            hx-get={`${baseUrl}?${buildPageUrl(pagination.page + 1, searchParams)}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
-            hx-push-url={`/pins?${buildPageUrl(pagination.page + 1, searchParams)}`}
+            hx-push-url={`${baseUrl}?${buildPageUrl(pagination.page + 1, searchParams)}`}
             class="px-3 py-1 text-sm font-medium border-2 border-foreground bg-background
                    hover:bg-accent/10 transition-colors"
           >
@@ -106,6 +111,7 @@ export const PinListPartial: FC<PinListPartialProps> = ({
   totalCount,
   searchParams,
   viewSize = 'expanded',
+  baseUrl = '/pins',
 }) => {
   // Determine if there are active filters by checking searchParams
   const params = new URLSearchParams(searchParams)
@@ -118,7 +124,7 @@ export const PinListPartial: FC<PinListPartialProps> = ({
   return (
     <>
       {pins.length === 0 ? (
-        <EmptyState hasFilters={hasFilters} />
+        <EmptyState hasFilters={hasFilters} baseUrl={baseUrl} />
       ) : (
         <div class={viewSize === 'compact' ? 'space-y-1' : 'space-y-4'}>
           {pins.map((pin) => (
@@ -126,6 +132,7 @@ export const PinListPartial: FC<PinListPartialProps> = ({
               pin={pin}
               viewSize={viewSize}
               searchParams={searchParams}
+              baseUrl={baseUrl}
             />
           ))}
         </div>
@@ -135,6 +142,7 @@ export const PinListPartial: FC<PinListPartialProps> = ({
         pagination={pagination}
         totalCount={totalCount}
         searchParams={searchParams}
+        baseUrl={baseUrl}
       />
     </>
   )

@@ -76,6 +76,11 @@ export class DrizzlePinRepository implements PinRepository {
       conditions.push(eq(pins.readLater, filter.readLater))
     }
 
+    // Add isPrivate filter if specified
+    if (filter?.isPrivate !== undefined) {
+      conditions.push(eq(pins.isPrivate, filter.isPrivate))
+    }
+
     // Add URL filter if specified (for findByUserIdAndUrl functionality)
     if (filter?.url !== undefined) {
       conditions.push(eq(pins.url, filter.url))
@@ -105,6 +110,7 @@ export class DrizzlePinRepository implements PinRepository {
           title: pins.title,
           description: pins.description,
           readLater: pins.readLater,
+          isPrivate: pins.isPrivate,
           createdAt: pins.createdAt,
           updatedAt: pins.updatedAt,
         })
@@ -141,6 +147,7 @@ export class DrizzlePinRepository implements PinRepository {
           title: pins.title,
           description: pins.description,
           readLater: pins.readLater,
+          isPrivate: pins.isPrivate,
           createdAt: pins.createdAt,
           updatedAt: pins.updatedAt,
         })
@@ -176,6 +183,7 @@ export class DrizzlePinRepository implements PinRepository {
           title: pins.title,
           description: pins.description,
           readLater: pins.readLater,
+          isPrivate: pins.isPrivate,
           createdAt: pins.createdAt,
           updatedAt: pins.updatedAt,
         })
@@ -229,6 +237,11 @@ export class DrizzlePinRepository implements PinRepository {
     // Add readLater filter if specified
     if (filter?.readLater !== undefined) {
       conditions.push(eq(pins.readLater, filter.readLater))
+    }
+
+    // Add isPrivate filter if specified
+    if (filter?.isPrivate !== undefined) {
+      conditions.push(eq(pins.isPrivate, filter.isPrivate))
     }
 
     // Add URL filter if specified
@@ -309,6 +322,7 @@ export class DrizzlePinRepository implements PinRepository {
       title: data.title,
       description: data.description,
       readLater: data.readLater,
+      isPrivate: data.isPrivate,
       createdAt: data.createdAt ?? now,
       updatedAt: data.updatedAt ?? now,
     })
@@ -356,6 +370,7 @@ export class DrizzlePinRepository implements PinRepository {
       title: updateFields.title,
       description: updateFields.description,
       readLater: updateFields.readLater,
+      isPrivate: updateFields.isPrivate,
       updatedAt: new Date(),
     }
 
@@ -469,6 +484,7 @@ export class DrizzlePinRepository implements PinRepository {
       title: pin.title,
       description: pin.description,
       readLater: pin.readLater,
+      isPrivate: pin.isPrivate,
       tagNames: pinTags.map(tag => tag.name),
       createdAt: pin.createdAt,
       updatedAt: pin.updatedAt,

@@ -15,6 +15,7 @@ interface PinFormProps {
   title?: string
   description?: string
   readLater?: boolean
+  isPrivate?: boolean
   tags?: string
   // Other
   pinId?: string
@@ -31,6 +32,7 @@ export const PinForm: FC<PinFormProps> = ({
   title = '',
   description = '',
   readLater = false,
+  isPrivate = false,
   tags = '',
   pinId,
   duplicatePinId,
@@ -185,6 +187,15 @@ export const PinForm: FC<PinFormProps> = ({
           checked={readLater}
           label="Read Later"
           helpText="Mark this pin to read later"
+        />
+
+        {/* Private checkbox */}
+        <Checkbox
+          id="isPrivate"
+          name="isPrivate"
+          checked={isPrivate}
+          label="Private"
+          helpText="Hide this pin from the normal view"
         />
 
         {/* Submit button */}

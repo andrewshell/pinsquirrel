@@ -19,6 +19,8 @@ interface PinsPageProps {
   sortDirection?: 'asc' | 'desc'
   noTags?: boolean
   flash?: { type: FlashType; message: string } | null
+  baseUrl?: string
+  privateMode?: boolean
 }
 
 export const PinsPage: FC<PinsPageProps> = ({
@@ -35,9 +37,16 @@ export const PinsPage: FC<PinsPageProps> = ({
   sortDirection = 'desc',
   noTags = false,
   flash,
+  baseUrl = '/pins',
+  privateMode = false,
 }) => {
   return (
-    <DefaultLayout title="Pins" user={user} currentPath="/pins">
+    <DefaultLayout
+      title={privateMode ? 'Private Pins' : 'Pins'}
+      user={user}
+      currentPath={baseUrl}
+      privateMode={privateMode}
+    >
       {/* Flash message */}
       {flash && (
         <FlashMessage
@@ -47,7 +56,7 @@ export const PinsPage: FC<PinsPageProps> = ({
         />
       )}
 
-      <h1 class="sr-only">Pins</h1>
+      <h1 class="sr-only">{privateMode ? 'Private Pins' : 'Pins'}</h1>
       <div id="pins-content">
         <PinsContentPartial
           pins={pins}
@@ -61,6 +70,7 @@ export const PinsPage: FC<PinsPageProps> = ({
           sortBy={sortBy}
           sortDirection={sortDirection}
           noTags={noTags}
+          baseUrl={baseUrl}
         />
       </div>
     </DefaultLayout>

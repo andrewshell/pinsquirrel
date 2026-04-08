@@ -14,11 +14,23 @@ import { DefaultLayout } from '../layouts/default'
 interface PinDeletePageProps {
   user: User
   pin: Pin
+  baseUrl?: string
+  privateMode?: boolean
 }
 
-export const PinDeletePage: FC<PinDeletePageProps> = ({ user, pin }) => {
+export const PinDeletePage: FC<PinDeletePageProps> = ({
+  user,
+  pin,
+  baseUrl = '/pins',
+  privateMode = false,
+}) => {
   return (
-    <DefaultLayout title="Delete Pin" user={user} width="form">
+    <DefaultLayout
+      title="Delete Pin"
+      user={user}
+      width="form"
+      privateMode={privateMode}
+    >
       <h1 class="sr-only">Delete Pin</h1>
       <Card>
         <CardHeader>
@@ -35,10 +47,14 @@ export const PinDeletePage: FC<PinDeletePageProps> = ({ user, pin }) => {
         </CardContent>
 
         <CardFooter class="gap-4">
-          <Button href="/pins" variant="outline" class="flex-1">
+          <Button href={baseUrl} variant="outline" class="flex-1">
             Cancel
           </Button>
-          <form method="post" action={`/pins/${pin.id}/delete`} class="flex-1">
+          <form
+            method="post"
+            action={`${baseUrl}/${pin.id}/delete`}
+            class="flex-1"
+          >
             <Button type="submit" variant="destructive" class="w-full">
               Delete Pin
             </Button>

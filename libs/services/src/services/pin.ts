@@ -32,6 +32,7 @@ export class PinService {
       title: input.title,
       description: input.description,
       readLater: input.readLater,
+      isPrivate: input.isPrivate,
       tagNames: input.tagNames,
       createdAt: input.createdAt,
       updatedAt: input.updatedAt,
@@ -67,6 +68,7 @@ export class PinService {
       title: input.title,
       description: input.description ?? null,
       readLater: input.readLater ?? false,
+      isPrivate: input.isPrivate ?? false,
       tagNames: input.tagNames ?? [],
       createdAt: input.createdAt,
       updatedAt: input.updatedAt,
@@ -130,6 +132,7 @@ export class PinService {
           ? updateFields.description
           : existingPin.description,
       readLater: updateFields.readLater ?? existingPin.readLater,
+      isPrivate: updateFields.isPrivate ?? existingPin.isPrivate,
       tagNames: tagNames !== undefined ? tagNames : existingPin.tagNames,
     }
 

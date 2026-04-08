@@ -6,6 +6,7 @@ interface FilterHeaderProps {
   readFilter: 'all' | 'unread' | 'read'
   searchParams: string
   noTags?: boolean
+  baseUrl?: string
 }
 
 // Build URL with updated read filter
@@ -58,6 +59,7 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
   readFilter,
   searchParams,
   noTags = false,
+  baseUrl = '/pins',
 }) => {
   const hasActiveTag = activeTag && activeTag.trim()
   const hasActiveSearch = searchQuery && searchQuery.trim()
@@ -113,31 +115,31 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
                 data-dropdown="menu"
               >
                 <a
-                  href={`/pins?${buildReadFilterUrl(searchParams, 'all')}`}
-                  hx-get={`/pins?${buildReadFilterUrl(searchParams, 'all')}`}
+                  href={`${baseUrl}?${buildReadFilterUrl(searchParams, 'all')}`}
+                  hx-get={`${baseUrl}?${buildReadFilterUrl(searchParams, 'all')}`}
                   hx-target="#pins-content"
                   hx-swap="innerHTML"
-                  hx-push-url={`/pins?${buildReadFilterUrl(searchParams, 'all')}`}
+                  hx-push-url={`${baseUrl}?${buildReadFilterUrl(searchParams, 'all')}`}
                   class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
                 >
                   All Pins
                 </a>
                 <a
-                  href={`/pins?${buildReadFilterUrl(searchParams, 'unread')}`}
-                  hx-get={`/pins?${buildReadFilterUrl(searchParams, 'unread')}`}
+                  href={`${baseUrl}?${buildReadFilterUrl(searchParams, 'unread')}`}
+                  hx-get={`${baseUrl}?${buildReadFilterUrl(searchParams, 'unread')}`}
                   hx-target="#pins-content"
                   hx-swap="innerHTML"
-                  hx-push-url={`/pins?${buildReadFilterUrl(searchParams, 'unread')}`}
+                  hx-push-url={`${baseUrl}?${buildReadFilterUrl(searchParams, 'unread')}`}
                   class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
                 >
                   To Read
                 </a>
                 <a
-                  href={`/pins?${buildReadFilterUrl(searchParams, 'read')}`}
-                  hx-get={`/pins?${buildReadFilterUrl(searchParams, 'read')}`}
+                  href={`${baseUrl}?${buildReadFilterUrl(searchParams, 'read')}`}
+                  hx-get={`${baseUrl}?${buildReadFilterUrl(searchParams, 'read')}`}
                   hx-target="#pins-content"
                   hx-swap="innerHTML"
-                  hx-push-url={`/pins?${buildReadFilterUrl(searchParams, 'read')}`}
+                  hx-push-url={`${baseUrl}?${buildReadFilterUrl(searchParams, 'read')}`}
                   class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
                 >
                   Read
@@ -165,11 +167,11 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
                 </svg>
                 <span>{activeTag}</span>
                 <a
-                  href={`/pins?${buildClearFilterUrl(searchParams, 'tag')}`}
-                  hx-get={`/pins?${buildClearFilterUrl(searchParams, 'tag')}`}
+                  href={`${baseUrl}?${buildClearFilterUrl(searchParams, 'tag')}`}
+                  hx-get={`${baseUrl}?${buildClearFilterUrl(searchParams, 'tag')}`}
                   hx-target="#pins-content"
                   hx-swap="innerHTML"
-                  hx-push-url={`/pins?${buildClearFilterUrl(searchParams, 'tag')}`}
+                  hx-push-url={`${baseUrl}?${buildClearFilterUrl(searchParams, 'tag')}`}
                   class="ml-1 hover:bg-destructive hover:text-destructive-foreground rounded-sm p-0.5 transition-colors"
                   aria-label={`Remove ${activeTag} tag filter`}
                 >
@@ -211,11 +213,11 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
                 </svg>
                 <span>"{searchQuery}"</span>
                 <a
-                  href={`/pins?${buildClearFilterUrl(searchParams, 'search')}`}
-                  hx-get={`/pins?${buildClearFilterUrl(searchParams, 'search')}`}
+                  href={`${baseUrl}?${buildClearFilterUrl(searchParams, 'search')}`}
+                  hx-get={`${baseUrl}?${buildClearFilterUrl(searchParams, 'search')}`}
                   hx-target="#pins-content"
                   hx-swap="innerHTML"
-                  hx-push-url={`/pins?${buildClearFilterUrl(searchParams, 'search')}`}
+                  hx-push-url={`${baseUrl}?${buildClearFilterUrl(searchParams, 'search')}`}
                   class="ml-1 hover:bg-destructive hover:text-destructive-foreground rounded-sm p-0.5 transition-colors"
                   aria-label="Clear search"
                 >
@@ -257,11 +259,11 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
                 </svg>
                 <span>Untagged</span>
                 <a
-                  href={`/pins?${buildClearFilterUrl(searchParams, 'notags')}`}
-                  hx-get={`/pins?${buildClearFilterUrl(searchParams, 'notags')}`}
+                  href={`${baseUrl}?${buildClearFilterUrl(searchParams, 'notags')}`}
+                  hx-get={`${baseUrl}?${buildClearFilterUrl(searchParams, 'notags')}`}
                   hx-target="#pins-content"
                   hx-swap="innerHTML"
-                  hx-push-url={`/pins?${buildClearFilterUrl(searchParams, 'notags')}`}
+                  hx-push-url={`${baseUrl}?${buildClearFilterUrl(searchParams, 'notags')}`}
                   class="ml-1 hover:bg-destructive hover:text-destructive-foreground rounded-sm p-0.5 transition-colors"
                   aria-label="Clear untagged filter"
                 >

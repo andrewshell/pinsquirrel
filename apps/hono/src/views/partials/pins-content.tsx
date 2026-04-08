@@ -16,6 +16,7 @@ interface PinsContentPartialProps {
   sortBy?: 'created' | 'title'
   sortDirection?: 'asc' | 'desc'
   noTags?: boolean
+  baseUrl?: string
 }
 
 export const PinsContentPartial: FC<PinsContentPartialProps> = ({
@@ -30,6 +31,7 @@ export const PinsContentPartial: FC<PinsContentPartialProps> = ({
   sortBy = 'created',
   sortDirection = 'desc',
   noTags = false,
+  baseUrl = '/pins',
 }) => {
   return (
     <>
@@ -39,6 +41,7 @@ export const PinsContentPartial: FC<PinsContentPartialProps> = ({
         readFilter={readFilter}
         searchParams={searchParams}
         noTags={noTags}
+        baseUrl={baseUrl}
       />
 
       <ViewSettings
@@ -46,6 +49,7 @@ export const PinsContentPartial: FC<PinsContentPartialProps> = ({
         sortDirection={sortDirection}
         viewSize={viewSize}
         searchParams={searchParams}
+        baseUrl={baseUrl}
       />
 
       <div id="pin-list">
@@ -55,6 +59,7 @@ export const PinsContentPartial: FC<PinsContentPartialProps> = ({
           totalCount={totalCount}
           searchParams={searchParams}
           viewSize={viewSize}
+          baseUrl={baseUrl}
         />
       </div>
     </>

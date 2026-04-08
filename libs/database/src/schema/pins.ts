@@ -20,6 +20,7 @@ export const pins = mysqlTable(
     title: varchar('title', { length: 255 }).notNull(),
     description: text('description'),
     readLater: boolean('read_later').default(false).notNull(),
+    isPrivate: boolean('is_private').default(false).notNull(),
     createdAt: timestamp('created_at', { mode: 'date', fsp: 3 })
       .defaultNow()
       .notNull(),

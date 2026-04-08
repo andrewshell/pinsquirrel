@@ -130,6 +130,26 @@ body {
   --sidebar-ring: oklch(0.75 0.25 200);
 }
 
+.private-mode {
+  --background: oklch(0.97 0.01 280);
+  --card: oklch(0.95 0.01 280);
+  --popover: oklch(0.95 0.01 280);
+  --primary: oklch(0.45 0.15 280);
+  --accent: oklch(0.45 0.15 280);
+  --ring: oklch(0.45 0.15 280);
+  --input: oklch(0.95 0.01 280);
+}
+
+.dark.private-mode {
+  --background: oklch(0.08 0.02 280);
+  --card: oklch(0.12 0.02 280);
+  --popover: oklch(0.12 0.02 280);
+  --primary: oklch(0.7 0.2 280);
+  --accent: oklch(0.7 0.2 280);
+  --ring: oklch(0.7 0.2 280);
+  --input: oklch(0.12 0.02 280);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

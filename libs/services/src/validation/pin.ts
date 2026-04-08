@@ -37,6 +37,7 @@ export const createPinDataSchema = z.object({
   title: pinTitleSchema,
   description: pinDescriptionSchema,
   readLater: z.boolean().optional().default(false),
+  isPrivate: z.boolean().optional().default(false),
   tagNames: z.array(tagNameSchema).optional(),
   createdAt: z.date().optional(),
   updatedAt: z.date().optional(),
@@ -47,6 +48,7 @@ export const updatePinDataSchema = z.object({
   title: pinTitleSchema.optional(),
   description: pinDescriptionSchema,
   readLater: z.boolean().optional(),
+  isPrivate: z.boolean().optional(),
   tagNames: z.array(tagNameSchema).optional(),
 })
 

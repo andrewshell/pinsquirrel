@@ -167,6 +167,7 @@ importRoute.post('/', async (c) => {
           title: title,
           description: description,
           readLater: pinboardPin.toread === 'yes',
+          isPrivate: false,
           tagNames: tagNames,
           createdAt: pinboardTimestamp,
           updatedAt: pinboardTimestamp,

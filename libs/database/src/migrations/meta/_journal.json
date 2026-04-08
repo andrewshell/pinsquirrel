@@ -15,6 +15,13 @@
       "when": 1774373720723,
       "tag": "0001_dashing_ender_wiggin",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1775662600286,
+      "tag": "0002_cold_power_pack",
+      "breakpoints": true
     }
   ]
 }

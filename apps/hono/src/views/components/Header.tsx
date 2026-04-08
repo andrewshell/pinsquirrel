@@ -5,13 +5,19 @@ import { Button } from './ui/Button'
 interface HeaderProps {
   user: User | null
   currentPath?: string
+  privateMode?: boolean
 }
 
-export const Header: FC<HeaderProps> = ({ user, currentPath }) => {
+export const Header: FC<HeaderProps> = ({
+  user,
+  currentPath,
+  privateMode = false,
+}) => {
+  const pinsBase = privateMode ? '/private/pins' : '/pins'
   const htmxAttrs =
-    currentPath === '/pins'
+    currentPath === pinsBase
       ? {
-          'hx-get': '/pins',
+          'hx-get': pinsBase,
           'hx-target': '#pins-content',
           'hx-swap': 'innerHTML',
           'hx-push-url': 'true',
@@ -53,10 +59,10 @@ export const Header: FC<HeaderProps> = ({ user, currentPath }) => {
                 {/* Nav links - hidden when search is open */}
                 <div class="flex items-center space-x-4" data-nav="links">
                   <a
-                    href="/pins"
+                    href={pinsBase}
                     class="text-base font-bold text-foreground hover:text-primary uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
                   >
-                    Pins
+                    {privateMode ? 'Private' : 'Pins'}
                   </a>
                   <a
                     href="/tags"
@@ -68,7 +74,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath }) => {
 
                 {/* Search input - visible when toggled */}
                 <form
-                  action="/pins"
+                  action={pinsBase}
                   method="get"
                   class="hidden items-center gap-2"
                   data-search="form"
@@ -142,7 +148,11 @@ export const Header: FC<HeaderProps> = ({ user, currentPath }) => {
                 </button>
 
                 {/* Create Pin Button */}
-                <Button href="/pins/new" size="icon" aria-label="Create Pin">
+                <Button
+                  href={`${pinsBase}/new`}
+                  size="icon"
+                  aria-label="Create Pin"
+                >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="16"
@@ -158,6 +168,40 @@ export const Header: FC<HeaderProps> = ({ user, currentPath }) => {
                     <path d="M12 5v14" />
                   </svg>
                 </Button>
+
+                {/* Lock button - only in private mode */}
+                {privateMode && (
+                  <form method="post" action="/private/lock">
+                    <Button
+                      type="submit"
+                      variant="outline"
+                      size="icon"
+                      aria-label="Lock private pins"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <rect
+                          width="18"
+                          height="11"
+                          x="3"
+                          y="11"
+                          rx="2"
+                          ry="2"
+                        />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                    </Button>
+                  </form>
+                )}
 
                 {/* User Dropdown */}
                 <div class="relative" data-dropdown="container">
@@ -195,6 +239,12 @@ export const Header: FC<HeaderProps> = ({ user, currentPath }) => {
                     >
                       Import
                     </a>
+                    <a
+                      href="/private/unlock"
+                      class="block px-4 py-2 text-sm hover:bg-accent/10 transition-colors"
+                    >
+                      Private Pins
+                    </a>
                     <hr class="border-foreground/20" />
                     <a
                       href="/signout"
@@ -220,7 +270,11 @@ export const Header: FC<HeaderProps> = ({ user, currentPath }) => {
           {/* Mobile Menu Button */}
           <div class="md:hidden flex items-center space-x-2">
             {user && (
-              <Button href="/pins/new" size="icon" aria-label="Create Pin">
+              <Button
+                href={`${pinsBase}/new`}
+                size="icon"
+                aria-label="Create Pin"
+              >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="16"
@@ -271,7 +325,7 @@ export const Header: FC<HeaderProps> = ({ user, currentPath }) => {
                     <>
                       {/* Mobile Search */}
                       <form
-                        action="/pins"
+                        action={pinsBase}
                         method="get"
                         class="flex items-center gap-2 mb-4"
                         {...htmxAttrs}
@@ -301,10 +355,10 @@ export const Header: FC<HeaderProps> = ({ user, currentPath }) => {
                       </form>
 
                       <a
-                        href="/pins"
+                        href={pinsBase}
                         class="block px-4 py-2 text-center font-bold uppercase hover:bg-accent/10 transition-colors"
                       >
-                        Pins
+                        {privateMode ? 'Private' : 'Pins'}
                       </a>
                       <a
                         href="/tags"
@@ -323,6 +377,12 @@ export const Header: FC<HeaderProps> = ({ user, currentPath }) => {
                         class="block px-4 py-2 text-center font-bold uppercase hover:bg-accent/10 transition-colors"
                       >
                         Import
+                      </a>
+                      <a
+                        href="/private/unlock"
+                        class="block px-4 py-2 text-center font-bold uppercase hover:bg-accent/10 transition-colors"
+                      >
+                        Private Pins
                       </a>
                       <hr class="border-foreground/20" />
                       <Button href="/signout" variant="outline" class="w-full">

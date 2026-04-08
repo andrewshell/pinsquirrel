@@ -22,6 +22,7 @@ const createTestPinData = async (
     title: string
     description?: string | null
     readLater?: boolean
+    isPrivate?: boolean
     tagNames?: string[]
   }
 ): Promise<CreatePinData> => {
@@ -31,6 +32,7 @@ const createTestPinData = async (
     title: data.title,
     description: data.description ?? null,
     readLater: data.readLater ?? false,
+    isPrivate: data.isPrivate ?? false,
     tagNames: data.tagNames ?? [],
   }
 }
@@ -44,6 +46,7 @@ const createTestUpdateData = async (
     title?: string
     description?: string | null
     readLater?: boolean
+    isPrivate?: boolean
     tagNames?: string[]
   } = {}
 ): Promise<UpdatePinData> => {
@@ -57,6 +60,7 @@ const createTestUpdateData = async (
         ? updates.description
         : existingPin.description,
     readLater: updates.readLater ?? existingPin.readLater,
+    isPrivate: updates.isPrivate ?? existingPin.isPrivate,
     tagNames:
       updates.tagNames !== undefined ? updates.tagNames : existingPin.tagNames,
   }
@@ -476,6 +480,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'Original Title',
         description: 'Original description',
         readLater: false,
+        isPrivate: false,
         tagNames: ['original-tag'],
       })
       const pin = await pinRepository.create(pinData)
@@ -552,6 +557,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'Original Title',
         description: null,
         readLater: false,
+        isPrivate: false,
         tagNames: [],
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -602,6 +608,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'Normal Pin',
         description: null,
         readLater: false,
+        isPrivate: false,
         tagNames: [],
       })
 
@@ -611,6 +618,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'Read Later Pin 1',
         description: null,
         readLater: true,
+        isPrivate: false,
         tagNames: [],
       })
 
@@ -620,6 +628,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'Read Later Pin 2',
         description: null,
         readLater: true,
+        isPrivate: false,
         tagNames: [],
       })
     })
@@ -674,6 +683,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'Normal Pin',
         description: null,
         readLater: false,
+        isPrivate: false,
         tagNames: [],
       })
 
@@ -683,6 +693,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'Read Later Pin 1',
         description: null,
         readLater: true,
+        isPrivate: false,
         tagNames: [],
       })
 
@@ -692,6 +703,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'Read Later Pin 2',
         description: null,
         readLater: true,
+        isPrivate: false,
         tagNames: [],
       })
     })
@@ -724,6 +736,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'React Tutorial for Beginners',
         description: 'Learn the basics of React JavaScript library',
         readLater: false,
+        isPrivate: false,
         tagNames: [],
       })
 
@@ -733,6 +746,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'React GitHub Repository',
         description: 'Official React repository on GitHub',
         readLater: true,
+        isPrivate: false,
         tagNames: [],
       })
 
@@ -742,6 +756,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'Vue.js Guide',
         description: 'Complete guide for Vue.js framework',
         readLater: false,
+        isPrivate: false,
         tagNames: [],
       })
 
@@ -751,6 +766,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'Angular Documentation',
         description: 'Official Angular framework documentation',
         readLater: true,
+        isPrivate: false,
         tagNames: [],
       })
     })
@@ -862,6 +878,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'React Tutorial for Beginners',
         description: 'Learn the basics of React JavaScript library',
         readLater: false,
+        isPrivate: false,
         tagNames: [],
       })
 
@@ -871,6 +888,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'React GitHub Repository',
         description: 'Official React repository on GitHub',
         readLater: true,
+        isPrivate: false,
         tagNames: [],
       })
 
@@ -880,6 +898,7 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         title: 'Vue.js Guide',
         description: 'Complete guide for Vue.js framework',
         readLater: false,
+        isPrivate: false,
         tagNames: [],
       })
     })
