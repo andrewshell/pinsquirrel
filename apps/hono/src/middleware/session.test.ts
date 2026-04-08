@@ -392,3 +392,161 @@ describe('requireAuth Middleware', () => {
     expect(res.headers.get('location')).toBe('/admin/login?redirectTo=%2Fadmin')
   })
 })
+
+describe('Private Mode', () => {
+  let app: Hono
+
+  const mockSession = {
+    id: 'session-123',
+    userId: 'user-456',
+    data: { userId: 'user-456', keepSignedIn: true },
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    createdAt: new Date(),
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    app = new Hono()
+    app.use('*', sessionMiddleware())
+
+    mockIsValidSession.mockResolvedValue(true)
+    mockFindById.mockResolvedValue(mockSession)
+    mockUpdate.mockResolvedValue(mockSession)
+  })
+
+  afterEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('should report private mode as locked by default', async () => {
+    app.get('/test', (c) => {
+      const manager = getSessionManager(c)
+      return c.json({
+        isPrivateUnlocked: manager.isPrivateUnlocked(),
+      })
+    })
+
+    const res = await app.request('/test', {
+      headers: { Cookie: '__session=session-123' },
+    })
+    const json = await res.json()
+
+    expect(json.isPrivateUnlocked).toBe(false)
+  })
+
+  it('should unlock private mode and persist to session', async () => {
+    app.post('/unlock', (c) => {
+      const manager = getSessionManager(c)
+      manager.unlockPrivateMode()
+      return c.json({
+        isPrivateUnlocked: manager.isPrivateUnlocked(),
+      })
+    })
+
+    const res = await app.request('/unlock', {
+      method: 'POST',
+      headers: { Cookie: '__session=session-123' },
+    })
+    const json = await res.json()
+
+    expect(json.isPrivateUnlocked).toBe(true)
+    expect(mockUpdate).toHaveBeenCalledWith(
+      'session-123',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          privateUnlockedAt: expect.any(Number),
+        }),
+      })
+    )
+  })
+
+  it('should lock private mode and clear the timestamp', async () => {
+    const sessionWithPrivate = {
+      ...mockSession,
+      data: {
+        userId: 'user-456',
+        keepSignedIn: true,
+        privateUnlockedAt: Date.now(),
+      },
+    }
+    mockFindById.mockResolvedValue(sessionWithPrivate)
+
+    app.post('/lock', (c) => {
+      const manager = getSessionManager(c)
+      manager.lockPrivateMode()
+      return c.json({
+        isPrivateUnlocked: manager.isPrivateUnlocked(),
+      })
+    })
+
+    const res = await app.request('/lock', {
+      method: 'POST',
+      headers: { Cookie: '__session=session-123' },
+    })
+    const json = await res.json()
+
+    expect(json.isPrivateUnlocked).toBe(false)
+    expect(mockUpdate).toHaveBeenCalledWith(
+      'session-123',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          privateUnlockedAt: undefined,
+        }),
+      })
+    )
+  })
+
+  it('should report expired private mode as locked after 15 minutes', async () => {
+    const sixteenMinutesAgo = Date.now() - 16 * 60 * 1000
+    const sessionWithExpiredPrivate = {
+      ...mockSession,
+      data: {
+        userId: 'user-456',
+        keepSignedIn: true,
+        privateUnlockedAt: sixteenMinutesAgo,
+      },
+    }
+    mockFindById.mockResolvedValue(sessionWithExpiredPrivate)
+
+    app.get('/test', (c) => {
+      const manager = getSessionManager(c)
+      return c.json({
+        isPrivateUnlocked: manager.isPrivateUnlocked(),
+      })
+    })
+
+    const res = await app.request('/test', {
+      headers: { Cookie: '__session=session-123' },
+    })
+    const json = await res.json()
+
+    expect(json.isPrivateUnlocked).toBe(false)
+  })
+
+  it('should report active private mode as unlocked within 15 minutes', async () => {
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000
+    const sessionWithActivePrivate = {
+      ...mockSession,
+      data: {
+        userId: 'user-456',
+        keepSignedIn: true,
+        privateUnlockedAt: fiveMinutesAgo,
+      },
+    }
+    mockFindById.mockResolvedValue(sessionWithActivePrivate)
+
+    app.get('/test', (c) => {
+      const manager = getSessionManager(c)
+      return c.json({
+        isPrivateUnlocked: manager.isPrivateUnlocked(),
+      })
+    })
+
+    const res = await app.request('/test', {
+      headers: { Cookie: '__session=session-123' },
+    })
+    const json = await res.json()
+
+    expect(json.isPrivateUnlocked).toBe(true)
+  })
+})

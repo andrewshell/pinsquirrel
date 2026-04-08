@@ -458,4 +458,107 @@ describe('PinService', () => {
       ).rejects.toThrow(UnauthorizedPinAccessError)
     })
   })
+
+  describe('isPrivate', () => {
+    it('should create a pin with isPrivate true', async () => {
+      mockPinRepository.findByUserIdAndUrl.mockResolvedValue(null)
+      mockPinRepository.create.mockResolvedValue({
+        ...mockPin,
+        isPrivate: true,
+      })
+
+      const result = await pinService.createPin(
+        createMockAccessControl(mockUser),
+        {
+          userId: mockUser.id,
+          url: 'https://example.com',
+          title: 'Secret',
+          description: null,
+          readLater: false,
+          isPrivate: true,
+          tagNames: [],
+        }
+      )
+
+      expect(result.isPrivate).toBe(true)
+      expect(mockPinRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isPrivate: true,
+        })
+      )
+    })
+
+    it('should default isPrivate to false when not provided', async () => {
+      mockPinRepository.findByUserIdAndUrl.mockResolvedValue(null)
+      mockPinRepository.create.mockResolvedValue(mockPin)
+
+      await pinService.createPin(createMockAccessControl(mockUser), {
+        userId: mockUser.id,
+        url: 'https://example.com',
+        title: 'Public',
+        description: null,
+        readLater: false,
+        isPrivate: false,
+        tagNames: [],
+      })
+
+      expect(mockPinRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isPrivate: false,
+        })
+      )
+    })
+
+    it('should update isPrivate from false to true', async () => {
+      mockPinRepository.findById.mockResolvedValue(mockPin)
+      mockPinRepository.update.mockResolvedValue({
+        ...mockPin,
+        isPrivate: true,
+      })
+
+      const result = await pinService.updatePin(
+        createMockAccessControl(mockUser),
+        {
+          id: 'pin-123',
+          userId: 'user-123',
+          url: 'https://example.com',
+          title: 'Example',
+          description: 'Description',
+          readLater: false,
+          isPrivate: true,
+          tagNames: ['javascript'],
+        }
+      )
+
+      expect(result.isPrivate).toBe(true)
+      expect(mockPinRepository.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isPrivate: true,
+        })
+      )
+    })
+
+    it('should preserve isPrivate when not provided in update', async () => {
+      const privatePin = { ...mockPin, isPrivate: true }
+      mockPinRepository.findById.mockResolvedValue(privatePin)
+      mockPinRepository.update.mockResolvedValue(privatePin)
+
+      await pinService.updatePin(createMockAccessControl(mockUser), {
+        id: 'pin-123',
+        userId: 'user-123',
+        url: 'https://example.com',
+        title: 'Updated Title',
+        description: 'Description',
+        readLater: false,
+        isPrivate: true,
+        tagNames: ['javascript'],
+      })
+
+      expect(mockPinRepository.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isPrivate: true,
+        })
+      )
+    })
+  })
 })

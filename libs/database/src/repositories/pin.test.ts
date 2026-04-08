@@ -1049,4 +1049,134 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       expect(count).toBe(0)
     })
   })
+
+  describe('isPrivate filtering', () => {
+    beforeEach(async () => {
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://public-pin.com',
+        title: 'Public Pin',
+        description: null,
+        readLater: false,
+        isPrivate: false,
+        tagNames: [],
+      })
+
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://private-pin1.com',
+        title: 'Private Pin 1',
+        description: null,
+        readLater: false,
+        isPrivate: true,
+        tagNames: [],
+      })
+
+      await pinRepository.create({
+        userId: testUser.id,
+        url: 'https://private-pin2.com',
+        title: 'Private Pin 2',
+        description: null,
+        readLater: true,
+        isPrivate: true,
+        tagNames: [],
+      })
+    })
+
+    it('should return all pins when no isPrivate filter is applied', async () => {
+      const result = await pinRepository.findByUserId(testUser.id, {})
+      expect(result.length).toBe(3)
+    })
+
+    it('should return only public pins when isPrivate is false', async () => {
+      const result = await pinRepository.findByUserId(testUser.id, {
+        isPrivate: false,
+      })
+      expect(result.length).toBe(1)
+      expect(result.every(pin => !pin.isPrivate)).toBe(true)
+    })
+
+    it('should return only private pins when isPrivate is true', async () => {
+      const result = await pinRepository.findByUserId(testUser.id, {
+        isPrivate: true,
+      })
+      expect(result.length).toBe(2)
+      expect(result.every(pin => pin.isPrivate)).toBe(true)
+    })
+
+    it('should combine isPrivate and readLater filters', async () => {
+      const result = await pinRepository.findByUserId(testUser.id, {
+        isPrivate: true,
+        readLater: true,
+      })
+      expect(result.length).toBe(1)
+      expect(result[0].isPrivate).toBe(true)
+      expect(result[0].readLater).toBe(true)
+    })
+
+    it('should count only public pins when isPrivate is false', async () => {
+      const count = await pinRepository.countByUserId(testUser.id, {
+        isPrivate: false,
+      })
+      expect(count).toBe(1)
+    })
+
+    it('should count only private pins when isPrivate is true', async () => {
+      const count = await pinRepository.countByUserId(testUser.id, {
+        isPrivate: true,
+      })
+      expect(count).toBe(2)
+    })
+  })
+
+  describe('isPrivate create and update', () => {
+    it('should create a pin with isPrivate true', async () => {
+      const createData = await createTestPinData(tagRepository, {
+        userId: testUser.id,
+        url: 'https://secret.com',
+        title: 'Secret Pin',
+        isPrivate: true,
+      })
+
+      const result = await pinRepository.create(createData)
+
+      expect(result.isPrivate).toBe(true)
+
+      const saved = await pinRepository.findById(result.id)
+      expect(saved!.isPrivate).toBe(true)
+    })
+
+    it('should create a pin with isPrivate defaulting to false', async () => {
+      const createData = await createTestPinData(tagRepository, {
+        userId: testUser.id,
+        url: 'https://public.com',
+        title: 'Public Pin',
+      })
+
+      const result = await pinRepository.create(createData)
+
+      expect(result.isPrivate).toBe(false)
+    })
+
+    it('should update isPrivate from false to true', async () => {
+      const createData = await createTestPinData(tagRepository, {
+        userId: testUser.id,
+        url: 'https://toggle.com',
+        title: 'Toggle Pin',
+        isPrivate: false,
+      })
+      const pin = await pinRepository.create(createData)
+      expect(pin.isPrivate).toBe(false)
+
+      const updateData = await createTestUpdateData(tagRepository, pin, {
+        isPrivate: true,
+      })
+      const updated = await pinRepository.update(updateData)
+
+      expect(updated!.isPrivate).toBe(true)
+
+      const saved = await pinRepository.findById(pin.id)
+      expect(saved!.isPrivate).toBe(true)
+    })
+  })
 })
