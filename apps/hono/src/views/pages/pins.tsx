@@ -9,7 +9,6 @@ interface PinsPageProps {
   user: User
   pins: Pin[]
   pagination: Pagination
-  totalCount: number
   searchParams?: string
   activeTag?: string
   searchQuery?: string
@@ -27,7 +26,6 @@ export const PinsPage: FC<PinsPageProps> = ({
   user,
   pins,
   pagination,
-  totalCount,
   searchParams = '',
   activeTag,
   searchQuery,
@@ -61,7 +59,6 @@ export const PinsPage: FC<PinsPageProps> = ({
         <PinsContentPartial
           pins={pins}
           pagination={pagination}
-          totalCount={totalCount}
           searchParams={searchParams}
           activeTag={activeTag}
           searchQuery={searchQuery}

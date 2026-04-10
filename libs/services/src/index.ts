@@ -6,5 +6,13 @@ export { TagService } from './services/tag.js'
 export { UserService } from './services/user.js'
 export { ApiKeyService } from './services/api-key.js'
 
+// Validation schemas (shared between REST, MCP, and other transports)
+export {
+  pinListInputSchema,
+  tagListInputSchema,
+  type PinListInput,
+  type TagListInput,
+} from './validation/pin-query.js'
+
 // Utilities
 export { md5 } from './utils/crypto.js'

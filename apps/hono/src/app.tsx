@@ -14,7 +14,8 @@ import { authRoutes } from './routes/auth'
 import { pinsRoutes } from './routes/pins'
 import { tagsRoutes } from './routes/tags'
 import { profileRoutes } from './routes/profile'
-import { apiRoutes } from './routes/api'
+import { apiInternalRoutes } from './routes/api-internal'
+import { apiV1Routes } from './routes/api-v1'
 import { staticRoutes } from './routes/static'
 import { styleRoutes } from './routes/style'
 import { importRoutes } from './routes/import'
@@ -59,7 +60,8 @@ app.route('/profile', profileRoutes)
 app.route('/import', importRoutes)
 app.route('/export', exportRoutes)
 app.route('/private', privateRoutes)
-app.route('/api', apiRoutes)
+app.route('/api/internal', apiInternalRoutes)
+app.route('/api/v1', apiV1Routes)
 
 // Home page - redirects logged-in users to /pins
 app.get('/', async (c) => {

@@ -7,7 +7,6 @@ import { PinListPartial } from './pin-list'
 interface PinsContentPartialProps {
   pins: Pin[]
   pagination: Pagination
-  totalCount: number
   searchParams: string
   activeTag?: string
   searchQuery?: string
@@ -22,7 +21,6 @@ interface PinsContentPartialProps {
 export const PinsContentPartial: FC<PinsContentPartialProps> = ({
   pins,
   pagination,
-  totalCount,
   searchParams,
   activeTag,
   searchQuery,
@@ -56,7 +54,6 @@ export const PinsContentPartial: FC<PinsContentPartialProps> = ({
         <PinListPartial
           pins={pins}
           pagination={pagination}
-          totalCount={totalCount}
           searchParams={searchParams}
           viewSize={viewSize}
           baseUrl={baseUrl}

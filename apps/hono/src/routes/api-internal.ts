@@ -6,13 +6,13 @@ import {
 } from '../lib/services'
 import { getSessionManager, requireAuth } from '../middleware/session'
 
-const api = new Hono()
+const apiInternal = new Hono()
 
 // Apply auth middleware to all API routes
-api.use('*', requireAuth())
+apiInternal.use('*', requireAuth())
 
-// GET /api/metadata - Fetch metadata for a URL
-api.get('/metadata', async (c) => {
+// GET /api/internal/metadata - Fetch metadata for a URL
+apiInternal.get('/metadata', async (c) => {
   const sessionManager = getSessionManager(c)
   const user = await sessionManager.getUser()
 
@@ -41,8 +41,8 @@ api.get('/metadata', async (c) => {
   }
 })
 
-// GET /api/check-url - Check if a URL is already saved
-api.get('/check-url', async (c) => {
+// GET /api/internal/check-url - Check if a URL is already saved
+apiInternal.get('/check-url', async (c) => {
   const sessionManager = getSessionManager(c)
   const user = await sessionManager.getUser()
 
@@ -81,4 +81,4 @@ api.get('/check-url', async (c) => {
   return c.json({ exists: false })
 })
 
-export { api as apiRoutes }
+export { apiInternal as apiInternalRoutes }

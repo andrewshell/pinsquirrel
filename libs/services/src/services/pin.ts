@@ -189,7 +189,6 @@ export class PinService {
   ): Promise<{
     pins: Pin[]
     pagination: Pagination
-    totalCount: number
   }> {
     if (!ac.user) {
       throw new UnauthorizedPinAccessError(
@@ -222,7 +221,6 @@ export class PinService {
     return {
       pins: filteredPins,
       pagination,
-      totalCount,
     }
   }
 }

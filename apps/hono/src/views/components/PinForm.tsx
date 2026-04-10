@@ -77,7 +77,7 @@ export const PinForm: FC<PinFormProps> = ({
             error={duplicatePinId ? undefined : errors?.url?.join('. ')}
             helpText="Enter the web address you want to save as a pin"
             data-url-input
-            hx-get="/api/check-url"
+            hx-get="/api/internal/check-url"
             hx-trigger="change"
             hx-target="#url-check-result"
             hx-swap="innerHTML"

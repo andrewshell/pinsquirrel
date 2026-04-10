@@ -57,7 +57,7 @@ tags.get('/', async (c) => {
       user={user}
       tags={userTags}
       currentFilter={currentFilter}
-      untaggedPinsCount={untaggedResult.totalCount}
+      untaggedPinsCount={untaggedResult.pagination.totalCount}
       flash={flash}
     />
   )

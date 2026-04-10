@@ -143,7 +143,6 @@ pins.get('/', async (c) => {
       <PinsContentPartial
         pins={result.pins}
         pagination={result.pagination}
-        totalCount={result.totalCount}
         searchParams={searchParams}
         activeTag={tag}
         searchQuery={search}
@@ -164,7 +163,6 @@ pins.get('/', async (c) => {
       user={user}
       pins={result.pins}
       pagination={result.pagination}
-      totalCount={result.totalCount}
       searchParams={searchParams}
       activeTag={tag}
       searchQuery={search}
@@ -693,7 +691,6 @@ pins.delete('/:id', async (c) => {
       <PinsContentPartial
         pins={result.pins}
         pagination={result.pagination}
-        totalCount={result.totalCount}
         searchParams={searchParams}
         activeTag={tag}
         searchQuery={search}

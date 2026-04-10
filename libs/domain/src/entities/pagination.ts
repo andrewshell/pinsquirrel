@@ -6,6 +6,7 @@ export interface PaginationOptions {
 }
 
 export class Pagination {
+  readonly totalCount: number
   readonly page: number
   readonly pageSize: number
   readonly offset: number
@@ -14,6 +15,7 @@ export class Pagination {
   readonly hasPrevious: boolean
 
   constructor(
+    totalCount: number,
     page: number,
     pageSize: number,
     offset: number,
@@ -21,6 +23,7 @@ export class Pagination {
     hasNext: boolean,
     hasPrevious: boolean
   ) {
+    this.totalCount = totalCount
     this.page = page
     this.pageSize = pageSize
     this.offset = offset
@@ -56,6 +59,7 @@ export class Pagination {
     const hasPrevious = normalizedPage > 1
 
     return new Pagination(
+      totalCount,
       normalizedPage,
       normalizedPageSize,
       offset,

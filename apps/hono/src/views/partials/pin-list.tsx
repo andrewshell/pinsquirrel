@@ -5,7 +5,6 @@ import { PinCard } from '../components/PinCard'
 interface PinListPartialProps {
   pins: Pin[]
   pagination: Pagination
-  totalCount: number
   searchParams: string
   viewSize?: 'expanded' | 'compact'
   baseUrl?: string
@@ -59,17 +58,16 @@ const EmptyState: FC<{ hasFilters: boolean; baseUrl: string }> = ({
 
 const PaginationControls: FC<{
   pagination: Pagination
-  totalCount: number
   searchParams: string
   baseUrl: string
-}> = ({ pagination, totalCount, searchParams, baseUrl }) => {
+}> = ({ pagination, searchParams, baseUrl }) => {
   if (pagination.totalPages <= 1) return null
 
   return (
     <div class="flex items-center justify-between mt-8 pt-4 border-t border-foreground/20">
       <div class="text-sm text-muted-foreground">
-        Showing page {pagination.page} of {pagination.totalPages} ({totalCount}{' '}
-        total pins)
+        Showing page {pagination.page} of {pagination.totalPages} (
+        {pagination.totalCount} total pins)
       </div>
 
       <div class="flex gap-2">
@@ -108,7 +106,6 @@ const PaginationControls: FC<{
 export const PinListPartial: FC<PinListPartialProps> = ({
   pins,
   pagination,
-  totalCount,
   searchParams,
   viewSize = 'expanded',
   baseUrl = '/pins',
@@ -140,7 +137,6 @@ export const PinListPartial: FC<PinListPartialProps> = ({
 
       <PaginationControls
         pagination={pagination}
-        totalCount={totalCount}
         searchParams={searchParams}
         baseUrl={baseUrl}
       />

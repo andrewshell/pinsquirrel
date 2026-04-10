@@ -80,7 +80,7 @@ function initMetadataFetch(form) {
 
     try {
       const response = await fetch(
-        `/api/metadata?url=${encodeURIComponent(url)}`
+        `/api/internal/metadata?url=${encodeURIComponent(url)}`
       )
       const data = await response.json()
 
