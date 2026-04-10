@@ -6,6 +6,7 @@ describe('Pagination', () => {
     it('should create pagination with default values', () => {
       const pagination = Pagination.fromTotalCount(100)
 
+      expect(pagination.totalCount).toBe(100)
       expect(pagination.page).toBe(1)
       expect(pagination.pageSize).toBe(25)
       expect(pagination.offset).toBe(0)
@@ -134,8 +135,9 @@ describe('Pagination', () => {
 
   describe('constructor', () => {
     it('should create pagination with provided values', () => {
-      const pagination = new Pagination(2, 25, 25, 4, true, true)
+      const pagination = new Pagination(100, 2, 25, 25, 4, true, true)
 
+      expect(pagination.totalCount).toBe(100)
       expect(pagination.page).toBe(2)
       expect(pagination.pageSize).toBe(25)
       expect(pagination.offset).toBe(25)
@@ -145,9 +147,10 @@ describe('Pagination', () => {
     })
 
     it('should make properties readonly', () => {
-      const pagination = new Pagination(1, 25, 0, 1, false, false)
+      const pagination = new Pagination(10, 1, 25, 0, 1, false, false)
 
       // TypeScript should prevent mutation of readonly properties
+      expect(pagination.totalCount).toBe(10)
       expect(pagination.page).toBe(1)
       expect(pagination.pageSize).toBe(25)
       expect(pagination.offset).toBe(0)
