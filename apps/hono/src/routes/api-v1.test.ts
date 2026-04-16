@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
-import type { ApiKey, Pin, Tag, User } from '@pinsquirrel/domain'
+import type { ApiKey, Pin, Tag, TagWithCount, User } from '@pinsquirrel/domain'
 import { Pagination } from '@pinsquirrel/domain'
 
 const mockAuthenticateByKey = vi.fn()
@@ -143,7 +143,7 @@ describe('api-v1 routes', () => {
       mockFindUserById.mockResolvedValue(testUser)
     })
 
-    it('returns data and pagination shape', async () => {
+    it('returns pins and pagination shape', async () => {
       mockGetUserPinsWithPagination.mockResolvedValue({
         pins: [makePin()],
         pagination: Pagination.fromTotalCount(1, { page: 1, pageSize: 25 }),
@@ -153,10 +153,10 @@ describe('api-v1 routes', () => {
       })
       expect(res.status).toBe(200)
       const body = (await res.json()) as {
-        data: unknown[]
+        pins: unknown[]
         pagination: { totalCount: number; page: number; hasNext: boolean }
       }
-      expect(body.data).toHaveLength(1)
+      expect(body.pins).toHaveLength(1)
       expect(body.pagination.totalCount).toBe(1)
       expect(body.pagination.page).toBe(1)
       expect(body.pagination.hasNext).toBe(false)
@@ -208,8 +208,8 @@ describe('api-v1 routes', () => {
         headers: { Authorization: 'Bearer ps_ok' },
       })
       expect(res.status).toBe(200)
-      const body = (await res.json()) as { data: { id: string } }
-      expect(body.data.id).toBe('pin-1')
+      const body = (await res.json()) as { id: string }
+      expect(body.id).toBe('pin-1')
     })
 
     it('returns 404 for private pins', async () => {
@@ -233,8 +233,8 @@ describe('api-v1 routes', () => {
         headers: { Authorization: 'Bearer ps_ok' },
       })
       expect(res.status).toBe(200)
-      const body = (await res.json()) as { data: { name: string }[] }
-      expect(body.data[0].name).toBe('foo')
+      const body = (await res.json()) as Tag[]
+      expect(body[0].name).toBe('foo')
     })
 
     it('returns tags with counts when withCounts=true', async () => {
@@ -245,8 +245,8 @@ describe('api-v1 routes', () => {
         headers: { Authorization: 'Bearer ps_ok' },
       })
       expect(res.status).toBe(200)
-      const body = (await res.json()) as { data: { pinCount: number }[] }
-      expect(body.data[0].pinCount).toBe(5)
+      const body = (await res.json()) as TagWithCount[]
+      expect(body[0].pinCount).toBe(5)
     })
   })
 

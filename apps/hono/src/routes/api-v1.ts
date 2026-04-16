@@ -1,13 +1,11 @@
 import { Hono, type Context } from 'hono'
 import {
   AccessControl,
-  Pagination,
   PinNotFoundError,
   TagNotFoundError,
   UnauthorizedPinAccessError,
   UnauthorizedTagAccessError,
   ValidationError,
-  type Pin,
   type PinFilter,
 } from '@pinsquirrel/domain'
 import {
@@ -71,30 +69,6 @@ function pinFilterFromInput(input: PinListInput): PinFilter {
   }
 }
 
-function serializePin(pin: Pin) {
-  return {
-    id: pin.id,
-    url: pin.url,
-    title: pin.title,
-    description: pin.description,
-    readLater: pin.readLater,
-    tags: pin.tagNames,
-    createdAt: pin.createdAt.toISOString(),
-    updatedAt: pin.updatedAt.toISOString(),
-  }
-}
-
-function serializePagination(p: Pagination) {
-  return {
-    page: p.page,
-    pageSize: p.pageSize,
-    totalCount: p.totalCount,
-    totalPages: p.totalPages,
-    hasNext: p.hasNext,
-    hasPrevious: p.hasPrevious,
-  }
-}
-
 // GET /api/v1/pins - list pins (excludes private pins)
 apiV1.get('/pins', async (c) => {
   const user = getApiUser(c)
@@ -114,10 +88,7 @@ apiV1.get('/pins', async (c) => {
       pinFilterFromInput(input),
       { page: input.page, pageSize: input.pageSize }
     )
-    return c.json({
-      data: result.pins.map(serializePin),
-      pagination: serializePagination(result.pagination),
-    })
+    return c.json(result)
   } catch (err) {
     return errorResponse(c, err)
   }
@@ -134,7 +105,7 @@ apiV1.get('/pins/:id', async (c) => {
     if (pin.isPrivate) {
       return c.json({ error: 'Pin not found' }, 404)
     }
-    return c.json({ data: serializePin(pin) })
+    return c.json(pin)
   } catch (err) {
     return errorResponse(c, err)
   }
@@ -153,27 +124,10 @@ apiV1.get('/tags', async (c) => {
   }
 
   try {
-    if (parsed.data.withCounts) {
-      const tags = await tagService.getUserTagsWithCount(ac, user.id)
-      return c.json({
-        data: tags.map((t) => ({
-          id: t.id,
-          name: t.name,
-          pinCount: t.pinCount,
-          createdAt: t.createdAt.toISOString(),
-          updatedAt: t.updatedAt.toISOString(),
-        })),
-      })
-    }
-    const tags = await tagService.getUserTags(ac, user.id)
-    return c.json({
-      data: tags.map((t) => ({
-        id: t.id,
-        name: t.name,
-        createdAt: t.createdAt.toISOString(),
-        updatedAt: t.updatedAt.toISOString(),
-      })),
-    })
+    const tags = parsed.data.withCounts
+      ? await tagService.getUserTagsWithCount(ac, user.id)
+      : await tagService.getUserTags(ac, user.id)
+    return c.json(tags)
   } catch (err) {
     return errorResponse(c, err)
   }
@@ -204,10 +158,7 @@ apiV1.get('/tags/:id/pins', async (c) => {
       { ...pinFilterFromInput(input), tag: tag.name },
       { page: input.page, pageSize: input.pageSize }
     )
-    return c.json({
-      data: result.pins.map(serializePin),
-      pagination: serializePagination(result.pagination),
-    })
+    return c.json(result)
   } catch (err) {
     return errorResponse(c, err)
   }
