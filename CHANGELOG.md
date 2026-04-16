@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.3.0](https://github.com/andrewshell/pinsquirrel/compare/v3.2.1...v3.3.0) (2026-04-16)
+
+
+### Features
+
+* add private pins with re-authentication and incognito-style UI ([4facb67](https://github.com/andrewshell/pinsquirrel/commit/4facb677fb4a2c4599f025200e3314b9c79f30b4))
+* **api:** add OpenAPI spec and Scalar docs UI ([cafe7a1](https://github.com/andrewshell/pinsquirrel/commit/cafe7a1ace3ba9c0b5ed0ad08d76ae9d8ffa5ce7))
+* **api:** add read-only REST API at /api/v1 with API key auth ([40b60c9](https://github.com/andrewshell/pinsquirrel/commit/40b60c96bb64aa8ea8bfbd90b94443ca715e19c2))
+* **mcp:** add read-only MCP endpoints with API key auth ([087c1c1](https://github.com/andrewshell/pinsquirrel/commit/087c1c160ec984d22e1a005f1ec6506f9c7dac7e))
+
+
+### Bug Fixes
+
+* **deps:** bump axios override to &gt;=1.15.0 and hono to &gt;=4.12.12 ([9103c07](https://github.com/andrewshell/pinsquirrel/commit/9103c07f9a41598b73d89a7d1fd84d954e0aea1d))
+* **lint:** set tsconfigRootDir and correct VSCode workingDirectories ([8fdc448](https://github.com/andrewshell/pinsquirrel/commit/8fdc44867eb426f53d9f6714d95dfcfc1f458f32))
+
 ## [3.2.1](https://github.com/andrewshell/pinsquirrel/compare/v3.2.0...v3.2.1) (2026-04-06)
 
 
