@@ -19,7 +19,9 @@
     "css:watch": "tailwindcss -i ./src/styles/app.css -o ./src/static/styles.css --watch"
   },
   "dependencies": {
+    "@hono/mcp": "^0.2.5",
     "@hono/node-server": "^1.19.13",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@pinsquirrel/adapters": "workspace:*",
     "@pinsquirrel/database": "workspace:*",
     "@pinsquirrel/domain": "workspace:*",
