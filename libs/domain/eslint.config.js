@@ -9,21 +9,24 @@ export default tseslint.config(
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
+      parserOptions: {
+        tsconfigRootDir: import.meta.dirname,
+      },
       globals: {
         process: 'readonly',
         console: 'readonly',
         Buffer: 'readonly',
         __dirname: 'readonly',
-        __filename: 'readonly'
-      }
+        __filename: 'readonly',
+      },
     },
     rules: {
       '@typescript-eslint/no-unused-vars': 'error',
       '@typescript-eslint/no-explicit-any': 'warn',
-      'no-console': 'warn'
-    }
+      'no-console': 'warn',
+    },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', '**/*.js']
+    ignores: ['dist/**', 'node_modules/**', '**/*.js'],
   }
 )

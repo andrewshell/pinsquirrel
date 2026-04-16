@@ -39,9 +39,8 @@
 
   // ESLint settings
   "eslint.workingDirectories": [
-    "apps/web",
-    "libs/core", 
-    "libs/database"
+    { "pattern": "apps/*" },
+    { "pattern": "libs/*" }
   ],
   "eslint.validate": [
     "javascript",
