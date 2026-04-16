@@ -23,6 +23,10 @@ export const pinListInputSchema = z.object({
 
 export type PinListInput = z.infer<typeof pinListInputSchema>
 
+export const pinGetInputSchema = {
+  id: z.string().describe('The pin ID'),
+}
+
 export const tagListInputSchema = z.object({
   withCounts: z.boolean().optional(),
 })

@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { csrf } from 'hono/csrf'
+import { HTTPException } from 'hono/http-exception'
 import { logger, safeError } from './lib/logger.js'
 import { secureHeaders } from 'hono/secure-headers'
 
@@ -21,6 +22,7 @@ import { styleRoutes } from './routes/style'
 import { importRoutes } from './routes/import'
 import { exportRoutes } from './routes/export'
 import { privateRoutes } from './routes/private'
+import { mcpRoutes } from './routes/mcp'
 import { sessionMiddleware } from './middleware/session'
 
 // Create the Hono app
@@ -45,6 +47,8 @@ app.use('*', secureHeaders())
 // Serve static files (must run before session middleware so CSS/JS load
 // even if the database is unavailable)
 app.use('/static/*', serveStatic({ root: './src' }))
+
+app.route('/mcp', mcpRoutes)
 
 app.use('*', sessionMiddleware())
 app.use('*', csrf())
@@ -107,6 +111,9 @@ function isDatabaseConnectionError(err: unknown): boolean {
 
 // Error handler for 500 errors
 app.onError((err, c) => {
+  if (err instanceof HTTPException) {
+    return err.getResponse()
+  }
   logger.error({ err: safeError(err) }, 'Unhandled server error')
   const message = isDatabaseConnectionError(err)
     ? 'Unable to connect to the database. If you are running locally, make sure Docker is running and start the database with `pnpm db:up`.'

@@ -9,6 +9,7 @@ export { ApiKeyService } from './services/api-key.js'
 // Validation schemas (shared between REST, MCP, and other transports)
 export {
   pinListInputSchema,
+  pinGetInputSchema,
   tagListInputSchema,
   type PinListInput,
   type TagListInput,
