@@ -1,4 +1,5 @@
-import { Hono, type Context } from 'hono'
+import { type Context } from 'hono'
+import { OpenAPIHono, z } from '@hono/zod-openapi'
 import {
   AccessControl,
   PinNotFoundError,
@@ -9,57 +10,175 @@ import {
   type PinFilter,
 } from '@pinsquirrel/domain'
 import {
-  pinListInputSchema,
-  tagListInputSchema,
+  pinListQuerySchema,
+  tagListQuerySchema,
+  pinSchema,
+  tagSchema,
+  tagWithCountSchema,
+  paginatedPinsSchema,
+  errorSchema,
   type PinListInput,
 } from '@pinsquirrel/services'
 import { pinService, tagService } from '../lib/services'
 import { tagRepository } from '../lib/db'
 import { apiKeyAuth, getApiUser } from '../middleware/api-auth'
 
-const apiV1 = new Hono()
+const apiV1 = new OpenAPIHono()
+
+// --- OpenAPI route specs (for spec generation only) -------------------------
+
+const security: Record<string, string[]>[] = [
+  { bearerAuth: [] },
+  { apiKeyHeader: [] },
+]
+
+apiV1.openAPIRegistry.registerPath({
+  method: 'get',
+  path: '/pins',
+  tags: ['Pins'],
+  summary: 'List pins',
+  description:
+    'List public pins for the authenticated user with optional filtering and pagination.',
+  security,
+  request: { query: pinListQuerySchema },
+  responses: {
+    200: {
+      content: { 'application/json': { schema: paginatedPinsSchema } },
+      description: 'Paginated list of pins',
+    },
+    400: {
+      content: { 'application/json': { schema: errorSchema } },
+      description: 'Validation error',
+    },
+    401: {
+      content: { 'application/json': { schema: errorSchema } },
+      description: 'Unauthorized',
+    },
+    500: {
+      content: { 'application/json': { schema: errorSchema } },
+      description: 'Internal server error',
+    },
+  },
+})
+
+apiV1.openAPIRegistry.registerPath({
+  method: 'get',
+  path: '/pins/{id}',
+  tags: ['Pins'],
+  summary: 'Get a pin',
+  description:
+    'Get a single pin by ID. Returns 404 for private or non-existent pins.',
+  security,
+  request: {
+    params: z.object({
+      id: z.string().describe('Pin ID'),
+    }),
+  },
+  responses: {
+    200: {
+      content: { 'application/json': { schema: pinSchema } },
+      description: 'Pin details',
+    },
+    401: {
+      content: { 'application/json': { schema: errorSchema } },
+      description: 'Unauthorized',
+    },
+    404: {
+      content: { 'application/json': { schema: errorSchema } },
+      description: 'Pin not found',
+    },
+    500: {
+      content: { 'application/json': { schema: errorSchema } },
+      description: 'Internal server error',
+    },
+  },
+})
+
+apiV1.openAPIRegistry.registerPath({
+  method: 'get',
+  path: '/tags',
+  tags: ['Tags'],
+  summary: 'List tags',
+  description:
+    "List the authenticated user's tags, optionally including pin counts.",
+  security,
+  request: { query: tagListQuerySchema },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: z.union([z.array(tagSchema), z.array(tagWithCountSchema)]),
+        },
+      },
+      description: 'List of tags (with or without counts)',
+    },
+    400: {
+      content: { 'application/json': { schema: errorSchema } },
+      description: 'Validation error',
+    },
+    401: {
+      content: { 'application/json': { schema: errorSchema } },
+      description: 'Unauthorized',
+    },
+    500: {
+      content: { 'application/json': { schema: errorSchema } },
+      description: 'Internal server error',
+    },
+  },
+})
+
+apiV1.openAPIRegistry.registerPath({
+  method: 'get',
+  path: '/tags/{id}/pins',
+  tags: ['Tags'],
+  summary: 'List pins for a tag',
+  description:
+    'Get public pins associated with a specific tag. Returns 404 if the tag does not exist or does not belong to the user.',
+  security,
+  request: {
+    params: z.object({
+      id: z.string().describe('Tag ID'),
+    }),
+    query: pinListQuerySchema,
+  },
+  responses: {
+    200: {
+      content: { 'application/json': { schema: paginatedPinsSchema } },
+      description: 'Paginated list of pins for the tag',
+    },
+    400: {
+      content: { 'application/json': { schema: errorSchema } },
+      description: 'Validation error',
+    },
+    401: {
+      content: { 'application/json': { schema: errorSchema } },
+      description: 'Unauthorized',
+    },
+    404: {
+      content: { 'application/json': { schema: errorSchema } },
+      description: 'Tag not found',
+    },
+    500: {
+      content: { 'application/json': { schema: errorSchema } },
+      description: 'Internal server error',
+    },
+  },
+})
+
+// --- Auth middleware (applies to all routes) ---------------------------------
 
 // TODO: write endpoints (POST/PUT/DELETE) will need CSRF bypass when added.
 apiV1.use('*', apiKeyAuth())
+
+// --- Helpers ----------------------------------------------------------------
 
 function firstIssue(issues: { message: string }[]): string {
   return issues[0]?.message ?? 'Invalid query'
 }
 
-/**
- * Convert raw HTTP query-string values (all strings) into the typed shape
- * that `pinListInputSchema` / `tagListInputSchema` expect. Unknown/absent
- * fields are dropped so schema `.optional()` handles them.
- */
-function coerceQuery(
-  raw: Record<string, string>,
-  numberKeys: readonly string[],
-  booleanKeys: readonly string[]
-): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...raw }
-  for (const key of numberKeys) {
-    if (raw[key] !== undefined) {
-      const n = Number(raw[key])
-      out[key] = Number.isNaN(n) ? raw[key] : n
-    }
-  }
-  for (const key of booleanKeys) {
-    if (raw[key] !== undefined) {
-      if (raw[key] === 'true' || raw[key] === '1') out[key] = true
-      else if (raw[key] === 'false' || raw[key] === '0') out[key] = false
-      // else leave as string so the schema rejects it with a useful error
-    }
-  }
-  return out
-}
-
-const PIN_LIST_NUMBER_KEYS = ['page', 'pageSize'] as const
-const PIN_LIST_BOOLEAN_KEYS = ['readLater', 'noTags'] as const
-const TAG_LIST_BOOLEAN_KEYS = ['withCounts'] as const
-
 function pinFilterFromInput(input: PinListInput): PinFilter {
   return {
-    isPrivate: false,
+    isPrivate: input.isPrivate,
     tag: input.tag,
     search: input.search,
     readLater: input.readLater,
@@ -69,14 +188,30 @@ function pinFilterFromInput(input: PinListInput): PinFilter {
   }
 }
 
+function errorResponse(c: Context, err: unknown) {
+  if (err instanceof ValidationError) {
+    return c.json({ error: 'Invalid request' }, 400)
+  }
+  if (err instanceof PinNotFoundError || err instanceof TagNotFoundError) {
+    return c.json({ error: err.message }, 404)
+  }
+  if (
+    err instanceof UnauthorizedPinAccessError ||
+    err instanceof UnauthorizedTagAccessError
+  ) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  return c.json({ error: 'Internal server error' }, 500)
+}
+
+// --- Route handlers ---------------------------------------------------------
+
 // GET /api/v1/pins - list pins (excludes private pins)
 apiV1.get('/pins', async (c) => {
   const user = getApiUser(c)
   const ac = new AccessControl(user)
 
-  const parsed = pinListInputSchema.safeParse(
-    coerceQuery(c.req.query(), PIN_LIST_NUMBER_KEYS, PIN_LIST_BOOLEAN_KEYS)
-  )
+  const parsed = pinListQuerySchema.safeParse(c.req.query())
   if (!parsed.success) {
     return c.json({ error: firstIssue(parsed.error.issues) }, 400)
   }
@@ -102,9 +237,6 @@ apiV1.get('/pins/:id', async (c) => {
 
   try {
     const pin = await pinService.getPin(ac, id)
-    if (pin.isPrivate) {
-      return c.json({ error: 'Pin not found' }, 404)
-    }
     return c.json(pin)
   } catch (err) {
     return errorResponse(c, err)
@@ -116,9 +248,7 @@ apiV1.get('/tags', async (c) => {
   const user = getApiUser(c)
   const ac = new AccessControl(user)
 
-  const parsed = tagListInputSchema.safeParse(
-    coerceQuery(c.req.query(), [], TAG_LIST_BOOLEAN_KEYS)
-  )
+  const parsed = tagListQuerySchema.safeParse(c.req.query())
   if (!parsed.success) {
     return c.json({ error: firstIssue(parsed.error.issues) }, 400)
   }
@@ -139,9 +269,7 @@ apiV1.get('/tags/:id/pins', async (c) => {
   const ac = new AccessControl(user)
   const tagId = c.req.param('id')
 
-  const parsed = pinListInputSchema.safeParse(
-    coerceQuery(c.req.query(), PIN_LIST_NUMBER_KEYS, PIN_LIST_BOOLEAN_KEYS)
-  )
+  const parsed = pinListQuerySchema.safeParse(c.req.query())
   if (!parsed.success) {
     return c.json({ error: firstIssue(parsed.error.issues) }, 400)
   }
@@ -163,21 +291,5 @@ apiV1.get('/tags/:id/pins', async (c) => {
     return errorResponse(c, err)
   }
 })
-
-function errorResponse(c: Context, err: unknown) {
-  if (err instanceof ValidationError) {
-    return c.json({ error: 'Invalid request' }, 400)
-  }
-  if (err instanceof PinNotFoundError || err instanceof TagNotFoundError) {
-    return c.json({ error: err.message }, 404)
-  }
-  if (
-    err instanceof UnauthorizedPinAccessError ||
-    err instanceof UnauthorizedTagAccessError
-  ) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-  return c.json({ error: 'Internal server error' }, 500)
-}
 
 export { apiV1 as apiV1Routes }

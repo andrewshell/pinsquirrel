@@ -15,5 +15,22 @@ export {
   type TagListInput,
 } from './validation/pin-query.js'
 
+// String-coercion query schemas (for HTTP query string inputs)
+export {
+  pinListQuerySchema,
+  tagListQuerySchema,
+} from './validation/query-coerce.js'
+
+// Response schemas (service output shapes)
+export {
+  pinSchema,
+  tagSchema,
+  tagWithCountSchema,
+  paginationSchema,
+  paginatedPinsSchema,
+  errorSchema,
+} from './validation/responses.js'
+
 // Utilities
 export { md5 } from './utils/crypto.js'
+export { booleanFromString, numberFromString } from './utils/zod-coerce.js'

@@ -11,14 +11,26 @@ import { z } from 'zod'
  */
 
 export const pinListInputSchema = z.object({
-  tag: z.string().trim().min(1).optional(),
-  search: z.string().trim().min(1).optional(),
-  readLater: z.boolean().optional(),
-  noTags: z.boolean().optional(),
-  sortBy: z.enum(['created', 'title']).optional(),
-  sortDirection: z.enum(['asc', 'desc']).optional(),
-  page: z.number().int().min(1).optional(),
-  pageSize: z.number().int().min(1).max(100).optional(),
+  tag: z.string().trim().min(1).optional().describe('Filter by tag name'),
+  search: z
+    .string()
+    .trim()
+    .min(1)
+    .optional()
+    .describe('Search pins by keyword'),
+  readLater: z.boolean().optional().describe('Filter to read-later pins only'),
+  noTags: z.boolean().optional().describe('Filter to pins with no tags'),
+  isPrivate: z.boolean().optional().describe('Filter by private status'),
+  sortBy: z.enum(['created', 'title']).optional().describe('Sort field'),
+  sortDirection: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
+  page: z.number().int().min(1).optional().describe('Page number (1-indexed)'),
+  pageSize: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe('Results per page (max 100)'),
 })
 
 export type PinListInput = z.infer<typeof pinListInputSchema>
@@ -28,7 +40,7 @@ export const pinGetInputSchema = {
 }
 
 export const tagListInputSchema = z.object({
-  withCounts: z.boolean().optional(),
+  withCounts: z.boolean().optional().describe('Include pin counts per tag'),
 })
 
 export type TagListInput = z.infer<typeof tagListInputSchema>
