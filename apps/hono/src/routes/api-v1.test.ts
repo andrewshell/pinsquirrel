@@ -160,11 +160,11 @@ describe('api-v1 routes', () => {
       expect(body.pagination.totalCount).toBe(1)
       expect(body.pagination.page).toBe(1)
       expect(body.pagination.hasNext).toBe(false)
-      // Verify filter forces isPrivate: false
+      // isPrivate defaults to undefined (no filter) when not specified
       const filter = mockGetUserPinsWithPagination.mock.calls[0][1] as {
-        isPrivate: boolean
+        isPrivate: boolean | undefined
       }
-      expect(filter.isPrivate).toBe(false)
+      expect(filter.isPrivate).toBeUndefined()
     })
 
     it('passes query params through to service', async () => {
@@ -183,7 +183,6 @@ describe('api-v1 routes', () => {
         readLater: true,
         sortBy: 'title',
         sortDirection: 'asc',
-        isPrivate: false,
       })
       expect(pagination).toEqual({ page: 2, pageSize: 10 })
     })
@@ -212,12 +211,14 @@ describe('api-v1 routes', () => {
       expect(body.id).toBe('pin-1')
     })
 
-    it('returns 404 for private pins', async () => {
+    it('returns private pins', async () => {
       mockGetPin.mockResolvedValue(makePin({ isPrivate: true }))
       const res = await app.request('/api/v1/pins/pin-1', {
         headers: { Authorization: 'Bearer ps_ok' },
       })
-      expect(res.status).toBe(404)
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { isPrivate: boolean }
+      expect(body.isPrivate).toBe(true)
     })
   })
 
@@ -268,10 +269,10 @@ describe('api-v1 routes', () => {
       expect(res.status).toBe(200)
       const filter = mockGetUserPinsWithPagination.mock.calls[0][1] as {
         tag: string
-        isPrivate: boolean
+        isPrivate: boolean | undefined
       }
       expect(filter.tag).toBe('foo')
-      expect(filter.isPrivate).toBe(false)
+      expect(filter.isPrivate).toBeUndefined()
     })
 
     it('returns 404 if tag does not belong to user', async () => {
