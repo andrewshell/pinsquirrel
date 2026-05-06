@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { PinFilter } from '@pinsquirrel/domain'
 
 /**
  * Canonical typed-JSON schemas for pin/tag list input.
@@ -44,3 +45,23 @@ export const tagListInputSchema = z.object({
 })
 
 export type TagListInput = z.infer<typeof tagListInputSchema>
+
+/**
+ * Translate a validated `PinListInput` into a domain `PinFilter`.
+ *
+ * Both the REST API and MCP transport accept the same logical input shape,
+ * so the conversion lives here as a single source of truth. Callers that
+ * need to enforce additional constraints (e.g. forcing `isPrivate: false`
+ * for public-only endpoints) should override after calling this helper.
+ */
+export function pinFilterFromInput(input: PinListInput): PinFilter {
+  return {
+    isPrivate: input.isPrivate,
+    tag: input.tag,
+    search: input.search,
+    readLater: input.readLater,
+    noTags: input.noTags,
+    sortBy: input.sortBy,
+    sortDirection: input.sortDirection,
+  }
+}

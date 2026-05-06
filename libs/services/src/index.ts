@@ -11,6 +11,7 @@ export {
   pinListInputSchema,
   pinGetInputSchema,
   tagListInputSchema,
+  pinFilterFromInput,
   type PinListInput,
   type TagListInput,
 } from './validation/pin-query.js'

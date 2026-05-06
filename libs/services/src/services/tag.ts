@@ -29,6 +29,19 @@ export class TagService {
   }
 
   /**
+   * Get a single tag owned by the authenticated user.
+   * Throws `TagNotFoundError` when the tag does not exist or the caller
+   * cannot read it (404-style ownership obfuscation).
+   */
+  async getUserTagById(ac: AccessControl, tagId: string): Promise<Tag> {
+    const tag = await this.tagRepository.findById(tagId)
+    if (!tag || !ac.canRead(tag)) {
+      throw new TagNotFoundError(`Tag with ID "${tagId}" not found`)
+    }
+    return tag
+  }
+
+  /**
    * Get all tags with pin counts for a specified user (filtered through access control)
    * Allows unauthenticated users - they will only see tags they can read (none for now, but future public tags)
    */

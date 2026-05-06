@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import type { ApiKey, Pin, Tag, TagWithCount, User } from '@pinsquirrel/domain'
-import { Pagination } from '@pinsquirrel/domain'
+import { Pagination, TagNotFoundError } from '@pinsquirrel/domain'
 
 const mockAuthenticateByKey = vi.fn()
 const mockFindUserById = vi.fn()
-const mockFindTagById = vi.fn()
 const mockGetPin = vi.fn()
 const mockGetUserPinsWithPagination = vi.fn()
 const mockGetUserTags = vi.fn()
 const mockGetUserTagsWithCount = vi.fn()
+const mockGetUserTagById = vi.fn()
 
 vi.mock('../lib/services', () => ({
   apiKeyService: {
@@ -25,15 +25,14 @@ vi.mock('../lib/services', () => ({
     getUserTags: (...args: unknown[]) => mockGetUserTags(...args) as unknown,
     getUserTagsWithCount: (...args: unknown[]) =>
       mockGetUserTagsWithCount(...args) as unknown,
+    getUserTagById: (...args: unknown[]) =>
+      mockGetUserTagById(...args) as unknown,
   },
 }))
 
 vi.mock('../lib/db', () => ({
   userRepository: {
     findById: (...args: unknown[]) => mockFindUserById(...args) as unknown,
-  },
-  tagRepository: {
-    findById: (...args: unknown[]) => mockFindTagById(...args) as unknown,
   },
 }))
 
@@ -258,7 +257,7 @@ describe('api-v1 routes', () => {
     })
 
     it('returns pins filtered by tag name', async () => {
-      mockFindTagById.mockResolvedValue(makeTag())
+      mockGetUserTagById.mockResolvedValue(makeTag())
       mockGetUserPinsWithPagination.mockResolvedValue({
         pins: [makePin()],
         pagination: Pagination.fromTotalCount(1),
@@ -275,16 +274,10 @@ describe('api-v1 routes', () => {
       expect(filter.isPrivate).toBeUndefined()
     })
 
-    it('returns 404 if tag does not belong to user', async () => {
-      mockFindTagById.mockResolvedValue(makeTag({ userId: 'other-user' }))
-      const res = await app.request('/api/v1/tags/tag-1/pins', {
-        headers: { Authorization: 'Bearer ps_ok' },
-      })
-      expect(res.status).toBe(404)
-    })
-
-    it('returns 404 when tag not found', async () => {
-      mockFindTagById.mockResolvedValue(null)
+    it('returns 404 when tag service throws TagNotFoundError', async () => {
+      mockGetUserTagById.mockRejectedValue(
+        new TagNotFoundError('Tag with ID "tag-1" not found')
+      )
       const res = await app.request('/api/v1/tags/tag-1/pins', {
         headers: { Authorization: 'Bearer ps_ok' },
       })
