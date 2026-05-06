@@ -1,83 +1,114 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code working in this repository.
 
 ## Repository Structure
 
-This is a pnpm monorepo with Turbo orchestration:
+pnpm monorepo orchestrated with Turbo:
 
-- `apps/` - Applications
-  - `hono/` - Hono + HTMX application (main app)
-- `libs/` - Shared libraries and utilities
-  - `services/` - Business logic services and validation
-  - `database/` - Database layer with Drizzle ORM for MySQL
-  - `domain/` - Domain entities and interfaces
-  - `adapters/` - External service adapters
-  - `mailgun/` - Email service implementation
-- `pnpm-workspace.yaml` - Defines workspace packages
-- `package.json` - Root package with Turbo scripts
-- `turbo.json` - Turbo task configuration
+- `apps/hono/` — Hono + HTMX application (main app, dev port 8100)
+- `libs/services/` — Business logic and validation (Zod). Dependency-injected services (e.g. `AuthenticationService`, `PinService`)
+- `libs/database/` — Drizzle ORM (MySQL) schema and repositories. Implements interfaces from `@pinsquirrel/domain`
+- `libs/domain/` — Domain entities (User, Pin, Tag) and repository interfaces. **No external dependencies — pure domain logic**
+- `libs/adapters/` — External service adapters
+- `libs/mailgun/` — Email service implementation
+
+Workspace packages depend on each other via the `workspace:*` protocol, e.g. `"@pinsquirrel/domain": "workspace:*"`.
 
 ## Essential Commands
 
-### Development
+Root-level (Turbo orchestrates across packages):
 
-- `pnpm dev` - Start development server (port 8100)
-- `pnpm build` - Build all packages
-- `pnpm start` - Start production server
-- `pnpm lint` - Run ESLint across all workspaces
-- `pnpm format` - Run Prettier formatting across all workspaces
-- `pnpm test` - Run tests across all workspaces
-- `pnpm typecheck` - Run TypeScript type checking
+| Command                                        | Purpose                                              |
+| ---------------------------------------------- | ---------------------------------------------------- |
+| `pnpm dev`                                     | Start Hono dev server (port 8100)                    |
+| `pnpm build`                                   | Build all packages                                   |
+| `pnpm test`                                    | Run all tests                                        |
+| `pnpm typecheck` / `pnpm lint` / `pnpm format` | Type check / ESLint / Prettier                       |
+| `pnpm quality`                                 | All checks: typecheck + lint + test + format + audit |
+| `pnpm run audit`                               | `pnpm audit --prod --audit-level=high` (matches CI)  |
+| `pnpm db:up` / `pnpm db:down`                  | Start / stop dev MySQL container                     |
 
-### Package Management
+Database operations (workspace-scoped):
 
-- `pnpm install` - Install dependencies for all workspaces
-- `pnpm add <pkg> --filter <workspace>` - Add dependency to specific workspace
-- `pnpm add <pkg> -w` - Add dependency to workspace root
-- `pnpm --filter <workspace> <command>` - Run command in specific workspace
+- `pnpm --filter @pinsquirrel/database db:generate` — generate Drizzle migration
+- `pnpm --filter @pinsquirrel/database db:migrate` — run migrations
+- `pnpm --filter @pinsquirrel/database db:studio` — open Drizzle Studio
 
-### Database Management
+For TDD, run a workspace-scoped test watcher:
 
-- `pnpm db:up` - Start development MySQL database via Docker
-- `pnpm db:down` - Stop development database
+```bash
+pnpm --filter <workspace> test:watch
+```
 
-### Workspace Operations
+## Monorepo Command Guidelines
 
-- `pnpm -r <command>` - Run command in all workspaces
-- `pnpm --filter "./apps/*" <command>` - Run command in all apps
-- `pnpm --filter "./libs/*" <command>` - Run command in all libs
+**ALWAYS run commands from the project root using `pnpm --filter <workspace>`.** Do not `cd` into a subdirectory to run commands.
 
-## Development Workflow
+```bash
+# Good
+pnpm --filter @pinsquirrel/hono build
 
-### IMPORTANT: Monorepo Command Guidelines
+# Avoid
+cd apps/hono && pnpm build
+```
 
-- **ALWAYS run commands from the project root** using `pnpm --filter <workspace>`
-- **NEVER navigate to subdirectories** to run commands unless absolutely necessary
-- If you must navigate to a subdirectory, **ALWAYS return to root** immediately after
-- Use `pnpm --filter @pinsquirrel/hono <command>` instead of `cd apps/hono && pnpm <command>`
-- Use `pnpm --filter @pinsquirrel/services <command>` instead of `cd libs/services && pnpm <command>`
-- Use `pnpm --filter @pinsquirrel/database <command>` instead of `cd libs/database && pnpm <command>`
+## Pre-Work Baseline Check
 
-### Test-Driven Development (TDD) Workflow
+**Before starting any new task, run `pnpm run audit` on the base branch.**
 
-When developing new features or fixing bugs, **ALWAYS follow the TDD red-green-refactor cycle**:
+Audit findings usually come from upstream advisories landing against dependencies that were fine yesterday — they are unrelated to whatever feature or bug you're about to work on. If you discover one mid-task, fixing it pollutes the PR with a dependency bump that has nothing to do with the change.
 
-1. **RED**: Write a failing test first
-   - `pnpm test --filter <workspace> -- --watch` to start test watcher
-   - Write test that describes the expected behavior
-   - Verify the test fails with the expected error
+If the audit fails on the base branch:
 
-2. **GREEN**: Write minimal code to make the test pass
-   - Implement just enough code to satisfy the test
-   - Keep implementation simple and focused
+1. Stop — do not start the planned work yet.
+2. Fix it on its own branch and open a separate PR (typically bumping the offending dependency or adding a `pnpm.overrides` entry).
+3. Once that lands, rebase and start the planned work on a clean baseline.
 
-3. **REFACTOR**: Improve the code while keeping tests green
-   - Clean up implementation
-   - Extract reusable components/functions
-   - Ensure all tests still pass
+The same principle applies if any other quality check is already broken on the base branch: fix it separately first.
 
-### Quality Check Requirements
+## Test-Driven Development (TDD) Workflow
+
+**ALWAYS write code via the Red → Green → Refactor cycle when adding behavior or fixing bugs.**
+
+Why this matters in practice:
+
+- The failing test is the spec. Writing it first forces you to define "done" before you start typing implementation, which catches vague requirements early.
+- Bug fixes need a regression test that fails _before_ the fix. Otherwise you have no proof the fix actually addresses the reported behavior — and no guard against the bug returning.
+- Refactoring with green tests is safe; refactoring without them is gambling. The cycle gives you a safety net before you need it.
+- Small Red → Green → Refactor loops produce small, reviewable commits. Big-bang implementations produce big-bang PRs.
+
+Start the watcher in the relevant workspace and leave it running:
+
+```bash
+pnpm --filter <workspace> test:watch
+```
+
+#### 1. RED — Write a failing test first
+
+- Write the test that captures the behavior you want. Be precise about inputs, outputs, and edge cases.
+- Run the watcher and confirm the test fails. Read the failure message.
+- The failure must be for the _right reason_ — the assertion you wrote, not a typo, missing import, or unrelated crash. A test that fails for the wrong reason is not a real RED.
+- If you can't make the test fail at all, the behavior already exists or the test is asserting nothing useful.
+
+#### 2. GREEN — Make the test pass with the minimum change
+
+- Write the simplest code that turns the test green. Hardcoding a return value is fine if that's what the current test demands — the next RED step will force generalization.
+- Resist the urge to add features, error handling, or abstractions the current test doesn't require. They belong in a future RED step (with their own test) or not at all.
+- Do not modify the test to make it pass. If the test was wrong, go back to RED and rewrite it intentionally.
+
+#### 3. REFACTOR — Improve the design with the safety net on
+
+- This is where design happens. With tests green, restructure freely: extract functions, rename for clarity, collapse duplication, push logic to a better layer.
+- Run the watcher continuously. If a refactor turns a test red, **revert the refactor** — don't "fix" the test to match the broken refactor.
+- Refactor is optional per cycle. If the GREEN code is already clean, skip straight to the next RED.
+- Pure refactors of code that already has solid coverage don't need a new RED step — the existing tests _are_ the safety net.
+
+#### Commit cadence
+
+Commit after each completed cycle (or after a small batch of related cycles), not at the end of a multi-hour session. Small, sequential commits make review easier and bisecting trivial if something breaks later.
+
+## Quality Check Requirements
 
 **NEVER mark any task as complete until ALL quality checks pass!**
 
@@ -87,6 +118,7 @@ Before considering any work "done", **ALL of the following must pass**:
 2. **Lint**: `pnpm lint` - Must pass with zero errors (warnings should be addressed)
 3. **Tests**: `pnpm test` - All tests must pass (100% success rate)
 4. **Format**: `pnpm format` - Code must be properly formatted
+5. **Audit**: `pnpm run audit` - No high-severity advisories in production dependencies (matches CI)
 
 **Quick Quality Check Commands:**
 
@@ -95,7 +127,7 @@ Before considering any work "done", **ALL of the following must pass**:
 pnpm quality
 
 # Or run individually:
-pnpm typecheck && pnpm lint && pnpm test && pnpm format
+pnpm typecheck && pnpm lint && pnpm test && pnpm format && pnpm run audit
 ```
 
 **If ANY check fails:**
@@ -103,7 +135,8 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm format
 - Fix typecheck errors first
 - Then fix lint errors
 - Then fix test failures
-- Finally run format
+- Then run format
+- Finally resolve any audit findings (upgrade the offending package, or add a `pnpm.overrides` entry pinning a safe version)
 - Re-run all checks until 100% pass
 
 **Only when ALL checks pass should you:**
@@ -112,200 +145,56 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm format
 - Commit changes
 - Create pull requests
 
-### Adding New Packages
+## Adding a New Package
 
 1. Create directory in `apps/` or `libs/`
-2. Add `package.json` with unique name following pattern `@pinsquirrel/<name>`
-3. Update `pnpm-workspace.yaml` if needed
-4. Install dependencies with `pnpm install`
+2. Add `package.json` named `@pinsquirrel/<name>` with `typecheck`, `lint`, `test`, `format` scripts (matches Turbo task config)
+3. Reference workspace siblings via `"workspace:*"` (e.g. `"@pinsquirrel/domain": "workspace:*"`)
+4. Run `pnpm install`
 
-### Inter-package Dependencies
+Turbo (`turbo.json`) handles task ordering and caching across packages. Build outputs go to `build/**` or `dist/**`.
 
-- Reference workspace packages using `workspace:*` protocol
-- Example: `"@pinsquirrel/shared": "workspace:*"`
-
-### Turbo Configuration
-
-- All scripts are orchestrated through Turbo
-- Commands automatically handle dependency order
-- Caching is enabled for builds and tests
-- Output directories: `build/**`, `dist/**`
-
-## Hono App (apps/hono)
-
-The main application using Hono + HTMX:
-
-- **Development**: `pnpm dev`
-- **Build**: `pnpm build`
-- **Start**: `pnpm start`
-
-### Tech Stack
+## Hono App Architecture (apps/hono)
 
 | Component     | Technology   | Purpose                                 |
 | ------------- | ------------ | --------------------------------------- |
 | Backend       | Hono         | HTTP routing, middleware, JSX templates |
 | Interactivity | HTMX         | Partial page updates, form handling     |
 | Complex UI    | Vanilla JS   | Dropdowns, tag input autocomplete       |
-| Database      | Drizzle ORM  | MySQL database access                   |
+| Database      | Drizzle ORM  | MySQL via `@pinsquirrel/database`       |
 | Styling       | Tailwind CSS | Utility-first CSS                       |
 
-### Key Characteristics
+Key constraints:
 
-- Server-rendered JSX templates (not React components)
-- HTMX attributes for interactivity (no client-side state management)
-- Database sessions stored in MySQL
-- Traditional page navigation (no client-side routing)
-- Vanilla JS for dropdowns (`dropdown.js`) and tag input (`tag-input-vanilla.js`)
+- **Server-rendered JSX templates, not React components.** No client-side state management or routing.
+- HTMX attributes drive interactivity. Vanilla JS only where HTMX is insufficient (`dropdown.js`, `tag-input-vanilla.js`).
+- Sessions are stored in MySQL.
 
-### Running Tests
+## Database
 
-- `pnpm test --filter @pinsquirrel/hono` - Run all tests once
-- `pnpm test --filter @pinsquirrel/hono -- --watch` - Run tests in watch mode for TDD
+- Connection via `DATABASE_URL`. Local default: `mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel` (started by `pnpm db:up`).
+- Schema in `libs/database/src/schema/`, repositories in `libs/database/src/repositories/`, client in `libs/database/src/client.ts`.
+- Repositories implement interfaces from `@pinsquirrel/domain`.
 
-## Services Library (libs/services)
+## Tooling Notes
 
-Business logic services and validation:
+- pnpm only — never npm or yarn. Node `>=24.0.0`.
+- TypeScript strict mode enabled across all packages.
+- ESLint v9 flat config with type-aware rules and accessibility checks.
+- Prettier: single quotes, no semicolons, 2-space indent, trailing commas.
 
-- **Development**: `pnpm dev --filter @pinsquirrel/services` (TypeScript watch mode)
-- **Build**: `pnpm build --filter @pinsquirrel/services` (creates `dist/`)
-- **Type Check**: `pnpm typecheck --filter @pinsquirrel/services`
-- **Testing**: Vitest for unit tests
-
-### Services Architecture
-
-- `src/services/` - Business logic services (e.g., AuthenticationService, PinService)
-- `src/validation/` - Validation schemas and utilities using Zod
-- `src/utils/` - Common utilities like cryptographic functions
-- Uses dependency injection and clean architecture principles
-
-### Running Tests
-
-- `pnpm test --filter @pinsquirrel/services` - Run all tests once
-- `pnpm test --filter @pinsquirrel/services -- --watch` - Run tests in watch mode for TDD
-
-## Domain Library (libs/domain)
-
-Core domain entities and interfaces:
-
-- **Development**: `pnpm dev --filter @pinsquirrel/domain` (TypeScript watch mode)
-- **Testing**: Vitest for unit tests
-- Contains domain entities (User, Pin, Tag) and repository interfaces
-- Pure domain logic with no external dependencies
-
-## Database Library (libs/database)
-
-Database layer with Drizzle ORM for MySQL:
-
-- **Development**: `pnpm dev --filter @pinsquirrel/database` (TypeScript watch mode)
-- **Build**: `pnpm build --filter @pinsquirrel/database` (creates `dist/`)
-- **Database Operations**:
-  - `pnpm --filter @pinsquirrel/database db:generate` - Generate migrations
-  - `pnpm --filter @pinsquirrel/database db:migrate` - Run migrations
-  - `pnpm --filter @pinsquirrel/database db:studio` - Open Drizzle Studio
-
-### Database Architecture
-
-- `src/schema/` - Drizzle schema definitions (e.g., users table)
-- `src/repositories/` - Repository implementations using Drizzle
-- `src/client.ts` - Database connection configuration
-- `drizzle.config.ts` - Drizzle kit configuration
-- Implements repository interfaces from `@pinsquirrel/domain`
-
-### Database Configuration
-
-- Uses MySQL with connection via `DATABASE_URL` environment variable
-- Default: `mysql://localhost:3306/pinsquirrel`
-
-### Running Tests
-
-- `pnpm test --filter @pinsquirrel/database` - Run all tests once
-- `pnpm test --filter @pinsquirrel/database -- --watch` - Run tests in watch mode for TDD
-
-## Code Quality Tools
-
-### ESLint Configuration
-
-- Modern flat ESLint v9 configuration
-- TypeScript ESLint with type-aware rules
-- Accessibility checks enabled
-
-### Prettier Configuration
-
-- Single quotes
-- No semicolons
-- 2-space indentation
-- Trailing commas in multiline
-
-### Type Checking
-
-- `pnpm typecheck` - Run TypeScript compiler across all packages
-- Strict mode enabled in all TypeScript configs
-
-## Package Manager
-
-This repository uses pnpm with version specified in `packageManager` field. Always use pnpm commands, not npm or yarn. Node.js version requirement: >= 22.0.0
-
-## Docker Support
-
-### Development Workflow
-
-For local development with containerized database:
+## Local Development with Docker
 
 ```bash
-# Start development database
-pnpm db:up
-
-# Run development server (connects to containerized DB)
-pnpm dev
-
-# Stop database when done
-pnpm db:down
+pnpm db:up    # start MySQL container
+pnpm dev      # run app against it
+pnpm db:down  # stop
 ```
 
-### Production Deployment
-
-#### Building Docker Image
-
-```bash
-# Build from monorepo root (required for proper build context)
-cd /path/to/pinsquirrel
-docker build -f apps/hono/Dockerfile -t your-username/pinsquirrel:latest .
-
-# Or use the convenience script (builds and pushes to Docker Hub)
-pnpm docker:build-push
-```
-
-#### Deployment Options
-
-**Option 1: Self-hosted with Dockge**
-
-- Create your own docker-compose.yml in Dockge
-- Reference your published Docker Hub image
-- Configure `DATABASE_URL` environment variable
-
-**Option 2: DigitalOcean App Platform**
-
-- Point to repository with `apps/hono/Dockerfile`
-- Use managed MySQL database
-- Set `DATABASE_URL` environment variable
-
-### Docker Configuration Files
-
-- `docker-compose.dev.yml` - Development database only
-- `apps/hono/Dockerfile` - Production-ready app image
-- `apps/hono/.dockerignore` - Optimized build context
-- `.env.example` - Environment template
-
-### Database Connection
-
-All environments use the `DATABASE_URL` environment variable:
-
-- **Development**: `mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel`
-- **Docker deployment**: `mysql://pinsquirrel:pinsquirrel@mysql:3306/pinsquirrel`
-- **Managed database**: `mysql://username:password@hostname:25060/database?sslmode=require`
+For production Docker builds and deployment, see [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 ## Related Documentation
 
-- [DEPLOYMENT.md](./DEPLOYMENT.md) - Production deployment guide with Docker and migration details
-- [STYLE.md](./STYLE.md) - Neo Brutalism UI design system and component patterns
-- [README.md](./README.md) - Quick start guide and repository overview
+- [DEPLOYMENT.md](./DEPLOYMENT.md) — Production deployment with Docker and migrations
+- [STYLE.md](./STYLE.md) — Neo Brutalism UI design system
+- [README.md](./README.md) — Quick start and overview
