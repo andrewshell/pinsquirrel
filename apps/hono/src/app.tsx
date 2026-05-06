@@ -23,6 +23,7 @@ import { importRoutes } from './routes/import'
 import { exportRoutes } from './routes/export'
 import { privateRoutes } from './routes/private'
 import { mcpRoutes } from './routes/mcp'
+import { seoRoutes } from './routes/seo'
 import { sessionMiddleware } from './middleware/session'
 
 // Create the Hono app
@@ -47,6 +48,10 @@ app.use('*', secureHeaders())
 // Serve static files (must run before session middleware so CSS/JS load
 // even if the database is unavailable)
 app.use('/static/*', serveStatic({ root: './src' }))
+
+// SEO endpoints — mounted before session middleware so crawlers can fetch
+// them without a database connection.
+app.route('/', seoRoutes)
 
 app.route('/mcp', mcpRoutes)
 
