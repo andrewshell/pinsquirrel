@@ -7,7 +7,6 @@ import {
   UnauthorizedPinAccessError,
   UnauthorizedTagAccessError,
   ValidationError,
-  type PinFilter,
 } from '@pinsquirrel/domain'
 import {
   pinListQuerySchema,
@@ -17,10 +16,9 @@ import {
   tagWithCountSchema,
   paginatedPinsSchema,
   errorSchema,
-  type PinListInput,
+  pinFilterFromInput,
 } from '@pinsquirrel/services'
 import { pinService, tagService } from '../lib/services'
-import { tagRepository } from '../lib/db'
 import { apiKeyAuth, getApiUser } from '../middleware/api-auth'
 
 const apiV1 = new OpenAPIHono()
@@ -176,18 +174,6 @@ function firstIssue(issues: { message: string }[]): string {
   return issues[0]?.message ?? 'Invalid query'
 }
 
-function pinFilterFromInput(input: PinListInput): PinFilter {
-  return {
-    isPrivate: input.isPrivate,
-    tag: input.tag,
-    search: input.search,
-    readLater: input.readLater,
-    noTags: input.noTags,
-    sortBy: input.sortBy,
-    sortDirection: input.sortDirection,
-  }
-}
-
 function errorResponse(c: Context, err: unknown) {
   if (err instanceof ValidationError) {
     return c.json({ error: 'Invalid request' }, 400)
@@ -276,11 +262,7 @@ apiV1.get('/tags/:id/pins', async (c) => {
   const input = parsed.data
 
   try {
-    const tag = await tagRepository.findById(tagId)
-    if (!tag || tag.userId !== user.id) {
-      return c.json({ error: 'Tag not found' }, 404)
-    }
-
+    const tag = await tagService.getUserTagById(ac, tagId)
     const result = await pinService.getUserPinsWithPagination(
       ac,
       { ...pinFilterFromInput(input), tag: tag.name },

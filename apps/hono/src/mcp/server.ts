@@ -1,13 +1,15 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPTransport } from '@hono/mcp'
-import { AccessControl, type User, type PinFilter } from '@pinsquirrel/domain'
+import { AccessControl, PinNotFoundError, type User } from '@pinsquirrel/domain'
 import {
   pinListInputSchema,
   pinGetInputSchema,
   tagListInputSchema,
+  pinFilterFromInput,
   type PinListInput,
 } from '@pinsquirrel/services'
 import { pinService, tagService } from '../lib/services.js'
+import { mapDomainErrorToMcp } from './errors.js'
 
 function getUserFromExtra(extra: {
   authInfo?: { extra?: Record<string, unknown> }
@@ -30,24 +32,20 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async (args, extra) => {
-    const user = getUserFromExtra(extra)
-    const ac = new AccessControl(user)
-    const input = args as PinListInput
-    const filter: PinFilter = {
-      isPrivate: false,
-      tag: input.tag,
-      search: input.search,
-      readLater: input.readLater,
-      noTags: input.noTags,
-      sortBy: input.sortBy,
-      sortDirection: input.sortDirection,
-    }
-    const result = await pinService.getUserPinsWithPagination(ac, filter, {
-      page: input.page,
-      pageSize: input.pageSize,
-    })
-    return {
-      content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+    try {
+      const user = getUserFromExtra(extra)
+      const ac = new AccessControl(user)
+      const input = args as PinListInput
+      const result = await pinService.getUserPinsWithPagination(
+        ac,
+        { ...pinFilterFromInput(input), isPrivate: false },
+        { page: input.page, pageSize: input.pageSize }
+      )
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+      }
+    } catch (err) {
+      return mapDomainErrorToMcp(err)
     }
   }
 )
@@ -61,17 +59,18 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ id }, extra) => {
-    const user = getUserFromExtra(extra)
-    const ac = new AccessControl(user)
-    const pin = await pinService.getPin(ac, id)
-    if (pin.isPrivate) {
-      return {
-        content: [{ type: 'text' as const, text: 'Pin not found' }],
-        isError: true,
+    try {
+      const user = getUserFromExtra(extra)
+      const ac = new AccessControl(user)
+      const pin = await pinService.getPin(ac, id)
+      if (pin.isPrivate) {
+        return mapDomainErrorToMcp(new PinNotFoundError(id))
       }
-    }
-    return {
-      content: [{ type: 'text' as const, text: JSON.stringify(pin) }],
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(pin) }],
+      }
+    } catch (err) {
+      return mapDomainErrorToMcp(err)
     }
   }
 )
@@ -85,13 +84,17 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ withCounts }, extra) => {
-    const user = getUserFromExtra(extra)
-    const ac = new AccessControl(user)
-    const tags = withCounts
-      ? await tagService.getUserTagsWithCount(ac, user.id)
-      : await tagService.getUserTags(ac, user.id)
-    return {
-      content: [{ type: 'text' as const, text: JSON.stringify(tags) }],
+    try {
+      const user = getUserFromExtra(extra)
+      const ac = new AccessControl(user)
+      const tags = withCounts
+        ? await tagService.getUserTagsWithCount(ac, user.id)
+        : await tagService.getUserTags(ac, user.id)
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(tags) }],
+      }
+    } catch (err) {
+      return mapDomainErrorToMcp(err)
     }
   }
 )
