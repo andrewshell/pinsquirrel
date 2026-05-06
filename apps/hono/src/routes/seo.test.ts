@@ -58,6 +58,32 @@ describe('SEO Routes', () => {
 
       expect(body).toContain('Sitemap: https://app.pinsquirrel.com/sitemap.xml')
     })
+
+    it('declares Content-Signal preferences under the wildcard block', async () => {
+      const res = await app.request('http://example.com/robots.txt')
+      const body = await res.text()
+
+      expect(body).toMatch(
+        /^Content-Signal:\s*search=yes,\s*ai-train=yes,\s*ai-input=yes\s*$/m
+      )
+    })
+
+    it('emits Content-Signal exactly once', async () => {
+      const res = await app.request('http://example.com/robots.txt')
+      const body = await res.text()
+
+      const matches = body.match(/^Content-Signal:/gm) ?? []
+      expect(matches).toHaveLength(1)
+    })
+
+    it('declares only the wildcard User-agent block', async () => {
+      const res = await app.request('http://example.com/robots.txt')
+      const body = await res.text()
+
+      const matches = body.match(/^User-agent:/gm) ?? []
+      expect(matches).toHaveLength(1)
+      expect(body).toMatch(/^User-agent:\s*\*\s*$/m)
+    })
   })
 
   describe('GET /sitemap.xml', () => {

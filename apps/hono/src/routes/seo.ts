@@ -27,6 +27,7 @@ seo.get('/robots.txt', (c) => {
   const origin = getOrigin(c.req.url)
   const lines = [
     'User-agent: *',
+    'Content-Signal: search=yes, ai-train=yes, ai-input=yes',
     ...DISALLOWED_PATHS.map((p) => `Disallow: ${p}`),
     '',
     `Sitemap: ${origin}/sitemap.xml`,
