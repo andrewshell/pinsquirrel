@@ -24,6 +24,7 @@ import { exportRoutes } from './routes/export'
 import { privateRoutes } from './routes/private'
 import { mcpRoutes } from './routes/mcp'
 import { seoRoutes } from './routes/seo'
+import { markdownNegotiation } from './middleware/markdown-negotiation'
 import { sessionMiddleware } from './middleware/session'
 
 // Create the Hono app
@@ -52,6 +53,12 @@ app.use('/static/*', serveStatic({ root: './src' }))
 // SEO endpoints — mounted before session middleware so crawlers can fetch
 // them without a database connection.
 app.route('/', seoRoutes)
+
+// Markdown content negotiation for the public, agent-relevant pages.
+// Honors `Accept: text/markdown` on the same URLs that serve HTML.
+app.use('/', markdownNegotiation())
+app.use('/privacy', markdownNegotiation())
+app.use('/terms', markdownNegotiation())
 
 app.route('/mcp', mcpRoutes)
 

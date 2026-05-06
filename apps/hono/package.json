@@ -34,12 +34,14 @@
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.12",
     "mailgun.js": "^12.7.1",
-    "pino": "^10.3.1"
+    "pino": "^10.3.1",
+    "turndown": "^7.2.4"
   },
   "devDependencies": {
     "@eslint/js": "^10",
     "@tailwindcss/cli": "^4.2.2",
     "@types/node": "^24.12.2",
+    "@types/turndown": "^5.0.6",
     "@vitest/coverage-v8": "^4.1.2",
     "concurrently": "^9.2.1",
     "eslint": "^10",
