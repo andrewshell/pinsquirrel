@@ -13,7 +13,10 @@ import {
   ResetTokenExpiredError,
   TooManyResetRequestsError,
   MissingRoleError,
+  AccessNotGrantedError,
+  UserNotFoundError,
   Role,
+  UserStatus,
 } from '@pinsquirrel/domain'
 
 // Mock the crypto module (which contains crypto functions)
@@ -44,6 +47,7 @@ describe('AuthenticationService', () => {
     passwordHash: 'hashedpassword',
     emailHash: null,
     roles: [Role.User],
+    status: UserStatus.Active,
     createdAt: new Date(),
     updatedAt: new Date(),
   }
@@ -437,6 +441,25 @@ describe('AuthenticationService', () => {
       )
     })
 
+    it('should throw AccessNotGrantedError when a waitlisted user signs in', async () => {
+      const waitlistedUser = {
+        ...mockUser,
+        status: UserStatus.Waitlist,
+        passwordHash: '$2b$10$validhash',
+      }
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(
+        waitlistedUser
+      )
+      vi.mocked(verifyPassword).mockResolvedValue(true)
+
+      await expect(
+        authService.login({
+          username: 'testuser',
+          password: 'password12345',
+        })
+      ).rejects.toThrow(AccessNotGrantedError)
+    })
+
     it('should throw validation error for invalid username', async () => {
       const loginInput = {
         username: 'ab', // too short
@@ -457,6 +480,42 @@ describe('AuthenticationService', () => {
       await expect(authService.login(loginInput)).rejects.toThrow(
         'Password must be at least 12 characters'
       )
+    })
+  })
+
+  describe('grantAccess', () => {
+    it('should move a waitlisted user to active', async () => {
+      const waitlistedUser = { ...mockUser, status: UserStatus.Waitlist }
+      const activatedUser = { ...mockUser, status: UserStatus.Active }
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(waitlistedUser)
+      vi.mocked(mockUserRepository.update).mockResolvedValue(activatedUser)
+
+      const result = await authService.grantAccess(waitlistedUser.id)
+
+      expect(mockUserRepository.update).toHaveBeenCalledWith(
+        waitlistedUser.id,
+        { status: UserStatus.Active }
+      )
+      expect(result.status).toBe(UserStatus.Active)
+    })
+
+    it('should be idempotent for an already-active user', async () => {
+      const activeUser = { ...mockUser, status: UserStatus.Active }
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(activeUser)
+
+      const result = await authService.grantAccess(activeUser.id)
+
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+      expect(result.status).toBe(UserStatus.Active)
+    })
+
+    it('should throw UserNotFoundError when the user does not exist', async () => {
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(null)
+
+      await expect(authService.grantAccess('missing-id')).rejects.toThrow(
+        UserNotFoundError
+      )
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
     })
   })
 
@@ -736,6 +795,34 @@ describe('AuthenticationService', () => {
       })
       expect(mockPasswordResetRepository.delete).toHaveBeenCalledWith(
         mockPasswordResetToken.id
+      )
+    })
+
+    it('should promote an unverified user to the waitlist when they set their password', async () => {
+      const unverifiedUser = { ...mockUser, status: UserStatus.Unverified }
+      vi.mocked(mockPasswordResetRepository.findByTokenHash).mockResolvedValue(
+        mockPasswordResetToken
+      )
+      vi.mocked(mockPasswordResetRepository.isValidToken).mockResolvedValue(
+        true
+      )
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(unverifiedUser)
+      vi.mocked(mockUserRepository.update).mockResolvedValue(unverifiedUser)
+      vi.mocked(mockPasswordResetRepository.delete).mockResolvedValue(true)
+
+      await authService.resetPassword({
+        token: 'mock-token',
+        newPassword: 'newpassword123',
+      })
+
+      expect(mockUserRepository.update).toHaveBeenCalledWith(
+        unverifiedUser.id,
+        {
+          username: unverifiedUser.username,
+          passwordHash: 'hashed_newpassword123',
+          emailHash: unverifiedUser.emailHash,
+          status: UserStatus.Waitlist,
+        }
       )
     })
 

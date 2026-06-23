@@ -8,6 +8,7 @@ import {
   UnauthorizedApiKeyAccessError,
   ValidationError,
   Role,
+  UserStatus,
 } from '@pinsquirrel/domain'
 
 vi.mock('../utils/crypto.js', () => ({
@@ -27,6 +28,7 @@ describe('ApiKeyService', () => {
     passwordHash: 'hashedpassword',
     emailHash: null,
     roles: [Role.User],
+    status: UserStatus.Active,
     createdAt: new Date(),
     updatedAt: new Date(),
   }
@@ -37,6 +39,7 @@ describe('ApiKeyService', () => {
     passwordHash: 'hashedpassword',
     emailHash: null,
     roles: [Role.User],
+    status: UserStatus.Active,
     createdAt: new Date(),
     updatedAt: new Date(),
   }

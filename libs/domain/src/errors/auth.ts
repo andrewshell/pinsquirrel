@@ -78,3 +78,12 @@ export class MissingRoleError extends AuthenticationError {
     this.name = 'MissingRoleError'
   }
 }
+
+export class AccessNotGrantedError extends AuthenticationError {
+  constructor() {
+    super(
+      "You're on the early-access waitlist. We're opening access in batches — please check back soon."
+    )
+    this.name = 'AccessNotGrantedError'
+  }
+}

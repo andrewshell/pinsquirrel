@@ -4,6 +4,7 @@
 // Entities
 export type { User, CreateUserData, UpdateUserData } from './entities/user.js'
 export { Role } from './entities/role.js'
+export { UserStatus } from './entities/user-status.js'
 export type { Pin, CreatePinData, UpdatePinData } from './entities/pin.js'
 export type {
   Tag,
@@ -54,7 +55,9 @@ export {
   TooManyResetRequestsError,
   EmailSendError,
   MissingRoleError,
+  AccessNotGrantedError,
 } from './errors/auth.js'
+export { UserError, UserNotFoundError } from './errors/user.js'
 export {
   PinError,
   PinNotFoundError,

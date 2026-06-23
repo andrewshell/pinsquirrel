@@ -4,6 +4,7 @@ import type { MySql2Database } from 'drizzle-orm/mysql2'
 import mysql from 'mysql2/promise'
 import type { Pool } from 'mysql2/promise'
 import { DrizzleUserRepository } from './user.js'
+import { UserStatus } from '@pinsquirrel/domain'
 
 describe('DrizzleUserRepository - Integration Tests', () => {
   let testDb: MySql2Database<Record<string, unknown>>
@@ -335,6 +336,22 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       const saved = await repository.findById(result.id)
       expect(saved?.emailHash).toBeNull()
     })
+
+    it('should default new users to unverified status', async () => {
+      const createData = {
+        username: `newuser-${crypto.randomUUID().slice(0, 8)}`,
+        passwordHash: null,
+        emailHash: null,
+      }
+
+      const result = await repository.create(createData)
+
+      expect(result.status).toBe(UserStatus.Unverified)
+
+      // Verify it was actually persisted
+      const saved = await repository.findById(result.id)
+      expect(saved?.status).toBe(UserStatus.Unverified)
+    })
   })
 
   describe('update', () => {
@@ -410,6 +427,18 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       const updated = await repository.findById(existingUserId)
       expect(updated!.passwordHash).toBe('new_hashed_password')
       expect(updated!.emailHash).toBe('new_hashed_email')
+    })
+
+    it('should update user status', async () => {
+      const result = await repository.update(existingUserId, {
+        status: UserStatus.Waitlist,
+      })
+
+      expect(result!.status).toBe(UserStatus.Waitlist)
+
+      // Verify it was actually updated in database
+      const updated = await repository.findById(existingUserId)
+      expect(updated!.status).toBe(UserStatus.Waitlist)
     })
 
     it('should update only updatedAt when no fields provided', async () => {
