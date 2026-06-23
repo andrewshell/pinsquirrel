@@ -3,8 +3,9 @@ import type {
   PasswordResetRepository,
   EmailService,
   User,
+  UpdateUserData,
 } from '@pinsquirrel/domain'
-import { Role } from '@pinsquirrel/domain'
+import { Role, UserStatus } from '@pinsquirrel/domain'
 import {
   InvalidCredentialsError,
   EmailVerificationRequiredError,
@@ -13,6 +14,8 @@ import {
   TooManyResetRequestsError,
   ValidationError,
   MissingRoleError,
+  AccessNotGrantedError,
+  UserNotFoundError,
 } from '@pinsquirrel/domain'
 import {
   hashPassword,
@@ -176,7 +179,38 @@ export class AuthenticationService {
       throw new MissingRoleError()
     }
 
+    // Only users who have been granted access can sign in. Verified accounts
+    // awaiting an access grant are still on the early-access waitlist.
+    if (user.status !== UserStatus.Active) {
+      throw new AccessNotGrantedError()
+    }
+
     return user
+  }
+
+  /**
+   * Grant a user access to the application, moving them off the early-access
+   * waitlist and into the active state. Idempotent: granting an already-active
+   * user is a no-op. Intended for manual/admin use.
+   */
+  async grantAccess(userId: string): Promise<User> {
+    const user = await this.userRepository.findById(userId)
+    if (!user) {
+      throw new UserNotFoundError(userId)
+    }
+
+    if (user.status === UserStatus.Active) {
+      return user
+    }
+
+    const updated = await this.userRepository.update(userId, {
+      status: UserStatus.Active,
+    })
+    if (!updated) {
+      throw new UserNotFoundError(userId)
+    }
+
+    return updated
   }
 
   async changePassword(input: {
@@ -384,11 +418,20 @@ export class AuthenticationService {
     const passwordHash = await hashPassword(input.newPassword)
 
     // Update the user's password
-    await this.userRepository.update(user.id, {
+    const updateData: UpdateUserData = {
       username: user.username,
       passwordHash,
       emailHash: user.emailHash,
-    })
+    }
+
+    // Setting a password completes email verification. For a brand-new
+    // account this is the moment they join the early-access waitlist.
+    // Never demote an already-active user resetting a forgotten password.
+    if (user.status === UserStatus.Unverified) {
+      updateData.status = UserStatus.Waitlist
+    }
+
+    await this.userRepository.update(user.id, updateData)
 
     // Delete the used token
     await this.passwordResetRepository.delete(resetToken.id)

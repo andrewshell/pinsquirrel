@@ -10,6 +10,7 @@ import {
   PinNotFoundError,
   UnauthorizedPinAccessError,
   DuplicatePinError,
+  UserStatus,
 } from '@pinsquirrel/domain'
 
 describe('PinService', () => {
@@ -43,6 +44,7 @@ describe('PinService', () => {
     passwordHash: 'hash',
     emailHash: 'emailhash',
     roles: [],
+    status: UserStatus.Active,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
   }

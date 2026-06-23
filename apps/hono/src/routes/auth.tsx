@@ -4,6 +4,7 @@ import {
   InvalidCredentialsError,
   EmailVerificationRequiredError,
   MissingRoleError,
+  AccessNotGrantedError,
   InvalidResetTokenError,
   ResetTokenExpiredError,
 } from '@pinsquirrel/domain'
@@ -110,6 +111,9 @@ auth.post('/signin', async (c) => {
       errors = { _form: [error.message] }
     } else if (error instanceof MissingRoleError) {
       errors = { _form: [error.message] }
+    } else if (error instanceof AccessNotGrantedError) {
+      // Verified user still waiting on the early-access waitlist
+      errors = { _form: [error.message] }
     } else {
       // Log unexpected errors for debugging
       logger.error({ err: safeError(error) }, 'Signin failed')
@@ -123,7 +127,10 @@ auth.post('/signin', async (c) => {
         username={username}
         keepSignedIn={keepSignedIn}
       />,
-      error instanceof MissingRoleError ? 403 : 400
+      error instanceof MissingRoleError ||
+        error instanceof AccessNotGrantedError
+        ? 403
+        : 400
     )
   }
 })
@@ -172,7 +179,7 @@ auth.post(
         return c.html(
           <SignUpPage
             success={true}
-            message="Your account was created, but we had trouble sending the verification email."
+            message="You're on the waitlist, but we had trouble sending your confirmation email."
             showResendLink={true}
           />
         )
@@ -182,7 +189,7 @@ auth.post(
       return c.html(
         <SignUpPage
           success={true}
-          message="Check your email to set your password and complete registration."
+          message="Check your email to confirm your spot on the early-access waitlist."
         />
       )
     } catch (error) {

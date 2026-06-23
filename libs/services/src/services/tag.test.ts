@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { TagService } from './tag.js'
 import type { TagRepository, Tag, User } from '@pinsquirrel/domain'
-import { AccessControl, Role, TagNotFoundError } from '@pinsquirrel/domain'
+import {
+  AccessControl,
+  Role,
+  TagNotFoundError,
+  UserStatus,
+} from '@pinsquirrel/domain'
 
 describe('TagService.getUserTagById', () => {
   let service: TagService
@@ -13,6 +18,7 @@ describe('TagService.getUserTagById', () => {
     passwordHash: 'x',
     emailHash: null,
     roles: [Role.User],
+    status: UserStatus.Active,
     createdAt: new Date(),
     updatedAt: new Date(),
   }

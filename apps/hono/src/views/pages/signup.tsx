@@ -20,14 +20,18 @@ export const SignUpPage: FC<SignUpPageProps> = ({
   showResendLink = false,
 }) => {
   return (
-    <DefaultLayout title="Sign Up" user={null}>
+    <DefaultLayout title="Request Early Access" user={null}>
       <div class="flex flex-col items-center justify-center px-4 py-16">
         <div class="w-full max-w-md">
           {/* Header */}
           <div class="text-center mb-8">
-            <h1 class="text-3xl font-bold">Join The Digital Squirrel Gang</h1>
+            <h1 class="text-3xl font-bold">Join the Early Access Waitlist</h1>
             <p class="mt-2 text-muted-foreground">
-              Or{' '}
+              PinSquirrel is opening up to new squirrels in batches. Claim your
+              spot and we'll let you in soon.
+            </p>
+            <p class="mt-2 text-muted-foreground">
+              Already in?{' '}
               <a
                 href="/signin"
                 class="text-primary hover:underline font-medium"
@@ -43,7 +47,7 @@ export const SignUpPage: FC<SignUpPageProps> = ({
               // Success state
               <div>
                 <h2 class="text-xl font-bold mb-4 text-green-700 dark:text-green-300">
-                  Account Created!
+                  You're on the list!
                 </h2>
                 {message && (
                   <SuccessMessage message={message} className="mb-4" />
@@ -51,7 +55,7 @@ export const SignUpPage: FC<SignUpPageProps> = ({
                 <p class="text-muted-foreground mb-4">
                   {showResendLink
                     ? 'If you don\u2019t receive an email, you can request a new one.'
-                    : 'We\u2019ve sent you an email with a link to set your password. Check your inbox (and spam folder) and click the link to complete your registration.'}
+                    : 'We\u2019ve sent you an email with a link to confirm your spot and set your password. Check your inbox (and spam folder) and click the link. We\u2019re opening access in batches and will let you in soon.'}
                 </p>
                 {showResendLink && (
                   <a
@@ -79,7 +83,7 @@ export const SignUpPage: FC<SignUpPageProps> = ({
             ) : (
               // Registration form
               <div>
-                <h2 class="text-xl font-bold mb-4">Create Account</h2>
+                <h2 class="text-xl font-bold mb-4">Request Early Access</h2>
 
                 <form
                   method="post"
@@ -137,8 +141,8 @@ export const SignUpPage: FC<SignUpPageProps> = ({
                       </p>
                     )}
                     <p class="text-xs text-muted-foreground">
-                      We'll send you an email to set your password. We hash your
-                      email for privacy.
+                      We'll email you a link to confirm your spot and set your
+                      password. We hash your email for privacy.
                     </p>
                   </div>
 
@@ -151,7 +155,7 @@ export const SignUpPage: FC<SignUpPageProps> = ({
                            active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
                            transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Create Account
+                    Request Early Access
                   </button>
                 </form>
               </div>

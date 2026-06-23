@@ -129,6 +129,11 @@ export class DrizzleUserRepository implements UserRepository {
       updateData.emailHash = data.emailHash
     }
 
+    // Update lifecycle status if provided
+    if (data.status !== undefined) {
+      updateData.status = data.status
+    }
+
     await this.db.update(users).set(updateData).where(eq(users.id, id))
 
     const [updated] = await this.db
