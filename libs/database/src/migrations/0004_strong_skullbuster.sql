@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `email_encrypted` text;

@@ -46,6 +46,7 @@ describe('AuthenticationService', () => {
     username: 'testuser',
     passwordHash: 'hashedpassword',
     emailHash: null,
+    emailEncrypted: null,
     roles: [Role.User],
     status: UserStatus.Active,
     createdAt: new Date(),
@@ -121,11 +122,41 @@ describe('AuthenticationService', () => {
         username: 'testuser',
         passwordHash: null,
         emailHash: 'hashed_test@example.com',
+        emailEncrypted: null,
       })
       expect(mockUserRepository.addRole).toHaveBeenCalledWith(
         mockUser.id,
         'User'
       )
+    })
+
+    it('should seal the email when an email sealer is configured', async () => {
+      const emailSealer = {
+        seal: vi.fn().mockResolvedValue('sealed-email-blob'),
+      }
+      const service = new AuthenticationService(
+        mockUserRepository,
+        mockPasswordResetRepository,
+        mockEmailService,
+        emailSealer
+      )
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.addRole).mockResolvedValue()
+
+      await service.register({
+        username: 'testuser',
+        email: 'test@example.com',
+      })
+
+      expect(emailSealer.seal).toHaveBeenCalledWith('test@example.com')
+      expect(mockUserRepository.create).toHaveBeenCalledWith({
+        username: 'testuser',
+        passwordHash: null,
+        emailHash: 'hashed_test@example.com',
+        emailEncrypted: 'sealed-email-blob',
+      })
     })
 
     it('should not throw when username is already taken', async () => {
@@ -536,10 +567,10 @@ describe('AuthenticationService', () => {
         'currentpass123',
         mockUser.passwordHash
       )
+      // Only the field this operation owns — not username/emailHash, which a
+      // concurrent change could have updated after the findById read.
       expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
-        username: mockUser.username,
         passwordHash: 'hashed_newpass1234567',
-        emailHash: mockUser.emailHash,
       })
     })
 
@@ -602,10 +633,11 @@ describe('AuthenticationService', () => {
       })
 
       expect(mockUserRepository.findById).toHaveBeenCalledWith('123')
+      // Only the fields this operation owns — never username/passwordHash, which
+      // could clobber a concurrent change made after the findById read.
       expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
-        username: mockUser.username,
-        passwordHash: mockUser.passwordHash,
         emailHash: 'hashed_newemail@example.com',
+        emailEncrypted: null,
       })
     })
 
@@ -620,9 +652,33 @@ describe('AuthenticationService', () => {
 
       expect(mockUserRepository.findById).toHaveBeenCalledWith('123')
       expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
-        username: mockUser.username,
-        passwordHash: mockUser.passwordHash,
         emailHash: null,
+        emailEncrypted: null,
+      })
+    })
+
+    it('should re-seal the email when a sealer is configured', async () => {
+      const emailSealer = {
+        seal: vi.fn().mockResolvedValue('resealed-blob'),
+      }
+      const service = new AuthenticationService(
+        mockUserRepository,
+        mockPasswordResetRepository,
+        mockEmailService,
+        emailSealer
+      )
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
+
+      await service.updateEmail({
+        userId: '123',
+        email: 'newemail@example.com',
+      })
+
+      expect(emailSealer.seal).toHaveBeenCalledWith('newemail@example.com')
+      expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
+        emailHash: 'hashed_newemail@example.com',
+        emailEncrypted: 'resealed-blob',
       })
     })
 
@@ -699,6 +755,108 @@ describe('AuthenticationService', () => {
         'mock-token',
         'https://example.com/reset'
       )
+      expect(result).toBe('mock-token')
+    })
+
+    it('should backfill the sealed email when missing and a sealer is configured', async () => {
+      const emailSealer = { seal: vi.fn().mockResolvedValue('backfilled-blob') }
+      const service = new AuthenticationService(
+        mockUserRepository,
+        mockPasswordResetRepository,
+        mockEmailService,
+        emailSealer
+      )
+      const userMissingSeal = {
+        ...mockUser,
+        emailHash: 'hashed_test@example.com',
+        emailEncrypted: null,
+      }
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(
+        userMissingSeal
+      )
+      vi.mocked(mockPasswordResetRepository.findByUserId).mockResolvedValue([])
+      vi.mocked(mockPasswordResetRepository.create).mockResolvedValue(
+        mockPasswordResetToken
+      )
+      vi.mocked(mockEmailService.sendPasswordResetEmail).mockResolvedValue()
+
+      await service.requestPasswordReset({
+        email: 'test@example.com',
+        resetUrl: 'https://example.com/reset',
+      })
+
+      expect(emailSealer.seal).toHaveBeenCalledWith('test@example.com')
+      expect(mockUserRepository.update).toHaveBeenCalledWith(
+        userMissingSeal.id,
+        { emailEncrypted: 'backfilled-blob' }
+      )
+    })
+
+    it('should not re-seal when the user already has a sealed email', async () => {
+      const emailSealer = { seal: vi.fn().mockResolvedValue('new-blob') }
+      const service = new AuthenticationService(
+        mockUserRepository,
+        mockPasswordResetRepository,
+        mockEmailService,
+        emailSealer
+      )
+      const userWithSeal = {
+        ...mockUser,
+        emailHash: 'hashed_test@example.com',
+        emailEncrypted: 'existing-blob',
+      }
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(
+        userWithSeal
+      )
+      vi.mocked(mockPasswordResetRepository.findByUserId).mockResolvedValue([])
+      vi.mocked(mockPasswordResetRepository.create).mockResolvedValue(
+        mockPasswordResetToken
+      )
+      vi.mocked(mockEmailService.sendPasswordResetEmail).mockResolvedValue()
+
+      await service.requestPasswordReset({
+        email: 'test@example.com',
+        resetUrl: 'https://example.com/reset',
+      })
+
+      expect(emailSealer.seal).not.toHaveBeenCalled()
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('still completes the reset when the opportunistic backfill fails', async () => {
+      const emailSealer = { seal: vi.fn().mockResolvedValue('sealed-blob') }
+      const service = new AuthenticationService(
+        mockUserRepository,
+        mockPasswordResetRepository,
+        mockEmailService,
+        emailSealer
+      )
+      const userMissingSeal = {
+        ...mockUser,
+        emailHash: 'hashed_test@example.com',
+        emailEncrypted: null,
+      }
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(
+        userMissingSeal
+      )
+      // The backfill write fails — it must not abort the password reset.
+      vi.mocked(mockUserRepository.update).mockRejectedValue(
+        new Error('db write failed')
+      )
+      vi.mocked(mockPasswordResetRepository.findByUserId).mockResolvedValue([])
+      vi.mocked(mockPasswordResetRepository.create).mockResolvedValue(
+        mockPasswordResetToken
+      )
+      vi.mocked(mockEmailService.sendPasswordResetEmail).mockResolvedValue()
+
+      const result = await service.requestPasswordReset({
+        email: 'test@example.com',
+        resetUrl: 'https://example.com/reset',
+      })
+
+      expect(mockUserRepository.update).toHaveBeenCalled()
+      expect(mockPasswordResetRepository.create).toHaveBeenCalled()
+      expect(mockEmailService.sendPasswordResetEmail).toHaveBeenCalled()
       expect(result).toBe('mock-token')
     })
 
@@ -789,9 +947,7 @@ describe('AuthenticationService', () => {
         'hashed_mock-token'
       )
       expect(mockUserRepository.update).toHaveBeenCalledWith(mockUser.id, {
-        username: mockUser.username,
         passwordHash: 'hashed_newpassword123',
-        emailHash: mockUser.emailHash,
       })
       expect(mockPasswordResetRepository.delete).toHaveBeenCalledWith(
         mockPasswordResetToken.id
@@ -818,9 +974,7 @@ describe('AuthenticationService', () => {
       expect(mockUserRepository.update).toHaveBeenCalledWith(
         unverifiedUser.id,
         {
-          username: unverifiedUser.username,
           passwordHash: 'hashed_newpassword123',
-          emailHash: unverifiedUser.emailHash,
           status: UserStatus.Waitlist,
         }
       )

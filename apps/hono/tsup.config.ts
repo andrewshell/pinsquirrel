@@ -6,6 +6,7 @@ export default defineConfig({
   dts: false,
   noExternal: [
     '@pinsquirrel/adapters',
+    '@pinsquirrel/crypto',
     '@pinsquirrel/database',
     '@pinsquirrel/domain',
     '@pinsquirrel/mailgun',

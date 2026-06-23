@@ -342,6 +342,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
         username: `newuser-${crypto.randomUUID().slice(0, 8)}`,
         passwordHash: null,
         emailHash: null,
+        emailEncrypted: null,
       }
 
       const result = await repository.create(createData)
@@ -351,6 +352,39 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       // Verify it was actually persisted
       const saved = await repository.findById(result.id)
       expect(saved?.status).toBe(UserStatus.Unverified)
+    })
+
+    it('should persist the sealed (encrypted) email', async () => {
+      const createData = {
+        username: `newuser-${crypto.randomUUID().slice(0, 8)}`,
+        passwordHash: null,
+        emailHash: 'hash',
+        emailEncrypted: 'sealed-blob-base64',
+      }
+
+      const result = await repository.create(createData)
+
+      expect(result.emailEncrypted).toBe('sealed-blob-base64')
+
+      // Verify it was actually persisted
+      const saved = await repository.findById(result.id)
+      expect(saved?.emailEncrypted).toBe('sealed-blob-base64')
+    })
+
+    it('should store a provided emailEncrypted as-is without collapsing falsy strings', async () => {
+      // Mirrors update(): only null/undefined become NULL, so an empty string
+      // surfaces an upstream sealing bug instead of being silently dropped.
+      const result = await repository.create({
+        username: `newuser-${crypto.randomUUID().slice(0, 8)}`,
+        passwordHash: null,
+        emailHash: null,
+        emailEncrypted: '',
+      })
+
+      expect(result.emailEncrypted).toBe('')
+
+      const saved = await repository.findById(result.id)
+      expect(saved?.emailEncrypted).toBe('')
     })
   })
 
@@ -439,6 +473,18 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       // Verify it was actually updated in database
       const updated = await repository.findById(existingUserId)
       expect(updated!.status).toBe(UserStatus.Waitlist)
+    })
+
+    it('should update the sealed (encrypted) email', async () => {
+      const result = await repository.update(existingUserId, {
+        emailEncrypted: 'new-sealed-blob',
+      })
+
+      expect(result!.emailEncrypted).toBe('new-sealed-blob')
+
+      // Verify it was actually updated in database
+      const updated = await repository.findById(existingUserId)
+      expect(updated!.emailEncrypted).toBe('new-sealed-blob')
     })
 
     it('should update only updatedAt when no fields provided', async () => {

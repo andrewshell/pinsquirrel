@@ -1,4 +1,5 @@
 import { CheerioHtmlParser, NodeHttpFetcher } from '@pinsquirrel/adapters'
+import { sealEmail, assertValidPublicKey } from '@pinsquirrel/crypto'
 import type { EmailService } from '@pinsquirrel/domain'
 import { MailgunEmailService } from '@pinsquirrel/mailgun'
 import {
@@ -8,6 +9,7 @@ import {
   PinService,
   TagService,
   UserService,
+  type EmailSealer,
 } from '@pinsquirrel/services'
 import {
   apiKeyRepository,
@@ -32,11 +34,32 @@ if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
   })
 }
 
+// Create email sealer if a public key is configured. This lets the waitlist be
+// contacted later via the offline admin app; this server can never decrypt it.
+// Validate the key at boot so a bad EMAIL_PUBLIC_KEY fails fast here instead of
+// returning runtime 500s the first time an auth flow tries to seal an email.
+let emailSealer: EmailSealer | undefined
+if (process.env.EMAIL_PUBLIC_KEY) {
+  const publicKey = process.env.EMAIL_PUBLIC_KEY
+  try {
+    assertValidPublicKey(publicKey)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(
+      `EMAIL_PUBLIC_KEY is invalid: ${detail}. ` +
+        'Generate one with: pnpm --filter @pinsquirrel/crypto keygen',
+      { cause: error }
+    )
+  }
+  emailSealer = { seal: (email: string) => sealEmail(email, publicKey) }
+}
+
 // Create service instances
 export const authService = new AuthenticationService(
   userRepository,
   passwordResetRepository,
-  emailService
+  emailService,
+  emailSealer
 )
 export const pinService = new PinService(pinRepository)
 export const tagService = new TagService(tagRepository)

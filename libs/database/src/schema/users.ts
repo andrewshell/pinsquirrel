@@ -3,6 +3,7 @@ import {
   varchar,
   timestamp,
   mysqlEnum,
+  text,
 } from 'drizzle-orm/mysql-core'
 
 export const users = mysqlTable('users', {
@@ -10,6 +11,7 @@ export const users = mysqlTable('users', {
   username: varchar('username', { length: 255 }).notNull().unique(),
   passwordHash: varchar('password_hash', { length: 255 }),
   emailHash: varchar('email_hash', { length: 255 }),
+  emailEncrypted: text('email_encrypted'),
   status: mysqlEnum('status', ['unverified', 'waitlist', 'active'])
     .default('unverified')
     .notNull(),

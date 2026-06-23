@@ -51,6 +51,7 @@
     "libs/services/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/services eslint --fix",
     "libs/database/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/database eslint --fix",
     "libs/domain/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/domain eslint --fix",
+    "libs/crypto/**/*.{ts,tsx}": "pnpm --filter @pinsquirrel/crypto eslint --fix",
     "libs/adapters/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/adapters eslint --fix",
     "libs/mailgun/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/mailgun eslint --fix",
     "**/*.{ts,tsx,js,jsx,json,md,css}": "prettier --write"

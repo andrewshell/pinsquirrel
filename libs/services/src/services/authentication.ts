@@ -31,11 +31,20 @@ import {
   emailSchema,
 } from '../validation/user.js'
 
+/**
+ * Seals an email so the waitlist can be contacted later. Implemented with a
+ * public key; the server cannot reverse it (only the offline admin app can).
+ */
+export interface EmailSealer {
+  seal(email: string): Promise<string>
+}
+
 export class AuthenticationService {
   constructor(
     private readonly userRepository: UserRepository,
     private readonly passwordResetRepository?: PasswordResetRepository,
-    private readonly emailService?: EmailService
+    private readonly emailService?: EmailService,
+    private readonly emailSealer?: EmailSealer
   ) {}
 
   async register(input: {
@@ -105,11 +114,18 @@ export class AuthenticationService {
       return { emailFailed: false }
     }
 
+    // Seal the email (if a public key is configured) so the waitlist can be
+    // contacted later. The server cannot decrypt this.
+    const emailEncrypted = this.emailSealer
+      ? await this.emailSealer.seal(input.email)
+      : null
+
     // Create user without password (they'll set it via email verification)
     const user = await this.userRepository.create({
       username: input.username,
       passwordHash: null, // No password yet - they'll set it via email verification
       emailHash,
+      emailEncrypted,
     })
 
     // Immediately assign User role
@@ -262,11 +278,9 @@ export class AuthenticationService {
     // Hash the new password in the business logic layer
     const passwordHash = await hashPassword(input.newPassword)
 
-    await this.userRepository.update(input.userId, {
-      username: user.username,
-      passwordHash,
-      emailHash: user.emailHash,
-    })
+    // Persist only the field this operation owns to avoid clobbering a
+    // concurrent username/email change made after the findById read.
+    await this.userRepository.update(input.userId, { passwordHash })
   }
 
   async updateEmail(input: {
@@ -291,10 +305,17 @@ export class AuthenticationService {
     // Hash the email in the business logic layer
     const emailHash = input.email ? hashEmail(input.email) : null
 
+    // Re-seal the email (or clear it) to keep the contactable copy in sync
+    const emailEncrypted =
+      input.email && this.emailSealer
+        ? await this.emailSealer.seal(input.email)
+        : null
+
+    // Persist only the fields this operation owns. Writing username/passwordHash
+    // from the stale findById snapshot could clobber a concurrent change.
     await this.userRepository.update(input.userId, {
-      username: user.username,
-      passwordHash: user.passwordHash,
       emailHash,
+      emailEncrypted,
     })
   }
 
@@ -335,6 +356,19 @@ export class AuthenticationService {
     // Don't reveal whether the email exists or not for security
     if (!user) {
       return null
+    }
+
+    // Opportunistically backfill the sealed email for users created before
+    // sealing existed (their email_encrypted is null). This is the one flow
+    // where we have the plaintext email for an existing account. Best-effort:
+    // a sealing or write failure must never abort the password reset itself.
+    if (this.emailSealer && !user.emailEncrypted) {
+      try {
+        const emailEncrypted = await this.emailSealer.seal(input.email)
+        await this.userRepository.update(user.id, { emailEncrypted })
+      } catch {
+        // Ignore — the backfill is opportunistic; the reset must still proceed.
+      }
     }
 
     // Check rate limiting - max 3 requests per hour
@@ -417,16 +451,11 @@ export class AuthenticationService {
     // Hash the new password
     const passwordHash = await hashPassword(input.newPassword)
 
-    // Update the user's password
-    const updateData: UpdateUserData = {
-      username: user.username,
-      passwordHash,
-      emailHash: user.emailHash,
-    }
-
-    // Setting a password completes email verification. For a brand-new
-    // account this is the moment they join the early-access waitlist.
-    // Never demote an already-active user resetting a forgotten password.
+    // Persist only the fields this operation owns: the new password and, for a
+    // brand-new (unverified) account, the verification status transition.
+    // Never write username/emailHash from the stale snapshot, and never demote
+    // an already-active user resetting a forgotten password.
+    const updateData: UpdateUserData = { passwordHash }
     if (user.status === UserStatus.Unverified) {
       updateData.status = UserStatus.Waitlist
     }
