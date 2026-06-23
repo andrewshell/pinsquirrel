@@ -8,6 +8,7 @@ FROM base AS dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/hono/package.json ./apps/hono/
 COPY libs/adapters/package.json ./libs/adapters/
+COPY libs/crypto/package.json ./libs/crypto/
 COPY libs/database/package.json ./libs/database/
 COPY libs/domain/package.json ./libs/domain/
 COPY libs/mailgun/package.json ./libs/mailgun/
@@ -28,6 +29,7 @@ FROM base AS production-deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/hono/package.json ./apps/hono/
 COPY libs/adapters/package.json ./libs/adapters/
+COPY libs/crypto/package.json ./libs/crypto/
 COPY libs/database/package.json ./libs/database/
 COPY libs/domain/package.json ./libs/domain/
 COPY libs/mailgun/package.json ./libs/mailgun/

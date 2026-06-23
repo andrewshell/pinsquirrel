@@ -95,6 +95,7 @@ export class DrizzleUserRepository implements UserRepository {
       username: data.username,
       passwordHash: data.passwordHash,
       emailHash: data.emailHash || null,
+      emailEncrypted: data.emailEncrypted ?? null,
       createdAt: now,
       updatedAt: now,
     })
@@ -127,6 +128,11 @@ export class DrizzleUserRepository implements UserRepository {
     // Use already-hashed email if provided
     if (data.emailHash !== undefined) {
       updateData.emailHash = data.emailHash
+    }
+
+    // Use already-sealed email if provided
+    if (data.emailEncrypted !== undefined) {
+      updateData.emailEncrypted = data.emailEncrypted
     }
 
     // Update lifecycle status if provided

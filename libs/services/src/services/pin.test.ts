@@ -43,6 +43,7 @@ describe('PinService', () => {
     username: 'testuser',
     passwordHash: 'hash',
     emailHash: 'emailhash',
+    emailEncrypted: null,
     roles: [],
     status: UserStatus.Active,
     createdAt: new Date('2024-01-01'),

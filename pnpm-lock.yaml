@@ -57,6 +57,9 @@ importers:
       '@pinsquirrel/adapters':
         specifier: workspace:*
         version: link:../../libs/adapters
+      '@pinsquirrel/crypto':
+        specifier: workspace:*
+        version: link:../../libs/crypto
       '@pinsquirrel/database':
         specifier: workspace:*
         version: link:../../libs/database
@@ -167,6 +170,36 @@ importers:
       prettier:
         specifier: ^3.8.1
         version: 3.8.1
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.2
+      typescript-eslint:
+        specifier: ^8.58.0
+        version: 8.58.0(eslint@10.2.0(jiti@2.6.1))(typescript@6.0.2)
+      vitest:
+        specifier: ^4.1.2
+        version: 4.1.2(@types/node@24.12.2)(happy-dom@18.0.1)(vite@6.3.6(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3))
+
+  libs/crypto:
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.2.0(jiti@2.6.1))
+      '@types/node':
+        specifier: ^24.12.2
+        version: 24.12.2
+      '@vitest/coverage-v8':
+        specifier: ^4.1.2
+        version: 4.1.2(vitest@4.1.2(@types/node@24.12.2)(happy-dom@18.0.1)(vite@6.3.6(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3)))
+      eslint:
+        specifier: ^10
+        version: 10.2.0(jiti@2.6.1)
+      prettier:
+        specifier: ^3.8.1
+        version: 3.8.1
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       typescript:
         specifier: ^6.0.2
         version: 6.0.2

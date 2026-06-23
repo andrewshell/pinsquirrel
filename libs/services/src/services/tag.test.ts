@@ -17,6 +17,7 @@ describe('TagService.getUserTagById', () => {
     username: 'owner',
     passwordHash: 'x',
     emailHash: null,
+    emailEncrypted: null,
     roles: [Role.User],
     status: UserStatus.Active,
     createdAt: new Date(),
