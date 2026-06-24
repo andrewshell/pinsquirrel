@@ -1,0 +1,44 @@
+{
+  "name": "@pinsquirrel/admin",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest --run",
+    "test:watch": "vitest --watch --coverage",
+    "test:coverage": "vitest --run --coverage"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.13",
+    "@pinsquirrel/crypto": "workspace:*",
+    "@pinsquirrel/database": "workspace:*",
+    "@pinsquirrel/domain": "workspace:*",
+    "@pinsquirrel/services": "workspace:*",
+    "dotenv": "^17.4.1",
+    "hono": "^4.12.25",
+    "mailgun.js": "^12.7.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10",
+    "@types/node": "^24.12.2",
+    "@vitest/coverage-v8": "^4.1.2",
+    "eslint": "^10",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "prettier": "^3.8.1",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.0",
+    "vitest": "^4.1.2"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

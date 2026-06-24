@@ -66,6 +66,7 @@ describe('AuthenticationService', () => {
       findById: vi.fn(),
       findByEmailHash: vi.fn(),
       findByUsername: vi.fn(),
+      findByStatus: vi.fn(),
       findAll: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),

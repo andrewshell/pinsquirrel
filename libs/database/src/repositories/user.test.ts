@@ -170,6 +170,36 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     })
   })
 
+  describe('findByStatus', () => {
+    it('returns only users with the given status', async () => {
+      const waitlisted = await repository.create({
+        username: `wl-${crypto.randomUUID().slice(0, 8)}`,
+        passwordHash: 'h',
+        emailHash: null,
+        emailEncrypted: 'sealed-blob',
+      })
+      await repository.update(waitlisted.id, { status: UserStatus.Waitlist })
+
+      const active = await repository.create({
+        username: `act-${crypto.randomUUID().slice(0, 8)}`,
+        passwordHash: 'h',
+        emailHash: null,
+      })
+      await repository.update(active.id, { status: UserStatus.Active })
+
+      const result = await repository.findByStatus(UserStatus.Waitlist)
+
+      const ids = result.map(u => u.id)
+      expect(ids).toContain(waitlisted.id)
+      expect(ids).not.toContain(active.id)
+      expect(result.every(u => u.status === UserStatus.Waitlist)).toBe(true)
+      // Email ciphertext is carried through so the admin app can decrypt it
+      expect(result.find(u => u.id === waitlisted.id)?.emailEncrypted).toBe(
+        'sealed-blob'
+      )
+    })
+  })
+
   describe('list', () => {
     it('should return users with limit', async () => {
       await Promise.all([
