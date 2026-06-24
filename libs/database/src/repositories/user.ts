@@ -4,6 +4,7 @@ import type {
   User,
   UserRepository,
   Role,
+  UserStatus,
 } from '@pinsquirrel/domain'
 import { eq, and, sql } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
@@ -56,6 +57,17 @@ export class DrizzleUserRepository implements UserRepository {
 
     if (!result[0]) return null
     return await this.attachRoles(result[0] as User)
+  }
+
+  async findByStatus(status: UserStatus): Promise<User[]> {
+    const results = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.status, status))
+
+    return await Promise.all(
+      results.map(user => this.attachRoles(user as User))
+    )
   }
 
   async findAll(): Promise<User[]> {

@@ -1,0 +1,5 @@
+# Local admin configuration and private keys — never commit these.
+admin.config.json
+keys/
+*.key.json
+dist/

@@ -6,6 +6,7 @@
   "scripts": {
     "build": "turbo build",
     "dev": "pnpm --filter @pinsquirrel/hono dev",
+    "admin": "pnpm --filter @pinsquirrel/admin dev",
     "start": "pnpm --filter @pinsquirrel/hono start",
     "typecheck": "turbo typecheck",
     "lint": "turbo lint",
@@ -48,6 +49,7 @@
   },
   "lint-staged": {
     "apps/hono/src/**/*.{ts,tsx}": "pnpm --filter @pinsquirrel/hono eslint --fix",
+    "apps/admin/src/**/*.{ts,tsx}": "pnpm --filter @pinsquirrel/admin eslint --fix",
     "libs/services/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/services eslint --fix",
     "libs/database/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/database eslint --fix",
     "libs/domain/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/domain eslint --fix",
