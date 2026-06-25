@@ -1,5 +1,29 @@
 # Changelog
 
+## [3.3.0](https://github.com/andrewshell/pinsquirrel/compare/v3.2.1...v3.3.0) (2026-06-25)
+
+
+### Features
+
+* add private pins with re-authentication and incognito-style UI ([4facb67](https://github.com/andrewshell/pinsquirrel/commit/4facb677fb4a2c4599f025200e3314b9c79f30b4))
+* **admin:** local web app to read and contact the waitlist ([00394cb](https://github.com/andrewshell/pinsquirrel/commit/00394cb7d344769f7fdebcf0006d71a0e5da6b94))
+* **api:** add OpenAPI spec and Scalar docs UI ([cafe7a1](https://github.com/andrewshell/pinsquirrel/commit/cafe7a1ace3ba9c0b5ed0ad08d76ae9d8ffa5ce7))
+* **api:** add read-only REST API at /api/v1 with API key auth ([40b60c9](https://github.com/andrewshell/pinsquirrel/commit/40b60c96bb64aa8ea8bfbd90b94443ca715e19c2))
+* **auth:** add early-access waitlist and user lifecycle states ([b307a70](https://github.com/andrewshell/pinsquirrel/commit/b307a700e5f46788821f6449046cacbbece48fb3))
+* **auth:** add grant-admin CLI script ([800bb3f](https://github.com/andrewshell/pinsquirrel/commit/800bb3f23bf187128fb2264258580a1911c8eb0a))
+* **crypto:** seal waitlist emails to a public key ([416cbbd](https://github.com/andrewshell/pinsquirrel/commit/416cbbdfa83b19940e2fe50b88e4fcb9a3646ef9))
+* **mcp:** add read-only MCP endpoints with API key auth ([087c1c1](https://github.com/andrewshell/pinsquirrel/commit/087c1c160ec984d22e1a005f1ec6506f9c7dac7e))
+* **seo:** declare Content-Signal preferences in robots.txt ([2fc181e](https://github.com/andrewshell/pinsquirrel/commit/2fc181ef64c5f906b468bb22e86066c35d5999f2))
+* **seo:** negotiate text/markdown on public pages ([e9cc48f](https://github.com/andrewshell/pinsquirrel/commit/e9cc48fba4a60f4940a0cbd04cd0adb42dfa6634))
+* **seo:** serve /robots.txt and /sitemap.xml ([24fb872](https://github.com/andrewshell/pinsquirrel/commit/24fb872a00e0893f8133aafe691aa00c368dff3a))
+
+
+### Bug Fixes
+
+* **deps:** bump axios override to &gt;=1.15.0 and hono to &gt;=4.12.12 ([9103c07](https://github.com/andrewshell/pinsquirrel/commit/9103c07f9a41598b73d89a7d1fd84d954e0aea1d))
+* **deps:** bump axios override to &gt;=1.15.2 to clear high-severity advisories ([1f8a70b](https://github.com/andrewshell/pinsquirrel/commit/1f8a70bd4eb67227a309f8a12b3493621a9b5738))
+* **lint:** set tsconfigRootDir and correct VSCode workingDirectories ([8fdc448](https://github.com/andrewshell/pinsquirrel/commit/8fdc44867eb426f53d9f6714d95dfcfc1f458f32))
+
 ## [3.2.1](https://github.com/andrewshell/pinsquirrel/compare/v3.2.0...v3.2.1) (2026-04-06)
 
 
