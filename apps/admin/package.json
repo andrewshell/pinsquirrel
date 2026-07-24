@@ -22,7 +22,7 @@
     "@pinsquirrel/domain": "workspace:*",
     "@pinsquirrel/services": "workspace:*",
     "dotenv": "^17.4.1",
-    "hono": "^4.12.25",
+    "hono": "^4.12.32",
     "mailgun.js": "^12.7.1"
   },
   "devDependencies": {
