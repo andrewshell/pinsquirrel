@@ -30,3 +30,19 @@ updates:
         update-types:
           - 'minor'
           - 'patch'
+    ignore:
+      # 1.5.2 ships broken type declarations: the `z` re-export resolves to an
+      # error type, so @typescript-eslint's type-aware rules report 23 errors
+      # in apps/hono/src/routes/api-v1.ts. tsc itself is fine; only the
+      # type-aware lint rules notice. Declared deps are identical to 1.5.1, so
+      # this is a regression in the published .d.ts. Exact-version ignore so
+      # 1.5.3+ is still offered.
+      - dependency-name: '@hono/zod-openapi'
+        versions: ['1.5.2']
+      # TypeScript 7 is unsupported by every released typescript-eslint —
+      # 8.67.0 (latest) still declares peer typescript '>=4.8.4 <6.1.0', and
+      # typescript-estree crashes with "Cannot read properties of undefined
+      # (reading 'Cjs')" under TS 7. Drop this ignore once typescript-eslint
+      # ships TS 7 support.
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
