@@ -58,7 +58,7 @@ const testApiKey: ApiKey = {
   lastUsedAt: new Date('2024-01-01'),
   expiresAt: null,
   createdAt: new Date('2024-01-01'),
-} as unknown as ApiKey
+}
 
 function makePin(overrides: Partial<Pin> = {}): Pin {
   return {
@@ -73,7 +73,7 @@ function makePin(overrides: Partial<Pin> = {}): Pin {
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     ...overrides,
-  } as Pin
+  }
 }
 
 function makeTag(overrides: Partial<Tag> = {}): Tag {
@@ -84,7 +84,7 @@ function makeTag(overrides: Partial<Tag> = {}): Tag {
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     ...overrides,
-  } as Tag
+  }
 }
 
 describe('api-v1 routes', () => {

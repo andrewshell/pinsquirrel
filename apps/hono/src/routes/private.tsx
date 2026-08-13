@@ -583,8 +583,7 @@ privateRouter.get('/pins/:id/delete-confirm', async (c) => {
   const ac = new AccessControl(user)
   const url = new URL(c.req.url)
   const viewSize = (url.searchParams.get('view') || 'expanded') as
-    | 'expanded'
-    | 'compact'
+    'expanded' | 'compact'
   url.searchParams.delete('view')
   const searchParams = url.searchParams.toString()
 
@@ -681,8 +680,7 @@ privateRouter.get('/pins/:id/card', async (c) => {
   const ac = new AccessControl(user)
   const url = new URL(c.req.url)
   const viewSize = (url.searchParams.get('view') || 'expanded') as
-    | 'expanded'
-    | 'compact'
+    'expanded' | 'compact'
   url.searchParams.delete('view')
   const searchParams = url.searchParams.toString()
 
