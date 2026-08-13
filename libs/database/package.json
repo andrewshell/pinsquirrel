@@ -28,7 +28,7 @@
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "drizzle-seed": "^0.3.1",
-    "mysql2": "^3.23.1"
+    "mysql2": "^3.23.3"
   },
   "devDependencies": {
     "@eslint/js": "^10",
@@ -36,7 +36,7 @@
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.8.1",
     "prettier": "^3.8.1",
-    "tsx": "^4.23.1",
+    "tsx": "^4.23.12",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.58.0",
     "vitest": "^4.1.10"
