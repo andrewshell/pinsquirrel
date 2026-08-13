@@ -24,7 +24,7 @@
     "@hono/mcp": "^0.3.1",
     "@hono/node-server": "^2.0.11",
     "@hono/zod-openapi": "^1.5.1",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@pinsquirrel/adapters": "workspace:*",
     "@pinsquirrel/crypto": "workspace:*",
     "@pinsquirrel/database": "workspace:*",
@@ -35,7 +35,7 @@
     "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.12.32",
+    "hono": "^4.13.2",
     "mailgun.js": "^13.3.0",
     "pino": "^10.3.1",
     "turndown": "^7.2.4"
@@ -45,9 +45,9 @@
     "@tailwindcss/cli": "^4.2.2",
     "@types/node": "^24.12.2",
     "@types/turndown": "^5.0.6",
-    "@vitest/coverage-v8": "^4.1.2",
+    "@vitest/coverage-v8": "^4.1.10",
     "concurrently": "^9.2.1",
-    "eslint": "^10",
+    "eslint": "^10.8.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
     "prettier": "^3.8.1",
@@ -56,7 +56,7 @@
     "tsx": "^4.23.1",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.58.0",
-    "vitest": "^4.1.2"
+    "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=24.0.0"

@@ -4,3 +4,29 @@ updates:
     directory: '/'
     schedule:
       interval: 'weekly'
+
+  # pnpm workspace: pnpm-lock.yaml at the root covers every package under
+  # apps/* and libs/*, so a single root entry updates the whole monorepo.
+  # Per-package directory entries would have no lockfile to resolve against.
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    open-pull-requests-limit: 5
+    # commitlint runs in CI, so Dependabot must raise conventional commits.
+    commit-message:
+      prefix: 'chore(deps)'
+      prefix-development: 'chore(deps-dev)'
+    # Batch minor/patch bumps into two PRs. Majors stay ungrouped so each one
+    # gets reviewed on its own.
+    groups:
+      production-dependencies:
+        dependency-type: 'production'
+        update-types:
+          - 'minor'
+          - 'patch'
+      development-dependencies:
+        dependency-type: 'development'
+        update-types:
+          - 'minor'
+          - 'patch'
