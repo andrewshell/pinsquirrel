@@ -374,7 +374,7 @@ find the metadata and then fail at a _later_, more informative step.
       `WWW-Authenticate` header. Currently returns bare `c.json({ error }, 401)` with no header,
       which is why no client can discover anything.
 
-  ```
+  ```http
   HTTP/1.1 401 Unauthorized
   WWW-Authenticate: Bearer resource_metadata="https://pinsquirrel.com/.well-known/oauth-protected-resource",
                            scope="pins:read tags:read"
@@ -384,6 +384,11 @@ find the metadata and then fail at a _later_, more informative step.
   - Must be an HTTP status, **not** an MCP tool error — applies to unauthenticated _tool calls_
     too, not just the initial connect ("lazy authentication")
 
+- [ ] **Derive every issuer/resource URL from config, not a hardcoded constant.** Dev is
+      `http://localhost:8100` (plain HTTP, no local TLS); production is
+      `https://pinsquirrel.com`. The documents below show the production values — build them from
+      the same base-URL config the rest of the app uses, or local testing will advertise
+      production endpoints.
 - [ ] Create `apps/hono/src/routes/oauth-metadata.ts`
   - `GET /.well-known/oauth-protected-resource` (RFC 9728)
     - `resource` **must match the MCP URL exactly as the user types it into Claude**, path
@@ -391,6 +396,9 @@ find the metadata and then fail at a _later_, more informative step.
     - `authorization_servers: ["https://pinsquirrel.com"]` — Claude uses the **first** entry only
       and never falls back to later ones
     - `scopes_supported: ["pins:read", "tags:read"]`
+    - ⚠️ **Do _not_ list `offline_access` here.** The spec says protected resources SHOULD NOT
+      advertise it — refresh is not a resource requirement. It belongs only in the
+      authorization-server document below.
   - `GET /.well-known/oauth-authorization-server` (RFC 8414):
 
     ```json
@@ -399,12 +407,12 @@ find the metadata and then fail at a _later_, more informative step.
       "authorization_endpoint": "https://pinsquirrel.com/oauth/authorize",
       "token_endpoint": "https://pinsquirrel.com/oauth/token",
       "registration_endpoint": "https://pinsquirrel.com/oauth/register",
-      "scopes_supported": ["pins:read", "tags:read"],
+      "scopes_supported": ["pins:read", "tags:read", "offline_access"],
       "response_types_supported": ["code"],
       "grant_types_supported": ["authorization_code", "refresh_token"],
       "code_challenge_methods_supported": ["S256"],
       "client_id_metadata_document_supported": true,
-      "token_endpoint_auth_methods_supported": ["none", "client_secret_post"],
+      "token_endpoint_auth_methods_supported": ["none"],
       "authorization_response_iss_parameter_supported": true
     }
     ```
@@ -414,10 +422,18 @@ find the metadata and then fail at a _later_, more informative step.
     `token_endpoint_auth_methods_supported`** — the CIMD client authenticates as a public client.
     Miss either and it silently falls back to DCR.
 
+    `offline_access` is listed here deliberately: Claude appends it to the authorization request
+    **only** when the authorization-server metadata advertises it, and without it Claude never
+    receives a refresh token and the connection dies at the first access-token expiry.
+
+    `token_endpoint_auth_methods_supported` lists only `"none"` — advertise what is actually
+    implemented. Add `client_secret_post` **only** alongside the confidential pre-registered
+    client support in 6e, not before.
+
 - [ ] Mount both `.well-known` routes **before** session/CSRF middleware in `app.tsx` (same
       position as `/mcp` at line ~63) — they must be reachable unauthenticated
-- [ ] Manual test: `curl -i https://localhost:8100/mcp` shows the header; both metadata documents
-      fetch and parse
+- [ ] Manual test: `curl -i http://localhost:8100/mcp` shows the header; both metadata documents
+      fetch and parse (note plain `http` — the dev server has no TLS)
 
 ### 6b. Domain + database layer
 
@@ -471,11 +487,25 @@ find the metadata and then fail at a _later_, more informative step.
   - Return RFC 6749 codes — **`invalid_grant`**, never a custom code, on a dead refresh token;
     Claude's recovery keys on it
 - [ ] `apps/hono/src/routes/oauth-register.ts` — `POST /oauth/register` (RFC 7591, DCR fallback)
+  - **Bound the growth.** DCR lets an anonymous caller create rows, and Claude registers afresh
+    on every new connection. Before shipping the endpoint: a per-IP registration quota (Phase
+    6f), a TTL on `oauth_clients` rows that never completed an authorization, and a scheduled
+    cleanup for expired/unused registrations. Deduplicate identical metadata rather than
+    inserting a new row each time.
 - [ ] Bypass CSRF for `/oauth/token` and `/oauth/register` (mount before `csrf()` like `/mcp`)
-- [ ] Update `apps/hono/src/mcp/auth.ts` — accept OAuth access tokens alongside `ps_` keys.
-      **Validate the token audience**: reject any token whose stored `resource` isn't this
-      server. This is a spec MUST and the confused-deputy defense; it's the step hand-rolled
-      implementations most often skip
+- [ ] **Give OAuth access tokens their own prefix** — e.g. `pso_` — so they are distinguishable
+      from `ps_` API keys at a glance and by `startsWith`. Without a distinct format the dispatch
+      below is guesswork.
+- [ ] Update `apps/hono/src/middleware/bearer-auth.ts` — `authenticateBearer` dispatches on
+      prefix: `ps_` → `apiKeyService.authenticateByKey()`, `pso_` → OAuth token-hash lookup in
+      `oauth_tokens`. Both return the same `AuthInfo` contract
+  - **Validate the token audience** on the OAuth path: reject any token whose stored `resource`
+    isn't this server. Spec MUST, and the confused-deputy defense; the step hand-rolled
+    implementations most often skip
+  - Keep `allowApiKeyHeader` semantics: `X-API-Key` stays API-key-only — an OAuth token
+    presented there must be rejected, not silently accepted
+- [ ] Tests: API key succeeds, OAuth token succeeds, OAuth token rejected on API-key-only routes,
+      wrong-audience token rejected, expired/revoked token rejected
 - [ ] Populate `scopes` in the `AuthInfo` object (currently hardcoded `[]` at `mcp/auth.ts:20`)
 
 ### 6e. Client registration (CIMD-first)
@@ -483,8 +513,16 @@ find the metadata and then fail at a _later_, more informative step.
 - [ ] CIMD resolution: when `client_id` is an HTTPS URL, fetch it, validate the document's
       `client_id` matches the URL exactly, validate `redirect_uris`, cache respecting HTTP cache
       headers
-  - ⚠️ **SSRF guard required** — this is a server-side fetch of a caller-supplied URL. Block
-    private ranges, loopback, link-local, and cap redirects/response size
+  - ⚠️ **SSRF guard required** — this is a server-side fetch of a caller-supplied URL. Blocking
+    by hostname is not enough:
+    - Resolve the host and validate **every resolved IP immediately before connecting** — reject
+      private, loopback, link-local, CGNAT, and IPv6-mapped equivalents. Checking the URL string
+      alone loses to DNS rebinding
+    - Disable redirect following, or revalidate the destination IP on **each** hop — a permitted
+      host can 302 to `169.254.169.254`
+    - Enforce separate connection and response-read timeouts, plus a response size cap
+    - Require `https` scheme and a path component (spec requirement for CIMD `client_id`)
+  - Tests: DNS rebinding, redirect to private/loopback/link-local, oversized response, timeout
 - [ ] **Redirect URI matching — the bug-prone part.** Two shapes:
   - Hosted Claude (web, Desktop, mobile, Cowork): exact match on
     `https://claude.ai/api/mcp/auth_callback`
@@ -492,8 +530,10 @@ find the metadata and then fail at a _later_, more informative step.
     `http://localhost/callback` and `http://127.0.0.1/callback` in its CIMD
     (`https://claude.ai/oauth/claude-code-client-metadata`), so **matching must ignore the port
     for loopback hosts**. RFC 8252 §7.3 requires this for `127.0.0.1`; apply the same to
-    `localhost` or Claude Code cannot connect. There is an open Claude Code issue (#37747) on
-    exactly this interaction — test against the real client, not just a unit test
+    `localhost` or Claude Code cannot connect. Claude Code issue #37747 (closed 2026-05-24) was a
+    regression in exactly this interaction — it's fixed upstream, cited here only as evidence
+    that the portless-CIMD path is easy to get wrong on both sides. Test against the real client,
+    not just a unit test
 - [ ] DCR as fallback for clients that don't do CIMD. Prefer CIMD: DCR is deprecated in the spec
       and makes Claude register a **new client row on every fresh connection** (Decision 15)
 - [ ] Support pre-registered static credentials — lets an org paste its own `client_id` when
@@ -539,7 +579,7 @@ Folded in from the standing follow-up; Phase 6 raises the priority, since `/oaut
 9. **MCP transport**: Streamable HTTP via `@hono/mcp` (`@modelcontextprotocol/hono` does not exist as a published package). Mounted at `/mcp`. Uses same Bearer token auth as REST API (existing `ps_` API keys).
 10. **MCP tools are read-only for now**: Initial implementation ships only `list_pins`, `get_pin`, `list_tags` — matches the read-only v1 REST API. Read-write tools (`create_pin`, `update_pin`, `delete_pin`) are deferred until there's a concrete agent use case.
 11. **API docs via OpenAPI + Scalar**: Instead of a hand-written JSX docs page, v1 routes use `@hono/zod-openapi` to generate an OpenAPI 3.1 spec (`/api/openapi.json`) rendered with Scalar (`/api/docs`). Schema-driven docs stay in sync with route definitions automatically.
-12. **OAuth and API keys coexist — OAuth does not replace `ps_` keys** (decided 2026-08-16). They solve different problems: OAuth is for interactive clients that need per-user consent and can survive a browser redirect (Claude, other MCP clients); API keys are for scripts, curl, and the Chrome extension, where a redirect is hostile UX. `authenticateBearer` branches on the token prefix and returns the same `AuthInfo` either way.
+12. **OAuth and API keys coexist — OAuth does not replace `ps_` keys** (decided 2026-08-16). They solve different problems: OAuth is for interactive clients that need per-user consent and can survive a browser redirect (Claude, other MCP clients); API keys are for scripts, curl, and the Chrome extension, where a redirect is hostile UX. `authenticateBearer` branches on the token prefix — `ps_` for API keys, `pso_` for OAuth access tokens — and returns the same `AuthInfo` either way.
 13. **PinSquirrel is its own authorization server**, colocated with the resource server. It already owns users, MySQL sessions, and a login UI, so `/oauth/authorize` is a consent page over existing session middleware. An external IdP (Auth0/Keycloak/WorkOS) would introduce a cross-host discovery problem — a documented common failure mode — for no benefit at this scale.
 14. **Hand-roll the OAuth endpoints in Hono; don't use the MCP SDK's auth router.** Verified against `@modelcontextprotocol/sdk` 1.29.0 in the tree: every handler (`authorize`, `token`, `register`, `metadata`, `revoke`) and `router.js` imports from `express`, and `OAuthServerProvider.authorize()` takes an Express `Response`. Two things are still reusable: the `OAuthServerProvider` interface as the shape for `OAuthService`, and the framework-agnostic Zod schemas in `@modelcontextprotocol/sdk/shared/auth.js`.
 15. **CIMD is the primary client-registration path; DCR is the fallback.** Dynamic Client Registration is deprecated in the current spec, and operationally it makes Claude register a new client on every fresh connection — an unbounded `oauth_clients` table for a public server. A CIMD `client_id` is a self-hosted HTTPS URL that gets fetched and cached instead, and is portable across authorization servers.
@@ -572,4 +612,4 @@ _All paths below re-verified 2026-08-16 — still present and accurate._
 - [MCP spec — Authorization](https://modelcontextprotocol.io/specification/draft/basic/authorization)
 - [MCP spec — Client Registration (CIMD vs DCR)](https://modelcontextprotocol.io/specification/draft/basic/authorization/client-registration)
 - [Anthropic — Authentication for connectors](https://claude.com/docs/connectors/building/authentication) — Anthropic-specific requirements beyond the spec (callback URLs, latency budgets, CIMD selection rules)
-- [Claude Code CIMD redirect_uri port issue #37747](https://github.com/anthropics/claude-code/issues/37747)
+- [Claude Code CIMD redirect_uri port issue #37747](https://github.com/anthropics/claude-code/issues/37747) — closed 2026-05-24; historical evidence that portless-CIMD loopback matching is easy to get wrong
