@@ -432,8 +432,18 @@ find the metadata and then fail at a _later_, more informative step.
 
 - [ ] Mount both `.well-known` routes **before** session/CSRF middleware in `app.tsx` (same
       position as `/mcp` at line ~63) — they must be reachable unauthenticated
-- [ ] Manual test: `curl -i http://localhost:8100/mcp` shows the header; both metadata documents
-      fetch and parse (note plain `http` — the dev server has no TLS)
+- [ ] Manual test — a bare `GET` does not exercise the tool-call path, so **POST a JSON-RPC body**
+      and assert the `401` plus the header (note plain `http` — the dev server has no TLS):
+
+  ```sh
+  curl -si http://localhost:8100/mcp \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json, text/event-stream' \
+    -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_pins","arguments":{}}}'
+  ```
+
+- [ ] Manual test: both metadata documents fetch and parse, and their URLs reflect the local
+      base-URL config rather than production
 
 ### 6b. Domain + database layer
 
@@ -490,18 +500,35 @@ find the metadata and then fail at a _later_, more informative step.
   - **Bound the growth.** DCR lets an anonymous caller create rows, and Claude registers afresh
     on every new connection. Before shipping the endpoint: a per-IP registration quota (Phase
     6f), a TTL on `oauth_clients` rows that never completed an authorization, and a scheduled
-    cleanup for expired/unused registrations. Deduplicate identical metadata rather than
-    inserting a new row each time.
+    cleanup covering **both** expired incomplete registrations and stale completed ones.
+  - **Deduplicate on a canonicalized key, not raw metadata equality.** Claude Code registers a
+    fresh ephemeral loopback port each connection, so byte-equal metadata comparison still yields
+    one row per connection — the exact thing dedup is meant to prevent. Build the dedup key by
+    **omitting the port for loopback hosts only** (`localhost`, `127.0.0.0/8`, `::1`), preserving
+    scheme, host, and path, and keeping exact-port matching for every non-loopback host. This is
+    the same canonicalization the redirect-URI matcher in 6e needs — write it once and share it.
 - [ ] Bypass CSRF for `/oauth/token` and `/oauth/register` (mount before `csrf()` like `/mcp`)
 - [ ] **Give OAuth access tokens their own prefix** — e.g. `pso_` — so they are distinguishable
       from `ps_` API keys at a glance and by `startsWith`. Without a distinct format the dispatch
       below is guesswork.
 - [ ] Update `apps/hono/src/middleware/bearer-auth.ts` — `authenticateBearer` dispatches on
       prefix: `ps_` → `apiKeyService.authenticateByKey()`, `pso_` → OAuth token-hash lookup in
-      `oauth_tokens`. Both return the same `AuthInfo` contract
-  - **Validate the token audience** on the OAuth path: reject any token whose stored `resource`
-    isn't this server. Spec MUST, and the confused-deputy defense; the step hand-rolled
-    implementations most often skip
+      `oauth_tokens`
+  - **Reconcile the return shape before writing either path.** Today's result carries
+    `{ apiKey, rawKey, user }` and both `apiKeyAuth()` and `mcpAuth()` read it directly — an
+    OAuth token has no `apiKey`. Either widen it to a discriminated union both consumers narrow,
+    or keep one result type and map OAuth identity/scopes into the fields `mcpAuth()` needs
+    (`token`, `clientId`, `scopes`, `extra.user`). Decide this first; it's the seam both callers
+    depend on.
+  - **Validate the token audience** on the OAuth path against the **canonical protected-resource
+    URI** — `https://pinsquirrel.com/mcp`, _not_ the issuer `https://pinsquirrel.com` or a bare
+    origin match. The two differ by exactly the path component that RFC 8707 makes significant,
+    and an origin-only check silently accepts a token minted for a different resource on the same
+    host. Spec MUST, and the confused-deputy defense.
+  - **One URI normalization rule, shared everywhere** — metadata generation, the `resource`
+    parameter on authorization and token requests, token issuance, and this bearer check. Divergent
+    normalization (trailing slash, case, default port) produces audience failures that look like
+    random connection breakage.
   - Keep `allowApiKeyHeader` semantics: `X-API-Key` stays API-key-only — an OAuth token
     presented there must be rejected, not silently accepted
 - [ ] Tests: API key succeeds, OAuth token succeeds, OAuth token rejected on API-key-only routes,
@@ -515,14 +542,19 @@ find the metadata and then fail at a _later_, more informative step.
       headers
   - ⚠️ **SSRF guard required** — this is a server-side fetch of a caller-supplied URL. Blocking
     by hostname is not enough:
-    - Resolve the host and validate **every resolved IP immediately before connecting** — reject
-      private, loopback, link-local, CGNAT, and IPv6-mapped equivalents. Checking the URL string
-      alone loses to DNS rebinding
-    - Disable redirect following, or revalidate the destination IP on **each** hop — a permitted
-      host can 302 to `169.254.169.254`
-    - Enforce separate connection and response-read timeouts, plus a response size cap
+    - Resolve the host, validate **every** resolved IP — reject private, loopback, link-local,
+      CGNAT, and IPv6-mapped equivalents — and then **connect to the IP you validated.** Checking
+      the URL string alone loses to DNS rebinding, and so does validate-then-fetch: if the HTTP
+      client re-resolves, an attacker's second answer wins the race. Use a custom
+      resolver/dialer (Node: `lookup` on the agent) that pins the approved address for the
+      connection.
+    - Disable redirect following, or revalidate **and re-pin** the destination IP on each hop
+      with a maximum hop count — a permitted host can 302 to `169.254.169.254`
+    - Enforce separate connection and response-read timeouts, an overall deadline across all
+      hops, and a response size cap
     - Require `https` scheme and a path component (spec requirement for CIMD `client_id`)
-  - Tests: DNS rebinding, redirect to private/loopback/link-local, oversized response, timeout
+  - Tests: DNS rebinding (second resolution returns a private IP), redirect to
+    private/loopback/link-local, redirect loop past the hop cap, oversized response, timeout
 - [ ] **Redirect URI matching — the bug-prone part.** Two shapes:
   - Hosted Claude (web, Desktop, mobile, Cowork): exact match on
     `https://claude.ai/api/mcp/auth_callback`
