@@ -195,6 +195,7 @@ For production Docker builds and deployment, see [DEPLOYMENT.md](./DEPLOYMENT.md
 
 ## Related Documentation
 
+- [PLAN.md](./PLAN.md) — Active roadmap for the API / MCP / OAuth / Chrome extension work, including the decision log
 - [DEPLOYMENT.md](./DEPLOYMENT.md) — Production deployment with Docker and migrations
 - [STYLE.md](./STYLE.md) — Neo Brutalism UI design system
 - [README.md](./README.md) — Quick start and overview
