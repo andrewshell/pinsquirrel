@@ -41,14 +41,14 @@
     "tsx": "^4.23.12"
   },
   "lint-staged": {
-    "apps/hono/src/**/*.{ts,tsx}": "pnpm --filter @pinsquirrel/hono eslint --fix",
-    "apps/admin/src/**/*.{ts,tsx}": "pnpm --filter @pinsquirrel/admin eslint --fix",
-    "libs/services/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/services eslint --fix",
-    "libs/database/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/database eslint --fix",
-    "libs/domain/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/domain eslint --fix",
-    "libs/crypto/**/*.{ts,tsx}": "pnpm --filter @pinsquirrel/crypto eslint --fix",
-    "libs/adapters/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/adapters eslint --fix",
-    "libs/mailgun/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/mailgun eslint --fix",
+    "apps/hono/src/**/*.{ts,tsx}": "pnpm --filter @pinsquirrel/hono exec eslint --fix",
+    "apps/admin/src/**/*.{ts,tsx}": "pnpm --filter @pinsquirrel/admin exec eslint --fix",
+    "libs/services/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/services exec eslint --fix",
+    "libs/database/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/database exec eslint --fix",
+    "libs/domain/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/domain exec eslint --fix",
+    "libs/crypto/**/*.{ts,tsx}": "pnpm --filter @pinsquirrel/crypto exec eslint --fix",
+    "libs/adapters/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/adapters exec eslint --fix",
+    "libs/mailgun/**/*.{ts,tsx,js,jsx}": "pnpm --filter @pinsquirrel/mailgun exec eslint --fix",
     "**/*.{ts,tsx,js,jsx,json,md,css}": "prettier --write"
   }
 }
