@@ -4,7 +4,7 @@ import {
   metadataErrorUtils,
   pinRepository,
 } from '../lib/services'
-import { getSessionManager, requireAuth } from '../middleware/session'
+import { getAuthUser, requireAuth } from '../middleware/session'
 
 const apiInternal = new Hono()
 
@@ -12,14 +12,9 @@ const apiInternal = new Hono()
 apiInternal.use('*', requireAuth())
 
 // GET /api/internal/metadata - Fetch metadata for a URL
+// Gated by requireAuth above; the handler itself needs no user, it just must
+// not be reachable anonymously.
 apiInternal.get('/metadata', async (c) => {
-  const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-
   const url = new URL(c.req.url)
   const targetUrl = url.searchParams.get('url')
 
@@ -43,12 +38,7 @@ apiInternal.get('/metadata', async (c) => {
 
 // GET /api/internal/check-url - Check if a URL is already saved
 apiInternal.get('/check-url', async (c) => {
-  const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
+  const user = getAuthUser(c)
 
   const url = new URL(c.req.url)
   const targetUrl = url.searchParams.get('url')

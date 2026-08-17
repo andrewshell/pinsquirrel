@@ -1,7 +1,11 @@
 import { Hono } from 'hono'
 import { AccessControl } from '@pinsquirrel/domain'
 import { pinService, tagService } from '../lib/services'
-import { getSessionManager, requireAuth } from '../middleware/session'
+import {
+  getAuthUser,
+  getSessionManager,
+  requireAuth,
+} from '../middleware/session'
 import { TagsPage, type TagFilterType } from '../views/pages/tags'
 import { TagMergePage } from '../views/pages/tag-merge'
 
@@ -13,11 +17,7 @@ tags.use('*', requireAuth())
 // GET /tags - Show tags cloud page
 tags.get('/', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const ac = new AccessControl(user)
 
@@ -66,11 +66,7 @@ tags.get('/', async (c) => {
 // GET /tags/merge - Show tag merge page
 tags.get('/merge', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const ac = new AccessControl(user)
 
@@ -89,11 +85,7 @@ tags.get('/merge', async (c) => {
 // POST /tags/merge - Perform tag merge
 tags.post('/merge', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const ac = new AccessControl(user)
 

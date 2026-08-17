@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Hono } from 'hono'
-import { sessionMiddleware, requireAuth, getSessionManager } from './session'
+import type { Context } from 'hono'
+import {
+  sessionMiddleware,
+  requireAuth,
+  getSessionManager,
+  getAuthUser,
+} from './session'
 
 // Create mock functions
 const mockIsValidSession = vi.fn()
@@ -365,6 +371,9 @@ describe('requireAuth Middleware', () => {
     }
     mockIsValidSession.mockResolvedValue(true)
     mockFindById.mockResolvedValue(mockSession)
+    // requireAuth now resolves the user as well as checking the session, so a
+    // request only counts as authenticated if the user row is actually there.
+    mockFindUserById.mockResolvedValue({ id: 'user-456', username: 'alice' })
 
     app.get('/protected', requireAuth(), (c) => {
       return c.json({ protected: true })
@@ -390,6 +399,93 @@ describe('requireAuth Middleware', () => {
 
     expect(res.status).toBe(302)
     expect(res.headers.get('location')).toBe('/admin/login?redirectTo=%2Fadmin')
+  })
+
+  describe('resolved user', () => {
+    const validSession = {
+      id: 'session-123',
+      userId: 'user-456',
+      data: { userId: 'user-456', keepSignedIn: true },
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      createdAt: new Date(),
+    }
+    const authedRequest = { headers: { Cookie: '__session=session-123' } }
+
+    beforeEach(() => {
+      mockIsValidSession.mockResolvedValue(true)
+      mockFindById.mockResolvedValue(validSession)
+    })
+
+    it('exposes the resolved user to handlers via getAuthUser', async () => {
+      mockFindUserById.mockResolvedValue({ id: 'user-456', username: 'alice' })
+
+      app.get('/protected', requireAuth(), (c) => {
+        return c.json({ username: getAuthUser(c).username })
+      })
+
+      const res = await app.request('/protected', authedRequest)
+
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({ username: 'alice' })
+    })
+
+    it('resolves the user exactly once per request', async () => {
+      mockFindUserById.mockResolvedValue({ id: 'user-456', username: 'alice' })
+
+      app.get('/protected', requireAuth(), (c) => {
+        getAuthUser(c)
+        getAuthUser(c)
+        return c.json({ ok: true })
+      })
+
+      await app.request('/protected', authedRequest)
+
+      expect(mockFindUserById).toHaveBeenCalledTimes(1)
+    })
+
+    it('redirects when the session references a user that no longer exists', async () => {
+      // The session carries a userId, so isAuthenticated() is true, but the row
+      // is gone — e.g. the account was deleted mid-session. Handlers used to
+      // each cope with this themselves, inconsistently; it is now one redirect.
+      mockFindUserById.mockResolvedValue(null)
+
+      const handler = vi.fn((c: Context) => c.json({ reached: true }))
+      app.get('/protected', requireAuth(), handler)
+
+      const res = await app.request('/protected', authedRequest)
+
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toBe(
+        '/signin?redirectTo=%2Fprotected'
+      )
+      expect(handler).not.toHaveBeenCalled()
+    })
+
+    it('throws rather than returning undefined when requireAuth is missing', async () => {
+      // Wiring guard: if a router loses its requireAuth(), handlers calling
+      // getAuthUser must fail loudly (500) instead of proceeding with an
+      // undefined user, which would read as "no user" and silently skip
+      // ownership checks.
+      mockFindUserById.mockResolvedValue({ id: 'user-456', username: 'alice' })
+
+      app.get('/unguarded', (c) => c.json({ id: getAuthUser(c).id }))
+
+      const res = await app.request('/unguarded', authedRequest)
+
+      expect(res.status).toBe(500)
+    })
+
+    it('does not hit the user repository when there is no session at all', async () => {
+      mockIsValidSession.mockResolvedValue(false)
+      mockFindById.mockResolvedValue(null)
+
+      app.get('/protected', requireAuth(), (c) => c.json({ ok: true }))
+
+      const res = await app.request('/protected')
+
+      expect(res.status).toBe(302)
+      expect(mockFindUserById).not.toHaveBeenCalled()
+    })
   })
 })
 

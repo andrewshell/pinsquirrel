@@ -1,7 +1,11 @@
 import { Hono } from 'hono'
 import { AccessControl, DuplicatePinError } from '@pinsquirrel/domain'
 import { pinService, pinRepository } from '../lib/services'
-import { getSessionManager, requireAuth } from '../middleware/session'
+import {
+  getAuthUser,
+  getSessionManager,
+  requireAuth,
+} from '../middleware/session'
 import { ImportPage } from '../views/pages/import'
 import { logger, safeError } from '../lib/logger.js'
 
@@ -25,11 +29,7 @@ importRoute.use('*', requireAuth())
 // GET /import - Show import form
 importRoute.get('/', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const flash = sessionManager.getFlash()
 
@@ -39,11 +39,7 @@ importRoute.get('/', async (c) => {
 // POST /import - Process import
 importRoute.post('/', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const ac = new AccessControl(user)
 

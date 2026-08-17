@@ -10,7 +10,11 @@ import {
   UnauthorizedPinAccessError,
 } from '@pinsquirrel/domain'
 import { pinService, tagService } from '../lib/services'
-import { getSessionManager, requireAuth } from '../middleware/session'
+import {
+  getAuthUser,
+  getSessionManager,
+  requireAuth,
+} from '../middleware/session'
 import { PinCard, PinDeleteConfirm } from '../views/components/PinCard'
 import { PinForm } from '../views/components/PinForm'
 import { PinDeletePage } from '../views/pages/pin-delete'
@@ -112,16 +116,8 @@ export async function fetchUserPins(
 // GET /pins - List all pins with filtering and pagination
 pins.get('/', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
+  const user = getAuthUser(c)
   const isHtmx = !!c.req.header('HX-Request')
-
-  if (!user) {
-    if (isHtmx) {
-      c.header('HX-Redirect', '/signin')
-      return c.body(null, 204)
-    }
-    return c.redirect('/signin')
-  }
 
   const {
     tag,
@@ -180,11 +176,7 @@ pins.get('/', async (c) => {
 // GET /pins/new - Show pin creation form
 pins.get('/new', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const ac = new AccessControl(user)
 
@@ -231,11 +223,7 @@ pins.get('/new', async (c) => {
 // POST /pins/new - Create a new pin
 pins.post('/new', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const ac = new AccessControl(user)
 
@@ -362,11 +350,7 @@ pins.post('/new', async (c) => {
 // GET /pins/:id/edit - Show pin edit form
 pins.get('/:id/edit', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
@@ -407,11 +391,7 @@ pins.get('/:id/edit', async (c) => {
 // POST /pins/:id/edit - Update a pin
 pins.post('/:id/edit', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
@@ -569,13 +549,7 @@ pins.post('/:id/edit', async (c) => {
 
 // POST /pins/:id/toggle-read - Toggle read later status (HTMX)
 pins.post('/:id/toggle-read', async (c) => {
-  const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    c.header('HX-Redirect', '/signin')
-    return c.body(null, 204)
-  }
+  const user = getAuthUser(c)
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
@@ -618,13 +592,7 @@ pins.post('/:id/toggle-read', async (c) => {
 
 // GET /pins/:id/delete-confirm - Inline delete confirmation (HTMX)
 pins.get('/:id/delete-confirm', async (c) => {
-  const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    c.header('HX-Redirect', '/signin')
-    return c.body(null, 204)
-  }
+  const user = getAuthUser(c)
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
@@ -658,13 +626,7 @@ pins.get('/:id/delete-confirm', async (c) => {
 
 // DELETE /pins/:id - Delete a pin (HTMX, returns refreshed list)
 pins.delete('/:id', async (c) => {
-  const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    c.header('HX-Redirect', '/signin')
-    return c.body(null, 204)
-  }
+  const user = getAuthUser(c)
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
@@ -714,13 +676,7 @@ pins.delete('/:id', async (c) => {
 
 // GET /pins/:id/card - Return a single pin card (HTMX, for cancel)
 pins.get('/:id/card', async (c) => {
-  const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    c.header('HX-Redirect', '/signin')
-    return c.body(null, 204)
-  }
+  const user = getAuthUser(c)
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
@@ -754,12 +710,7 @@ pins.get('/:id/card', async (c) => {
 
 // GET /pins/:id/delete - Show delete confirmation (full page, non-JS fallback)
 pins.get('/:id/delete', async (c) => {
-  const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
@@ -782,11 +733,7 @@ pins.get('/:id/delete', async (c) => {
 // POST /pins/:id/delete - Delete a pin
 pins.post('/:id/delete', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
