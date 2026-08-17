@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { AccessControl } from '@pinsquirrel/domain'
 import { pinService, tagService } from '../lib/services'
+import { getString } from '../lib/form'
 import {
   getAuthUser,
   getSessionManager,
@@ -91,13 +92,6 @@ tags.post('/merge', async (c) => {
 
   // Parse form data
   const formData = await c.req.parseBody()
-
-  // Helper to get string values
-  const getString = (value: unknown): string => {
-    if (typeof value === 'string') return value
-    if (Array.isArray(value)) return getString(value[0])
-    return ''
-  }
 
   // Get source tag IDs (comma-separated string from hidden input)
   let sourceTagIds: string[] = []

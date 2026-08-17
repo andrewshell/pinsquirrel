@@ -8,6 +8,7 @@ import {
   InvalidCredentialsError,
 } from '@pinsquirrel/domain'
 import { authService, pinService, tagService } from '../lib/services'
+import { parsePinForm } from '../lib/form'
 import {
   getAuthUser,
   getSessionManager,
@@ -178,22 +179,16 @@ privateRouter.post('/pins/new', async (c) => {
   const ac = new AccessControl(user)
   const formData = await c.req.parseBody()
 
-  const getString = (value: unknown): string => {
-    if (typeof value === 'string') return value
-    if (Array.isArray(value)) return getString(value[0])
-    return ''
-  }
-
-  const pinUrl = getString(formData.url)
-  const title = getString(formData.title)
-  const description = getString(formData.description) || null
-  const readLater = getString(formData.readLater) === 'true'
-  const tagsInput = getString(formData.tags)
-
-  const tagNames = tagsInput
-    .split(',')
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0)
+  // isPrivate is intentionally not read here: this form always stores a
+  // private pin, whatever the submitted value says.
+  const {
+    url: pinUrl,
+    title,
+    description,
+    readLater,
+    tagsInput,
+    tagNames,
+  } = parsePinForm(formData)
 
   const userTags = await tagService.getUserTags(ac, user.id)
 
@@ -352,23 +347,15 @@ privateRouter.post('/pins/:id/edit', async (c) => {
 
   const formData = await c.req.parseBody()
 
-  const getString = (value: unknown): string => {
-    if (typeof value === 'string') return value
-    if (Array.isArray(value)) return getString(value[0])
-    return ''
-  }
-
-  const pinUrl = getString(formData.url)
-  const title = getString(formData.title)
-  const description = getString(formData.description) || null
-  const readLater = getString(formData.readLater) === 'true'
-  const isPrivate = getString(formData.isPrivate) === 'true'
-  const tagsInput = getString(formData.tags)
-
-  const tagNames = tagsInput
-    .split(',')
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0)
+  const {
+    url: pinUrl,
+    title,
+    description,
+    readLater,
+    isPrivate,
+    tagsInput,
+    tagNames,
+  } = parsePinForm(formData)
 
   const userTags = await tagService.getUserTags(ac, user.id)
 

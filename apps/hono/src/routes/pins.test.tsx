@@ -252,6 +252,20 @@ describe('pins routes', () => {
       expect(svc.createPin.mock.calls[0][1]).toMatchObject({ readLater: false })
     })
 
+    it('sends null, not empty string, for an omitted description', async () => {
+      // Reaches the database as a nullable column, so the distinction matters.
+      svc.createPin.mockResolvedValue(makePin())
+
+      await app.request(
+        '/pins/new',
+        formBody({ url: 'https://x.test/a', title: 'T', description: '' })
+      )
+
+      expect(svc.createPin.mock.calls[0][1]).toMatchObject({
+        description: null,
+      })
+    })
+
     it('drops empty tags and trims whitespace', async () => {
       svc.createPin.mockResolvedValue(makePin())
 
