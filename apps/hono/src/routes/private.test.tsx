@@ -307,6 +307,22 @@ describe('private routes', () => {
       expect(svc.createPin.mock.calls[0][1]).toMatchObject({ isPrivate: true })
     })
 
+    it('flashes the private-specific success message', async () => {
+      // Distinct from the public list's 'Pin created successfully!'. It is a
+      // createPinRoutes option now, so it would be easy to unify by accident.
+      svc.createPin.mockResolvedValue(makePin({ isPrivate: true }))
+
+      await app.request(
+        '/private/pins/new',
+        formBody({ url: 'https://x.test/a', title: 'T' })
+      )
+
+      expect(session.setFlash).toHaveBeenCalledWith(
+        'success',
+        'Private pin created successfully!'
+      )
+    })
+
     it('re-renders the form without redirecting on a duplicate URL', async () => {
       svc.createPin.mockRejectedValue(new DuplicatePinError('https://x.test/a'))
 
