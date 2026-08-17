@@ -6,10 +6,6 @@ allowBuilds:
   '@parcel/watcher': true
   esbuild: true
 
-onlyBuiltDependencies:
-  - '@tailwindcss/oxide'
-  - esbuild
-
 overrides:
   axios: '>=1.18.0'
   undici: '>=8.9.0'
