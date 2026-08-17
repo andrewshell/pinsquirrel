@@ -10,6 +10,7 @@ import { eq, and, sql } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { users } from '../schema/users.js'
 import { userRoles } from '../schema/user-roles.js'
+import { OFFSET_WITHOUT_LIMIT } from './pagination.js'
 
 export class DrizzleUserRepository implements UserRepository {
   constructor(private db: MySql2Database<Record<string, unknown>>) {}
@@ -87,7 +88,7 @@ export class DrizzleUserRepository implements UserRepository {
       results = await this.db
         .select()
         .from(users)
-        .limit(2147483647)
+        .limit(OFFSET_WITHOUT_LIMIT)
         .offset(offset)
     } else {
       results = await this.db.select().from(users)
