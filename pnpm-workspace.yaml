@@ -21,7 +21,3 @@ overrides:
   happy-dom: '>=20.8.9'
   tsup>esbuild: ^0.28.1
   bundle-require>esbuild: ^0.28.1
-
-peerDependencyRules:
-  allowedVersions:
-    '@hono/mcp>hono-rate-limiter': 0.4.2
