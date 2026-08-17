@@ -10,6 +10,7 @@ import type {
 import { tags } from '../schema/tags.js'
 import { pinsTags } from '../schema/pins-tags.js'
 import { pins } from '../schema/pins.js'
+import { OFFSET_WITHOUT_LIMIT } from './pagination.js'
 
 export class DrizzleTagRepository implements TagRepository {
   constructor(private db: MySql2Database<Record<string, unknown>>) {}
@@ -166,7 +167,7 @@ export class DrizzleTagRepository implements TagRepository {
     } else if (limit !== undefined) {
       query = baseQuery.limit(limit)
     } else if (offset !== undefined) {
-      query = baseQuery.limit(2147483647).offset(offset)
+      query = baseQuery.limit(OFFSET_WITHOUT_LIMIT).offset(offset)
     } else {
       query = baseQuery
     }

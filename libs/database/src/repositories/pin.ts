@@ -20,12 +20,30 @@ import {
   sql,
 } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
+import { applyPagination } from './pagination.js'
 import { pins } from '../schema/pins.js'
 import { pinsTags } from '../schema/pins-tags.js'
 import { tags } from '../schema/tags.js'
 
 function md5(input: string): string {
   return createHash('md5').update(input).digest('hex')
+}
+
+/**
+ * The pin columns, listed explicitly because the tag-filtered queries join
+ * other tables and `select()` would widen the row to the joined shape.
+ */
+const PIN_COLUMNS = {
+  id: pins.id,
+  userId: pins.userId,
+  url: pins.url,
+  urlHash: pins.urlHash,
+  title: pins.title,
+  description: pins.description,
+  readLater: pins.readLater,
+  isPrivate: pins.isPrivate,
+  createdAt: pins.createdAt,
+  updatedAt: pins.updatedAt,
 }
 
 export class DrizzlePinRepository implements PinRepository {
@@ -63,244 +81,105 @@ export class DrizzlePinRepository implements PinRepository {
     return this.mapToPin(pin, pinTags)
   }
 
+  /**
+   * Conditions shared by every pin query for a user.
+   *
+   * `findByUserId` and `countByUserId` must agree exactly or a filtered list
+   * paginates against the wrong total, so they build their WHERE clause here
+   * rather than each maintaining its own copy.
+   */
+  private buildConditions(userId: string, filter?: PinFilter) {
+    const conditions = [eq(pins.userId, userId)]
+
+    if (filter?.readLater !== undefined) {
+      conditions.push(eq(pins.readLater, filter.readLater))
+    }
+
+    if (filter?.isPrivate !== undefined) {
+      conditions.push(eq(pins.isPrivate, filter.isPrivate))
+    }
+
+    if (filter?.url !== undefined) {
+      conditions.push(eq(pins.url, filter.url))
+    }
+
+    if (filter?.search !== undefined && filter.search.trim() !== '') {
+      const searchTerm = `%${filter.search}%`
+      const searchCondition = or(
+        like(pins.url, searchTerm),
+        like(pins.title, searchTerm),
+        like(pins.description, searchTerm)
+      )
+      if (searchCondition) {
+        conditions.push(searchCondition)
+      }
+    }
+
+    return conditions
+  }
+
   async findByUserId(
     userId: string,
     filter?: PinFilter,
     options?: { limit?: number; offset?: number }
   ): Promise<Pin[]> {
-    // Build query conditions
-    const conditions = [eq(pins.userId, userId)]
+    const conditions = this.buildConditions(userId, filter)
+    const orderBy = this.getOrderBy(filter)
 
-    // Add readLater filter if specified
-    if (filter?.readLater !== undefined) {
-      conditions.push(eq(pins.readLater, filter.readLater))
-    }
+    // Each tag filter needs its own join, so the branches differ in shape
+    // rather than just in a WHERE clause. `countByUserId` mirrors them exactly.
+    const select = () => this.db.select(PIN_COLUMNS).from(pins).$dynamic()
 
-    // Add isPrivate filter if specified
-    if (filter?.isPrivate !== undefined) {
-      conditions.push(eq(pins.isPrivate, filter.isPrivate))
-    }
-
-    // Add URL filter if specified (for findByUserIdAndUrl functionality)
-    if (filter?.url !== undefined) {
-      conditions.push(eq(pins.url, filter.url))
-    }
-
-    // Add search filter if specified
-    if (filter?.search !== undefined && filter.search.trim() !== '') {
-      const searchTerm = `%${filter.search}%`
-      const searchCondition = or(
-        like(pins.url, searchTerm),
-        like(pins.title, searchTerm),
-        like(pins.description, searchTerm)
-      )
-      if (searchCondition) {
-        conditions.push(searchCondition)
-      }
-    }
-
-    // If filtering by tag name, we need to join with tags
+    let query
     if (filter?.tag) {
-      const baseQuery = this.db
-        .select({
-          id: pins.id,
-          userId: pins.userId,
-          url: pins.url,
-          urlHash: pins.urlHash,
-          title: pins.title,
-          description: pins.description,
-          readLater: pins.readLater,
-          isPrivate: pins.isPrivate,
-          createdAt: pins.createdAt,
-          updatedAt: pins.updatedAt,
-        })
-        .from(pins)
+      query = select()
         .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
         .innerJoin(tags, eq(pinsTags.tagId, tags.id))
         .where(and(...conditions, eq(tags.name, filter.tag)))
-        .orderBy(this.getOrderBy(filter))
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let query = baseQuery as any
-      if (options?.limit !== undefined && options?.offset !== undefined) {
-        query = baseQuery.limit(options.limit).offset(options.offset)
-      } else if (options?.limit !== undefined) {
-        query = baseQuery.limit(options.limit)
-      } else if (options?.offset !== undefined) {
-        query = baseQuery.limit(2147483647).offset(options.offset)
-      }
-
-      const results = await query
-
-      // Use mapPinsBulk to properly load tags for each pin
-      return this.mapPinsBulk(results)
-    }
-
-    // If filtering by tag ID, we need to join with pinsTags
-    if (filter?.tagId) {
-      const baseQuery = this.db
-        .select({
-          id: pins.id,
-          userId: pins.userId,
-          url: pins.url,
-          urlHash: pins.urlHash,
-          title: pins.title,
-          description: pins.description,
-          readLater: pins.readLater,
-          isPrivate: pins.isPrivate,
-          createdAt: pins.createdAt,
-          updatedAt: pins.updatedAt,
-        })
-        .from(pins)
+    } else if (filter?.tagId) {
+      query = select()
         .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
         .where(and(...conditions, eq(pinsTags.tagId, filter.tagId)))
-        .orderBy(this.getOrderBy(filter))
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let query = baseQuery as any
-      if (options?.limit !== undefined && options?.offset !== undefined) {
-        query = baseQuery.limit(options.limit).offset(options.offset)
-      } else if (options?.limit !== undefined) {
-        query = baseQuery.limit(options.limit)
-      } else if (options?.offset !== undefined) {
-        query = baseQuery.limit(2147483647).offset(options.offset)
-      }
-
-      const results = await query
-
-      // Use mapPinsBulk to properly load tags for each pin
-      return this.mapPinsBulk(results)
-    }
-
-    // If filtering for pins with no tags, use LEFT JOIN to find pins without tag associations
-    if (filter?.noTags) {
-      const baseQuery = this.db
-        .select({
-          id: pins.id,
-          userId: pins.userId,
-          url: pins.url,
-          urlHash: pins.urlHash,
-          title: pins.title,
-          description: pins.description,
-          readLater: pins.readLater,
-          isPrivate: pins.isPrivate,
-          createdAt: pins.createdAt,
-          updatedAt: pins.updatedAt,
-        })
-        .from(pins)
+    } else if (filter?.noTags) {
+      // LEFT JOIN + IS NULL: pins with no tag associations at all.
+      query = select()
         .leftJoin(pinsTags, eq(pins.id, pinsTags.pinId))
         .where(and(...conditions, isNull(pinsTags.pinId)))
-        .orderBy(this.getOrderBy(filter))
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let query = baseQuery as any
-      if (options?.limit !== undefined && options?.offset !== undefined) {
-        query = baseQuery.limit(options.limit).offset(options.offset)
-      } else if (options?.limit !== undefined) {
-        query = baseQuery.limit(options.limit)
-      } else if (options?.offset !== undefined) {
-        query = baseQuery.limit(2147483647).offset(options.offset)
-      }
-
-      const results = await query
-
-      // Use mapPinsBulk to properly load tags for each pin
-      return this.mapPinsBulk(results)
+    } else {
+      query = select().where(and(...conditions))
     }
 
-    // Standard query without tag filtering
-    const baseQuery = this.db
-      .select()
-      .from(pins)
-      .where(and(...conditions))
-      .orderBy(this.getOrderBy(filter))
+    const results = await applyPagination(query.orderBy(orderBy), options)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let query = baseQuery as any
-    if (options?.limit !== undefined && options?.offset !== undefined) {
-      query = baseQuery.limit(options.limit).offset(options.offset)
-    } else if (options?.limit !== undefined) {
-      query = baseQuery.limit(options.limit)
-    } else if (options?.offset !== undefined) {
-      query = baseQuery.limit(2147483647).offset(options.offset)
-    }
-
-    const result = await query
-
-    return this.mapPinsBulk(result)
+    return this.mapPinsBulk(results)
   }
 
   async countByUserId(userId: string, filter?: PinFilter): Promise<number> {
-    // Build query conditions
-    const conditions = [eq(pins.userId, userId)]
+    const conditions = this.buildConditions(userId, filter)
 
-    // Add readLater filter if specified
-    if (filter?.readLater !== undefined) {
-      conditions.push(eq(pins.readLater, filter.readLater))
-    }
+    // Mirrors the branches in findByUserId; only the projection differs.
+    const select = () =>
+      this.db.select({ count: count() }).from(pins).$dynamic()
 
-    // Add isPrivate filter if specified
-    if (filter?.isPrivate !== undefined) {
-      conditions.push(eq(pins.isPrivate, filter.isPrivate))
-    }
-
-    // Add URL filter if specified
-    if (filter?.url !== undefined) {
-      conditions.push(eq(pins.url, filter.url))
-    }
-
-    // Add search filter if specified
-    if (filter?.search !== undefined && filter.search.trim() !== '') {
-      const searchTerm = `%${filter.search}%`
-      const searchCondition = or(
-        like(pins.url, searchTerm),
-        like(pins.title, searchTerm),
-        like(pins.description, searchTerm)
-      )
-      if (searchCondition) {
-        conditions.push(searchCondition)
-      }
-    }
-
-    // If filtering by tag name, we need to join with tags
+    let query
     if (filter?.tag) {
-      const result = await this.db
-        .select({ count: count() })
-        .from(pins)
+      query = select()
         .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
         .innerJoin(tags, eq(pinsTags.tagId, tags.id))
         .where(and(...conditions, eq(tags.name, filter.tag)))
-
-      return result[0]?.count ?? 0
-    }
-
-    // If filtering by tag ID, we need to join with pinsTags
-    if (filter?.tagId) {
-      const result = await this.db
-        .select({ count: count() })
-        .from(pins)
+    } else if (filter?.tagId) {
+      query = select()
         .innerJoin(pinsTags, eq(pins.id, pinsTags.pinId))
         .where(and(...conditions, eq(pinsTags.tagId, filter.tagId)))
-
-      return result[0]?.count ?? 0
-    }
-
-    // If filtering for pins with no tags, use LEFT JOIN to count pins without tag associations
-    if (filter?.noTags) {
-      const result = await this.db
-        .select({ count: count() })
-        .from(pins)
+    } else if (filter?.noTags) {
+      query = select()
         .leftJoin(pinsTags, eq(pins.id, pinsTags.pinId))
         .where(and(...conditions, isNull(pinsTags.pinId)))
-
-      return result[0]?.count ?? 0
+    } else {
+      query = select().where(and(...conditions))
     }
 
-    // Standard count without tag filtering
-    const result = await this.db
-      .select({ count: count() })
-      .from(pins)
-      .where(and(...conditions))
+    const result = await query
 
     return result[0]?.count ?? 0
   }
