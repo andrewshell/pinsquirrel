@@ -54,6 +54,9 @@ vi.mock('../middleware/session', () => ({
     await next()
   },
   getSessionManager: () => fakeSessionManager(session),
+  // requireAuth resolves the user; the suites drive that seam through the same
+  // session.getUser mock so the fixtures stay shared with the real middleware.
+  getAuthUser: () => session.authUser() as unknown,
 }))
 
 import { privateRoutes } from './private'
@@ -64,6 +67,7 @@ describe('private routes', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     session.getUser.mockResolvedValue(testUser)
+    session.authUser.mockReturnValue(testUser)
     session.getFlash.mockReturnValue(null)
     session.isPrivateUnlocked.mockReturnValue(true)
     svc.getUserTags.mockResolvedValue([makeTag()])

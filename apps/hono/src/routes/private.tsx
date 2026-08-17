@@ -8,7 +8,11 @@ import {
   InvalidCredentialsError,
 } from '@pinsquirrel/domain'
 import { authService, pinService, tagService } from '../lib/services'
-import { getSessionManager, requireAuth } from '../middleware/session'
+import {
+  getAuthUser,
+  getSessionManager,
+  requireAuth,
+} from '../middleware/session'
 import { requirePrivateUnlock } from '../middleware/private-mode'
 import { PinCard, PinDeleteConfirm } from '../views/components/PinCard'
 import { PinForm } from '../views/components/PinForm'
@@ -30,11 +34,7 @@ privateRouter.use('*', requireAuth())
 // GET /private/unlock — Password form
 privateRouter.get('/unlock', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   // If already unlocked, redirect to private pins
   if (sessionManager.isPrivateUnlocked()) {
@@ -47,11 +47,7 @@ privateRouter.get('/unlock', async (c) => {
 // POST /private/unlock — Verify password and unlock
 privateRouter.post('/unlock', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const formData = await c.req.parseBody()
   const password =
@@ -92,16 +88,8 @@ privateRouter.use('/pins', requirePrivateUnlock())
 // GET /private/pins — List private pins
 privateRouter.get('/pins', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
+  const user = getAuthUser(c)
   const isHtmx = !!c.req.header('HX-Request')
-
-  if (!user) {
-    if (isHtmx) {
-      c.header('HX-Redirect', '/signin')
-      return c.body(null, 204)
-    }
-    return c.redirect('/signin')
-  }
 
   const {
     tag,
@@ -164,11 +152,7 @@ privateRouter.get('/pins', async (c) => {
 // GET /private/pins/new — Create private pin form
 privateRouter.get('/pins/new', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const ac = new AccessControl(user)
   const userTags = await tagService.getUserTags(ac, user.id)
@@ -189,11 +173,7 @@ privateRouter.get('/pins/new', async (c) => {
 // POST /private/pins/new — Create a private pin
 privateRouter.post('/pins/new', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const ac = new AccessControl(user)
   const formData = await c.req.parseBody()
@@ -321,11 +301,7 @@ privateRouter.post('/pins/new', async (c) => {
 // GET /private/pins/:id/edit
 privateRouter.get('/pins/:id/edit', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
@@ -365,11 +341,7 @@ privateRouter.get('/pins/:id/edit', async (c) => {
 // POST /private/pins/:id/edit
 privateRouter.post('/pins/:id/edit', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
@@ -527,13 +499,7 @@ privateRouter.post('/pins/:id/edit', async (c) => {
 
 // POST /private/pins/:id/toggle-read
 privateRouter.post('/pins/:id/toggle-read', async (c) => {
-  const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    c.header('HX-Redirect', '/signin')
-    return c.body(null, 204)
-  }
+  const user = getAuthUser(c)
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
@@ -571,13 +537,7 @@ privateRouter.post('/pins/:id/toggle-read', async (c) => {
 
 // GET /private/pins/:id/delete-confirm
 privateRouter.get('/pins/:id/delete-confirm', async (c) => {
-  const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    c.header('HX-Redirect', '/signin')
-    return c.body(null, 204)
-  }
+  const user = getAuthUser(c)
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
@@ -610,13 +570,7 @@ privateRouter.get('/pins/:id/delete-confirm', async (c) => {
 
 // DELETE /private/pins/:id
 privateRouter.delete('/pins/:id', async (c) => {
-  const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    c.header('HX-Redirect', '/signin')
-    return c.body(null, 204)
-  }
+  const user = getAuthUser(c)
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
@@ -668,13 +622,7 @@ privateRouter.delete('/pins/:id', async (c) => {
 
 // GET /private/pins/:id/card
 privateRouter.get('/pins/:id/card', async (c) => {
-  const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    c.header('HX-Redirect', '/signin')
-    return c.body(null, 204)
-  }
+  const user = getAuthUser(c)
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
@@ -707,12 +655,7 @@ privateRouter.get('/pins/:id/card', async (c) => {
 
 // GET /private/pins/:id/delete — Full page delete confirmation
 privateRouter.get('/pins/:id/delete', async (c) => {
-  const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)
@@ -736,11 +679,7 @@ privateRouter.get('/pins/:id/delete', async (c) => {
 // POST /private/pins/:id/delete
 privateRouter.post('/pins/:id/delete', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const pinId = c.req.param('id')
   const ac = new AccessControl(user)

@@ -64,6 +64,10 @@ export interface SessionManager {
 interface SessionVariables {
   session: Session | null
   sessionManager: SessionManager
+  // Set by requireAuth() only. Routes behind that middleware read it with
+  // getAuthUser(); anywhere else it is absent, which is why it is not typed as
+  // a plain `User` here.
+  authUser: User | undefined
 }
 
 // Extend Hono's context types
@@ -247,11 +251,26 @@ export function sessionMiddleware(): MiddlewareHandler {
 }
 
 // Helper middleware to require authentication
+/**
+ * Gate a route on a signed-in user, and resolve that user once for the whole
+ * request.
+ *
+ * Two ways to fail, both ending in the same redirect: there is no session at
+ * all, or the session names a user that no longer exists (deleted mid-session).
+ * The second used to fall through to the handlers, which each coped with it
+ * differently — some redirected, some returned `HX-Redirect` with a 204 — so
+ * the same condition produced eight different responses across the app.
+ *
+ * On success the resolved user is stashed on the context. Handlers read it with
+ * `getAuthUser(c)` instead of awaiting `getUser()` themselves, which keeps the
+ * user lookup to one query per request and removes the unreachable null check
+ * that every handler carried.
+ */
 export function requireAuth(redirectTo = '/signin'): MiddlewareHandler {
   return async (c, next) => {
     const sessionManager = c.get('sessionManager')
 
-    if (!sessionManager.isAuthenticated()) {
+    const redirectToSignin = () => {
       const url = new URL(c.req.url)
       const currentPath = url.pathname + url.search
       const redirectUrl =
@@ -262,6 +281,18 @@ export function requireAuth(redirectTo = '/signin'): MiddlewareHandler {
       return c.redirect(redirectUrl)
     }
 
+    // Checked before getUser() so an anonymous request never touches the
+    // database.
+    if (!sessionManager.isAuthenticated()) {
+      return redirectToSignin()
+    }
+
+    const user = await sessionManager.getUser()
+    if (!user) {
+      return redirectToSignin()
+    }
+
+    c.set('authUser', user)
     await next()
   }
 }
@@ -269,4 +300,22 @@ export function requireAuth(redirectTo = '/signin'): MiddlewareHandler {
 // Helper to get session manager from context
 export function getSessionManager(c: Context): SessionManager {
   return c.get('sessionManager')
+}
+
+/**
+ * The signed-in user for a route mounted behind `requireAuth()`.
+ *
+ * Non-null by construction: the middleware redirects rather than calling the
+ * handler when no user resolves. Throws if called from a route that is not
+ * behind `requireAuth()`, which is a wiring mistake rather than a runtime
+ * condition to handle.
+ */
+export function getAuthUser(c: Context): User {
+  const user = c.get('authUser')
+  if (!user) {
+    throw new Error(
+      'getAuthUser() called on a route that is not behind requireAuth()'
+    )
+  }
+  return user
 }

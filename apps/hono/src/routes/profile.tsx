@@ -6,7 +6,11 @@ import {
   ValidationError,
 } from '@pinsquirrel/domain'
 import { apiKeyService, authService } from '../lib/services'
-import { getSessionManager, requireAuth } from '../middleware/session'
+import {
+  getAuthUser,
+  getSessionManager,
+  requireAuth,
+} from '../middleware/session'
 import { ProfilePage } from '../views/pages/profile'
 
 const profile = new Hono()
@@ -17,11 +21,7 @@ profile.use('*', requireAuth())
 // GET /profile - Show profile page
 profile.get('/', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   // Get flash message if any
   const flash = sessionManager.getFlash()
@@ -36,11 +36,7 @@ profile.get('/', async (c) => {
 // POST /profile - Handle form submissions
 profile.post('/', async (c) => {
   const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   // Parse form data
   const formData = await c.req.parseBody()

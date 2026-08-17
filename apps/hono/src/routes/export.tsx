@@ -3,7 +3,7 @@ import { AccessControl } from '@pinsquirrel/domain'
 import type { Pin } from '@pinsquirrel/domain'
 import { md5 } from '@pinsquirrel/services'
 import { pinService } from '../lib/services'
-import { getSessionManager, requireAuth } from '../middleware/session'
+import { getAuthUser, requireAuth } from '../middleware/session'
 
 function formatPinboardTime(date: Date): string {
   return date.toISOString().replace('.000Z', 'Z')
@@ -32,12 +32,7 @@ exportRoute.use('*', requireAuth())
 
 // GET /export/pinboard.json - Export pins in Pinboard format
 exportRoute.get('/pinboard.json', async (c) => {
-  const sessionManager = getSessionManager(c)
-  const user = await sessionManager.getUser()
-
-  if (!user) {
-    return c.redirect('/signin')
-  }
+  const user = getAuthUser(c)
 
   const ac = new AccessControl(user)
   const allPins = await pinService.getUserPins(ac)

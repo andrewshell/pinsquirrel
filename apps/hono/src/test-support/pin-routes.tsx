@@ -66,9 +66,16 @@ export function createServiceMocks(): ServiceMocks {
   }
 }
 
-/** Mock fns backing the fake `SessionManager`. */
+/**
+ * Mock fns backing the fake `SessionManager`.
+ *
+ * `authUser` stands in for `getAuthUser(c)`, which routes behind `requireAuth`
+ * use to read the already-resolved user. It is synchronous, unlike the async
+ * `getUser` on the session manager — mixing them up hands the route a Promise.
+ */
 export interface SessionMocks {
   getUser: Mock
+  authUser: Mock
   setFlash: Mock
   getFlash: Mock
   isPrivateUnlocked: Mock
@@ -79,6 +86,7 @@ export interface SessionMocks {
 export function createSessionMocks(): SessionMocks {
   return {
     getUser: vi.fn(),
+    authUser: vi.fn(),
     setFlash: vi.fn(),
     getFlash: vi.fn(),
     isPrivateUnlocked: vi.fn(),
