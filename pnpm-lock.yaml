@@ -77,8 +77,8 @@ importers:
         specifier: ^4.13.2
         version: 4.13.2
       mailgun.js:
-        specifier: ^13.3.0
-        version: 13.3.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
+        specifier: ^14.0.0
+        version: 14.0.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
     devDependencies:
       '@eslint/js':
         specifier: ^10
@@ -162,8 +162,8 @@ importers:
         specifier: ^4.13.2
         version: 4.13.2
       mailgun.js:
-        specifier: ^13.3.0
-        version: 13.3.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
+        specifier: ^14.0.0
+        version: 14.0.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       pino:
         specifier: ^10.3.1
         version: 10.3.1
@@ -366,8 +366,8 @@ importers:
         specifier: workspace:*
         version: link:../domain
       mailgun.js:
-        specifier: ^13.3.0
-        version: 13.3.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
+        specifier: ^14.0.0
+        version: 14.0.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
     devDependencies:
       '@eslint/js':
         specifier: ^10
@@ -2206,10 +2206,6 @@ packages:
     resolution: {integrity: sha512-NqADB8VjPFLM2V0VvHUewwwsw0ZWBaIdgo+ieHtK3hasLz4qeCRjYcqfB6AQrBggRKppKF8L52/VqdVsO47Dlw==}
     engines: {node: '>= 0.4'}
 
-  hasown@2.0.2:
-    resolution: {integrity: sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==}
-    engines: {node: '>= 0.4'}
-
   hasown@2.0.4:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
@@ -2469,8 +2465,8 @@ packages:
   magicast@0.5.2:
     resolution: {integrity: sha512-E3ZJh4J3S9KfwdjZhe2afj6R9lGIN5Pher1pF39UGrXRqq/VDaGVIGN13BjHd2u8B61hArAGOnso7nBOouW3TQ==}
 
-  mailgun.js@13.3.0:
-    resolution: {integrity: sha512-8avnVhhaZJ17Pw91nPq+N4WuhCBBi9SJpsiAs5SV0CmLXZhz0UobTGP5p3bVTI+Zh1NZU6nXtL+N8KM/taBX4w==}
+  mailgun.js@14.0.0:
+    resolution: {integrity: sha512-3JOytYg/Ff8Itrw74gfwQjylcu/tBEMf4O2HdpfgMqCLON6kypreVDYy5nUqrvMYjtDPVsCV1yKU8mvWsg4VPw==}
     engines: {node: '>=18.0.0'}
 
   make-dir@4.0.0:
@@ -4702,7 +4698,7 @@ snapshots:
       get-proto: 1.0.1
       gopd: 1.2.0
       has-symbols: 1.1.0
-      hasown: 2.0.2
+      hasown: 2.0.4
       math-intrinsics: 1.1.0
 
   get-proto@1.0.1:
@@ -4729,10 +4725,6 @@ snapshots:
   has-tostringtag@1.0.2:
     dependencies:
       has-symbols: 1.1.0
-
-  hasown@2.0.2:
-    dependencies:
-      function-bind: 1.1.2
 
   hasown@2.0.4:
     dependencies:
@@ -4951,7 +4943,7 @@ snapshots:
       '@babel/types': 7.29.0
       source-map-js: 1.2.1
 
-  mailgun.js@13.3.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2):
+  mailgun.js@14.0.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2):
     dependencies:
       axios: 1.18.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       base-64: 1.0.0
