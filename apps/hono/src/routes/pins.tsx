@@ -10,6 +10,7 @@ import {
   UnauthorizedPinAccessError,
 } from '@pinsquirrel/domain'
 import { pinService, tagService } from '../lib/services'
+import { parsePinForm } from '../lib/form'
 import {
   getAuthUser,
   getSessionManager,
@@ -230,25 +231,15 @@ pins.post('/new', async (c) => {
   // Parse form data
   const formData = await c.req.parseBody()
 
-  // Helper to safely extract string from form data (handles File | string | array)
-  const getString = (value: unknown): string => {
-    if (typeof value === 'string') return value
-    if (Array.isArray(value)) return getString(value[0])
-    return ''
-  }
-
-  const pinUrl = getString(formData.url)
-  const title = getString(formData.title)
-  const description = getString(formData.description) || null
-  const readLater = getString(formData.readLater) === 'true'
-  const isPrivate = getString(formData.isPrivate) === 'true'
-  const tagsInput = getString(formData.tags)
-
-  // Parse tags from comma-separated string
-  const tagNames = tagsInput
-    .split(',')
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0)
+  const {
+    url: pinUrl,
+    title,
+    description,
+    readLater,
+    isPrivate,
+    tagsInput,
+    tagNames,
+  } = parsePinForm(formData)
 
   // Fetch user's tags for re-rendering form on error
   const userTags = await tagService.getUserTags(ac, user.id)
@@ -405,24 +396,15 @@ pins.post('/:id/edit', async (c) => {
   const formData = await c.req.parseBody()
 
   // Helper to safely extract string from form data
-  const getString = (value: unknown): string => {
-    if (typeof value === 'string') return value
-    if (Array.isArray(value)) return getString(value[0])
-    return ''
-  }
-
-  const pinUrl = getString(formData.url)
-  const title = getString(formData.title)
-  const description = getString(formData.description) || null
-  const readLater = getString(formData.readLater) === 'true'
-  const isPrivate = getString(formData.isPrivate) === 'true'
-  const tagsInput = getString(formData.tags)
-
-  // Parse tags from comma-separated string
-  const tagNames = tagsInput
-    .split(',')
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0)
+  const {
+    url: pinUrl,
+    title,
+    description,
+    readLater,
+    isPrivate,
+    tagsInput,
+    tagNames,
+  } = parsePinForm(formData)
 
   // Fetch user's tags for re-rendering form on error
   const userTags = await tagService.getUserTags(ac, user.id)

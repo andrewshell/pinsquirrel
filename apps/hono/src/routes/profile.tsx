@@ -6,6 +6,7 @@ import {
   ValidationError,
 } from '@pinsquirrel/domain'
 import { apiKeyService, authService } from '../lib/services'
+import { getString } from '../lib/form'
 import {
   getAuthUser,
   getSessionManager,
@@ -40,13 +41,6 @@ profile.post('/', async (c) => {
 
   // Parse form data
   const formData = await c.req.parseBody()
-
-  // Helper to get string values
-  const getString = (value: unknown): string => {
-    if (typeof value === 'string') return value
-    if (Array.isArray(value)) return getString(value[0])
-    return ''
-  }
 
   const intent = getString(formData['intent'])
 
