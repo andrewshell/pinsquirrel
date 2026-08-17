@@ -23,7 +23,7 @@
     "@pinsquirrel/services": "workspace:*",
     "dotenv": "^17.4.2",
     "hono": "^4.13.2",
-    "mailgun.js": "^13.3.0"
+    "mailgun.js": "^14.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10",
