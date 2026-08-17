@@ -5,7 +5,7 @@
 Add API key authentication, a general-purpose REST API, API documentation, OAuth 2.1
 authorization for the MCP endpoint, and a Chrome extension for bookmark syncing.
 
-## Current Status (verified 2026-08-16)
+## Current Status (verified 2026-08-17)
 
 **Phases 1–4 are shipped and on `main`.** Verified against the code: `api-keys` schema +
 `DrizzleApiKeyRepository`, `ApiKeyService`, profile-page key management UI, `/api/internal/*`,
@@ -25,9 +25,14 @@ the early-access waitlist + user lifecycle states, `libs/crypto` (sealed waitlis
 `apps/admin` (local-only waitlist reader/mailer), and a long run of dependency/advisory
 maintenance. Released as 3.3.0 on 2026-08-13.
 
-Baseline health as of 2026-08-16: `pnpm run audit` is clean on `main`. One open PR: #72
-`chore(deps): drop the now-redundant shell-quote override` (branch
-`chore/drop-shell-quote-override`) — land or close it before branching Phase 6.
+Baseline health as of 2026-08-17: `pnpm run audit` is clean on `main`, and **the Phase 6 gate is
+clear — there is no blocking PR.** The 2026-08-16 note pointed at #72 (`drop the now-redundant
+shell-quote override`); it landed as `9efaab2`, and a maintenance run has since merged on top of
+it: #80 (pnpm 10 → 11, with `pnpm.overrides` / `peerDependencyRules` relocated from `package.json`
+into `pnpm-workspace.yaml`), #75–#79 (dependency bumps — notably vite 6 → 8, lint-staged 16 → 17,
+and mailgun.js 13 → 14), and #81 (`.husky/pre-commit` switched from `pnpx` to `pnpm exec`, so the
+hook runs the lockfile-pinned binary instead of a registry fetch). Phase 6 can branch from `main`
+as it stands.
 
 ### Open follow-ups on the API surface
 
@@ -35,8 +40,9 @@ Baseline health as of 2026-08-16: `pnpm run audit` is clean on `main`. One open 
       `/oauth/token` and `/oauth/register` are unauthenticated endpoints. Folded into Phase 6f.
 - [ ] **Deferred read-write MCP tools** — see Phase 3b-7. Gated on the `pins:write` scope
       from Phase 6, so do Phase 6 first.
-- [ ] Bump `hono-rate-limiter` to `^0.5.3`, handle its `unstorage` peer, and remove the temporary
-      `peerDependencyRules` allowance — do this as part of Phase 6f.
+- [x] ~~Bump `hono-rate-limiter` to `^0.5.3`, handle its `unstorage` peer, and remove the temporary
+      `peerDependencyRules` allowance.~~ Resolved 2026-08-17 — see Phase 6f for what was actually
+      required (much less than this item assumed).
 
 ## Status Legend
 
@@ -286,7 +292,8 @@ Approach changed: instead of a hand-written JSX docs page, the v1 routes were re
 >
 > **This phase does not need Phase 6.** The extension authenticates with a `ps_` API key pasted
 > into its settings — an OAuth browser redirect would be worse UX here, not better. Phase 6 is
-> for interactive MCP clients; the two auth paths coexist (Decision 12).
+> for interactive MCP clients; the two auth paths coexist (Decision 12), and `/api/v1/*` stays
+> API-key-only regardless of how far Phase 6 gets (Decision 18).
 
 ### 5a. Scaffold
 
@@ -383,6 +390,9 @@ find the metadata and then fail at a _later_, more informative step.
   - Must be HTTP `401`, not `200` — Claude ignores `WWW-Authenticate` on a 200
   - Must be an HTTP status, **not** an MCP tool error — applies to unauthenticated _tool calls_
     too, not just the initial connect ("lazy authentication")
+  - **Only this 401 changes.** `middleware/api-auth.ts:19` has its own bare
+    `c.json({ error }, 401)` for `/api/v1/*` — leave it alone. RFC 9728 discovery is what MCP
+    clients need; the REST API is API-key-only (Decision 18) and has nothing to discover.
 
 - [ ] **Derive every issuer/resource URL from config, not a hardcoded constant.** Dev is
       `http://localhost:8100` (plain HTTP, no local TLS); production is
@@ -431,7 +441,9 @@ find the metadata and then fail at a _later_, more informative step.
     client support in 6e, not before.
 
 - [ ] Mount both `.well-known` routes **before** session/CSRF middleware in `app.tsx` (same
-      position as `/mcp` at line ~63) — they must be reachable unauthenticated
+      position as `/mcp`, `app.tsx:63`) — they must be reachable unauthenticated. Verified
+      2026-08-17: nothing currently serves `/.well-known/*`, and the pre-session `seoRoutes` mount
+      claims only `/robots.txt` and `/sitemap.xml`, so the path is free.
 - [ ] Manual test — a bare `GET` does not exercise the tool-call path, so **POST a JSON-RPC body**
       and assert the `401` plus the header (note plain `http` — the dev server has no TLS):
 
@@ -514,12 +526,17 @@ find the metadata and then fail at a _later_, more informative step.
 - [ ] Update `apps/hono/src/middleware/bearer-auth.ts` — `authenticateBearer` dispatches on
       prefix: `ps_` → `apiKeyService.authenticateByKey()`, `pso_` → OAuth token-hash lookup in
       `oauth_tokens`
-  - **Reconcile the return shape before writing either path.** Today's result carries
-    `{ apiKey, rawKey, user }` and both `apiKeyAuth()` and `mcpAuth()` read it directly — an
-    OAuth token has no `apiKey`. Either widen it to a discriminated union both consumers narrow,
-    or keep one result type and map OAuth identity/scopes into the fields `mcpAuth()` needs
-    (`token`, `clientId`, `scopes`, `extra.user`). Decide this first; it's the seam both callers
-    depend on.
+  - **Reconcile the return shape before writing either path.** Today's `AuthenticatedRequest`
+    carries `{ user, apiKey, rawKey }` and both `apiKeyAuth()` and `mcpAuth()` read it directly —
+    an OAuth token has no `apiKey`. Go with a discriminated union both consumers narrow.
+    - This is **cheaper than it looks**. Traced 2026-08-17: `apiKey` is written but never read
+      anywhere in the app. `getApiKey()` (`middleware/api-auth.ts:31`) has zero call sites, and
+      `c.get('apiKey')` is never consumed. Nothing downstream depends on the field.
+    - The only real obstacle is `middleware/api-auth.ts:5-13`, which declares `apiKey: ApiKey`
+      as a **non-optional** `ContextVariableMap` entry. That declaration — not any consumer — is
+      what forces the field to exist. Narrow or drop it and the union falls out easily.
+    - `mcpAuth()` needs `token`, `clientId`, `scopes`, `extra.user` (`mcp/auth.ts:17-22`); make
+      those the fields the union guarantees on both arms.
   - **Validate the token audience** on the OAuth path against the **canonical protected-resource
     URI** — `https://pinsquirrel.com/mcp`, _not_ the issuer `https://pinsquirrel.com` or a bare
     origin match. The two differ by exactly the path component that RFC 8707 makes significant,
@@ -531,6 +548,10 @@ find the metadata and then fail at a _later_, more informative step.
     random connection breakage.
   - Keep `allowApiKeyHeader` semantics: `X-API-Key` stays API-key-only — an OAuth token
     presented there must be rejected, not silently accepted
+  - **Add `allowOAuth: boolean` (default `false`) alongside it, and have `/mcp` opt in.** That
+    header rule governs the _header_; this one governs the _route_. `routes/api-v1.ts:169` applies
+    `apiKeyAuth()` over the same `authenticateBearer`, so without this flag, widening the function
+    silently makes `/api/v1/*` an OAuth surface — see Decision 18
 - [ ] Tests: API key succeeds, OAuth token succeeds, OAuth token rejected on API-key-only routes,
       wrong-audience token rejected, expired/revoked token rejected
 - [ ] Populate `scopes` in the `AuthInfo` object (currently hardcoded `[]` at `mcp/auth.ts:20`)
@@ -576,9 +597,19 @@ find the metadata and then fail at a _later_, more informative step.
 Folded in from the standing follow-up; Phase 6 raises the priority, since `/oauth/token` and
 `/oauth/register` are unauthenticated endpoints.
 
-- [ ] Extend `rate-limit.ts` coverage to `/mcp`, `/api/v1/*`, `/oauth/token`, `/oauth/register`
-- [ ] Bump `hono-rate-limiter` to `^0.5.3`, handle its `unstorage` peer, remove the temporary
-      `peerDependencyRules` allowance
+- [ ] Extend `rate-limit.ts` coverage to `/mcp`, `/api/v1/*`, `/oauth/token`, `/oauth/register`.
+      Today it is only wired into `routes/auth.tsx` — verified 2026-08-17.
+- [x] ~~Bump `hono-rate-limiter` to `^0.5.3`, handle its `unstorage` peer, remove the temporary
+      `peerDependencyRules` allowance.~~ Done 2026-08-17; all three clauses turned out to be stale
+      or already satisfied, and none of it was actually Phase 6 work:
+  - The **bump** was already satisfied transitively. `hono-rate-limiter` is not a direct
+    dependency — it arrives as a peer of `@hono/mcp@0.3.1`, which declares `^0.5.3`, and 0.5.3 is
+    what the lockfile resolves.
+  - The **`unstorage` peer** needs no handling: `hono-rate-limiter@0.5.3` marks it `optional: true`
+    in `peerDependenciesMeta`.
+  - The **`peerDependencyRules` allowance** (relocated into `pnpm-workspace.yaml` by #80) had gone
+    inert — it permitted `0.4.2`, a version nothing requests. Removed in its own PR after
+    confirming a forced full re-resolve produced a zero-line lockfile diff and no peer warnings.
 - [ ] **Latency budget** — Claude waits **10s** for discovery/register/token and **30s** for
       refresh, then treats the flow as failed. Don't buffer the response behind slow downstream
       work
@@ -611,16 +642,21 @@ Folded in from the standing follow-up; Phase 6 raises the priority, since `/oaut
 9. **MCP transport**: Streamable HTTP via `@hono/mcp` (`@modelcontextprotocol/hono` does not exist as a published package). Mounted at `/mcp`. Uses same Bearer token auth as REST API (existing `ps_` API keys).
 10. **MCP tools are read-only for now**: Initial implementation ships only `list_pins`, `get_pin`, `list_tags` — matches the read-only v1 REST API. Read-write tools (`create_pin`, `update_pin`, `delete_pin`) are deferred until there's a concrete agent use case.
 11. **API docs via OpenAPI + Scalar**: Instead of a hand-written JSX docs page, v1 routes use `@hono/zod-openapi` to generate an OpenAPI 3.1 spec (`/api/openapi.json`) rendered with Scalar (`/api/docs`). Schema-driven docs stay in sync with route definitions automatically.
-12. **OAuth and API keys coexist — OAuth does not replace `ps_` keys** (decided 2026-08-16). They solve different problems: OAuth is for interactive clients that need per-user consent and can survive a browser redirect (Claude, other MCP clients); API keys are for scripts, curl, and the Chrome extension, where a redirect is hostile UX. `authenticateBearer` branches on the token prefix — `ps_` for API keys, `pso_` for OAuth access tokens — and returns the same `AuthInfo` either way.
+12. **OAuth and API keys coexist — OAuth does not replace `ps_` keys** (decided 2026-08-16). They solve different problems: OAuth is for interactive clients that need per-user consent and can survive a browser redirect (Claude, other MCP clients); API keys are for scripts, curl, and the Chrome extension, where a redirect is hostile UX. `authenticateBearer` branches on the token prefix — `ps_` for API keys, `pso_` for OAuth access tokens. Note the two types in play: `authenticateBearer` returns the app's own `AuthenticatedRequest`, which becomes a **discriminated union** across the two arms (Phase 6d); the MCP SDK's `AuthInfo` is a separate shape that `mcpAuth()` builds _from_ it. Only `/mcp` accepts the OAuth arm — see Decision 18.
 13. **PinSquirrel is its own authorization server**, colocated with the resource server. It already owns users, MySQL sessions, and a login UI, so `/oauth/authorize` is a consent page over existing session middleware. An external IdP (Auth0/Keycloak/WorkOS) would introduce a cross-host discovery problem — a documented common failure mode — for no benefit at this scale.
-14. **Hand-roll the OAuth endpoints in Hono; don't use the MCP SDK's auth router.** Verified against `@modelcontextprotocol/sdk` 1.29.0 in the tree: every handler (`authorize`, `token`, `register`, `metadata`, `revoke`) and `router.js` imports from `express`, and `OAuthServerProvider.authorize()` takes an Express `Response`. Two things are still reusable: the `OAuthServerProvider` interface as the shape for `OAuthService`, and the framework-agnostic Zod schemas in `@modelcontextprotocol/sdk/shared/auth.js`.
+14. **Hand-roll the OAuth endpoints in Hono; don't use the MCP SDK's auth router.** Originally verified against `@modelcontextprotocol/sdk` 1.29.0: every handler (`authorize`, `token`, `register`, `metadata`, `revoke`) and `router.js` imports from `express`, and `OAuthServerProvider.authorize()` takes an Express `Response`. Two things are still reusable: the `OAuthServerProvider` interface as the shape for `OAuthService`, and the framework-agnostic Zod schemas in `@modelcontextprotocol/sdk/shared/auth.js`. ⚠️ The tree is now on `^1.30.0` (1.30.0 resolved) — **re-confirm the Express coupling against the installed version before writing 6c**, since this decision rests entirely on that observation. Note `@hono/mcp@0.3.1` declares the SDK as a peer at `^1.29.0`, so the floor is unlikely to move without a `@hono/mcp` bump.
 15. **CIMD is the primary client-registration path; DCR is the fallback.** Dynamic Client Registration is deprecated in the current spec, and operationally it makes Claude register a new client on every fresh connection — an unbounded `oauth_clients` table for a public server. A CIMD `client_id` is a self-hosted HTTPS URL that gets fetched and cached instead, and is portable across authorization servers.
 16. **Scopes start minimal**: `pins:read`, `tags:read` — matching the read-only MCP tools. `pins:write` arrives with Phase 3b-7's write tools, via the spec's step-up authorization flow. Easier to add a scope later than to un-grant an over-broad one.
 17. **Token audience binding is mandatory**: the `resource` (RFC 8707) from the authorization request is stored on the access token, and `/mcp` rejects any token not issued for itself. Spec MUST, and the confused-deputy defense.
+18. **`/api/v1/*` stays API-key-only; OAuth tokens are accepted at `/mcp` only** (decided 2026-08-17). The two surfaces have different clients: `/mcp` serves interactive agents that can survive a browser redirect, while `/api/v1` serves scripts, curl, and the Chrome extension, where a redirect is hostile UX (Decision 12). Making `/api/v1` an OAuth resource too would mean a _second_ protected-resource metadata document at `https://pinsquirrel.com/api/v1` with its own audience, because Decision 17 binds each token to one exact resource URI — real complexity for zero current demand.
+
+    **This needs an explicit mechanism, or it gets decided by accident.** `routes/api-v1.ts:169` applies `apiKeyAuth()`, which delegates to the _same_ `authenticateBearer` that Phase 6d widens — so widening that function silently opts `/api/v1/*` into OAuth unless something stops it. Add an `allowOAuth: boolean` option to `authenticateBearer`, symmetric with the existing `allowApiKeyHeader`, defaulting to `false`; `/mcp` opts in explicitly. Without the flag, audience validation (Decision 17) would be the only thing rejecting OAuth tokens at `/api/v1` — correct by accident, and silently wrong the moment anyone loosens the audience check.
+
+    **Cheap to revisit.** The REST API has no external consumers yet, so adding OAuth to `/api/v1` later is additive — a new resource-metadata document plus an audience — not a breaking change.
 
 ## Key Files to Reuse
 
-_All paths below re-verified 2026-08-16 — still present and accurate._
+_All paths below re-verified 2026-08-17 — still present and accurate._
 
 - `libs/services/src/utils/crypto.ts` — `generateSecureToken()`, `hashToken()` for API key generation/hashing
 - `libs/domain/src/entities/access.ts` — `AccessControl`, `AccessGateable` for authorization
