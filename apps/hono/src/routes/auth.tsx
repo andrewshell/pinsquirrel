@@ -13,7 +13,9 @@ import { logger, safeError } from '../lib/logger.js'
 import { getSessionManager } from '../middleware/session'
 import {
   signinLimiter,
+  signinIpLimiter,
   signinRateLimitKey,
+  getClientIp,
   signupLimiter,
   forgotPasswordLimiter,
   rateLimitByIp,
@@ -62,8 +64,16 @@ auth.post('/signin', async (c) => {
   const keepSignedIn = formData.keepSignedIn === 'true'
   const redirectTo = formData.redirectTo as string | undefined
 
+  // Two keys, two attacks. The IP:username key stops guessing at one account;
+  // the IP-only key stops one address spraying a password across many
+  // usernames, which the first never sees because every guess lands in a fresh
+  // bucket.
   const rateLimitKey = signinRateLimitKey(c, username || '')
-  if (signinLimiter.isLimited(rateLimitKey)) {
+  const ipKey = getClientIp(c)
+  if (
+    signinLimiter.isLimited(rateLimitKey) ||
+    signinIpLimiter.isLimited(ipKey)
+  ) {
     return c.html(
       <SignInPage
         errors={{
@@ -81,6 +91,9 @@ auth.post('/signin', async (c) => {
   try {
     const user = await authService.login({ username, password })
 
+    // Only the per-account counter is cleared. Clearing the IP counter too
+    // would let an attacker who owns one valid account wipe their spray budget
+    // by signing into it between rounds.
     signinLimiter.reset(rateLimitKey)
 
     // Create session
@@ -106,6 +119,7 @@ auth.post('/signin', async (c) => {
       errors = error.fields
     } else if (error instanceof InvalidCredentialsError) {
       signinLimiter.hit(rateLimitKey)
+      signinIpLimiter.hit(ipKey)
       errors = { _form: ['Invalid username or password'] }
     } else if (error instanceof EmailVerificationRequiredError) {
       errors = { _form: [error.message] }

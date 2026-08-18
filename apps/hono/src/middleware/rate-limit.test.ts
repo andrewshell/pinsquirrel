@@ -34,7 +34,19 @@ describe('getClientIp', () => {
     expect(await res.text()).toBe('10.0.0.1')
   })
 
-  it('returns unknown when no headers present', async () => {
+  it('falls back to the socket peer address when no headers present', async () => {
+    // Without a proxy header there is nothing to key a rate limit on, and the
+    // old 'unknown' literal put every such caller in one shared bucket - so a
+    // single attacker could 429 everyone else. The socket address is always
+    // available under @hono/node-server, so this branch is what runs in
+    // production whenever a request arrives without going through the proxy.
+    const res = await app.request('/test', undefined, {
+      incoming: { socket: { remoteAddress: '9.9.9.9' } },
+    })
+    expect(await res.text()).toBe('9.9.9.9')
+  })
+
+  it('returns unknown only when even the socket address is unavailable', async () => {
     const res = await app.request('/test')
     expect(await res.text()).toBe('unknown')
   })
