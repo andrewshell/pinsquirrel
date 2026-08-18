@@ -44,6 +44,9 @@ const limiter = {
   hit: vi.fn(),
   reset: vi.fn(),
   ipLimited: vi.fn(),
+  ipIsLimited: vi.fn(),
+  ipHit: vi.fn(),
+  ipReset: vi.fn(),
 }
 
 vi.mock('../lib/services', () => ({
@@ -80,9 +83,16 @@ vi.mock('../middleware/rate-limit', () => ({
     hit: (...a: unknown[]): unknown => limiter.hit(...a) as unknown,
     reset: (...a: unknown[]): unknown => limiter.reset(...a) as unknown,
   },
+  signinIpLimiter: {
+    isLimited: (...a: unknown[]): boolean =>
+      limiter.ipIsLimited(...a) as boolean,
+    hit: (...a: unknown[]): unknown => limiter.ipHit(...a) as unknown,
+    reset: (...a: unknown[]): unknown => limiter.ipReset(...a) as unknown,
+  },
   signupLimiter: {},
   forgotPasswordLimiter: {},
   signinRateLimitKey: (_c: unknown, username: string) => `ip:${username}`,
+  getClientIp: () => 'ip',
   rateLimitByIp: (): MiddlewareHandler => async (c, next) => {
     if (limiter.ipLimited() as boolean) return c.text('Too many requests', 429)
     await next()
@@ -113,6 +123,7 @@ describe('auth routes', () => {
     session.getFlash.mockReturnValue(null)
     limiter.isLimited.mockReturnValue(false)
     limiter.ipLimited.mockReturnValue(false)
+    limiter.ipIsLimited.mockReturnValue(false)
     app = new Hono()
     app.route('/', authRoutes)
   })
@@ -255,6 +266,62 @@ describe('auth routes', () => {
         await app.request('/signin', form({ username: 'alice', password: 'x' }))
 
         expect(limiter.hit).not.toHaveBeenCalled()
+      })
+
+      // The IP:username key stops guessing at one account but never fires
+      // against an attacker who sprays one password across many usernames -
+      // every guess lands in a fresh bucket. The looser IP-only limiter is
+      // what covers that, so both are consulted on every attempt.
+      it('returns 429 without attempting a login when the IP limiter is tripped', async () => {
+        limiter.ipIsLimited.mockReturnValue(true)
+
+        const res = await app.request(
+          '/signin',
+          form({ username: 'alice', password: 'pw' })
+        )
+
+        expect(res.status).toBe(429)
+        expect(auth.login).not.toHaveBeenCalled()
+      })
+
+      it('keys the IP limiter on the address alone, not the username', async () => {
+        auth.login.mockResolvedValue({ id: 'user-1' })
+
+        await app.request('/signin', form({ username: 'alice', password: 'p' }))
+
+        expect(limiter.ipIsLimited).toHaveBeenCalledWith('ip')
+      })
+
+      it('counts a wrong-credentials failure against both limiters', async () => {
+        auth.login.mockRejectedValue(new InvalidCredentialsError())
+
+        await app.request('/signin', form({ username: 'alice', password: 'x' }))
+
+        expect(limiter.hit).toHaveBeenCalledWith('ip:alice')
+        expect(limiter.ipHit).toHaveBeenCalledWith('ip')
+      })
+
+      it('does not clear the IP limiter on a successful sign-in', async () => {
+        // Deliberate asymmetry with signinLimiter.reset above: an attacker who
+        // owns one valid account could otherwise wipe their spray budget at
+        // will by signing into it between rounds.
+        auth.login.mockResolvedValue({ id: 'user-1' })
+
+        await app.request('/signin', form({ username: 'alice', password: 'p' }))
+
+        expect(limiter.reset).toHaveBeenCalledWith('ip:alice')
+        expect(limiter.ipReset).not.toHaveBeenCalled()
+      })
+
+      it.each([
+        ['validation error', () => new ValidationError({ username: ['bad'] })],
+        ['unexpected error', () => new Error('boom')],
+      ])('does not count a %s against the IP limiter', async (_label, make) => {
+        auth.login.mockRejectedValue(make())
+
+        await app.request('/signin', form({ username: 'alice', password: 'x' }))
+
+        expect(limiter.ipHit).not.toHaveBeenCalled()
       })
     })
 

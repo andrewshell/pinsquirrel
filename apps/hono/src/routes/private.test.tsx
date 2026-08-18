@@ -32,6 +32,24 @@ import {
 const svc = createServiceMocks()
 const session = createSessionMocks()
 
+const unlockLimiter = {
+  isLimited: vi.fn(),
+  hit: vi.fn(),
+  reset: vi.fn(),
+}
+
+// The RateLimiter class has its own unit tests; what matters here is that the
+// unlock route consults it and honours the answer, so the seam is driven
+// directly - same approach as auth.test.tsx.
+vi.mock('../middleware/rate-limit', () => ({
+  privateUnlockLimiter: {
+    isLimited: (...a: unknown[]): boolean =>
+      unlockLimiter.isLimited(...a) as boolean,
+    hit: (...a: unknown[]): unknown => unlockLimiter.hit(...a) as unknown,
+    reset: (...a: unknown[]): unknown => unlockLimiter.reset(...a) as unknown,
+  },
+}))
+
 vi.mock('../lib/services', () => ({
   authService: {
     login: (...a: unknown[]) => svc.login(...a) as unknown,
@@ -70,6 +88,7 @@ describe('private routes', () => {
     session.authUser.mockReturnValue(testUser)
     session.getFlash.mockReturnValue(null)
     session.isPrivateUnlocked.mockReturnValue(true)
+    unlockLimiter.isLimited.mockReturnValue(false)
     svc.getUserTags.mockResolvedValue([makeTag()])
     svc.getUserPinsWithPagination.mockResolvedValue({
       pins: [makePin({ isPrivate: true })],
@@ -187,6 +206,50 @@ describe('private routes', () => {
       expect(res.status).toBe(200)
       expect(await res.text()).toContain('Invalid password')
       expect(session.unlockPrivateMode).not.toHaveBeenCalled()
+    })
+
+    // Unlock checks the account password on every POST, so without a limit it
+    // is an unbounded password-guessing oracle for anyone holding the session
+    // cookie. Keyed on the user id, not the IP: the attacker already has the
+    // session, so the address proves nothing and rotating it must not help.
+    describe('rate limiting', () => {
+      it('returns 429 without checking the password when limited', async () => {
+        unlockLimiter.isLimited.mockReturnValue(true)
+
+        const res = await app.request(
+          '/private/unlock',
+          formBody({ password: 'guess' })
+        )
+
+        expect(res.status).toBe(429)
+        expect(svc.login).not.toHaveBeenCalled()
+        expect(session.unlockPrivateMode).not.toHaveBeenCalled()
+      })
+
+      it('keys the limiter on the user id', async () => {
+        svc.login.mockResolvedValue(testUser)
+
+        await app.request('/private/unlock', formBody({ password: 'p' }))
+
+        expect(unlockLimiter.isLimited).toHaveBeenCalledWith(testUser.id)
+      })
+
+      it('counts a wrong password against the limiter', async () => {
+        svc.login.mockRejectedValue(new InvalidCredentialsError())
+
+        await app.request('/private/unlock', formBody({ password: 'wrong' }))
+
+        expect(unlockLimiter.hit).toHaveBeenCalledWith(testUser.id)
+      })
+
+      it('clears the limiter on a correct password', async () => {
+        svc.login.mockResolvedValue(testUser)
+
+        await app.request('/private/unlock', formBody({ password: 'right' }))
+
+        expect(unlockLimiter.reset).toHaveBeenCalledWith(testUser.id)
+        expect(unlockLimiter.hit).not.toHaveBeenCalled()
+      })
     })
 
     it('locks and redirects to the public list', async () => {

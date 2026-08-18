@@ -7,6 +7,7 @@ import {
   requireAuth,
 } from '../middleware/session'
 import { requirePrivateUnlock } from '../middleware/private-mode'
+import { privateUnlockLimiter } from '../middleware/rate-limit'
 import { PrivateUnlockPage } from '../views/pages/private-unlock'
 import { createPinRoutes } from './pin-routes'
 
@@ -39,8 +40,21 @@ privateRouter.post('/unlock', async (c) => {
   const password =
     typeof formData.password === 'string' ? formData.password : ''
 
+  // This checks the account password on every POST, so unlimited it is a
+  // password-guessing oracle for anyone who has got hold of the session.
+  if (privateUnlockLimiter.isLimited(user.id)) {
+    return c.html(
+      <PrivateUnlockPage
+        user={user}
+        error="Too many failed attempts. Please try again in 15 minutes."
+      />,
+      429
+    )
+  }
+
   try {
     await authService.login({ username: user.username, password })
+    privateUnlockLimiter.reset(user.id)
     sessionManager.unlockPrivateMode()
     return c.redirect(BASE_URL)
   } catch (error) {
@@ -48,6 +62,11 @@ privateRouter.post('/unlock', async (c) => {
       error instanceof InvalidCredentialsError ||
       error instanceof ValidationError
     ) {
+      // Only a wrong password burns an attempt. ValidationError here means an
+      // empty or malformed field, which never reached a credential check.
+      if (error instanceof InvalidCredentialsError) {
+        privateUnlockLimiter.hit(user.id)
+      }
       return c.html(<PrivateUnlockPage user={user} error="Invalid password." />)
     }
     throw error
