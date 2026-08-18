@@ -4,6 +4,7 @@ export {
   sealEmail,
   openSealedEmail,
   assertValidPublicKey,
+  createEmailSealer,
 } from './email-crypto.js'
 export {
   serializeRawPrivateKey,
