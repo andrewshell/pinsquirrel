@@ -15,9 +15,9 @@ import { Role, UserStatus } from '@pinsquirrel/domain'
 import type { Hono } from 'hono'
 import type { User } from '@pinsquirrel/domain'
 
-const userRepository = {
-  findByStatus: vi.fn(),
-  findByUsername: vi.fn(),
+const userService = {
+  getUserByUsername: vi.fn(),
+  listByStatus: vi.fn(),
 }
 
 const authService = {
@@ -27,7 +27,7 @@ const authService = {
 }
 
 vi.mock('./runtime.js', () => ({
-  getRuntime: () => ({ userRepository, authService }),
+  getRuntime: () => ({ userService, authService }),
 }))
 
 // The key file is never read in tests; the unlock flow takes the raw-key path.
@@ -126,6 +126,21 @@ async function signIn(): Promise<string> {
   return cookie
 }
 
+/**
+ * Answer getUserByUsername for the signed-in admin plus any named targets.
+ *
+ * The app re-reads its own account each request to build the AccessControl it
+ * passes to listByStatus, so a blanket mockResolvedValue would hand the admin
+ * lookup whatever the test meant for its target.
+ */
+function usersByName(targets: Record<string, User | null> = {}): void {
+  userService.getUserByUsername.mockImplementation((name: string) =>
+    Promise.resolve(
+      name === adminUser.username ? adminUser : (targets[name] ?? null)
+    )
+  )
+}
+
 function form(fields: Record<string, string>, cookie: string): RequestInit {
   return {
     method: 'POST',
@@ -140,13 +155,14 @@ beforeEach(async () => {
   process.env.ADMIN_CONFIG = configPath
   domain = await import('@pinsquirrel/domain')
   app = (await import('./app.js')).app
-  userRepository.findByStatus.mockResolvedValue([])
+  userService.listByStatus.mockResolvedValue([])
+  usersByName()
 })
 
 describe('GET /waitlist', () => {
   it('lists waitlisted users with their decrypted email', async () => {
     const cookie = await signIn()
-    userRepository.findByStatus.mockResolvedValue([makeUser()])
+    userService.listByStatus.mockResolvedValue([makeUser()])
 
     const res = await app.request('/waitlist', { headers: { Cookie: cookie } })
     const body = await res.text()
@@ -158,13 +174,42 @@ describe('GET /waitlist', () => {
 
   it('reports a database failure without throwing', async () => {
     const cookie = await signIn()
-    userRepository.findByStatus.mockRejectedValue(new Error('connection lost'))
+    userService.listByStatus.mockRejectedValue(new Error('connection lost'))
 
     const res = await app.request('/waitlist', { headers: { Cookie: cookie } })
 
     expect(res.status).toBe(500)
     // The leading apostrophe of "Couldn't" is HTML-escaped in the render.
     expect(await res.text()).toContain('reach the Test Env database')
+  })
+
+  // The listing is Admin-gated in UserService, so the app has to hand it an
+  // AccessControl for the signed-in account rather than an empty one.
+  it('asks for the waitlist as the signed-in admin', async () => {
+    const cookie = await signIn()
+
+    await app.request('/waitlist', { headers: { Cookie: cookie } })
+
+    const [ac, status] = userService.listByStatus.mock.calls[0] as [
+      { user: User | null },
+      string,
+    ]
+    expect(ac.user?.id).toBe(adminUser.id)
+    expect(status).toBe(UserStatus.Waitlist)
+  })
+
+  // The account is re-read each request, so a mid-session demotion is caught
+  // by the service. Reporting that as a database failure would be a lie.
+  it('reports a lost Admin role as such, not as a database failure', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockRejectedValue(new domain.MissingRoleError())
+
+    const res = await app.request('/waitlist', { headers: { Cookie: cookie } })
+
+    expect(res.status).toBe(500)
+    const body = await res.text()
+    expect(body).toContain('no longer has admin access')
+    expect(body).not.toContain('reach the Test Env database')
   })
 
   it('redirects to /login when unauthenticated', async () => {
@@ -256,7 +301,7 @@ describe('POST /grant-admin', () => {
   it('grants the Admin role by username', async () => {
     const cookie = await signIn()
     const target = makeUser({ username: 'bob', roles: [Role.User] })
-    userRepository.findByUsername.mockResolvedValue(target)
+    usersByName({ bob: target })
     authService.grantAdmin.mockResolvedValue({
       ...target,
       roles: [Role.User, Role.Admin],
@@ -274,9 +319,9 @@ describe('POST /grant-admin', () => {
 
   it('reports no change for an existing admin without writing', async () => {
     const cookie = await signIn()
-    userRepository.findByUsername.mockResolvedValue(
-      makeUser({ username: 'bob', roles: [Role.User, Role.Admin] })
-    )
+    usersByName({
+      bob: makeUser({ username: 'bob', roles: [Role.User, Role.Admin] }),
+    })
 
     const res = await app.request(
       '/grant-admin',
@@ -290,7 +335,7 @@ describe('POST /grant-admin', () => {
 
   it('reports an unknown username', async () => {
     const cookie = await signIn()
-    userRepository.findByUsername.mockResolvedValue(null)
+    usersByName({})
 
     const res = await app.request(
       '/grant-admin',
@@ -311,15 +356,13 @@ describe('POST /grant-admin', () => {
     )
 
     expect(res.status).toBe(400)
-    expect(userRepository.findByUsername).not.toHaveBeenCalled()
+    expect(authService.grantAdmin).not.toHaveBeenCalled()
     expect(authService.grantAdmin).not.toHaveBeenCalled()
   })
 
   it('returns 404 when the target is deleted between lookup and grant', async () => {
     const cookie = await signIn()
-    userRepository.findByUsername.mockResolvedValue(
-      makeUser({ username: 'bob', roles: [Role.User] })
-    )
+    usersByName({ bob: makeUser({ username: 'bob', roles: [Role.User] }) })
     authService.grantAdmin.mockRejectedValue(
       new domain.UserNotFoundError('user-1')
     )
