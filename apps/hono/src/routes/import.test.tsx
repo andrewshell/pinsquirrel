@@ -10,11 +10,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import type { MiddlewareHandler } from 'hono'
 import { DuplicatePinError } from '@pinsquirrel/domain'
+import { PinboardService, type PinService } from '@pinsquirrel/services'
 import { testUser } from '../test-support/pin-routes'
 
 const svc = {
   createPin: vi.fn(),
-  updateCreatedAt: vi.fn(),
+  backdatePin: vi.fn(),
 }
 
 const session = {
@@ -22,13 +23,14 @@ const session = {
   setFlash: vi.fn(),
 }
 
+// A real PinboardService over a mocked PinService: the format rules moved into
+// the service, but these remain end-to-end assertions that the route still
+// produces the same calls and the same summary as before the extraction.
 vi.mock('../lib/services', () => ({
-  pinService: {
+  pinboardService: new PinboardService({
     createPin: (...a: unknown[]) => svc.createPin(...a) as unknown,
-  },
-  pinRepository: {
-    updateCreatedAt: (...a: unknown[]) => svc.updateCreatedAt(...a) as unknown,
-  },
+    backdatePin: (...a: unknown[]) => svc.backdatePin(...a) as unknown,
+  } as unknown as PinService),
 }))
 
 vi.mock('../middleware/session', () => ({
@@ -327,7 +329,8 @@ describe('import routes', () => {
         uploadPins([{ time: '2020-01-01T00:00:00Z' }])
       )
 
-      expect(svc.updateCreatedAt).toHaveBeenCalledWith(
+      expect(svc.backdatePin).toHaveBeenCalledWith(
+        expect.anything(),
         'pin-9',
         new Date('2020-01-01T00:00:00Z')
       )
@@ -346,7 +349,7 @@ describe('import routes', () => {
         uploadPins([{ time: '2024-06-01T00:00:00Z' }])
       )
 
-      expect(svc.updateCreatedAt).not.toHaveBeenCalled()
+      expect(svc.backdatePin).not.toHaveBeenCalled()
     })
 
     it('still counts the pin as skipped when back-dating fails', async () => {
@@ -356,7 +359,7 @@ describe('import routes', () => {
           createdAt: new Date('2024-06-01'),
         })
       )
-      svc.updateCreatedAt.mockRejectedValue(new Error('db down'))
+      svc.backdatePin.mockRejectedValue(new Error('db down'))
 
       const res = await app.request(
         '/import',
