@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.4.1](https://github.com/andrewshell/pinsquirrel/compare/v3.4.0...v3.4.1) (2026-08-18)
+
+
+### Bug Fixes
+
+* repair the production Docker build and startup for pnpm 11 ([d85abda](https://github.com/andrewshell/pinsquirrel/commit/d85abda1606eaced4618e1b2c52ad0ed502826c2))
+
 ## [3.4.0](https://github.com/andrewshell/pinsquirrel/compare/v3.3.0...v3.4.0) (2026-08-18)
 
 
