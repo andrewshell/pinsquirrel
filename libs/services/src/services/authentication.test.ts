@@ -551,6 +551,67 @@ describe('AuthenticationService', () => {
     })
   })
 
+  describe('grantAdmin', () => {
+    it('should add the Admin role to a user who lacks it', async () => {
+      const plainUser = { ...mockUser, roles: [Role.User] }
+      const adminUser = { ...mockUser, roles: [Role.User, Role.Admin] }
+      vi.mocked(mockUserRepository.findById)
+        .mockResolvedValueOnce(plainUser)
+        .mockResolvedValueOnce(adminUser)
+
+      const result = await authService.grantAdmin(plainUser.id)
+
+      expect(mockUserRepository.addRole).toHaveBeenCalledWith(
+        plainUser.id,
+        Role.Admin
+      )
+      expect(result.roles).toContain(Role.Admin)
+    })
+
+    it('should preserve existing roles rather than replacing them', async () => {
+      const plainUser = { ...mockUser, roles: [Role.User] }
+      const adminUser = { ...mockUser, roles: [Role.User, Role.Admin] }
+      vi.mocked(mockUserRepository.findById)
+        .mockResolvedValueOnce(plainUser)
+        .mockResolvedValueOnce(adminUser)
+
+      const result = await authService.grantAdmin(plainUser.id)
+
+      expect(result.roles).toContain(Role.User)
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('should be idempotent for an existing admin', async () => {
+      const adminUser = { ...mockUser, roles: [Role.User, Role.Admin] }
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(adminUser)
+
+      const result = await authService.grantAdmin(adminUser.id)
+
+      expect(mockUserRepository.addRole).not.toHaveBeenCalled()
+      expect(result.roles).toContain(Role.Admin)
+    })
+
+    it('should throw UserNotFoundError when the user does not exist', async () => {
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(null)
+
+      await expect(authService.grantAdmin('missing-id')).rejects.toThrow(
+        UserNotFoundError
+      )
+      expect(mockUserRepository.addRole).not.toHaveBeenCalled()
+    })
+
+    it('should throw UserNotFoundError if the user vanishes after the role write', async () => {
+      const plainUser = { ...mockUser, roles: [Role.User] }
+      vi.mocked(mockUserRepository.findById)
+        .mockResolvedValueOnce(plainUser)
+        .mockResolvedValueOnce(null)
+
+      await expect(authService.grantAdmin(plainUser.id)).rejects.toThrow(
+        UserNotFoundError
+      )
+    })
+  })
+
   describe('changePassword', () => {
     it('should update password with valid current password', async () => {
       vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
