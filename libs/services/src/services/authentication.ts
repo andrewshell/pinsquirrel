@@ -229,6 +229,33 @@ export class AuthenticationService {
     return updated
   }
 
+  /**
+   * Add the Admin role to a user.
+   *
+   * Roles are additive: existing roles and the user's status are left
+   * untouched. Idempotent — granting to an existing admin is a no-op.
+   */
+  async grantAdmin(userId: string): Promise<User> {
+    const user = await this.userRepository.findById(userId)
+    if (!user) {
+      throw new UserNotFoundError(userId)
+    }
+
+    if (user.roles.includes(Role.Admin)) {
+      return user
+    }
+
+    await this.userRepository.addRole(userId, Role.Admin)
+
+    // addRole resolves to void, so re-read to return the updated roles.
+    const updated = await this.userRepository.findById(userId)
+    if (!updated) {
+      throw new UserNotFoundError(userId)
+    }
+
+    return updated
+  }
+
   async changePassword(input: {
     userId: string
     currentPassword: string
