@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { AccountService } from './account.js'
+import { NullEmailService } from './null-email.js'
 import type {
   UserRepository,
   User,
@@ -360,6 +361,55 @@ describe('AccountService', () => {
       await accountService.register(registerInput)
 
       expect(mockEmailService.sendSignupNotificationEmail).toHaveBeenCalled()
+    })
+  })
+
+  describe('with no email provider configured', () => {
+    it('reports emailFailed rather than claiming the email was sent', async () => {
+      const service = new AccountService(
+        mockUserRepository,
+        mockPasswordResetRepository,
+        new NullEmailService()
+      )
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      // First call is register's duplicate check (no match); the second is the
+      // lookup inside requestPasswordReset, by which point the user exists.
+      vi.mocked(mockUserRepository.findByEmailHash)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.addRole).mockResolvedValue()
+      vi.mocked(mockPasswordResetRepository.findByUserId).mockResolvedValue([])
+
+      const result = await service.register({
+        username: 'testuser',
+        email: 'test@example.com',
+        resetUrl: 'http://localhost/reset-password',
+      })
+
+      expect(result.emailFailed).toBe(true)
+      // The account is still created; only delivery failed.
+      expect(mockUserRepository.create).toHaveBeenCalled()
+    })
+
+    it('still creates the account when the signup notification cannot send', async () => {
+      const service = new AccountService(
+        mockUserRepository,
+        mockPasswordResetRepository,
+        new NullEmailService()
+      )
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.addRole).mockResolvedValue()
+
+      await expect(
+        service.register({
+          username: 'testuser',
+          email: 'test@example.com',
+          notifyEmail: 'ops@example.com',
+        })
+      ).resolves.toBeDefined()
     })
   })
 
@@ -786,22 +836,6 @@ describe('AccountService', () => {
 
       expect(mockUserRepository.update).not.toHaveBeenCalled()
       expect(mockPasswordResetRepository.delete).not.toHaveBeenCalled()
-    })
-
-    it('should handle repository unavailability gracefully', async () => {
-      // Create service without password reset repository
-      const serviceWithoutReset = new AccountService(
-        mockUserRepository,
-        null as unknown as PasswordResetRepository, // Simulate missing repository
-        mockEmailService
-      )
-
-      await expect(
-        serviceWithoutReset.resetPassword({
-          token: 'mock-token',
-          newPassword: 'newpassword123',
-        })
-      ).rejects.toThrow('Password reset is not configured')
     })
   })
 

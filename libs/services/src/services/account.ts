@@ -37,8 +37,11 @@ import type { EmailSealer } from './authentication.js'
 export class AccountService {
   constructor(
     private readonly userRepository: UserRepository,
-    private readonly passwordResetRepository?: PasswordResetRepository,
-    private readonly emailService?: EmailService,
+    private readonly passwordResetRepository: PasswordResetRepository,
+    private readonly emailService: EmailService,
+    // Optional by design, unlike the two above: an install that keeps no
+    // contactable copy of user emails simply has no key. Every use below
+    // stores null rather than failing. Pass a sealer to enable it.
     private readonly emailSealer?: EmailSealer
   ) {}
 
@@ -80,7 +83,7 @@ export class AccountService {
     // Handle conflicts without revealing which field conflicted
     if (existingUserByEmail) {
       // Email already registered — notify the email owner privately
-      if (this.emailService && input.signinUrl) {
+      if (input.signinUrl) {
         try {
           await this.emailService.sendEmailAlreadyRegisteredEmail(
             input.email,
@@ -95,7 +98,7 @@ export class AccountService {
 
     if (existingUserByUsername) {
       // Username taken — notify the provided email privately
-      if (this.emailService && input.signupUrl) {
+      if (input.signupUrl) {
         try {
           await this.emailService.sendUsernameTakenEmail(
             input.email,
@@ -128,7 +131,7 @@ export class AccountService {
 
     // Auto-trigger password reset email for verification if URL provided
     let emailFailed = false
-    if (input.resetUrl && this.passwordResetRepository && this.emailService) {
+    if (input.resetUrl) {
       try {
         await this.requestPasswordReset({
           email: input.email,
@@ -140,7 +143,7 @@ export class AccountService {
     }
 
     // Send signup notification email if notifyEmail is provided
-    if (input.notifyEmail && this.emailService) {
+    if (input.notifyEmail) {
       try {
         await this.emailService.sendSignupNotificationEmail(
           input.notifyEmail,
@@ -217,10 +220,6 @@ export class AccountService {
       })
     }
 
-    if (!this.passwordResetRepository || !this.emailService) {
-      throw new Error('Password reset is not configured')
-    }
-
     // Hash the email to find the user
     const emailHash = hashEmail(input.email)
     const user = await this.userRepository.findByEmailHash(emailHash)
@@ -295,10 +294,6 @@ export class AccountService {
       })
     }
 
-    if (!this.passwordResetRepository) {
-      throw new Error('Password reset is not configured')
-    }
-
     // Hash the token to find it in the database
     const tokenHash = hashToken(input.token)
     const resetToken =
@@ -339,10 +334,6 @@ export class AccountService {
   }
 
   async validateResetToken(token: string): Promise<boolean> {
-    if (!this.passwordResetRepository) {
-      return false
-    }
-
     // Hash the token to find it in the database
     const tokenHash = hashToken(token)
     const resetToken =
