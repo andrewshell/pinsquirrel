@@ -11,11 +11,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import type { MiddlewareHandler } from 'hono'
+import type { TagRepository } from '@pinsquirrel/domain'
+import { TagService } from '@pinsquirrel/services'
 import { makeTag, testUser } from '../test-support/pin-routes'
 
-const svc = {
-  getUserTagsWithCount: vi.fn(),
+const repo = {
+  findById: vi.fn(),
+  findByUserIdWithPinCount: vi.fn(),
   mergeTags: vi.fn(),
+  deleteTagsWithNoPins: vi.fn(),
 }
 
 const session = {
@@ -23,15 +27,19 @@ const session = {
   setFlash: vi.fn(),
 }
 
+// A real TagService over a mocked repository. The merge rules moved into the
+// service, so mocking the service wholesale would stop these tests exercising
+// the very thing they exist to pin down.
 vi.mock('../lib/services', () => ({
   pinService: { getUserPinsWithPagination: vi.fn() },
-  tagService: {
-    getUserTagsWithCount: (...a: unknown[]) =>
-      svc.getUserTagsWithCount(...a) as unknown,
-    mergeTags: (...a: unknown[]) => svc.mergeTags(...a) as unknown,
-    getUserTags: vi.fn(),
-    deleteTagsWithNoPins: vi.fn(),
-  },
+  tagService: new TagService({
+    findById: (...a: unknown[]) => repo.findById(...a) as unknown,
+    findByUserIdWithPinCount: (...a: unknown[]) =>
+      repo.findByUserIdWithPinCount(...a) as unknown,
+    mergeTags: (...a: unknown[]) => repo.mergeTags(...a) as unknown,
+    deleteTagsWithNoPins: (...a: unknown[]) =>
+      repo.deleteTagsWithNoPins(...a) as unknown,
+  } as unknown as TagRepository),
 }))
 
 vi.mock('../middleware/session', () => ({
@@ -65,16 +73,20 @@ describe('tag merge routes', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     session.getFlash.mockReturnValue(null)
-    svc.getUserTagsWithCount.mockResolvedValue([
+    repo.findByUserIdWithPinCount.mockResolvedValue([
       tagWithCount('tag-a', 'alpha'),
       tagWithCount('tag-b', 'beta'),
       tagWithCount('tag-c', 'gamma'),
     ])
+    // Ownership lookups inside mergeTags.
+    repo.findById.mockImplementation((id: string) =>
+      Promise.resolve(makeTag({ id, name: id }))
+    )
   })
 
   describe('GET /tags/merge', () => {
     it('lists only tags that have pins', async () => {
-      svc.getUserTagsWithCount.mockResolvedValue([
+      repo.findByUserIdWithPinCount.mockResolvedValue([
         tagWithCount('tag-a', 'alpha', 3),
         tagWithCount('tag-empty', 'unused', 0),
       ])
@@ -95,14 +107,14 @@ describe('tag merge routes', () => {
       expect(await res.text()).toContain(
         'Please select at least one source tag.'
       )
-      expect(svc.mergeTags).not.toHaveBeenCalled()
+      expect(repo.mergeTags).not.toHaveBeenCalled()
     })
 
     it('rejects a merge with no destination tag', async () => {
       const res = await postMerge({ sourceTagIds: 'tag-a,tag-b' })
 
       expect(await res.text()).toContain('Please select a destination tag.')
-      expect(svc.mergeTags).not.toHaveBeenCalled()
+      expect(repo.mergeTags).not.toHaveBeenCalled()
     })
 
     // Merging a tag into itself would delete it and reassign its pins to
@@ -116,21 +128,21 @@ describe('tag merge routes', () => {
       expect(await res.text()).toContain(
         'Destination tag cannot be one of the source tags.'
       )
-      expect(svc.mergeTags).not.toHaveBeenCalled()
+      expect(repo.mergeTags).not.toHaveBeenCalled()
     })
   })
 
   describe('POST /tags/merge success', () => {
     it('merges the selected sources into the destination', async () => {
-      svc.mergeTags.mockResolvedValue(undefined)
+      repo.mergeTags.mockResolvedValue(undefined)
 
       const res = await postMerge({
         sourceTagIds: 'tag-a,tag-b',
         destinationTagId: 'tag-c',
       })
 
-      expect(svc.mergeTags).toHaveBeenCalledWith(
-        expect.anything(),
+      expect(repo.mergeTags).toHaveBeenCalledWith(
+        testUser.id,
         ['tag-a', 'tag-b'],
         'tag-c'
       )
@@ -144,28 +156,28 @@ describe('tag merge routes', () => {
 
     // The hidden input carries the selection as one comma-separated value.
     it('splits the comma-separated source list', async () => {
-      svc.mergeTags.mockResolvedValue(undefined)
+      repo.mergeTags.mockResolvedValue(undefined)
 
       await postMerge({
         sourceTagIds: 'tag-a,tag-b',
         destinationTagId: 'tag-c',
       })
 
-      expect(svc.mergeTags.mock.calls[0][1]).toEqual(['tag-a', 'tag-b'])
+      expect(repo.mergeTags.mock.calls[0][1]).toEqual(['tag-a', 'tag-b'])
     })
 
     it('accepts a single source tag', async () => {
-      svc.mergeTags.mockResolvedValue(undefined)
+      repo.mergeTags.mockResolvedValue(undefined)
 
       await postMerge({ sourceTagIds: 'tag-a', destinationTagId: 'tag-c' })
 
-      expect(svc.mergeTags.mock.calls[0][1]).toEqual(['tag-a'])
+      expect(repo.mergeTags.mock.calls[0][1]).toEqual(['tag-a'])
     })
   })
 
   describe('POST /tags/merge failure', () => {
     it('re-renders with an error when the merge throws', async () => {
-      svc.mergeTags.mockRejectedValue(new Error('db down'))
+      repo.mergeTags.mockRejectedValue(new Error('db down'))
 
       const res = await postMerge({
         sourceTagIds: 'tag-a',
