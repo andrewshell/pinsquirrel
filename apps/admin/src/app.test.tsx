@@ -92,6 +92,17 @@ const adminUser = makeUser({
 
 let app: Hono
 
+/**
+ * Domain error classes, re-imported per test.
+ *
+ * `vi.resetModules()` gives the freshly imported app its own instance of
+ * `@pinsquirrel/domain`, so classes from a static import at the top of this
+ * file are different objects and every `instanceof` check in the app would
+ * miss. These have to come from the same post-reset registry as the app.
+ * Enums (Role, UserStatus) compare by value and are unaffected.
+ */
+let domain: typeof import('@pinsquirrel/domain')
+
 /** Sign in and unlock, returning the session cookie for later requests. */
 async function signIn(): Promise<string> {
   authService.login.mockResolvedValue(adminUser)
@@ -127,6 +138,7 @@ beforeEach(async () => {
   vi.clearAllMocks()
   vi.resetModules()
   process.env.ADMIN_CONFIG = configPath
+  domain = await import('@pinsquirrel/domain')
   app = (await import('./app.js')).app
   userRepository.findByStatus.mockResolvedValue([])
 })
@@ -182,13 +194,46 @@ describe('POST /grant-access', () => {
     expect(await res.text()).toContain('Granted access to alice')
   })
 
-  it('reports a user that no longer exists rather than throwing', async () => {
+  it('returns 404 when the target was deleted before the grant', async () => {
     const cookie = await signIn()
-    authService.grantAccess.mockRejectedValue(new Error('User not found'))
+    authService.grantAccess.mockRejectedValue(
+      new domain.UserNotFoundError('ghost')
+    )
 
     const res = await app.request(
       '/grant-access',
       form({ userId: 'ghost' }, cookie)
+    )
+
+    expect(res.status).toBe(404)
+    expect(await res.text()).toContain('no longer exists')
+  })
+
+  it('refuses to activate a user who has not confirmed their email', async () => {
+    const cookie = await signIn()
+    authService.grantAccess.mockRejectedValue(
+      new domain.UserNotEligibleError(
+        UserStatus.Unverified,
+        'User "alice" has not confirmed their email yet'
+      )
+    )
+
+    const res = await app.request(
+      '/grant-access',
+      form({ userId: 'user-1' }, cookie)
+    )
+
+    expect(res.status).toBe(400)
+    expect(await res.text()).toContain('has not confirmed their email yet')
+  })
+
+  it('reports an unexpected failure as a 500', async () => {
+    const cookie = await signIn()
+    authService.grantAccess.mockRejectedValue(new Error('connection reset'))
+
+    const res = await app.request(
+      '/grant-access',
+      form({ userId: 'user-1' }, cookie)
     )
 
     expect(res.status).toBe(500)
@@ -268,6 +313,24 @@ describe('POST /grant-admin', () => {
     expect(res.status).toBe(400)
     expect(userRepository.findByUsername).not.toHaveBeenCalled()
     expect(authService.grantAdmin).not.toHaveBeenCalled()
+  })
+
+  it('returns 404 when the target is deleted between lookup and grant', async () => {
+    const cookie = await signIn()
+    userRepository.findByUsername.mockResolvedValue(
+      makeUser({ username: 'bob', roles: [Role.User] })
+    )
+    authService.grantAdmin.mockRejectedValue(
+      new domain.UserNotFoundError('user-1')
+    )
+
+    const res = await app.request(
+      '/grant-admin',
+      form({ username: 'bob' }, cookie)
+    )
+
+    expect(res.status).toBe(404)
+    expect(await res.text()).toContain('no longer exists')
   })
 
   it('redirects to /login when unauthenticated', async () => {

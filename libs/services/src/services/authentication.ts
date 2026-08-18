@@ -16,6 +16,7 @@ import {
   MissingRoleError,
   AccessNotGrantedError,
   UserNotFoundError,
+  UserNotEligibleError,
 } from '@pinsquirrel/domain'
 import {
   hashPassword,
@@ -217,6 +218,18 @@ export class AuthenticationService {
 
     if (user.status === UserStatus.Active) {
       return user
+    }
+
+    // Only a verified account waiting on the list can be admitted. Activating
+    // an unverified one would strand it as Active with no password; setting a
+    // password later runs resetPassword, whose Unverified guard no longer
+    // matches, leaving an account that reached Active without ever being on
+    // the waitlist.
+    if (user.status !== UserStatus.Waitlist) {
+      throw new UserNotEligibleError(
+        user.status,
+        `User "${user.username}" has not confirmed their email yet`
+      )
     }
 
     const updated = await this.userRepository.update(userId, {
