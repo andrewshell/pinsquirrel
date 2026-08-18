@@ -7,8 +7,7 @@ import {
   TagNotFoundError,
 } from '@pinsquirrel/domain'
 
-const mockAuthenticateByKey = vi.fn()
-const mockFindUserById = vi.fn()
+const mockAuthenticate = vi.fn()
 const mockGetPin = vi.fn()
 const mockGetPublicPin = vi.fn()
 const mockGetUserPinsWithPagination = vi.fn()
@@ -18,8 +17,7 @@ const mockGetUserTagById = vi.fn()
 
 vi.mock('../lib/services', () => ({
   apiKeyService: {
-    authenticateByKey: (...args: unknown[]) =>
-      mockAuthenticateByKey(...args) as unknown,
+    authenticate: (...args: unknown[]) => mockAuthenticate(...args) as unknown,
   },
   pinService: {
     getPin: (...args: unknown[]) => mockGetPin(...args) as unknown,
@@ -33,12 +31,6 @@ vi.mock('../lib/services', () => ({
       mockGetUserTagsWithCount(...args) as unknown,
     getUserTagById: (...args: unknown[]) =>
       mockGetUserTagById(...args) as unknown,
-  },
-}))
-
-vi.mock('../lib/db', () => ({
-  userRepository: {
-    findById: (...args: unknown[]) => mockFindUserById(...args) as unknown,
   },
 }))
 
@@ -110,7 +102,7 @@ describe('api-v1 routes', () => {
     })
 
     it('returns 401 with invalid API key', async () => {
-      mockAuthenticateByKey.mockResolvedValue(null)
+      mockAuthenticate.mockResolvedValue(null)
       const res = await app.request('/api/v1/pins', {
         headers: { Authorization: 'Bearer ps_bad' },
       })
@@ -118,19 +110,23 @@ describe('api-v1 routes', () => {
       expect(await res.json()).toEqual({ error: 'Invalid API key' })
     })
 
-    it('returns 401 when user lookup fails', async () => {
-      mockAuthenticateByKey.mockResolvedValue(testApiKey)
-      mockFindUserById.mockResolvedValue(null)
+    // Keys cascade-delete with their user, so a key with no owner is only
+    // reachable in a race. It reports as invalid rather than confirming the
+    // key itself was good.
+    it('returns 401 when the key has no owner', async () => {
+      mockAuthenticate.mockResolvedValue(null)
       const res = await app.request('/api/v1/pins', {
         headers: { Authorization: 'Bearer ps_ok' },
       })
       expect(res.status).toBe(401)
-      expect(await res.json()).toEqual({ error: 'User not found' })
+      expect(await res.json()).toEqual({ error: 'Invalid API key' })
     })
 
     it('accepts X-API-Key header', async () => {
-      mockAuthenticateByKey.mockResolvedValue(testApiKey)
-      mockFindUserById.mockResolvedValue(testUser)
+      mockAuthenticate.mockResolvedValue({
+        apiKey: testApiKey,
+        user: testUser,
+      })
       mockGetUserPinsWithPagination.mockResolvedValue({
         pins: [],
         pagination: Pagination.fromTotalCount(0),
@@ -144,8 +140,10 @@ describe('api-v1 routes', () => {
 
   describe('GET /api/v1/pins', () => {
     beforeEach(() => {
-      mockAuthenticateByKey.mockResolvedValue(testApiKey)
-      mockFindUserById.mockResolvedValue(testUser)
+      mockAuthenticate.mockResolvedValue({
+        apiKey: testApiKey,
+        user: testUser,
+      })
     })
 
     it('returns pins and pagination shape', async () => {
@@ -203,8 +201,10 @@ describe('api-v1 routes', () => {
 
   describe('GET /api/v1/pins/:id', () => {
     beforeEach(() => {
-      mockAuthenticateByKey.mockResolvedValue(testApiKey)
-      mockFindUserById.mockResolvedValue(testUser)
+      mockAuthenticate.mockResolvedValue({
+        apiKey: testApiKey,
+        user: testUser,
+      })
     })
 
     it('returns pin', async () => {
@@ -230,8 +230,10 @@ describe('api-v1 routes', () => {
 
   describe('GET /api/v1/tags', () => {
     beforeEach(() => {
-      mockAuthenticateByKey.mockResolvedValue(testApiKey)
-      mockFindUserById.mockResolvedValue(testUser)
+      mockAuthenticate.mockResolvedValue({
+        apiKey: testApiKey,
+        user: testUser,
+      })
     })
 
     it('returns tags', async () => {
@@ -259,8 +261,10 @@ describe('api-v1 routes', () => {
 
   describe('GET /api/v1/tags/:id/pins', () => {
     beforeEach(() => {
-      mockAuthenticateByKey.mockResolvedValue(testApiKey)
-      mockFindUserById.mockResolvedValue(testUser)
+      mockAuthenticate.mockResolvedValue({
+        apiKey: testApiKey,
+        user: testUser,
+      })
     })
 
     it('returns pins filtered by tag name', async () => {

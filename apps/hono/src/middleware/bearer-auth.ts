@@ -1,7 +1,6 @@
 import type { Context } from 'hono'
 import type { ApiKey, User } from '@pinsquirrel/domain'
 import { apiKeyService } from '../lib/services.js'
-import { userRepository } from '../lib/db.js'
 
 export interface AuthenticatedRequest {
   user: User
@@ -13,7 +12,6 @@ export type AuthFailure =
   | { reason: 'missing'; message: 'Missing API key' }
   | { reason: 'invalid'; message: 'Invalid API key' }
   | { reason: 'invalid_header'; message: 'Invalid Authorization header' }
-  | { reason: 'no_user'; message: 'User not found' }
 
 function extractRawKey(
   c: Context,
@@ -42,10 +40,10 @@ function extractRawKey(
 /**
  * Authenticate a request via API key (Bearer token, optionally `X-API-Key`).
  *
- * Returns the resolved `User` and `ApiKey` on success, or a structured
- * `AuthFailure` describing what went wrong. Callers (REST middleware,
- * MCP middleware) decide how to render the failure as an HTTP response
- * and what context variables to set on success.
+ * Header parsing stays here because it is transport; resolving the token to a
+ * principal is ApiKeyService's job. Callers (REST middleware, MCP middleware)
+ * decide how to render the failure as an HTTP response and what context
+ * variables to set on success.
  */
 export async function authenticateBearer(
   c: Context,
@@ -56,21 +54,19 @@ export async function authenticateBearer(
   const extracted = extractRawKey(c, options)
   if ('failure' in extracted) return { ok: false, failure: extracted.failure }
 
-  const apiKey = await apiKeyService.authenticateByKey(extracted.rawKey)
-  if (!apiKey) {
+  // One call: the service resolves the key and the account behind it. A key
+  // whose owner has gone is reported as invalid rather than as a missing user,
+  // so the response never confirms that the key itself was good.
+  const authenticated = await apiKeyService.authenticate(extracted.rawKey)
+  if (!authenticated) {
     return {
       ok: false,
       failure: { reason: 'invalid', message: 'Invalid API key' },
     }
   }
 
-  const user = await userRepository.findById(apiKey.userId)
-  if (!user) {
-    return {
-      ok: false,
-      failure: { reason: 'no_user', message: 'User not found' },
-    }
+  return {
+    ok: true,
+    auth: { ...authenticated, rawKey: extracted.rawKey },
   }
-
-  return { ok: true, auth: { user, apiKey, rawKey: extracted.rawKey } }
 }

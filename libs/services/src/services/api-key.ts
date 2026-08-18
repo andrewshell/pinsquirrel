@@ -2,6 +2,8 @@ import type {
   AccessControl,
   ApiKey,
   ApiKeyRepository,
+  User,
+  UserRepository,
 } from '@pinsquirrel/domain'
 import {
   ApiKeyLimitExceededError,
@@ -15,7 +17,10 @@ import { apiKeyNameSchema } from '../validation/api-key.js'
 const MAX_KEYS_PER_USER = 5
 
 export class ApiKeyService {
-  constructor(private readonly apiKeyRepository: ApiKeyRepository) {}
+  constructor(
+    private readonly apiKeyRepository: ApiKeyRepository,
+    private readonly userRepository: UserRepository
+  ) {}
 
   async createApiKey(
     ac: AccessControl,
@@ -79,6 +84,34 @@ export class ApiKeyService {
     }
 
     await this.apiKeyRepository.delete(keyId)
+  }
+
+  /**
+   * Resolve a raw bearer token to the key and the account behind it.
+   *
+   * One operation rather than two: the transport used to authenticate the key
+   * here and then look the user up against the repository itself, which is the
+   * one place an API request resolved its own principal without going through
+   * a service.
+   *
+   * A key whose owner has gone reads as an unknown key. That is only reachable
+   * in the race between reading the key and the row cascading away, and a
+   * distinct answer would confirm the key itself was good.
+   */
+  async authenticate(
+    rawKey: string
+  ): Promise<{ apiKey: ApiKey; user: User } | null> {
+    const apiKey = await this.authenticateByKey(rawKey)
+    if (!apiKey) {
+      return null
+    }
+
+    const user = await this.userRepository.findById(apiKey.userId)
+    if (!user) {
+      return null
+    }
+
+    return { apiKey, user }
   }
 
   async authenticateByKey(rawKey: string): Promise<ApiKey | null> {
