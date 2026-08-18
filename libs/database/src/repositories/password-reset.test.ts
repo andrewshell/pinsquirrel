@@ -7,7 +7,7 @@ import { DrizzlePasswordResetRepository } from './password-reset.js'
 import type { CreatePasswordResetTokenData } from '@pinsquirrel/domain'
 
 describe('DrizzlePasswordResetRepository - Integration Tests', () => {
-  let testDb: MySql2Database<Record<string, unknown>>
+  let testDb: MySql2Database
   let testPool: Pool
   let repository: DrizzlePasswordResetRepository
 
@@ -18,16 +18,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
   beforeAll(async () => {
     testPool = mysql.createPool(TEST_DATABASE_URL)
 
-    const { users } = await import('../schema/users.js')
-    const { pins } = await import('../schema/pins.js')
-    const { tags } = await import('../schema/tags.js')
-    const { pinsTags } = await import('../schema/pins-tags.js')
-    const { passwordResetTokens } =
-      await import('../schema/password-reset-tokens.js')
-
-    const schema = { users, pins, tags, pinsTags, passwordResetTokens }
-
-    testDb = drizzle(testPool, { schema, mode: 'default' })
+    testDb = drizzle({ client: testPool })
   })
 
   afterAll(async () => {

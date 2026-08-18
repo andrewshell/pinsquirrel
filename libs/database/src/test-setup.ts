@@ -22,7 +22,7 @@ export async function setup() {
     await pool.query('SET FOREIGN_KEY_CHECKS = 1')
 
     // Run migrations
-    const db = drizzle(pool, { mode: 'default' })
+    const db = drizzle({ client: pool })
     const migrationsPath = process.cwd().endsWith('database')
       ? './src/migrations'
       : './libs/database/src/migrations'

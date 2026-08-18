@@ -9,7 +9,7 @@ import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { sessions } from '../schema/sessions'
 
 export class DrizzleSessionRepository implements SessionRepository {
-  constructor(private db: MySql2Database<Record<string, unknown>>) {}
+  constructor(private db: MySql2Database) {}
 
   async findById(id: string): Promise<Session | null> {
     const result = await this.db

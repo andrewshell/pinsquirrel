@@ -25,9 +25,8 @@
   "dependencies": {
     "@pinsquirrel/domain": "workspace:*",
     "dotenv": "^17.4.2",
-    "drizzle-kit": "^0.31.10",
-    "drizzle-orm": "^0.45.2",
-    "drizzle-seed": "^0.3.1",
+    "drizzle-kit": "1.0.0-rc.5-ab785fc",
+    "drizzle-orm": "1.0.0-rc.5-169397b",
     "mysql2": "^3.23.3"
   },
   "devDependencies": {
