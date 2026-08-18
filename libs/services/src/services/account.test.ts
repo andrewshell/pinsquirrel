@@ -483,33 +483,6 @@ describe('AccountService', () => {
     })
   })
 
-  describe('findByEmail', () => {
-    it('should find user by email', async () => {
-      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(mockUser)
-
-      const result = await accountService.findByEmail('test@example.com')
-
-      expect(mockUserRepository.findByEmailHash).toHaveBeenCalledWith(
-        'hashed_test@example.com'
-      )
-      expect(result).toEqual(mockUser)
-    })
-
-    it('should return null when user not found', async () => {
-      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
-
-      const result = await accountService.findByEmail('nonexistent@example.com')
-
-      expect(result).toBeNull()
-    })
-
-    it('should throw validation error for invalid email', async () => {
-      await expect(accountService.findByEmail('invalid-email')).rejects.toThrow(
-        'Invalid email'
-      )
-    })
-  })
-
   describe('requestPasswordReset', () => {
     it('should create a password reset token and send email', async () => {
       const mockUserWithEmail = {

@@ -76,9 +76,7 @@ export class AccountService {
     const existingUserByUsername = await this.userRepository.findByUsername(
       input.username
     )
-    const emailHash = hashEmail(input.email)
-    const existingUserByEmail =
-      await this.userRepository.findByEmailHash(emailHash)
+    const existingUserByEmail = await this.findUserByEmail(input.email)
 
     // Handle conflicts without revealing which field conflicted
     if (existingUserByEmail) {
@@ -122,7 +120,9 @@ export class AccountService {
     const user = await this.userRepository.create({
       username: input.username,
       passwordHash: null, // No password yet - they'll set it via email verification
-      emailHash,
+      // Hashed here rather than reusing a binding from the duplicate check:
+      // this is the stored value, and the lookup above hides its own hashing.
+      emailHash: hashEmail(input.email),
       emailEncrypted,
     })
 
@@ -194,20 +194,6 @@ export class AccountService {
     })
   }
 
-  async findByEmail(email: string): Promise<User | null> {
-    // Validate email at service boundary
-    const emailResult = emailSchema.safeParse(email)
-    if (!emailResult.success) {
-      throw new ValidationError({
-        email: [emailResult.error.issues[0]?.message || 'Invalid email'],
-      })
-    }
-
-    // Hash the email in the business logic layer
-    const emailHash = hashEmail(email)
-    return await this.userRepository.findByEmailHash(emailHash)
-  }
-
   async requestPasswordReset(input: {
     email: string
     resetUrl: string
@@ -220,9 +206,7 @@ export class AccountService {
       })
     }
 
-    // Hash the email to find the user
-    const emailHash = hashEmail(input.email)
-    const user = await this.userRepository.findByEmailHash(emailHash)
+    const user = await this.findUserByEmail(input.email)
 
     // Don't reveal whether the email exists or not for security
     if (!user) {
@@ -345,5 +329,19 @@ export class AccountService {
 
     // Check if token is valid (not expired)
     return await this.passwordResetRepository.isValidToken(tokenHash)
+  }
+
+  /**
+   * The account registered with this address, if any.
+   *
+   * Emails are never stored in the clear, so every lookup has to go through
+   * the same hash. This was written out at each of the three call sites, one
+   * of which was a public findByEmail that nothing called.
+   *
+   * Validation is the caller's business: both callers validate at their own
+   * boundary, and register does so well before it gets here.
+   */
+  private async findUserByEmail(email: string): Promise<User | null> {
+    return this.userRepository.findByEmailHash(hashEmail(email))
   }
 }
