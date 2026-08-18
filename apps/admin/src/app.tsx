@@ -57,6 +57,7 @@ async function currentSession(
 }
 
 interface WaitlistRow {
+  id: string
   username: string
   email: string
   joinedAt: string
@@ -79,12 +80,49 @@ async function loadWaitlist(
       }
     }
     rows.push({
+      id: user.id,
       username: user.username,
       email,
       joinedAt: user.createdAt.toISOString().slice(0, 10),
     })
   }
   return rows
+}
+
+/**
+ * Re-render the waitlist with the outcome of an action.
+ *
+ * The grant routes report their result on the page they were invoked from
+ * rather than redirecting, matching how /send renders SentPage. A failure to
+ * reload the list is reported alongside the action's own message; the action
+ * already happened either way.
+ */
+async function renderWaitlist(
+  c: Context,
+  env: AdminEnvironment,
+  viewer: { username: string; privateKey: string },
+  outcome: { notice?: string; error?: string } = {},
+  status: 200 | 400 | 404 | 500 = 200
+) {
+  let rows: WaitlistRow[] = []
+  let error = outcome.error
+  let code = status
+  try {
+    rows = await loadWaitlist(env, viewer.privateKey)
+  } catch (err) {
+    error = error ?? dbErrorMessage(env, err)
+    code = 500
+  }
+  return c.html(
+    <WaitlistPage
+      envLabel={env.label}
+      username={viewer.username}
+      rows={rows}
+      notice={outcome.notice}
+      error={error}
+    />,
+    code
+  )
 }
 
 app.get('/', async c => {
@@ -218,23 +256,110 @@ app.get('/waitlist', async c => {
   if (!sess.session.privateKey) return c.redirect('/unlock')
 
   const env = getEnvironment(config, sess.session.environment)
-  try {
-    const rows = await loadWaitlist(env, sess.session.privateKey)
-    return c.html(
-      <WaitlistPage
-        envLabel={env.label}
-        username={sess.session.username}
-        rows={rows}
-      />
+  return renderWaitlist(c, env, {
+    username: sess.session.username,
+    privateKey: sess.session.privateKey,
+  })
+})
+
+// Admit one person from the waitlist. Replaces the grant-access script, which
+// could only be run from a dev checkout pointed at the target database.
+app.post('/grant-access', async c => {
+  const sess = await currentSession(c)
+  if (!sess) return c.redirect('/login')
+  if (!sess.session.privateKey) return c.redirect('/unlock')
+
+  const env = getEnvironment(config, sess.session.environment)
+  const viewer = {
+    username: sess.session.username,
+    privateKey: sess.session.privateKey,
+  }
+  const body = await c.req.parseBody()
+  const userId = field(body, 'userId')
+
+  if (!userId) {
+    return renderWaitlist(
+      c,
+      env,
+      viewer,
+      { error: 'No user was selected.' },
+      400
     )
+  }
+
+  try {
+    const updated = await getRuntime(env).authService.grantAccess(userId)
+    return renderWaitlist(c, env, viewer, {
+      notice: `Granted access to ${updated.username}.`,
+    })
   } catch (error) {
-    return c.html(
-      <WaitlistPage
-        envLabel={env.label}
-        username={sess.session.username}
-        rows={[]}
-        error={dbErrorMessage(env, error)}
-      />,
+    console.error(`[admin] grant-access failed for "${env.name}":`, error)
+    return renderWaitlist(
+      c,
+      env,
+      viewer,
+      { error: 'Could not grant access. Please try again.' },
+      500
+    )
+  }
+})
+
+// Add the Admin role to any account. Replaces the grant-admin script.
+app.post('/grant-admin', async c => {
+  const sess = await currentSession(c)
+  if (!sess) return c.redirect('/login')
+  if (!sess.session.privateKey) return c.redirect('/unlock')
+
+  const env = getEnvironment(config, sess.session.environment)
+  const viewer = {
+    username: sess.session.username,
+    privateKey: sess.session.privateKey,
+  }
+  const body = await c.req.parseBody()
+  const username = field(body, 'username').trim()
+
+  if (!username) {
+    return renderWaitlist(
+      c,
+      env,
+      viewer,
+      { error: 'Enter a username to grant the Admin role.' },
+      400
+    )
+  }
+
+  try {
+    const { userRepository, authService } = getRuntime(env)
+    const user = await userRepository.findByUsername(username)
+
+    if (!user) {
+      return renderWaitlist(
+        c,
+        env,
+        viewer,
+        { error: `No user named ${username}.` },
+        404
+      )
+    }
+
+    // Checked here rather than relying on grantAdmin's idempotence, so the
+    // page can tell "nothing to do" apart from "role added".
+    if (user.roles.includes(Role.Admin)) {
+      return renderWaitlist(c, env, viewer, {
+        notice: `${user.username} is already an admin.`,
+      })
+    }
+
+    const updated = await authService.grantAdmin(user.id)
+    return renderWaitlist(c, env, viewer, {
+      notice: `Granted the Admin role to ${updated.username}.`,
+    })
+  } catch (error) {
+    return renderWaitlist(
+      c,
+      env,
+      viewer,
+      { error: dbErrorMessage(env, error) },
       500
     )
   }
