@@ -152,3 +152,21 @@ export async function openSealedEmail(
   ])
   return plaintext.toString('utf8')
 }
+
+/**
+ * A sealer bound to one public key, validated up front.
+ *
+ * Validating on construction means a bad key fails where it is configured
+ * rather than the first time an account needs its address sealed. The returned
+ * shape matches the `EmailSealer` that services expect, without this package
+ * having to depend on them for the type.
+ */
+export function createEmailSealer(publicKeyB64: string): {
+  seal(email: string): Promise<string>
+} {
+  assertValidPublicKey(publicKeyB64)
+
+  return {
+    seal: (email: string) => sealEmail(email, publicKeyB64),
+  }
+}

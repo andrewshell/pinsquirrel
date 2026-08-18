@@ -4,6 +4,7 @@ import {
   sealEmail,
   openSealedEmail,
   assertValidPublicKey,
+  createEmailSealer,
 } from './email-crypto.js'
 
 describe('email sealing', () => {
@@ -49,5 +50,34 @@ describe('assertValidPublicKey', () => {
   it('rejects a private key pasted in place of a public key', async () => {
     const { privateKey } = await generateKeyPair()
     expect(() => assertValidPublicKey(privateKey)).toThrow()
+  })
+})
+
+describe('createEmailSealer', () => {
+  it('returns a sealer whose output the keypair can open', async () => {
+    const { publicKey, privateKey } = await generateKeyPair()
+    const sealer = createEmailSealer(publicKey)
+
+    const sealed = await sealer.seal('person@example.com')
+
+    await expect(openSealedEmail(sealed, privateKey)).resolves.toBe(
+      'person@example.com'
+    )
+  })
+
+  // Validating on construction is the point: a bad key fails where it is
+  // configured rather than the first time an email needs sealing.
+  it('rejects an invalid public key immediately', () => {
+    expect(() => createEmailSealer('not-a-key')).toThrow(/X25519 public key/)
+  })
+
+  it('rejects an empty public key immediately', () => {
+    expect(() => createEmailSealer('')).toThrow(/X25519 public key/)
+  })
+
+  it('rejects a private key pasted in place of a public key', async () => {
+    const { privateKey } = await generateKeyPair()
+
+    expect(() => createEmailSealer(privateKey)).toThrow(/X25519 public key/)
   })
 })
