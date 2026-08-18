@@ -72,7 +72,7 @@ export const pinService = new PinService(pinRepository)
 export const pinboardService = new PinboardService(pinService)
 export const tagService = new TagService(tagRepository)
 export const userService = new UserService(userRepository)
-export const apiKeyService = new ApiKeyService(apiKeyRepository)
+export const apiKeyService = new ApiKeyService(apiKeyRepository, userRepository)
 export const metadataService = new MetadataService(httpFetcher, htmlParser)
 
 // Export static utilities for error handling

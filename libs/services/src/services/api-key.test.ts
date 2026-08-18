@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ApiKeyService } from './api-key.js'
-import type { ApiKeyRepository, ApiKey, User } from '@pinsquirrel/domain'
+import type {
+  ApiKeyRepository,
+  ApiKey,
+  User,
+  UserRepository,
+} from '@pinsquirrel/domain'
 import {
   AccessControl,
   ApiKeyNotFoundError,
@@ -19,6 +24,7 @@ vi.mock('../utils/crypto.js', () => ({
 describe('ApiKeyService', () => {
   let service: ApiKeyService
   let mockRepo: ApiKeyRepository
+  let mockUserRepo: UserRepository
 
   const userId = '123e4567-e89b-12d3-a456-426614174000'
 
@@ -67,7 +73,18 @@ describe('ApiKeyService', () => {
       updateLastUsed: vi.fn(),
       delete: vi.fn(),
     }
-    service = new ApiKeyService(mockRepo)
+    mockUserRepo = {
+      findById: vi.fn(),
+      findByEmailHash: vi.fn(),
+      findByUsername: vi.fn(),
+      findByStatus: vi.fn(),
+      findAll: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      addRole: vi.fn(),
+    }
+    service = new ApiKeyService(mockRepo, mockUserRepo)
   })
 
   describe('createApiKey', () => {
@@ -173,6 +190,58 @@ describe('ApiKeyService', () => {
       await expect(service.revokeApiKey(ac, 'key-1')).rejects.toThrow(
         UnauthorizedApiKeyAccessError
       )
+    })
+  })
+
+  describe('authenticate', () => {
+    it('returns the key and its owner for a usable key', async () => {
+      vi.mocked(mockRepo.findByKeyHash).mockResolvedValue(mockApiKey)
+      vi.mocked(mockUserRepo.findById).mockResolvedValue(mockUser)
+
+      const result = await service.authenticate('ps_mock-secure-token')
+
+      expect(result).toEqual({ apiKey: mockApiKey, user: mockUser })
+      expect(mockUserRepo.findById).toHaveBeenCalledWith(userId)
+    })
+
+    it('records the key as used', async () => {
+      vi.mocked(mockRepo.findByKeyHash).mockResolvedValue(mockApiKey)
+      vi.mocked(mockUserRepo.findById).mockResolvedValue(mockUser)
+
+      await service.authenticate('ps_mock-secure-token')
+
+      expect(mockRepo.updateLastUsed).toHaveBeenCalled()
+    })
+
+    it('returns null for an unknown key', async () => {
+      vi.mocked(mockRepo.findByKeyHash).mockResolvedValue(null)
+
+      await expect(service.authenticate('ps_unknown-key')).resolves.toBeNull()
+      expect(mockUserRepo.findById).not.toHaveBeenCalled()
+    })
+
+    it('returns null for an expired key', async () => {
+      vi.mocked(mockRepo.findByKeyHash).mockResolvedValue({
+        ...mockApiKey,
+        expiresAt: new Date('2020-01-01'),
+      })
+
+      await expect(
+        service.authenticate('ps_mock-secure-token')
+      ).resolves.toBeNull()
+      expect(mockUserRepo.findById).not.toHaveBeenCalled()
+    })
+
+    // Keys cascade-delete with their user, so this is only reachable in the
+    // race between reading the key and the row going away. It reads as an
+    // invalid key rather than confirming the key was good.
+    it('returns null when the owner has gone', async () => {
+      vi.mocked(mockRepo.findByKeyHash).mockResolvedValue(mockApiKey)
+      vi.mocked(mockUserRepo.findById).mockResolvedValue(null)
+
+      await expect(
+        service.authenticate('ps_mock-secure-token')
+      ).resolves.toBeNull()
     })
   })
 
