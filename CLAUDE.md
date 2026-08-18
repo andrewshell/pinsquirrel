@@ -15,6 +15,21 @@ pnpm monorepo orchestrated with Turbo:
 
 Workspace packages depend on each other via the `workspace:*` protocol, e.g. `"@pinsquirrel/domain": "workspace:*"`.
 
+### Layering
+
+**Apps assemble and call services. Services use repositories. Apps do not call repositories.**
+
+`libs/services` is the only layer that enforces `AccessControl` and validation, so a repository call from an app is an authorization check that did not happen. Every instance of this has produced a real bug: the REST API listed private pins because it re-decided the rule a transport at a time, the internal check-url endpoint looked pins up with no `AccessControl` at all, and the tag merge rules were enforced by the shape of a form rather than by the operation.
+
+A route or middleware that wants data should call a service method. If none fits, add one — that is the cheaper half of the work.
+
+Two deliberate exceptions, both documented at the point of use:
+
+- `apps/hono/src/middleware/session.ts` — a session is how an `AccessControl` gets built, so there is nothing for a service to check, and only this app could ever call it.
+- `apps/hono/src/routes/health.ts` — asks whether the connection is alive, which no service models.
+
+Composition roots (`apps/hono/src/lib/db.ts`, `apps/admin/src/runtime.ts`) construct repositories by definition; that is their job.
+
 ## Essential Commands
 
 Root-level (Turbo orchestrates across packages):
