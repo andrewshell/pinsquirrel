@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPTransport } from '@hono/mcp'
-import { AccessControl, PinNotFoundError, type User } from '@pinsquirrel/domain'
+import { AccessControl, type User } from '@pinsquirrel/domain'
 import {
   pinListInputSchema,
   pinGetInputSchema,
@@ -38,7 +38,7 @@ server.registerTool(
       const input = args as PinListInput
       const result = await pinService.getUserPinsWithPagination(
         ac,
-        { ...pinFilterFromInput(input), isPrivate: false },
+        pinFilterFromInput(input),
         { page: input.page, pageSize: input.pageSize }
       )
       return {
@@ -62,10 +62,7 @@ server.registerTool(
     try {
       const user = getUserFromExtra(extra)
       const ac = new AccessControl(user)
-      const pin = await pinService.getPin(ac, id)
-      if (pin.isPrivate) {
-        return mapDomainErrorToMcp(new PinNotFoundError(id))
-      }
+      const pin = await pinService.getPublicPin(ac, id)
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(pin) }],
       }

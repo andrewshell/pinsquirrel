@@ -170,6 +170,22 @@ export class PinService {
     return pin
   }
 
+  /**
+   * Get a pin that the caller is allowed to see over a public-only surface.
+   *
+   * The REST API and the MCP server both authenticate with an API key and
+   * expose public pins only. A private pin is reported as missing rather than
+   * forbidden, so a caller cannot use the error to tell an existing private
+   * pin apart from no pin at all.
+   */
+  async getPublicPin(ac: AccessControl, pinId: string): Promise<Pin> {
+    const pin = await this.getPin(ac, pinId)
+    if (pin.isPrivate) {
+      throw new PinNotFoundError(pinId)
+    }
+    return pin
+  }
+
   async getUserPins(ac: AccessControl): Promise<Pin[]> {
     if (!ac.user) {
       throw new UnauthorizedPinAccessError(

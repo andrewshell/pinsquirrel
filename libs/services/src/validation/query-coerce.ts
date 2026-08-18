@@ -18,7 +18,6 @@ export const pinListQuerySchema = z.object({
     .optional()
     .describe('Filter to read-later pins only'),
   noTags: booleanFromString.optional().describe('Filter to pins with no tags'),
-  isPrivate: booleanFromString.optional().describe('Filter by private status'),
   sortBy: z.enum(['created', 'title']).optional().describe('Sort field'),
   sortDirection: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
   page: numberFromString

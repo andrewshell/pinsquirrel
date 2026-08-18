@@ -462,6 +462,51 @@ describe('PinService', () => {
     })
   })
 
+  describe('getPublicPin', () => {
+    it('should return a public pin owned by the user', async () => {
+      mockPinRepository.findById.mockResolvedValue(mockPin)
+
+      const result = await pinService.getPublicPin(
+        createMockAccessControl(mockUser),
+        'pin-123'
+      )
+
+      expect(result).toEqual(mockPin)
+    })
+
+    // Reported as missing rather than forbidden: a caller restricted to public
+    // pins must not be able to tell an existing private pin from no pin.
+    it('should throw PinNotFoundError for a private pin the user owns', async () => {
+      mockPinRepository.findById.mockResolvedValue({
+        ...mockPin,
+        isPrivate: true,
+      })
+
+      await expect(
+        pinService.getPublicPin(createMockAccessControl(mockUser), 'pin-123')
+      ).rejects.toThrow(PinNotFoundError)
+    })
+
+    it('should throw PinNotFoundError if the pin does not exist', async () => {
+      mockPinRepository.findById.mockResolvedValue(null)
+
+      await expect(
+        pinService.getPublicPin(createMockAccessControl(mockUser), 'pin-123')
+      ).rejects.toThrow(PinNotFoundError)
+    })
+
+    it("should throw UnauthorizedPinAccessError for another user's pin", async () => {
+      mockPinRepository.findById.mockResolvedValue({
+        ...mockPin,
+        userId: 'other-user',
+      })
+
+      await expect(
+        pinService.getPublicPin(createMockAccessControl(mockUser), 'pin-123')
+      ).rejects.toThrow(UnauthorizedPinAccessError)
+    })
+  })
+
   describe('isPrivate', () => {
     it('should create a pin with isPrivate true', async () => {
       mockPinRepository.findByUserIdAndUrl.mockResolvedValue(null)
