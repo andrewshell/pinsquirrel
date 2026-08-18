@@ -24,7 +24,9 @@ export function TagMergePage({
   selectedSourceTags = [],
   selectedDestinationTag = '',
 }: TagMergePageProps) {
-  const formError = errors?._form?.[0]
+  // Fall back to any field the service reported: mergeTags keys its errors by
+  // input name (sourceTagIds / destinationTagId), not by the _form convention.
+  const formError = errors?._form?.[0] ?? Object.values(errors ?? {})[0]?.[0]
 
   return (
     <DefaultLayout

@@ -102,6 +102,25 @@ export class TagService {
       )
     }
 
+    // These three rules used to live in the web form's handler, so nothing
+    // else calling mergeTags was covered by them. Checked before any lookup so
+    // an invalid request costs no queries.
+    const errors: Record<string, string[]> = {}
+    if (sourceTagIds.length === 0) {
+      errors.sourceTagIds = ['Please select at least one source tag.']
+    }
+    if (!targetTagId) {
+      errors.destinationTagId = ['Please select a destination tag.']
+    } else if (sourceTagIds.includes(targetTagId)) {
+      // Merging a tag into itself would delete it and strand its pins.
+      errors.destinationTagId = [
+        'Destination tag cannot be one of the source tags.',
+      ]
+    }
+    if (Object.keys(errors).length > 0) {
+      throw new ValidationError(errors)
+    }
+
     // Verify the target tag belongs to the user
     const targetTag = await this.tagRepository.findById(targetTagId)
     if (!targetTag) {

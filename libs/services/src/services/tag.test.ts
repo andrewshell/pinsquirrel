@@ -351,11 +351,62 @@ describe('TagService.mergeTags', () => {
   })
 
   it('merges under the caller’s id, not an id supplied by the request', async () => {
-    vi.mocked(mockRepo.findById).mockResolvedValue(targetTag)
+    vi.mocked(mockRepo.findById).mockImplementation((id: string) =>
+      Promise.resolve({ target: targetTag, 'src-a': sourceA }[id] ?? null)
+    )
 
-    await service.mergeTags(new AccessControl(owner), [], 'target')
+    await service.mergeTags(new AccessControl(owner), ['src-a'], 'target')
 
-    expect(mockRepo.mergeTags).toHaveBeenCalledWith('owner-id', [], 'target')
+    expect(mockRepo.mergeTags).toHaveBeenCalledWith(
+      'owner-id',
+      ['src-a'],
+      'target'
+    )
+  })
+
+  describe('input validation', () => {
+    // These three rules were enforced by the web form's handler, so nothing
+    // else calling mergeTags — a CLI, a future API — was covered by them.
+    it('rejects an empty source list', async () => {
+      await expect(
+        service.mergeTags(new AccessControl(owner), [], 'target')
+      ).rejects.toBeInstanceOf(ValidationError)
+      expect(mockRepo.mergeTags).not.toHaveBeenCalled()
+    })
+
+    it('rejects a blank destination', async () => {
+      await expect(
+        service.mergeTags(new AccessControl(owner), ['src-a'], '')
+      ).rejects.toBeInstanceOf(ValidationError)
+      expect(mockRepo.mergeTags).not.toHaveBeenCalled()
+    })
+
+    // Merging a tag into itself would delete it and strand its pins.
+    it('rejects a destination that is also a source', async () => {
+      await expect(
+        service.mergeTags(
+          new AccessControl(owner),
+          ['src-a', 'target'],
+          'target'
+        )
+      ).rejects.toBeInstanceOf(ValidationError)
+      expect(mockRepo.mergeTags).not.toHaveBeenCalled()
+    })
+
+    it('validates before touching the repository at all', async () => {
+      await expect(
+        service.mergeTags(new AccessControl(owner), [], 'target')
+      ).rejects.toBeInstanceOf(ValidationError)
+      expect(mockRepo.findById).not.toHaveBeenCalled()
+    })
+
+    it('reports the offending field', async () => {
+      await expect(
+        service.mergeTags(new AccessControl(owner), [], 'target')
+      ).rejects.toMatchObject({
+        fields: { sourceTagIds: ['Please select at least one source tag.'] },
+      })
+    })
   })
 })
 

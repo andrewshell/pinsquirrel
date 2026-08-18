@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { AccessControl } from '@pinsquirrel/domain'
+import { AccessControl, ValidationError } from '@pinsquirrel/domain'
 import { pinService, tagService } from '../lib/services'
 import { getString } from '../lib/form'
 import {
@@ -111,63 +111,29 @@ tags.post('/merge', async (c) => {
   const userTags = await tagService.getUserTagsWithCount(ac, user.id)
   const tagsWithPins = userTags.filter((tag) => tag.pinCount > 0)
 
-  // Validation
-  if (sourceTagIds.length === 0) {
-    return c.html(
+  const reject = (errors: Record<string, string[]>, status?: 500) =>
+    c.html(
       <TagMergePage
         user={user}
         tags={tagsWithPins}
-        errors={{ _form: ['Please select at least one source tag.'] }}
-        selectedSourceTags={sourceTagIds}
-        selectedDestinationTag={destinationTagId}
-      />
-    )
-  }
-
-  if (!destinationTagId) {
-    return c.html(
-      <TagMergePage
-        user={user}
-        tags={tagsWithPins}
-        errors={{ _form: ['Please select a destination tag.'] }}
-        selectedSourceTags={sourceTagIds}
-        selectedDestinationTag={destinationTagId}
-      />
-    )
-  }
-
-  if (sourceTagIds.includes(destinationTagId)) {
-    return c.html(
-      <TagMergePage
-        user={user}
-        tags={tagsWithPins}
-        errors={{
-          _form: ['Destination tag cannot be one of the source tags.'],
-        }}
-        selectedSourceTags={sourceTagIds}
-        selectedDestinationTag={destinationTagId}
-      />
-    )
-  }
-
-  try {
-    // Perform the merge
-    await tagService.mergeTags(ac, sourceTagIds, destinationTagId)
-
-    // Redirect with success message
-    sessionManager.setFlash('success', 'Tags merged successfully!')
-    return c.redirect('/tags')
-  } catch {
-    return c.html(
-      <TagMergePage
-        user={user}
-        tags={tagsWithPins}
-        errors={{ _form: ['Failed to merge tags. Please try again.'] }}
+        errors={errors}
         selectedSourceTags={sourceTagIds}
         selectedDestinationTag={destinationTagId}
       />,
-      500
+      ...(status ? ([status] as const) : ([] as const))
     )
+
+  try {
+    // The selection rules live in TagService, so every caller gets them.
+    await tagService.mergeTags(ac, sourceTagIds, destinationTagId)
+
+    sessionManager.setFlash('success', 'Tags merged successfully!')
+    return c.redirect('/tags')
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return reject(error.fields)
+    }
+    return reject({ _form: ['Failed to merge tags. Please try again.'] }, 500)
   }
 })
 
