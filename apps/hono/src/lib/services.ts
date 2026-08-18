@@ -3,6 +3,7 @@ import { sealEmail, assertValidPublicKey } from '@pinsquirrel/crypto'
 import type { EmailService } from '@pinsquirrel/domain'
 import { MailgunEmailService } from '@pinsquirrel/mailgun'
 import {
+  AccountService,
   ApiKeyService,
   AuthenticationService,
   MetadataService,
@@ -55,7 +56,8 @@ if (process.env.EMAIL_PUBLIC_KEY) {
 }
 
 // Create service instances
-export const authService = new AuthenticationService(
+export const authService = new AuthenticationService(userRepository)
+export const accountService = new AccountService(
   userRepository,
   passwordResetRepository,
   emailService,

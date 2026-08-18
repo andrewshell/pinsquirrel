@@ -5,7 +5,7 @@ import {
   InvalidCredentialsError,
   ValidationError,
 } from '@pinsquirrel/domain'
-import { apiKeyService, authService } from '../lib/services'
+import { accountService, apiKeyService, authService } from '../lib/services'
 import { getString } from '../lib/form'
 import {
   getAuthUser,
@@ -48,7 +48,7 @@ profile.post('/', async (c) => {
     if (intent === 'update-email') {
       const email = getString(formData['email'])
 
-      await authService.updateEmail({
+      await accountService.updateEmail({
         userId: user.id,
         email: email === '' ? null : email,
       })

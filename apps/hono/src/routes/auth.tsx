@@ -8,7 +8,7 @@ import {
   InvalidResetTokenError,
   ResetTokenExpiredError,
 } from '@pinsquirrel/domain'
-import { authService } from '../lib/services'
+import { accountService, authService } from '../lib/services'
 import { logger, safeError } from '../lib/logger.js'
 import { getSessionManager } from '../middleware/session'
 import {
@@ -165,7 +165,7 @@ auth.post(
     const resetUrl = `${url.origin}/reset-password`
 
     try {
-      const result = await authService.register({
+      const result = await accountService.register({
         username,
         email,
         resetUrl,
@@ -247,7 +247,7 @@ auth.post(
 
     try {
       // Request password reset - service handles validation
-      await authService.requestPasswordReset({
+      await accountService.requestPasswordReset({
         email,
         resetUrl: resetBaseUrl,
       })
@@ -303,7 +303,7 @@ auth.get('/reset-password/:token', async (c) => {
   }
 
   // Validate the token
-  const isValidToken = await authService.validateResetToken(token)
+  const isValidToken = await accountService.validateResetToken(token)
   if (!isValidToken) {
     return c.html(<ResetPasswordPage invalidToken={true} />)
   }
@@ -335,7 +335,7 @@ auth.post('/reset-password/:token', async (c) => {
 
   try {
     // Service handles password validation
-    await authService.resetPassword({
+    await accountService.resetPassword({
       token,
       newPassword,
     })
