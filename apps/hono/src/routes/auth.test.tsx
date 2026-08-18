@@ -47,8 +47,12 @@ const limiter = {
 }
 
 vi.mock('../lib/services', () => ({
+  // login is the only method left on AuthenticationService; registration,
+  // verification, and password recovery moved to AccountService.
   authService: {
     login: (...a: unknown[]) => auth.login(...a) as unknown,
+  },
+  accountService: {
     register: (...a: unknown[]) => auth.register(...a) as unknown,
     requestPasswordReset: (...a: unknown[]) =>
       auth.requestPasswordReset(...a) as unknown,

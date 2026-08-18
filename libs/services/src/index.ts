@@ -3,6 +3,7 @@ export {
   AuthenticationService,
   type EmailSealer,
 } from './services/authentication.js'
+export { AccountService } from './services/account.js'
 export { MetadataService } from './services/metadata.js'
 export { PinService } from './services/pin.js'
 export { TagService } from './services/tag.js'
