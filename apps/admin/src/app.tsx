@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { getSignedCookie, setSignedCookie, deleteCookie } from 'hono/cookie'
 import {
+  AccessControl,
   Role,
   UserStatus,
   InvalidCredentialsError,
@@ -48,6 +49,11 @@ function field(body: Record<string, string | File>, name: string): string {
 // Friendly message for a transient DB/runtime failure after unlock; the
 // underlying error is logged to the local console for the operator.
 function dbErrorMessage(env: AdminEnvironment, error: unknown): string {
+  // listByStatus enforces the Admin role, so a session whose account was
+  // demoted mid-flight lands here. Saying "database" would be a lie.
+  if (error instanceof MissingRoleError) {
+    return 'This account no longer has admin access.'
+  }
   console.error(`[admin] database/runtime failure for "${env.name}":`, error)
   return `Couldn't reach the ${env.label} database. Please try again.`
 }
@@ -68,18 +74,34 @@ interface WaitlistRow {
   joinedAt: string
 }
 
+/**
+ * Rebuild the AccessControl for the signed-in admin.
+ *
+ * The session records only the id and username, so the account is re-read per
+ * request. That also means losing the Admin role takes effect immediately
+ * rather than at the end of the session.
+ */
+async function adminAccessControl(
+  env: AdminEnvironment,
+  username: string
+): Promise<AccessControl> {
+  const user = await getRuntime(env).userService.getUserByUsername(username)
+  return new AccessControl(user)
+}
+
 async function loadWaitlist(
   env: AdminEnvironment,
-  privateKey: string
+  viewer: { username: string; privateKey: string }
 ): Promise<WaitlistRow[]> {
-  const { userRepository } = getRuntime(env)
-  const users = await userRepository.findByStatus(UserStatus.Waitlist)
+  const { userService } = getRuntime(env)
+  const ac = await adminAccessControl(env, viewer.username)
+  const users = await userService.listByStatus(ac, UserStatus.Waitlist)
   const rows: WaitlistRow[] = []
   for (const user of users) {
     let email = '(no sealed email)'
     if (user.emailEncrypted) {
       try {
-        email = await openSealedEmail(user.emailEncrypted, privateKey)
+        email = await openSealedEmail(user.emailEncrypted, viewer.privateKey)
       } catch {
         email = '(decrypt failed)'
       }
@@ -113,7 +135,7 @@ async function renderWaitlist(
   let error = outcome.error
   let code = status
   try {
-    rows = await loadWaitlist(env, viewer.privateKey)
+    rows = await loadWaitlist(env, viewer)
   } catch (err) {
     error = error ?? dbErrorMessage(env, err)
     code = 500
@@ -342,8 +364,8 @@ app.post('/grant-admin', async c => {
   }
 
   try {
-    const { userRepository, authService } = getRuntime(env)
-    const user = await userRepository.findByUsername(username)
+    const { userService, authService } = getRuntime(env)
+    const user = await userService.getUserByUsername(username)
 
     if (!user) {
       return renderWaitlist(
@@ -390,7 +412,10 @@ app.get('/compose', async c => {
 
   const env = getEnvironment(config, sess.session.environment)
   try {
-    const rows = await loadWaitlist(env, sess.session.privateKey)
+    const rows = await loadWaitlist(env, {
+      username: sess.session.username,
+      privateKey: sess.session.privateKey,
+    })
     const recipientCount = rows.filter(r => r.email.includes('@')).length
     return c.html(
       <ComposePage envLabel={env.label} recipientCount={recipientCount} />
@@ -436,7 +461,10 @@ app.post('/send', async c => {
   // list and never put plaintext emails on the wire until send time.
   let recipients: string[]
   try {
-    const rows = await loadWaitlist(env, sess.session.privateKey)
+    const rows = await loadWaitlist(env, {
+      username: sess.session.username,
+      privateKey: sess.session.privateKey,
+    })
     recipients = rows.map(r => r.email).filter(e => e.includes('@'))
   } catch (error) {
     return c.html(

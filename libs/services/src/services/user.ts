@@ -7,6 +7,9 @@ import type {
 import {
   AuthenticationError,
   InvalidCredentialsError,
+  MissingRoleError,
+  Role,
+  UserStatus,
 } from '@pinsquirrel/domain'
 
 export class UserService {
@@ -33,6 +36,22 @@ export class UserService {
     }
 
     return user
+  }
+
+  /**
+   * Every user in a given lifecycle state.
+   *
+   * Admin-only, and checked here rather than by the caller: this is how the
+   * admin app gets the waitlist whose sealed addresses it then decrypts, so
+   * the query carries its own authorization instead of trusting whichever
+   * app happens to call it.
+   */
+  async listByStatus(ac: AccessControl, status: UserStatus): Promise<User[]> {
+    if (!ac.hasRole(Role.Admin)) {
+      throw new MissingRoleError()
+    }
+
+    return this.userRepository.findByStatus(status)
   }
 
   /**

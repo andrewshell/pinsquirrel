@@ -2,12 +2,12 @@ import {
   createDatabaseClient,
   DrizzleUserRepository,
 } from '@pinsquirrel/database'
-import { AuthenticationService } from '@pinsquirrel/services'
+import { AuthenticationService, UserService } from '@pinsquirrel/services'
 import type { AdminEnvironment } from './config.js'
 
 export interface EnvRuntime {
-  userRepository: DrizzleUserRepository
   authService: AuthenticationService
+  userService: UserService
 }
 
 // One DB client/repository set per environment, created lazily and reused.
@@ -19,8 +19,8 @@ export function getRuntime(env: AdminEnvironment): EnvRuntime {
     const db = createDatabaseClient(env.databaseUrl)
     const userRepository = new DrizzleUserRepository(db)
     runtime = {
-      userRepository,
       authService: new AuthenticationService(userRepository),
+      userService: new UserService(userRepository),
     }
     cache.set(env.name, runtime)
   }
