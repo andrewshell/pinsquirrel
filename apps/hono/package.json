@@ -16,9 +16,7 @@
     "test:watch": "vitest --watch --coverage",
     "test:coverage": "vitest --run --coverage",
     "css:build": "tailwindcss -i ./src/styles/app.css -o ./src/static/styles.css",
-    "css:watch": "tailwindcss -i ./src/styles/app.css -o ./src/static/styles.css --watch",
-    "grant-access": "tsx src/scripts/grant-access.ts",
-    "grant-admin": "tsx src/scripts/grant-admin.ts"
+    "css:watch": "tailwindcss -i ./src/styles/app.css -o ./src/static/styles.css --watch"
   },
   "dependencies": {
     "@hono/mcp": "^0.3.1",

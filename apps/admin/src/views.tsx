@@ -15,6 +15,11 @@ const styles = `
   textarea { min-height: 200px; resize: vertical; }
   button, .btn { display: inline-block; margin-top: 1rem; padding: 0.55rem 1rem; border-radius: 8px; border: 0; background: #6366f1; color: #fff; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
   .btn-secondary { background: #334155; }
+  .btn-sm { margin-top: 0; padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+  .notice { background: #14532d; color: #bbf7d0; padding: 0.6rem 0.8rem; border-radius: 8px; margin-top: 0.75rem; font-size: 0.9rem; }
+  .inline-form { display: flex; gap: 0.5rem; align-items: flex-end; }
+  .inline-form input { flex: 1; }
+  .inline-form button { margin-top: 0; white-space: nowrap; }
   .row { display: flex; gap: 1rem; align-items: center; justify-content: space-between; }
   table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.9rem; }
   th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid #334155; }
@@ -96,9 +101,10 @@ export const UnlockPage: FC<{ envLabel: string; error?: string }> = ({
 export const WaitlistPage: FC<{
   envLabel: string
   username: string
-  rows: { username: string; email: string; joinedAt: string }[]
+  rows: { id: string; username: string; email: string; joinedAt: string }[]
+  notice?: string
   error?: string
-}> = ({ envLabel, username, rows, error }) => (
+}> = ({ envLabel, username, rows, notice, error }) => (
   <Layout title="Waitlist">
     <div class="row">
       <div>
@@ -114,6 +120,7 @@ export const WaitlistPage: FC<{
       </form>
     </div>
     <div class="card">
+      {notice ? <div class="notice">{notice}</div> : ''}
       {error ? <div class="error">{error}</div> : ''}
       {rows.length === 0 ? (
         error ? (
@@ -128,6 +135,7 @@ export const WaitlistPage: FC<{
               <th>Username</th>
               <th>Email</th>
               <th>Joined</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -136,6 +144,16 @@ export const WaitlistPage: FC<{
                 <td>{r.username}</td>
                 <td>{r.email}</td>
                 <td class="muted">{r.joinedAt}</td>
+                <td>
+                  {/* Granting flips the user to Active, so the row drops off
+                      the next render — the list is queried by Waitlist status. */}
+                  <form method="post" action="/grant-access">
+                    <input type="hidden" name="userId" value={r.id} />
+                    <button class="btn-sm" type="submit">
+                      Grant access
+                    </button>
+                  </form>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -148,6 +166,20 @@ export const WaitlistPage: FC<{
       ) : (
         ''
       )}
+    </div>
+    <div class="card">
+      <h1>Grant admin</h1>
+      <p class="muted">
+        Adds the Admin role to any existing account, on or off the waitlist.
+        Roles are additive and granting twice changes nothing.
+      </p>
+      <form method="post" action="/grant-admin">
+        <label for="admin-username">Username</label>
+        <div class="inline-form">
+          <input id="admin-username" name="username" required />
+          <button type="submit">Grant admin</button>
+        </div>
+      </form>
     </div>
   </Layout>
 )
