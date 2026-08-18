@@ -171,6 +171,31 @@ export class PinService {
   }
 
   /**
+   * Move a pin's creation date earlier.
+   *
+   * The Pinboard import uses this when it meets a URL the user already has:
+   * if the Pinboard copy is older, the existing pin keeps its original date
+   * rather than the date it happened to be saved here. Ownership is checked
+   * because the caller reaches this with an id taken from a
+   * DuplicatePinError, not from a pin it fetched itself.
+   */
+  async backdatePin(
+    ac: AccessControl,
+    pinId: string,
+    createdAt: Date
+  ): Promise<void> {
+    const pin = await this.pinRepository.findById(pinId)
+    if (!pin) {
+      throw new PinNotFoundError(pinId)
+    }
+    if (!ac.canUpdate(pin)) {
+      throw new UnauthorizedPinAccessError(pinId)
+    }
+
+    await this.pinRepository.updateCreatedAt(pinId, createdAt)
+  }
+
+  /**
    * Get a pin that the caller is allowed to see over a public-only surface.
    *
    * The REST API and the MCP server both authenticate with an API key and
