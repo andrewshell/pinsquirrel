@@ -13,7 +13,7 @@ import { pins } from '../schema/pins.js'
 import { OFFSET_WITHOUT_LIMIT } from './pagination.js'
 
 export class DrizzleTagRepository implements TagRepository {
-  constructor(private db: MySql2Database<Record<string, unknown>>) {}
+  constructor(private db: MySql2Database) {}
 
   async findById(id: string): Promise<Tag | null> {
     const result = await this.db

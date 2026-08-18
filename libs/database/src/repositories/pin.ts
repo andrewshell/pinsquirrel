@@ -48,7 +48,7 @@ const PIN_COLUMNS = {
 
 export class DrizzlePinRepository implements PinRepository {
   constructor(
-    private db: MySql2Database<Record<string, unknown>>,
+    private db: MySql2Database,
     private tagRepository: TagRepository
   ) {}
 

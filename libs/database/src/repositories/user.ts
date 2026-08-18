@@ -13,7 +13,7 @@ import { userRoles } from '../schema/user-roles.js'
 import { OFFSET_WITHOUT_LIMIT } from './pagination.js'
 
 export class DrizzleUserRepository implements UserRepository {
-  constructor(private db: MySql2Database<Record<string, unknown>>) {}
+  constructor(private db: MySql2Database) {}
 
   private async attachRoles(user: User): Promise<User> {
     const roles = await this.db

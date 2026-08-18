@@ -7,7 +7,7 @@ import { DrizzleUserRepository } from './user.js'
 import { UserStatus } from '@pinsquirrel/domain'
 
 describe('DrizzleUserRepository - Integration Tests', () => {
-  let testDb: MySql2Database<Record<string, unknown>>
+  let testDb: MySql2Database
   let testPool: Pool
   let repository: DrizzleUserRepository
 
@@ -19,23 +19,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     // Create test database connection
     testPool = mysql.createPool(TEST_DATABASE_URL)
 
-    // Import the schema and create test database connection
-    const { users } = await import('../schema/users.js')
-    const { pins } = await import('../schema/pins.js')
-    const { tags } = await import('../schema/tags.js')
-    const { pinsTags } = await import('../schema/pins-tags.js')
-    const { passwordResetTokens } =
-      await import('../schema/password-reset-tokens.js')
-
-    const schema = {
-      users,
-      pins,
-      tags,
-      pinsTags,
-      passwordResetTokens,
-    }
-
-    testDb = drizzle(testPool, { schema, mode: 'default' })
+    testDb = drizzle({ client: testPool })
   })
 
   afterAll(async () => {

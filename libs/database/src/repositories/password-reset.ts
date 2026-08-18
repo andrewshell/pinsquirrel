@@ -8,7 +8,7 @@ import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { passwordResetTokens } from '../schema/password-reset-tokens'
 
 export class DrizzlePasswordResetRepository implements PasswordResetRepository {
-  constructor(private db: MySql2Database<Record<string, unknown>>) {}
+  constructor(private db: MySql2Database) {}
 
   async findById(id: string): Promise<PasswordResetToken | null> {
     const result = await this.db
