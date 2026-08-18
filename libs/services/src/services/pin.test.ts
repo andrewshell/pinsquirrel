@@ -23,6 +23,7 @@ describe('PinService', () => {
     findByUserId: Mock
     findByUserIdAndUrl: Mock
     countByUserId: Mock
+    updateCreatedAt: Mock
   }
 
   const mockPin: Pin = {
@@ -73,6 +74,7 @@ describe('PinService', () => {
       findByUserId: vi.fn(),
       findByUserIdAndUrl: vi.fn(),
       countByUserId: vi.fn(),
+      updateCreatedAt: vi.fn(),
     }
 
     pinService = new PinService(mockPinRepository as unknown as PinRepository)
@@ -459,6 +461,55 @@ describe('PinService', () => {
       await expect(
         pinService.getPin(createMockAccessControl(mockUser), 'pin-123')
       ).rejects.toThrow(UnauthorizedPinAccessError)
+    })
+  })
+
+  describe('backdatePin', () => {
+    it('moves an owned pin to the earlier timestamp', async () => {
+      mockPinRepository.findById.mockResolvedValue(mockPin)
+      const when = new Date('2019-05-04T00:00:00.000Z')
+
+      await pinService.backdatePin(
+        createMockAccessControl(mockUser),
+        'pin-123',
+        when
+      )
+
+      expect(mockPinRepository.updateCreatedAt).toHaveBeenCalledWith(
+        'pin-123',
+        when
+      )
+    })
+
+    it('throws PinNotFoundError if the pin does not exist', async () => {
+      mockPinRepository.findById.mockResolvedValue(null)
+
+      await expect(
+        pinService.backdatePin(
+          createMockAccessControl(mockUser),
+          'pin-123',
+          new Date()
+        )
+      ).rejects.toThrow(PinNotFoundError)
+      expect(mockPinRepository.updateCreatedAt).not.toHaveBeenCalled()
+    })
+
+    // The import loop reaches this with a pin id taken from a DuplicatePinError,
+    // so ownership is checked here rather than trusted from the caller.
+    it("refuses to backdate another user's pin", async () => {
+      mockPinRepository.findById.mockResolvedValue({
+        ...mockPin,
+        userId: 'other-user',
+      })
+
+      await expect(
+        pinService.backdatePin(
+          createMockAccessControl(mockUser),
+          'pin-123',
+          new Date()
+        )
+      ).rejects.toThrow(UnauthorizedPinAccessError)
+      expect(mockPinRepository.updateCreatedAt).not.toHaveBeenCalled()
     })
   })
 
