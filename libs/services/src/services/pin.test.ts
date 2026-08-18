@@ -464,6 +464,46 @@ describe('PinService', () => {
     })
   })
 
+  describe('findByUrl', () => {
+    it('returns the pin the user has saved for that URL', async () => {
+      mockPinRepository.findByUserIdAndUrl.mockResolvedValue(mockPin)
+
+      const result = await pinService.findByUrl(
+        createMockAccessControl(mockUser),
+        'https://example.test/a'
+      )
+
+      expect(mockPinRepository.findByUserIdAndUrl).toHaveBeenCalledWith(
+        mockUser.id,
+        'https://example.test/a'
+      )
+      expect(result).toEqual(mockPin)
+    })
+
+    it('returns null when the user has not saved that URL', async () => {
+      mockPinRepository.findByUserIdAndUrl.mockResolvedValue(null)
+
+      const result = await pinService.findByUrl(
+        createMockAccessControl(mockUser),
+        'https://example.test/new'
+      )
+
+      expect(result).toBeNull()
+    })
+
+    // The lookup is scoped to the caller, so it cannot be used to probe
+    // whether some other account has saved a given URL.
+    it('refuses an unauthenticated caller', async () => {
+      await expect(
+        pinService.findByUrl(
+          createMockAccessControl(null),
+          'https://example.test/a'
+        )
+      ).rejects.toThrow(UnauthorizedPinAccessError)
+      expect(mockPinRepository.findByUserIdAndUrl).not.toHaveBeenCalled()
+    })
+  })
+
   describe('backdatePin', () => {
     it('moves an owned pin to the earlier timestamp', async () => {
       mockPinRepository.findById.mockResolvedValue(mockPin)

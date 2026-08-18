@@ -49,11 +49,9 @@ export class PinService {
       throw new ValidationError(errors)
     }
 
-    // Check for duplicate URL
-    const existingPin = await this.pinRepository.findByUserIdAndUrl(
-      input.userId,
-      input.url
-    )
+    // Check for duplicate URL. canCreateAs above already established that the
+    // caller is input.userId, so the caller-scoped lookup is the same query.
+    const existingPin = await this.findByUrl(ac, input.url)
     if (existingPin) {
       throw new DuplicatePinError(input.url, {
         id: existingPin.id,
@@ -168,6 +166,24 @@ export class PinService {
       throw new UnauthorizedPinAccessError(pinId)
     }
     return pin
+  }
+
+  /**
+   * The caller's own pin for a URL, if they have one.
+   *
+   * Scoped to the authenticated user, so it cannot be used to probe whether
+   * some other account has saved a given URL. This is the one way to ask the
+   * question: it used to be asked three different ways, including one that
+   * went straight to the repository and checked nothing.
+   */
+  async findByUrl(ac: AccessControl, url: string): Promise<Pin | null> {
+    if (!ac.user) {
+      throw new UnauthorizedPinAccessError(
+        'User must be authenticated to look up pins by URL'
+      )
+    }
+
+    return this.pinRepository.findByUserIdAndUrl(ac.user.id, url)
   }
 
   /**

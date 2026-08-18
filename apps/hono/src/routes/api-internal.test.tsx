@@ -12,20 +12,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import type { MiddlewareHandler } from 'hono'
-import type { Pin } from '@pinsquirrel/domain'
+import type { Pin, PinRepository } from '@pinsquirrel/domain'
+import { PinService } from '@pinsquirrel/services'
 import { testUser } from '../test-support/pin-routes'
 
 const svc = {
   findByUserIdAndUrl: vi.fn(),
 }
 
+// A real PinService over a mocked repository, so the assertions below still
+// prove which query runs — not merely that one mock called another.
 vi.mock('../lib/services', () => ({
   metadataService: { fetchMetadata: vi.fn() },
   metadataErrorUtils: { getUserFriendlyMessage: () => 'nope' },
-  pinRepository: {
+  pinService: new PinService({
     findByUserIdAndUrl: (...a: unknown[]) =>
       svc.findByUserIdAndUrl(...a) as unknown,
-  },
+  } as unknown as PinRepository),
 }))
 
 vi.mock('../middleware/session', () => ({
@@ -56,8 +59,8 @@ function makePin(overrides: Partial<Pin> = {}): Pin {
 const app = new Hono()
 app.route('/api/internal', apiInternalRoutes)
 
-function get(query: string, htmx = false): Promise<Response> {
-  return app.request(`/api/internal/check-url${query}`, {
+async function get(query: string, htmx = false): Promise<Response> {
+  return await app.request(`/api/internal/check-url${query}`, {
     headers: htmx ? { 'HX-Request': 'true' } : {},
   })
 }
