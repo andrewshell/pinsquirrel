@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.4.0](https://github.com/andrewshell/pinsquirrel/compare/v3.3.0...v3.4.0) (2026-08-18)
+
+
+### Features
+
+* add AuthenticationService.grantAdmin ([57ca94c](https://github.com/andrewshell/pinsquirrel/commit/57ca94c85381cef86fdd5967a75827079122a596))
+* add PinService.backdatePin ([31dd6c1](https://github.com/andrewshell/pinsquirrel/commit/31dd6c1c1bf16a424ee718e0b25e090de85ea858))
+* move grant-access and grant-admin into the admin app ([a7d8e1c](https://github.com/andrewshell/pinsquirrel/commit/a7d8e1ce03a79676ec43dfb1e648959107ff36fb))
+
+
+### Bug Fixes
+
+* close three brute-force gaps around password checks ([21f14ca](https://github.com/andrewshell/pinsquirrel/commit/21f14cadad26974084aa5a638a50ffa58fdb55d0))
+* guard grantAccess against unverified users and report a missing target as 404 ([20cc140](https://github.com/andrewshell/pinsquirrel/commit/20cc14032a6eca19b584128e30f07ebbb4496e8e))
+* make the lint-staged eslint hooks actually run ([7556c19](https://github.com/andrewshell/pinsquirrel/commit/7556c19ef92803425194287de2808d1cb46609e6))
+* require AccountService's email dependencies ([51d13df](https://github.com/andrewshell/pinsquirrel/commit/51d13df8b5eb7b053a67ad3eae7085b3a123d176))
+* run lint-staged from local node_modules in pre-commit hook ([fd427f8](https://github.com/andrewshell/pinsquirrel/commit/fd427f8b311f12455cc738decc6407a66ea8215a))
+* stop the REST API exposing private pins ([1ca149e](https://github.com/andrewshell/pinsquirrel/commit/1ca149eda24c043c26b5248255b08c3c553d0325))
+
 ## [3.3.0](https://github.com/andrewshell/pinsquirrel/compare/v3.2.1...v3.3.0) (2026-08-13)
 
 
