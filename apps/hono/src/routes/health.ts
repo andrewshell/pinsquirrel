@@ -3,6 +3,9 @@ import { sql } from 'drizzle-orm'
 import { db } from '../lib/db.js'
 import { logger, safeError } from '../lib/logger.js'
 
+// Uses the raw client rather than a service on purpose: this asks whether the
+// connection is alive, which is infrastructure rather than anything a service
+// models. See middleware/session.ts for the other deliberate exception.
 const healthRoutes = new Hono()
 
 healthRoutes.get('/', async (c) => {

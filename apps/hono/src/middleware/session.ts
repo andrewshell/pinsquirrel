@@ -1,3 +1,27 @@
+/**
+ * Cookie-backed sessions.
+ *
+ * This file talks to the repositories directly, which nothing else outside the
+ * composition root does. That is deliberate, not an oversight.
+ *
+ * Everywhere else, an app calling a repository skips the layer that enforces
+ * authorization and validation — that is what let the REST API list private
+ * pins, and what let the tag merge rules be enforced by a form instead of the
+ * operation. None of that applies here: a session is how an AccessControl gets
+ * built in the first place, so there is no authorization to bypass and nothing
+ * for a service to check. A SessionService would take no AccessControl, and
+ * only this app could ever call it — the admin app keeps its sessions in
+ * memory, and an API key or a CLI has no session at all.
+ *
+ * So the persistence stays here, alongside the parts that are unambiguously
+ * web-only: the cookie itself, the flash message that survives one redirect,
+ * and the private-unlock window. The equivalent for API callers does live in a
+ * service — ApiKeyService.authenticate — because a token resolves to a
+ * principal the same way for every transport.
+ *
+ * If sessions ever need to be readable from outside this app, that is the
+ * point to revisit this.
+ */
 import type { Context, MiddlewareHandler } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import type { Session, User } from '@pinsquirrel/domain'
