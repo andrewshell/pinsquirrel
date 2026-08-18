@@ -21,7 +21,7 @@
     "docker:build-push": "./scripts/docker-build-push.sh",
     "docker:build-push-skip-quality": "./scripts/docker-build-push.sh --skip-quality",
     "docker:dry-run": "./scripts/docker-build-push.sh --dry-run --skip-quality",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "devDependencies": {
     "eslint": "^10.8.1",
