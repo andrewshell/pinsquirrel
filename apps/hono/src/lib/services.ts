@@ -75,10 +75,6 @@ export const userService = new UserService(userRepository)
 export const apiKeyService = new ApiKeyService(apiKeyRepository)
 export const metadataService = new MetadataService(httpFetcher, htmlParser)
 
-// Still needed by the internal check-url endpoint, which looks a pin up by URL
-// without going through PinService. The Pinboard import no longer needs it.
-export { pinRepository }
-
 // Export static utilities for error handling
 export const metadataErrorUtils = {
   getHttpStatusForError: (error: Error) =>

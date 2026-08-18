@@ -38,6 +38,7 @@ vi.mock('../lib/services', () => ({
     deletePin: (...a: unknown[]) => svc.deletePin(...a) as unknown,
     getUserPinsWithPagination: (...a: unknown[]) =>
       svc.getUserPinsWithPagination(...a) as unknown,
+    findByUrl: (...a: unknown[]) => svc.findByUrl(...a) as unknown,
   },
   tagService: {
     getUserTags: (...a: unknown[]) => svc.getUserTags(...a) as unknown,
@@ -163,10 +164,7 @@ describe('pins routes', () => {
     })
 
     it('prefills from query params when the URL is not already saved', async () => {
-      svc.getUserPinsWithPagination.mockResolvedValue({
-        pins: [],
-        pagination: Pagination.fromTotalCount(0),
-      })
+      svc.findByUrl.mockResolvedValue(null)
 
       const res = await app.request(
         '/pins/new?url=https%3A%2F%2Fx.test%2Fa&title=Hello&tag=foo'
@@ -181,24 +179,19 @@ describe('pins routes', () => {
     it('redirects to the existing pin when the URL is already saved', async () => {
       // Bookmarklet dedup: a prefill URL that already exists sends the user to
       // that pin's edit form instead of creating a duplicate.
-      svc.getUserPinsWithPagination.mockResolvedValue({
-        pins: [makePin({ id: 'pin-42' })],
-        pagination: Pagination.fromTotalCount(1),
-      })
+      svc.findByUrl.mockResolvedValue(makePin({ id: 'pin-42' }))
 
       const res = await app.request('/pins/new?url=https%3A%2F%2Fx.test%2Fa')
 
       expect(res.status).toBe(302)
       expect(res.headers.get('Location')).toBe('/pins/pin-42/edit')
-      expect(svc.getUserPinsWithPagination.mock.calls[0][1]).toEqual({
-        url: 'https://x.test/a',
-      })
+      expect(svc.findByUrl.mock.calls[0][1]).toBe('https://x.test/a')
     })
 
     it('skips the dedup lookup when no url param is supplied', async () => {
       await app.request('/pins/new')
 
-      expect(svc.getUserPinsWithPagination).not.toHaveBeenCalled()
+      expect(svc.findByUrl).not.toHaveBeenCalled()
     })
   })
 

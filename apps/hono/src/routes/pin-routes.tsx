@@ -226,14 +226,10 @@ export function createPinRoutes({
       prefillTag = url.searchParams.get('tag') || ''
 
       if (prefillUrl) {
-        const existingPins = await pinService.getUserPinsWithPagination(
-          ac,
-          { url: prefillUrl },
-          { page: 1, pageSize: 1 }
-        )
+        const existing = await pinService.findByUrl(ac, prefillUrl)
 
-        if (existingPins.pins.length > 0) {
-          return c.redirect(`${baseUrl}/${existingPins.pins[0].id}/edit`)
+        if (existing) {
+          return c.redirect(`${baseUrl}/${existing.id}/edit`)
         }
       }
     }

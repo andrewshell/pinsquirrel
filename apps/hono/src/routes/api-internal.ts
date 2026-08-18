@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
+import { AccessControl } from '@pinsquirrel/domain'
 import {
   metadataService,
   metadataErrorUtils,
-  pinRepository,
+  pinService,
 } from '../lib/services'
 import { getAuthUser, requireAuth } from '../middleware/session'
 
@@ -47,7 +48,10 @@ apiInternal.get('/check-url', async (c) => {
     return c.json({ error: 'Missing url parameter' }, 400)
   }
 
-  const existingPin = await pinRepository.findByUserIdAndUrl(user.id, targetUrl)
+  const existingPin = await pinService.findByUrl(
+    new AccessControl(user),
+    targetUrl
+  )
 
   const exclude = url.searchParams.get('exclude')
   const isDuplicate = existingPin && existingPin.id !== exclude
