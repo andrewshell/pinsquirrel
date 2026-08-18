@@ -4,6 +4,10 @@ export {
   type EmailSealer,
 } from './services/authentication.js'
 export { AccountService } from './services/account.js'
+export {
+  NullEmailService,
+  EmailNotConfiguredError,
+} from './services/null-email.js'
 export { MetadataService } from './services/metadata.js'
 export { PinService } from './services/pin.js'
 export { TagService } from './services/tag.js'

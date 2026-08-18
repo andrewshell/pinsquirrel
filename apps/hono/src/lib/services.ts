@@ -5,6 +5,7 @@ import { MailgunEmailService } from '@pinsquirrel/mailgun'
 import {
   AccountService,
   ApiKeyService,
+  NullEmailService,
   AuthenticationService,
   MetadataService,
   PinService,
@@ -24,16 +25,19 @@ import {
 const htmlParser = new CheerioHtmlParser()
 const httpFetcher = new NodeHttpFetcher()
 
-// Create email service if Mailgun is configured
-let emailService: EmailService | undefined
-if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
-  emailService = new MailgunEmailService({
-    apiKey: process.env.MAILGUN_API_KEY,
-    domain: process.env.MAILGUN_DOMAIN,
-    fromEmail: process.env.MAILGUN_FROM_EMAIL || 'noreply@pinsquirrel.com',
-    fromName: process.env.MAILGUN_FROM_NAME || 'PinSquirrel',
-  })
-}
+// Create the email service if Mailgun is configured. Without it every send
+// fails loudly instead of being skipped: an unconfigured install then reports
+// "we had trouble sending your confirmation email" on signup rather than
+// telling the user to check an inbox nothing was sent to.
+const emailService: EmailService =
+  process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN
+    ? new MailgunEmailService({
+        apiKey: process.env.MAILGUN_API_KEY,
+        domain: process.env.MAILGUN_DOMAIN,
+        fromEmail: process.env.MAILGUN_FROM_EMAIL || 'noreply@pinsquirrel.com',
+        fromName: process.env.MAILGUN_FROM_NAME || 'PinSquirrel',
+      })
+    : new NullEmailService()
 
 // Create email sealer if a public key is configured. This lets the waitlist be
 // contacted later via the offline admin app; this server can never decrypt it.
