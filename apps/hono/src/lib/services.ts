@@ -8,6 +8,7 @@ import {
   NullEmailService,
   AuthenticationService,
   MetadataService,
+  PinboardService,
   PinService,
   TagService,
   UserService,
@@ -68,12 +69,14 @@ export const accountService = new AccountService(
   emailSealer
 )
 export const pinService = new PinService(pinRepository)
+export const pinboardService = new PinboardService(pinService)
 export const tagService = new TagService(tagRepository)
 export const userService = new UserService(userRepository)
 export const apiKeyService = new ApiKeyService(apiKeyRepository)
 export const metadataService = new MetadataService(httpFetcher, htmlParser)
 
-// Export repositories for special cases
+// Still needed by the internal check-url endpoint, which looks a pin up by URL
+// without going through PinService. The Pinboard import no longer needs it.
 export { pinRepository }
 
 // Export static utilities for error handling

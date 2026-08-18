@@ -10,6 +10,13 @@ export {
 } from './services/null-email.js'
 export { MetadataService } from './services/metadata.js'
 export { PinService } from './services/pin.js'
+export {
+  PinboardService,
+  InvalidPinboardExportError,
+  type PinboardPin,
+  type ImportResult,
+  type InvalidPinboardExportReason,
+} from './services/pinboard.js'
 export { TagService } from './services/tag.js'
 export { UserService } from './services/user.js'
 export { ApiKeyService } from './services/api-key.js'

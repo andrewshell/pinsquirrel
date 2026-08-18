@@ -10,17 +10,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import type { MiddlewareHandler } from 'hono'
 import type { Pin } from '@pinsquirrel/domain'
-import { md5 } from '@pinsquirrel/services'
+import { PinboardService, md5, type PinService } from '@pinsquirrel/services'
 import { testUser } from '../test-support/pin-routes'
 
 const svc = {
   getUserPins: vi.fn(),
 }
 
+// A real PinboardService over a mocked PinService, so these stay end-to-end
+// assertions about the bytes the route serves.
 vi.mock('../lib/services', () => ({
-  pinService: {
+  pinboardService: new PinboardService({
     getUserPins: (...a: unknown[]) => svc.getUserPins(...a) as unknown,
-  },
+  } as unknown as PinService),
 }))
 
 vi.mock('../middleware/session', () => ({
