@@ -276,11 +276,13 @@ describe('import routes', () => {
       expect(svc.createPin.mock.calls[2][1].readLater).toBe(false)
     })
 
-    it('imports every pin as public, ignoring Pinboard’s shared flag', async () => {
-      // NOTE: `shared: "no"` marks a bookmark private in Pinboard, and this
-      // import discards it — every imported pin lands public. Pinned as current
-      // behavior, but see the PR: given the app has a private-pins feature,
-      // this is probably not what an importing user expects.
+    it('lands every pin in the main list, whatever Pinboard’s shared flag says', async () => {
+      // Pinboard's `shared` controls whether a bookmark is visible on the
+      // public web; PinSquirrel publishes nothing, so it has no counterpart
+      // here and is dropped. `isPrivate` is a different axis — an extra tier
+      // *within* an already-login-only account, hidden from the main list and
+      // gated behind a password re-entry. Mapping `shared: "no"` onto it would
+      // put those pins behind the unlock gate, which is not what the flag meant.
       await app.request(
         '/import',
         uploadPins([{ shared: 'no' }, { shared: 'yes' }])
