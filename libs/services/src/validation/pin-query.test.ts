@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { pinListInputSchema, tagListInputSchema } from './pin-query.js'
+import {
+  pinFilterFromInput,
+  pinListInputSchema,
+  tagListInputSchema,
+} from './pin-query.js'
 
 describe('pinListInputSchema', () => {
   it('parses empty input', () => {
@@ -71,5 +75,47 @@ describe('tagListInputSchema', () => {
 
   it('accepts empty input', () => {
     expect(tagListInputSchema.parse({})).toEqual({})
+  })
+})
+
+describe('pinFilterFromInput', () => {
+  // Both callers — the REST API and the MCP server — are public-only surfaces.
+  // Forcing the flag here is what keeps them from drifting apart again.
+  it('always excludes private pins', () => {
+    expect(pinFilterFromInput({}).isPrivate).toBe(false)
+  })
+
+  it('cannot be talked into including private pins', () => {
+    const filter = pinFilterFromInput({
+      isPrivate: true,
+    } as unknown as Parameters<typeof pinFilterFromInput>[0])
+
+    expect(filter.isPrivate).toBe(false)
+  })
+
+  it('passes the remaining filters through', () => {
+    const filter = pinFilterFromInput({
+      tag: 'reading',
+      search: 'rust',
+      readLater: true,
+      noTags: false,
+      sortBy: 'title',
+      sortDirection: 'asc',
+    })
+
+    expect(filter).toMatchObject({
+      tag: 'reading',
+      search: 'rust',
+      readLater: true,
+      noTags: false,
+      sortBy: 'title',
+      sortDirection: 'asc',
+    })
+  })
+})
+
+describe('pinListInputSchema isPrivate', () => {
+  it('drops isPrivate rather than honouring it', () => {
+    expect(pinListInputSchema.parse({ isPrivate: true })).toEqual({})
   })
 })

@@ -222,7 +222,7 @@ apiV1.get('/pins/:id', async (c) => {
   const id = c.req.param('id')
 
   try {
-    const pin = await pinService.getPin(ac, id)
+    const pin = await pinService.getPublicPin(ac, id)
     return c.json(pin)
   } catch (err) {
     return errorResponse(c, err)

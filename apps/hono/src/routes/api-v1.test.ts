@@ -1,11 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import type { ApiKey, Pin, Tag, TagWithCount, User } from '@pinsquirrel/domain'
-import { Pagination, TagNotFoundError } from '@pinsquirrel/domain'
+import {
+  Pagination,
+  PinNotFoundError,
+  TagNotFoundError,
+} from '@pinsquirrel/domain'
 
 const mockAuthenticateByKey = vi.fn()
 const mockFindUserById = vi.fn()
 const mockGetPin = vi.fn()
+const mockGetPublicPin = vi.fn()
 const mockGetUserPinsWithPagination = vi.fn()
 const mockGetUserTags = vi.fn()
 const mockGetUserTagsWithCount = vi.fn()
@@ -18,6 +23,7 @@ vi.mock('../lib/services', () => ({
   },
   pinService: {
     getPin: (...args: unknown[]) => mockGetPin(...args) as unknown,
+    getPublicPin: (...args: unknown[]) => mockGetPublicPin(...args) as unknown,
     getUserPinsWithPagination: (...args: unknown[]) =>
       mockGetUserPinsWithPagination(...args) as unknown,
   },
@@ -159,11 +165,12 @@ describe('api-v1 routes', () => {
       expect(body.pagination.totalCount).toBe(1)
       expect(body.pagination.page).toBe(1)
       expect(body.pagination.hasNext).toBe(false)
-      // isPrivate defaults to undefined (no filter) when not specified
+      // The API is public-only: the filter always excludes private pins,
+      // and there is no query parameter that can turn that off.
       const filter = mockGetUserPinsWithPagination.mock.calls[0][1] as {
         isPrivate: boolean | undefined
       }
-      expect(filter.isPrivate).toBeUndefined()
+      expect(filter.isPrivate).toBe(false)
     })
 
     it('passes query params through to service', async () => {
@@ -201,7 +208,7 @@ describe('api-v1 routes', () => {
     })
 
     it('returns pin', async () => {
-      mockGetPin.mockResolvedValue(makePin())
+      mockGetPublicPin.mockResolvedValue(makePin())
       const res = await app.request('/api/v1/pins/pin-1', {
         headers: { Authorization: 'Bearer ps_ok' },
       })
@@ -210,14 +217,14 @@ describe('api-v1 routes', () => {
       expect(body.id).toBe('pin-1')
     })
 
-    it('returns private pins', async () => {
-      mockGetPin.mockResolvedValue(makePin({ isPrivate: true }))
+    // Was the opposite until the REST API was brought in line with MCP: the
+    // same key could read a private pin here but not over the MCP server.
+    it('reports a private pin as not found', async () => {
+      mockGetPublicPin.mockRejectedValue(new PinNotFoundError('pin-1'))
       const res = await app.request('/api/v1/pins/pin-1', {
         headers: { Authorization: 'Bearer ps_ok' },
       })
-      expect(res.status).toBe(200)
-      const body = (await res.json()) as { isPrivate: boolean }
-      expect(body.isPrivate).toBe(true)
+      expect(res.status).toBe(404)
     })
   })
 
@@ -271,7 +278,8 @@ describe('api-v1 routes', () => {
         isPrivate: boolean | undefined
       }
       expect(filter.tag).toBe('foo')
-      expect(filter.isPrivate).toBeUndefined()
+      // Tag listings are public-only too.
+      expect(filter.isPrivate).toBe(false)
     })
 
     it('returns 404 when tag service throws TagNotFoundError', async () => {

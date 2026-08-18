@@ -21,7 +21,6 @@ export const pinListInputSchema = z.object({
     .describe('Search pins by keyword'),
   readLater: z.boolean().optional().describe('Filter to read-later pins only'),
   noTags: z.boolean().optional().describe('Filter to pins with no tags'),
-  isPrivate: z.boolean().optional().describe('Filter by private status'),
   sortBy: z.enum(['created', 'title']).optional().describe('Sort field'),
   sortDirection: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
   page: z.number().int().min(1).optional().describe('Page number (1-indexed)'),
@@ -49,14 +48,17 @@ export type TagListInput = z.infer<typeof tagListInputSchema>
 /**
  * Translate a validated `PinListInput` into a domain `PinFilter`.
  *
- * Both the REST API and MCP transport accept the same logical input shape,
- * so the conversion lives here as a single source of truth. Callers that
- * need to enforce additional constraints (e.g. forcing `isPrivate: false`
- * for public-only endpoints) should override after calling this helper.
+ * Both callers — the REST API and the MCP server — authenticate with an API
+ * key and expose public pins only, so `isPrivate: false` is forced here rather
+ * than left to each transport. It used to be each transport's job: MCP did it,
+ * the REST API did not, and `?isPrivate=true` listed private pins.
+ *
+ * `isPrivate` is not part of the input schema, so there is nothing to honour
+ * even if a caller sends it.
  */
 export function pinFilterFromInput(input: PinListInput): PinFilter {
   return {
-    isPrivate: input.isPrivate,
+    isPrivate: false,
     tag: input.tag,
     search: input.search,
     readLater: input.readLater,
