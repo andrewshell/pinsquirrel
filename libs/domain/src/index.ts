@@ -57,7 +57,11 @@ export {
   MissingRoleError,
   AccessNotGrantedError,
 } from './errors/auth.js'
-export { UserError, UserNotFoundError } from './errors/user.js'
+export {
+  UserError,
+  UserNotFoundError,
+  UserNotEligibleError,
+} from './errors/user.js'
 export {
   PinError,
   PinNotFoundError,

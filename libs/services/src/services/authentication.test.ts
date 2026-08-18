@@ -15,6 +15,7 @@ import {
   MissingRoleError,
   AccessNotGrantedError,
   UserNotFoundError,
+  UserNotEligibleError,
   Role,
   UserStatus,
 } from '@pinsquirrel/domain'
@@ -546,6 +547,24 @@ describe('AuthenticationService', () => {
 
       await expect(authService.grantAccess('missing-id')).rejects.toThrow(
         UserNotFoundError
+      )
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+    })
+
+    // Activating an unverified account would strand it as Active with no
+    // password. Setting one later runs resetPassword, whose Unverified guard
+    // no longer matches, so the account would be signed in having never been
+    // on the waitlist at all.
+    it('should refuse an unverified user rather than skipping the waitlist', async () => {
+      const unverified = {
+        ...mockUser,
+        status: UserStatus.Unverified,
+        passwordHash: null,
+      }
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(unverified)
+
+      await expect(authService.grantAccess(unverified.id)).rejects.toThrow(
+        UserNotEligibleError
       )
       expect(mockUserRepository.update).not.toHaveBeenCalled()
     })

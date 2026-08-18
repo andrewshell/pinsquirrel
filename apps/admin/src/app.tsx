@@ -7,6 +7,8 @@ import {
   AccessNotGrantedError,
   MissingRoleError,
   ValidationError,
+  UserNotFoundError,
+  UserNotEligibleError,
 } from '@pinsquirrel/domain'
 import { openSealedEmail } from '@pinsquirrel/crypto'
 import { loadConfig, getEnvironment, type AdminEnvironment } from './config.js'
@@ -31,6 +33,9 @@ import type { Context } from 'hono'
 
 const config = loadConfig()
 const COOKIE = 'admin_session'
+
+/** Shown when a grant target is deleted mid-action. */
+const GONE = 'That user no longer exists.'
 
 export const app = new Hono()
 
@@ -293,6 +298,14 @@ app.post('/grant-access', async c => {
       notice: `Granted access to ${updated.username}.`,
     })
   } catch (error) {
+    if (error instanceof UserNotFoundError) {
+      return renderWaitlist(c, env, viewer, { error: GONE }, 404)
+    }
+    // The account has not confirmed its email; activating it would skip the
+    // waitlist entirely. The service message names the user.
+    if (error instanceof UserNotEligibleError) {
+      return renderWaitlist(c, env, viewer, { error: error.message }, 400)
+    }
     console.error(`[admin] grant-access failed for "${env.name}":`, error)
     return renderWaitlist(
       c,
@@ -355,6 +368,11 @@ app.post('/grant-admin', async c => {
       notice: `Granted the Admin role to ${updated.username}.`,
     })
   } catch (error) {
+    // grantAdmin re-reads the user, so a delete between the lookup above and
+    // the write surfaces here rather than as a missing-user render.
+    if (error instanceof UserNotFoundError) {
+      return renderWaitlist(c, env, viewer, { error: GONE }, 404)
+    }
     return renderWaitlist(
       c,
       env,
