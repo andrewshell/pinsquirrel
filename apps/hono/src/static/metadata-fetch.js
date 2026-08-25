@@ -158,18 +158,4 @@ function initMetadataFetch(form) {
   updateRefreshButtonState()
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('[data-metadata-fetch]').forEach(initMetadataFetch)
-})
-
-document.addEventListener('htmx:afterSettle', event => {
-  const target = event.detail.target
-  const forms = target.querySelectorAll
-    ? target.querySelectorAll('[data-metadata-fetch]')
-    : []
-  forms.forEach(initMetadataFetch)
-  // Also check if the target itself is a form with the attribute
-  if (target.matches && target.matches('[data-metadata-fetch]')) {
-    initMetadataFetch(target)
-  }
-})
+onReady('[data-metadata-fetch]', initMetadataFetch)

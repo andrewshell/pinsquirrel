@@ -4,22 +4,7 @@
  * Usage: Add data-tag-input="container" to wrapper div
  * Include data-initial-tags='["tag1", "tag2"]' and data-all-tags='["all", "tags"]'
  */
-document.addEventListener('DOMContentLoaded', () => {
-  document
-    .querySelectorAll('[data-tag-input="container"]')
-    .forEach(initTagInput)
-})
-
-document.addEventListener('htmx:afterSettle', event => {
-  const target = event.detail.target
-  const containers = target.querySelectorAll
-    ? target.querySelectorAll('[data-tag-input="container"]')
-    : []
-  containers.forEach(initTagInput)
-  if (target.matches && target.matches('[data-tag-input="container"]')) {
-    initTagInput(target)
-  }
-})
+onReady('[data-tag-input="container"]', initTagInput)
 
 function initTagInput(container) {
   const initialTags = JSON.parse(container.dataset.initialTags || '[]')

@@ -259,10 +259,9 @@ describe('private routes', () => {
       expect(res.headers.get('Location')).toBe('/pins')
     })
 
-    it('returns 204 for a text/plain beacon on lock (tab close)', async () => {
-      const res = await app.request('/private/lock', {
+    it('returns 204 for a ?beacon=1 lock (tab close)', async () => {
+      const res = await app.request('/private/lock?beacon=1', {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
       })
 
       expect(res.status).toBe(204)

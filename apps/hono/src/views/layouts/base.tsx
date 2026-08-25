@@ -69,6 +69,9 @@ export const BaseLayout: FC<PropsWithChildren<BaseLayoutProps>> = ({
         ${darkModeScript}
         <link rel="stylesheet" href="/static/styles.css" />
         <script src="/static/htmx.min.js"></script>
+        <!-- on-ready.js defines the onReady() the components below init with,
+             and deferred scripts run in order, so it must stay first. -->
+        <script src="/static/on-ready.js" defer></script>
         <script src="/static/dropdown.js" defer></script>
         <script src="/static/tag-input-vanilla.js" defer></script>
         <script src="/static/tag-select.js" defer></script>
