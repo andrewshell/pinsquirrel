@@ -2,7 +2,7 @@
  * Tests for UserService.listByStatus.
  *
  * UserService had no tests; these cover the method added for the admin
- * waitlist page. getUser/getUserByUsername/updateUser remain uncovered.
+ * waitlist page. getUserByUsername remains uncovered.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createMockUserRepository } from '../test-utils.js'
