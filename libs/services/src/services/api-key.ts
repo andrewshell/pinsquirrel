@@ -28,6 +28,7 @@ export class ApiKeyService {
   ): Promise<{ apiKey: ApiKey; rawKey: string }> {
     if (!ac.canCreateAs(input.userId)) {
       throw new UnauthorizedApiKeyAccessError(
+        '',
         'User can only create API keys for themselves'
       )
     }
@@ -67,7 +68,10 @@ export class ApiKeyService {
 
   async listApiKeys(ac: AccessControl, userId: string): Promise<ApiKey[]> {
     if (!ac.canCreateAs(userId)) {
-      throw new UnauthorizedApiKeyAccessError()
+      throw new UnauthorizedApiKeyAccessError(
+        '',
+        "Not authorized to list another user's API keys"
+      )
     }
 
     return this.apiKeyRepository.findByUserId(userId)
@@ -80,7 +84,7 @@ export class ApiKeyService {
     }
 
     if (!ac.canDelete(apiKey)) {
-      throw new UnauthorizedApiKeyAccessError()
+      throw new UnauthorizedApiKeyAccessError(keyId)
     }
 
     await this.apiKeyRepository.delete(keyId)

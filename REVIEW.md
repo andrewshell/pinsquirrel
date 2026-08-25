@@ -262,7 +262,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 
 ### Inconsistency
 
-#### 2.25
+#### 2.25 — **Done**
 
 - **Where:** `libs/domain/src/errors/pin.ts:15,39,46` (`UnauthorizedPinAccessError`, `TagNotFoundError`, `UnauthorizedTagAccessError`); callers in `libs/services/src/services/pin.ts:26,181,232,251` and `tag.ts:39,69,100,127-178`
 - **Problem:** Constructors take an _id_ and template it (`Tag with ID "${id}" not found`), but callers pass full sentences → messages like `Tag with ID "Target tag with ID x not found" not found`.

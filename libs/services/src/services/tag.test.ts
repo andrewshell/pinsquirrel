@@ -127,6 +127,17 @@ describe('TagService.getUserTagById', () => {
       TagNotFoundError
     )
   })
+
+  // The constructor templates the id into the message. Passing it a finished
+  // sentence produced `Tag with ID "Tag with ID "tag-1" not found" not found`.
+  it('names the tag once in the message', async () => {
+    vi.mocked(mockRepo.findById).mockResolvedValue(null)
+    const ac = new AccessControl(owner)
+
+    await expect(service.getUserTagById(ac, 'tag-1')).rejects.toThrow(
+      new TagNotFoundError('tag-1')
+    )
+  })
 })
 
 describe('TagService.getUserTagsWithCount', () => {
@@ -292,6 +303,28 @@ describe('TagService.mergeTags', () => {
     expect(mockRepo.mergeTags).not.toHaveBeenCalled()
   })
 
+  it('says which tag is missing, and says it once', async () => {
+    vi.mocked(mockRepo.findById).mockResolvedValue(null)
+
+    await expect(
+      service.mergeTags(new AccessControl(owner), ['src-a'], 'target')
+    ).rejects.toThrow(
+      new TagNotFoundError('target', 'Target tag with ID "target" not found')
+    )
+  })
+
+  it('says which source tag is missing', async () => {
+    vi.mocked(mockRepo.findById).mockImplementation((id: string) =>
+      Promise.resolve(id === 'target' ? targetTag : null)
+    )
+
+    await expect(
+      service.mergeTags(new AccessControl(owner), ['missing'], 'target')
+    ).rejects.toThrow(
+      new TagNotFoundError('missing', 'Source tag with ID "missing" not found')
+    )
+  })
+
   it('refuses to merge into a target owned by someone else', async () => {
     // The sources are deliberately owned by the caller. If they were not, the
     // source-ownership loop would throw too and this test would pass even with
@@ -427,6 +460,14 @@ describe('TagService.deleteTag', () => {
       service.deleteTag(new AccessControl(owner), 'tag-1')
     ).rejects.toBeInstanceOf(TagNotFoundError)
     expect(mockRepo.delete).not.toHaveBeenCalled()
+  })
+
+  it('names the tag once when it does not exist', async () => {
+    vi.mocked(mockRepo.findById).mockResolvedValue(null)
+
+    await expect(
+      service.deleteTag(new AccessControl(owner), 'tag-1')
+    ).rejects.toThrow(new TagNotFoundError('tag-1'))
   })
 
   it('refuses to delete a tag owned by someone else', async () => {

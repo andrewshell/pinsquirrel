@@ -23,6 +23,7 @@ export class PinService {
     // Check if user can create pins as the specified user
     if (!ac.canCreateAs(input.userId)) {
       throw new UnauthorizedPinAccessError(
+        '',
         'User can only create pins for themselves'
       )
     }
@@ -179,6 +180,7 @@ export class PinService {
   async findByUrl(ac: AccessControl, url: string): Promise<Pin | null> {
     if (!ac.user) {
       throw new UnauthorizedPinAccessError(
+        '',
         'User must be authenticated to look up pins by URL'
       )
     }
@@ -230,6 +232,7 @@ export class PinService {
   async getUserPins(ac: AccessControl): Promise<Pin[]> {
     if (!ac.user) {
       throw new UnauthorizedPinAccessError(
+        '',
         'User must be authenticated to export pins'
       )
     }
@@ -249,6 +252,7 @@ export class PinService {
   }> {
     if (!ac.user) {
       throw new UnauthorizedPinAccessError(
+        '',
         'User must be authenticated to view pins'
       )
     }
