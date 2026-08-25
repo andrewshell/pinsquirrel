@@ -256,6 +256,23 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       expect(result.find(t => t.name === 'tag1')).toBeDefined()
       expect(result.find(t => t.name === 'tag2')).toBeDefined()
     })
+
+    it('should resolve concurrent creates of the same new name to one tag', async () => {
+      // Two writers (browser + extension/API) saving the same new tag at the
+      // same time both see "not there" and both insert. The loser of the race
+      // must re-read the winner's row, not blow up on a duplicate key.
+      const [first, second] = await Promise.all([
+        tagRepository.fetchOrCreateByNames(testUser.id, ['race-tag']),
+        tagRepository.fetchOrCreateByNames(testUser.id, ['race-tag']),
+      ])
+
+      expect(first).toHaveLength(1)
+      expect(second).toHaveLength(1)
+      expect(first[0].id).toBe(second[0].id)
+
+      const allTags = await tagRepository.findByUserId(testUser.id)
+      expect(allTags).toHaveLength(1)
+    })
   })
 
   describe('create', () => {

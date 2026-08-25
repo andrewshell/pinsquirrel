@@ -52,7 +52,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `create`/`update` do the pin write, the `pins_tags` delete/insert, and `tagRepository.fetchOrCreateByNames` as 3–6 separate statements with no transaction. A mid-way failure leaves a pin with no tags, or with its tag links deleted and not re-added.
 - **Fix:** Wrap each in `db.transaction(tx => …)`. The transaction handle must **not** go on the `TagRepository` interface in `libs/domain` (CLAUDE.md: domain has no external deps). Options: (a) narrow `DrizzlePinRepository`'s constructor to take `DrizzleTagRepository` and add a tx-aware method there; (b) move the tag upsert into `DrizzlePinRepository`. **Blocked on Q13. After 1.5.**
 
-#### 1.5
+#### 1.5 — **Done**
 
 - **Where:** `libs/database/src/repositories/tag.ts:56-108`
 - **Problem:** `fetchOrCreateByNames` is SELECT-then-INSERT; two concurrent saves of the same new tag (browser + extension/API) race into a `tags_user_id_name_idx` duplicate-key error.

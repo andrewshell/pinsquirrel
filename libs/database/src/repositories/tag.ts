@@ -1,4 +1,4 @@
-import { eq, and, inArray, count, isNull } from 'drizzle-orm'
+import { eq, and, inArray, count, isNull, sql } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import type {
   Tag,
@@ -83,14 +83,20 @@ export class DrizzleTagRepository implements TagRepository {
         updatedAt: now,
       }))
 
-      await this.db.insert(tags).values(tagValues)
+      // Two writers can pass the SELECT above at the same time and both try to
+      // insert the same (user_id, name). `ON DUPLICATE KEY UPDATE id = id` makes
+      // the loser a no-op instead of a duplicate-key error; the select below
+      // then reads back whichever row actually won, by name rather than by the
+      // id we generated (which may not be the stored one).
+      await this.db
+        .insert(tags)
+        .values(tagValues)
+        .onDuplicateKeyUpdate({ set: { id: sql`id` } })
 
-      // Select back the created tags
-      const createdTagIds = tagValues.map(t => t.id)
       const selected = await this.db
         .select()
         .from(tags)
-        .where(inArray(tags.id, createdTagIds))
+        .where(and(eq(tags.userId, userId), inArray(tags.name, tagsToCreate)))
       createdTags.push(...selected)
     }
 
