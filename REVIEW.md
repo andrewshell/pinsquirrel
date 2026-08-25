@@ -356,11 +356,12 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** "Timing-safe" test compares wall-clock of two scrypt calls (< 5×); flaky under load and proves nothing about `timingSafeEqual`.
 - **Fix:** Delete it.
 
-#### 2.40
+#### 2.40 — **Done**
 
 - **Where:** `apps/hono` — `routes/profile.tsx`, `middleware/api-auth.ts`, `bearer-auth.ts`, `private-mode.ts`, `mcp/*`; `pins.test.tsx`
 - **Problem:** No route tests for profile intents, the three middlewares (HX-Redirect vs 302), or MCP; no error-path tests for `POST /:id/edit` (validation, duplicate, missing pin) or `toggle-read` on a missing pin.
 - **Fix:** Route-level tests using the fakes in `src/test-support/pin-routes.tsx`. Pairs with 2.13, 2.16, 2.31. **PLAN.md:** `api-auth.ts` is deleted in Phase 7a and `bearer-auth.ts`/`mcp/auth.ts` are rewritten in Phase 6a with their own tests (6g) — don't write tests for those three now; the profile, `private-mode.ts`, and pin-route gaps still stand.
+- **Note (when done):** The profile intents were covered by 2.13's `profile.test.tsx`. `private-mode.ts` turned out to be covered already — `private.test.tsx` mounts the real middleware, and mutating away either the unlock check or the `HX-Request` branch fails it — so this item added only the pin-route error paths: on both `POST /new` and `POST /:id/edit`, the HTMX-vs-full-page split, the duplicate-URL link to the existing pin, and the generic 500. Verified by mutation; the create-side gaps were found by mutating the create handler while checking the edit ones.
 
 #### 2.41
 
