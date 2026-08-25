@@ -350,7 +350,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** No unit tests; format rules, truncation, backdating, md5 digests are covered only through `apps/hono/src/routes/{import,export}.test.tsx`.
 - **Fix:** Service-level tests for each rule.
 
-#### 2.39
+#### 2.39 — **Done**
 
 - **Where:** `libs/services/src/utils/crypto.test.ts:63-83`
 - **Problem:** "Timing-safe" test compares wall-clock of two scrypt calls (< 5×); flaky under load and proves nothing about `timingSafeEqual`.
