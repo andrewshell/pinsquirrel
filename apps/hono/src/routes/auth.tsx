@@ -294,21 +294,10 @@ auth.post(
         )
       }
 
-      // Check for rate limiting error
-      if (error instanceof Error && error.message.includes('Too many')) {
-        return c.html(
-          <ForgotPasswordPage
-            errors={{
-              _form: [
-                'Too many password reset requests. Please try again later.',
-              ],
-            }}
-            email={email}
-          />,
-          429
-        )
-      }
-
+      // No rate-limit branch here: rateLimitByIp above already answers 429
+      // before the handler runs, and deciding it a second time by matching
+      // 'Too many' in a message meant any service error that happened to use
+      // those words came back as a rate limit.
       return c.html(
         <ForgotPasswordPage
           errors={{ _form: ['An error occurred. Please try again later.'] }}

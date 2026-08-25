@@ -274,7 +274,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `grantAccess`, `grantAdmin`, `changePassword`, `updateEmail` take a bare `userId` with no `AccessControl`, while `UserService.listByStatus` argues in a comment that services must carry their own authorization.
 - **Fix:** Add an `ac: AccessControl` parameter and check `canUpdate`/`hasRole(Admin)` in-service; update `apps/hono` and `apps/admin` callers. **Blocked on Q4.**
 
-#### 2.27
+#### 2.27 — **Done**
 
 - **Where:** `apps/hono/src/routes/auth.tsx:280`
 - **Problem:** `error.message.includes('Too many')` decides on a 429 by string-matching; the rate-limit middleware on `:243` already covers this route.
