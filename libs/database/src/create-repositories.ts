@@ -39,7 +39,9 @@ export function createRepositories(db: MySql2Database): Repositories {
     userRepository: new DrizzleUserRepository(db),
     tagRepository,
     // Reads and writes pins by tag name, so it resolves names through the
-    // same tag repository returned above rather than a second instance.
+    // same tag repository returned above rather than a second instance. It
+    // needs the Drizzle class specifically, not the `TagRepository`
+    // interface — see its constructor for why.
     pinRepository: new DrizzlePinRepository(db, tagRepository),
     passwordResetRepository: new DrizzlePasswordResetRepository(db),
     sessionRepository: new DrizzleSessionRepository(db),

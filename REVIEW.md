@@ -46,7 +46,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 
 ### Data integrity
 
-#### 1.4
+#### 1.4 — **Done**
 
 - **Where:** `libs/database/src/repositories/pin.ts:192-297`
 - **Problem:** `create`/`update` do the pin write, the `pins_tags` delete/insert, and `tagRepository.fetchOrCreateByNames` as 3–6 separate statements with no transaction. A mid-way failure leaves a pin with no tags, or with its tag links deleted and not re-added.
@@ -337,7 +337,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `mergeTags` does one SELECT + one INSERT per pin and one SELECT per source tag inside the transaction.
 - **Fix:** `INSERT IGNORE … SELECT DISTINCT pin_id, ? FROM pins_tags WHERE tag_id IN (…)` then one `DELETE … WHERE NOT EXISTS`.
 
-#### 2.37
+#### 2.37 — **Done**
 
 - **Where:** `libs/database/src/repositories/pin.ts:239-297`
 - **Problem:** `update` is ~7 round trips: calls `findById` (2 queries) just for `userId`, re-selects the pin, and re-fetches tags via `getPinTags` even when `tagNames` was provided and the result is discarded.

@@ -559,6 +559,58 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     })
   })
 
+  // A pin write and its tag writes are one unit of work: a failure part-way
+  // through used to leave a pin with no tags, or with its old tag links
+  // deleted and the new ones never added.
+  //
+  // The forced failure is a tag name longer than tags.name (varchar 255),
+  // which MySQL rejects in strict mode - late enough that the pin row is
+  // already written.
+  describe('atomicity of the pin and tag writes', () => {
+    const overlongTagName = 'x'.repeat(300)
+
+    it('leaves no pin behind when the tag write fails during create', async () => {
+      const createData = await createTestPinData(tagRepository, {
+        userId: testUser.id,
+        url: 'https://atomic-create.example',
+        title: 'Never Committed',
+        tagNames: ['fine', overlongTagName],
+      })
+
+      await expect(pinRepository.create(createData)).rejects.toThrow()
+
+      const orphan = await pinRepository.findByUserIdAndUrl(
+        testUser.id,
+        'https://atomic-create.example'
+      )
+      expect(orphan).toBeNull()
+    })
+
+    it('leaves the pin and its tags untouched when the tag write fails during update', async () => {
+      const pin = await pinRepository.create(
+        await createTestPinData(tagRepository, {
+          userId: testUser.id,
+          url: 'https://atomic-update.example',
+          title: 'Original Title',
+          tagNames: ['keep-me'],
+        })
+      )
+
+      await expect(
+        pinRepository.update(
+          await createTestUpdateData(tagRepository, pin, {
+            title: 'Rolled Back',
+            tagNames: [overlongTagName],
+          })
+        )
+      ).rejects.toThrow()
+
+      const unchanged = await pinRepository.findById(pin.id)
+      expect(unchanged!.title).toBe('Original Title')
+      expect(unchanged!.tagNames).toEqual(['keep-me'])
+    })
+  })
+
   describe('delete', () => {
     it('should delete pin and return true', async () => {
       const pinData = await createTestPinData(tagRepository, {

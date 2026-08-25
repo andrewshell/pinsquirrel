@@ -10,6 +10,7 @@ import type {
 import { tags } from '../schema/tags.js'
 import { pinsTags } from '../schema/pins-tags.js'
 import { pins } from '../schema/pins.js'
+import type { Executor } from './executor.js'
 
 export class DrizzleTagRepository implements TagRepository {
   constructor(private db: MySql2Database) {}
@@ -53,6 +54,25 @@ export class DrizzleTagRepository implements TagRepository {
   }
 
   async fetchOrCreateByNames(userId: string, names: string[]): Promise<Tag[]> {
+    return this.fetchOrCreateByNamesIn(this.db, userId, names)
+  }
+
+  /**
+   * `fetchOrCreateByNames`, run against a caller-supplied executor.
+   *
+   * `DrizzlePinRepository` writes a pin and its tag links as one unit of work,
+   * so the tag upsert has to run on that transaction's handle — statements
+   * issued on `this.db` would sit outside it and commit on their own. The
+   * handle is a Drizzle type, which cannot appear on the `TagRepository`
+   * interface (it lives in `libs/domain`, which has no external dependencies),
+   * so this method stays on the Drizzle class and the pin repository depends
+   * on the class rather than the interface.
+   */
+  async fetchOrCreateByNamesIn(
+    executor: Executor,
+    userId: string,
+    names: string[]
+  ): Promise<Tag[]> {
     if (names.length === 0) {
       return []
     }
@@ -63,7 +83,7 @@ export class DrizzleTagRepository implements TagRepository {
     )
 
     // Find existing tags
-    const existingTags = await this.db
+    const existingTags = await executor
       .select()
       .from(tags)
       .where(and(eq(tags.userId, userId), inArray(tags.name, uniqueNames)))
@@ -88,12 +108,12 @@ export class DrizzleTagRepository implements TagRepository {
       // the loser a no-op instead of a duplicate-key error; the select below
       // then reads back whichever row actually won, by name rather than by the
       // id we generated (which may not be the stored one).
-      await this.db
+      await executor
         .insert(tags)
         .values(tagValues)
         .onDuplicateKeyUpdate({ set: { id: sql`id` } })
 
-      const selected = await this.db
+      const selected = await executor
         .select()
         .from(tags)
         .where(and(eq(tags.userId, userId), inArray(tags.name, tagsToCreate)))
