@@ -389,11 +389,12 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 
 ## 3. Low — housekeeping
 
-#### 3.1
+#### 3.1 — **Done**
 
 - **Where:** `tsconfig.base.json`; every package `tsconfig.json`
 - **Problem:** The base exists but no package extends it. Every package restates all options with drift (`ES2022` vs `ESNext` target; `crypto`/`mailgun` exclude tests from typecheck, others include them; `apps/*` set `declaration` though they never emit).
 - **Fix:** `"extends": "../../tsconfig.base.json"` everywhere, keeping each package's current `include`/`exclude` verbatim. Whether tests should be typechecked uniformly is **Q17**. Pair with 1.3.
+- **Note (when done):** Tests are typechecked everywhere (Q17); the only error that surfaced was `libs/mailgun/src/email-service.test.ts` importing vitest's `Mock` as a value under `verbatimModuleSyntax`. The `ES2022`/`ESNext` drift resolved to the base's `ESNext`, and `crypto`/`mailgun` lost the `*.config.ts` half of their `include` along with the test excludes that made it necessary. The two apps set `declaration`/`declarationMap` to `false`: they never emit declarations (hono builds with tsup, admin runs under tsx).
 
 #### 3.2 — **Done except vitest.config.ts (Q10)**
 
