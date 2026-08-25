@@ -14,7 +14,7 @@ export default defineConfig({
       exclude: [
         'node_modules/',
         'dist/',
-        'drizzle/',
+        'src/migrations/',
         '**/*.config.*',
         '**/*.test.*',
         '**/*.spec.*',

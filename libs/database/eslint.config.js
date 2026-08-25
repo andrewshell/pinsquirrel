@@ -30,12 +30,6 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/scripts/**/*.ts'],
-    rules: {
-      'no-console': 'off',
-    },
-  },
-  {
-    ignores: ['dist/**', 'node_modules/**', '**/*.js', 'drizzle/**'],
+    ignores: ['dist/**', 'node_modules/**', '**/*.js', 'src/migrations/**'],
   }
 )
