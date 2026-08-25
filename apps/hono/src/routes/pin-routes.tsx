@@ -90,7 +90,11 @@ export function parsePinQueryParams(c: Context, privateMode = false) {
   filter.sortBy = sortBy
   filter.sortDirection = sortDirection
 
-  const page = pageParam ? parseInt(pageParam, 10) : 1
+  // Anything that isn't a whole page number falls back to 1. A bare parseInt
+  // lets `?page=abc` through as NaN, which becomes a NaN OFFSET at the
+  // database and a 500 on a URL any crawler can type.
+  const parsedPage = pageParam ? parseInt(pageParam, 10) : 1
+  const page = Number.isInteger(parsedPage) && parsedPage >= 1 ? parsedPage : 1
 
   const viewSize: 'expanded' | 'compact' =
     sizeParam === 'compact' ? 'compact' : 'expanded'

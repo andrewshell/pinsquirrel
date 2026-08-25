@@ -171,7 +171,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Fetch errors are classified by `message.includes('timeout')` and a regex on `'HTTP (\d+)'`, coupling the service to the adapter's error strings; the outer `catch` then re-checks `instanceof` for errors it just threw.
 - **Fix:** Have `NodeHttpFetcher` throw the `FetchTimeoutError`/`HttpError` that already exist in `libs/domain`; delete the string matching and the outer wrapper. Do this **before 1.12's** DNS half, which also edits `NodeHttpFetcher`.
 
-#### 2.11
+#### 2.11 — **Done**
 
 - **Where:** `apps/hono/src/routes/pin-routes.tsx:93`
 - **Problem:** `parseInt('abc', 10)` → `NaN` → `Pagination.fromTotalCount` (`libs/domain/src/entities/pagination.ts:46`) computes a `NaN` offset → 500 on `?page=abc`.
