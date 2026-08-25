@@ -7,7 +7,8 @@ import {
   createEmailAlreadyRegisteredTemplate,
   createUsernameTakenTemplate,
 } from './templates.js'
-import type { MailgunConfig } from './types.js'
+import type { MailgunConfig, SendResult } from './types.js'
+import { REQUEST_TIMEOUT_MS, withRetry } from './retry.js'
 
 export class MailgunEmailService implements EmailService {
   private mailgun: ReturnType<Mailgun['client']>
@@ -24,6 +25,7 @@ export class MailgunEmailService implements EmailService {
       // only way to reach the EU region, and while this line was commented
       // out an EU config posted to the US API without saying so.
       url: config.baseUrl ?? 'https://api.mailgun.net',
+      timeout: REQUEST_TIMEOUT_MS,
     })
   }
 
@@ -35,29 +37,100 @@ export class MailgunEmailService implements EmailService {
   private async send(
     to: string,
     subject: string,
-    body: { html: string; text: string },
-    options: { description: string; headers?: Record<string, string> }
+    body: { html?: string; text: string },
+    options: {
+      description: string
+      headers?: Record<string, string>
+      /**
+       * Retry transient failures with backoff. Off for the transactional
+       * mails, which are sent inside a user's request/response cycle where
+       * three attempts would hold the response open for a second and a half;
+       * on for the operator console's bulk send, where nobody is waiting and
+       * a dropped announcement cannot be resent selectively.
+       */
+      retry?: boolean
+    }
   ): Promise<void> {
-    try {
-      const from = this.config.fromName
-        ? `${this.config.fromName} <${this.config.fromEmail}>`
-        : this.config.fromEmail
+    const from = this.config.fromName
+      ? `${this.config.fromName} <${this.config.fromEmail}>`
+      : this.config.fromEmail
 
-      await this.mailgun.messages.create(this.config.domain, {
+    const post = () =>
+      this.mailgun.messages.create(this.config.domain, {
         from,
         to: [to],
         ...options.headers,
         subject,
         ...body,
       })
+
+    try {
+      if (options.retry) {
+        await withRetry(post)
+      } else {
+        await post()
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred'
 
       throw new EmailSendError(
-        `Failed to send ${options.description}: ${errorMessage}`
+        `Failed to send ${options.description}: ${errorMessage}`,
+        { cause: error }
       )
     }
+  }
+
+  /**
+   * Send one plain-text message. No template and no html part: the operator
+   * console composes the body itself, so there is nothing here to render.
+   */
+  async sendPlainText(
+    to: string,
+    subject: string,
+    text: string
+  ): Promise<void> {
+    await this.send(
+      to,
+      subject,
+      { text },
+      {
+        description: `message to ${to}`,
+        retry: true,
+      }
+    )
+  }
+
+  /**
+   * Send a plain-text message to each recipient individually.
+   *
+   * One Mailgun message per address, so recipients never see each other and one
+   * failure does not block the rest. Failures are reported per recipient rather
+   * than thrown: a partial send is the normal outcome for a waitlist blast, and
+   * the operator needs to see which addresses to chase.
+   */
+  async sendBulk(
+    recipients: string[],
+    subject: string,
+    text: string
+  ): Promise<SendResult[]> {
+    const results: SendResult[] = []
+    for (const recipient of recipients) {
+      try {
+        await this.sendPlainText(recipient, subject, text)
+        results.push({ recipient, ok: true })
+      } catch (error) {
+        // The provider's own message, not this class's wrapping of it: the
+        // recipient is already the row's key, so repeating it reads as noise.
+        const cause = error instanceof Error ? (error.cause ?? error) : error
+        results.push({
+          recipient,
+          ok: false,
+          error: cause instanceof Error ? cause.message : String(cause),
+        })
+      }
+    }
+    return results
   }
 
   async sendPasswordResetEmail(

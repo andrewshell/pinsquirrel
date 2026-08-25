@@ -63,6 +63,9 @@ importers:
       '@pinsquirrel/domain':
         specifier: workspace:*
         version: link:../../libs/domain
+      '@pinsquirrel/mailgun':
+        specifier: workspace:*
+        version: link:../../libs/mailgun
       '@pinsquirrel/services':
         specifier: workspace:*
         version: link:../../libs/services
@@ -72,9 +75,6 @@ importers:
       hono:
         specifier: ^4.13.2
         version: 4.13.2
-      mailgun.js:
-        specifier: ^14.0.0
-        version: 14.0.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
     devDependencies:
       '@eslint/js':
         specifier: ^10
@@ -219,7 +219,7 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0
       undici:
-        specifier: ^8.10.0
+        specifier: '>=8.9.0'
         version: 8.10.0
     devDependencies:
       '@eslint/js':

@@ -66,9 +66,20 @@ export class TooManyResetRequestsError extends PasswordResetError {
 }
 
 export class EmailSendError extends PasswordResetError {
-  constructor(message: string = 'Failed to send password reset email') {
+  /**
+   * @param options carries the provider's own error as `cause`, so a caller
+   *   that reports failures per recipient can show what the provider said
+   *   rather than this class's wrapping of it.
+   */
+  constructor(
+    message: string = 'Failed to send password reset email',
+    options?: { cause?: unknown }
+  ) {
     super(message)
     this.name = 'EmailSendError'
+    // Assigned rather than passed to super: the AuthenticationError chain
+    // takes a message only, and widening it would touch every error in it.
+    if (options && 'cause' in options) this.cause = options.cause
   }
 }
 

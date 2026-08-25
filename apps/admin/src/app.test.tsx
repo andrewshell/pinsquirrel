@@ -56,10 +56,20 @@ vi.mock('./runtime.js', () => ({
   getRuntime: () => ({ userService, authService }),
 }))
 
-const mailer = { sendBulk: vi.fn() }
+// The shared Mailgun service is stubbed at the class, so these tests still
+// observe the send without a network call. `configuredWith` records the config
+// the app built the client from, which used to be sendBulk's first argument.
+const mailer = { sendBulk: vi.fn(), configuredWith: vi.fn() }
 
-vi.mock('./mailer.js', () => ({
-  sendBulk: (...args: unknown[]) => mailer.sendBulk(...args) as unknown,
+vi.mock('@pinsquirrel/mailgun', () => ({
+  MailgunEmailService: class {
+    constructor(config: unknown) {
+      mailer.configuredWith(config)
+    }
+    sendBulk(...args: unknown[]) {
+      return mailer.sendBulk(...args) as unknown
+    }
+  },
 }))
 
 // Only the sealed-email half is mocked: the waitlist rows are fixtures, but
@@ -633,8 +643,10 @@ describe('POST /send', () => {
     )
 
     expect(res.status).toBe(200)
+    expect(mailer.configuredWith).toHaveBeenCalledWith(
+      expect.objectContaining({ domain: 'mg.example.com' })
+    )
     expect(mailer.sendBulk).toHaveBeenCalledWith(
-      expect.objectContaining({ domain: 'mg.example.com' }),
       ['person@example.com'],
       'Hi',
       'Hello'

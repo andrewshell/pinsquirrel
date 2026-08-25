@@ -1,6 +1,6 @@
 import type { FC, PropsWithChildren } from 'hono/jsx'
 import { html, raw } from 'hono/html'
-import type { SendResult } from './mailer.js'
+import type { SendResult } from '@pinsquirrel/mailgun'
 
 const styles = `
   :root { color-scheme: light dark; }

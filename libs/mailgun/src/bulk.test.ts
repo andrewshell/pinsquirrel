@@ -1,5 +1,14 @@
+/**
+ * Spec for the bulk/plain-text sender.
+ *
+ * Moved here from `apps/admin/src/mailer.test.ts`, which was the spec for the
+ * admin console's own Mailgun client before that client was folded into this
+ * package. The assertions are unchanged: they are what the operator console
+ * depends on.
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { isTransient, sendBulk } from './mailer.js'
+import { MailgunEmailService } from './email-service.js'
+import { isTransient } from './retry.js'
 
 // Mock the Mailgun client so no network calls happen and we can observe
 // messages.create. vi.hoisted lets the mock factory reference createMock.
@@ -44,15 +53,17 @@ describe('isTransient', () => {
 })
 
 describe('sendBulk', () => {
+  let service: MailgunEmailService
+
   beforeEach(() => {
     createMock.mockReset()
+    service = new MailgunEmailService(settings)
   })
 
   it('sends one isolated message per recipient', async () => {
     createMock.mockResolvedValue({ id: 'ok' })
 
-    const results = await sendBulk(
-      settings,
+    const results = await service.sendBulk(
       ['a@example.com', 'b@example.com'],
       'Hello',
       'Body text'
@@ -85,8 +96,7 @@ describe('sendBulk', () => {
       )
       .mockResolvedValueOnce({ id: 'ok' })
 
-    const results = await sendBulk(
-      settings,
+    const results = await service.sendBulk(
       ['bad@example.com', 'good@example.com'],
       'S',
       'B'
@@ -97,5 +107,77 @@ describe('sendBulk', () => {
       { recipient: 'bad@example.com', ok: false, error: 'bad request' },
       { recipient: 'good@example.com', ok: true },
     ])
+  })
+
+  // The retry was the reason the admin console kept its own client. It has to
+  // survive the move, or a transient blip drops a waitlist announcement.
+  it('retries a transient failure and reports the eventual success', async () => {
+    vi.useFakeTimers()
+    createMock
+      .mockRejectedValueOnce(
+        Object.assign(new Error('gateway timeout'), { status: 504 })
+      )
+      .mockResolvedValueOnce({ id: 'ok' })
+
+    const pending = service.sendBulk(['a@example.com'], 'S', 'B')
+    await vi.runAllTimersAsync()
+    const results = await pending
+    vi.useRealTimers()
+
+    expect(createMock).toHaveBeenCalledTimes(2)
+    expect(results).toEqual([{ recipient: 'a@example.com', ok: true }])
+  })
+
+  it('gives up after three attempts on a persistently transient failure', async () => {
+    vi.useFakeTimers()
+    createMock.mockRejectedValue(
+      Object.assign(new Error('service unavailable'), { status: 503 })
+    )
+
+    const pending = service.sendBulk(['a@example.com'], 'S', 'B')
+    await vi.runAllTimersAsync()
+    const results = await pending
+    vi.useRealTimers()
+
+    expect(createMock).toHaveBeenCalledTimes(3)
+    expect(results).toEqual([
+      {
+        recipient: 'a@example.com',
+        ok: false,
+        error: 'service unavailable',
+      },
+    ])
+  })
+})
+
+describe('sendPlainText', () => {
+  let service: MailgunEmailService
+
+  beforeEach(() => {
+    createMock.mockReset()
+    service = new MailgunEmailService(settings)
+  })
+
+  it('posts a text-only message with no html part', async () => {
+    createMock.mockResolvedValue({ id: 'ok' })
+
+    await service.sendPlainText('a@example.com', 'Hello', 'Body text')
+
+    expect(createMock).toHaveBeenCalledWith('mg.test', {
+      from: 'Test <no-reply@test>',
+      to: ['a@example.com'],
+      subject: 'Hello',
+      text: 'Body text',
+    })
+  })
+
+  it('names the recipient when the send fails', async () => {
+    createMock.mockRejectedValue(
+      Object.assign(new Error('bad request'), { status: 400 })
+    )
+
+    await expect(
+      service.sendPlainText('a@example.com', 'Hello', 'Body text')
+    ).rejects.toThrow(/a@example\.com/)
   })
 })
