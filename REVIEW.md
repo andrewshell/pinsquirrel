@@ -318,7 +318,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 
 ### Performance (all cheap)
 
-#### 2.34
+#### 2.34 — **Done**
 
 - **Where:** `libs/database/src/schema/pins.ts:31-36`
 - **Problem:** Every list is `WHERE user_id=? ORDER BY created_at DESC LIMIT/OFFSET`, but the only index is `(user_id, url_hash)` → filesort of the user's whole pin set per page.
