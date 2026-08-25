@@ -417,11 +417,12 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Fix:** Update the three configs; `rmdir src/scripts` (untracked, so it will not show in the diff); pick one `DATABASE_URL` behaviour; create the test DB from `docker-compose.dev.yml` init and delete `pretest`.
 - **Note (when done):** `drizzle/` became `src/migrations/` in the vitest coverage exclude and the eslint `ignores`, and was dropped from `.gitignore` (migrations are tracked). `drizzle.config.ts` throws with no fallback. The test DB now comes from `scripts/mysql-init/01-create-test-database.sql`, mounted read-only at `/docker-entrypoint-initdb.d`. MySQL runs that only on **first** initialisation of the volume, so a developer with an existing `pinsquirrel_mysql_data` volume that predates this change and never ran `pretest` needs one `docker compose -f docker-compose.dev.yml down -v` — that is the only migration cost. Verified both ways: a from-scratch volume in an isolated compose project (test DB created, writable by the app user, 158 tests green with no `pretest`), and the real `pnpm db:down && pnpm db:up` on the existing volume. CI is unaffected — `ci.yml` creates `pinsquirrel_test` through the service container's `MYSQL_DATABASE`.
 
-#### 3.6
+#### 3.6 — **Done**
 
 - **Where:** `libs/database/src/repositories/user.ts:38,49,60,70,77,98,123,165`
 - **Problem:** Eight `as User` casts hide column/entity drift.
 - **Fix:** `mapToUser(row, roles)` like the other repos.
+- **Note (when done):** `attachRoles` now takes a row rather than a half-built `User`. `status` goes through an exhaustive `STATUS_BY_COLUMN` record instead of a cast, so the column's enum and `UserStatus` have to keep agreeing.
 
 #### 3.7
 
