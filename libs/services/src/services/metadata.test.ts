@@ -92,9 +92,9 @@ describe('MetadataService', () => {
 
     const error = await service
       .fetchMetadata('https://example.com')
-      .catch(e => e)
+      .catch((e: unknown) => e)
     expect(error).toBeInstanceOf(HttpError)
-    expect(error.status).toBe(404)
+    expect((error as HttpError).status).toBe(404)
 
     expect(mockHttpFetcher.fetch).toHaveBeenCalledWith('https://example.com')
     expect(mockHtmlParser.parseMetadata).not.toHaveBeenCalled()

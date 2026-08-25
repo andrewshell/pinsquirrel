@@ -24,13 +24,11 @@
     "undici": "^8.10.0"
   },
   "devDependencies": {
-    "@eslint/js": "^10",
     "@types/node": "^26.2.0",
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.8.1",
     "prettier": "^3.9.6",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.67.0",
     "vitest": "^4.1.10"
   },
   "engines": {

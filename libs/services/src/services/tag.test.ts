@@ -64,7 +64,7 @@ beforeEach(() => {
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
-  } as unknown as TagRepository
+  }
   service = new TagService(mockRepo)
 })
 

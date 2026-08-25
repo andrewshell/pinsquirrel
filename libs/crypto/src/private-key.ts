@@ -1,3 +1,11 @@
+/*
+ * The exported entry points are `async` even though every primitive below is
+ * a synchronous `node:crypto` call. The promise is the contract every caller
+ * already awaits, and `scryptSync` — which blocks the event loop for as long
+ * as the KDF runs — is the obvious thing to move to the callback-based
+ * `scrypt` later, which would need the signature these already have.
+ */
+/* eslint-disable @typescript-eslint/require-await */
 import {
   randomBytes,
   scryptSync,

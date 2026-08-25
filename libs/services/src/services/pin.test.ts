@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest'
 import { PinService } from './pin.js'
 import type {
-  PinRepository,
   TagRepository,
   Pin,
   User,
@@ -82,7 +81,7 @@ describe('PinService', () => {
     mockTagRepository = { deleteTagsWithNoPins: vi.fn() }
 
     pinService = new PinService(
-      mockPinRepository as unknown as PinRepository,
+      mockPinRepository,
       mockTagRepository as unknown as TagRepository
     )
   })

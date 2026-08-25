@@ -35,7 +35,7 @@ export class DrizzleTagRepository implements TagRepository {
       .from(tags)
       .where(eq(tags.userId, userId))
 
-    return result.map(this.mapToTag)
+    return result.map(tag => this.mapToTag(tag))
   }
 
   async findByUserIdAndName(userId: string, name: string): Promise<Tag | null> {
@@ -129,7 +129,7 @@ export class DrizzleTagRepository implements TagRepository {
       .map(name => nameToTag.get(name))
       .filter((tag): tag is typeof tags.$inferSelect => tag !== undefined)
 
-    return sortedTags.map(this.mapToTag)
+    return sortedTags.map(tag => this.mapToTag(tag))
   }
 
   async findByUserIdWithPinCount(

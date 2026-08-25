@@ -197,8 +197,8 @@ Key constraints:
 ## Tooling Notes
 
 - pnpm only — never npm or yarn. Node `>=24.0.0`.
-- TypeScript strict mode enabled across all packages.
-- ESLint v10 flat config with type-aware rules and accessibility checks.
+- TypeScript strict mode enabled across all packages; every `tsconfig.json` extends root `tsconfig.base.json` and overrides only what differs. Test files are typechecked too.
+- ESLint v10 flat config, type-aware (`recommendedTypeChecked`) in every package. The rules live once in root `eslint.config.base.js`; each package's `eslint.config.js` calls `createConfig(import.meta.dirname)` and adds its own `ignores`. `libs/adapters` passes `{ strict: true }` for `strictTypeChecked`.
 - Prettier: single quotes, no semicolons, 2-space indent, trailing commas.
 
 ## Local Development with Docker

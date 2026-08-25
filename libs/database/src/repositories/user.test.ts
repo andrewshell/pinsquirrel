@@ -24,7 +24,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     process.env.TEST_DATABASE_URL ||
     'mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel_test'
 
-  beforeAll(async () => {
+  beforeAll(() => {
     // Create test database connection
     testPool = mysql.createPool(TEST_DATABASE_URL)
 

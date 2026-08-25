@@ -1,35 +1,8 @@
-import js from '@eslint/js'
-import tseslint from 'typescript-eslint'
+import { createConfig } from '../../eslint.config.base.js'
 
-export default tseslint.config(
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
+export default [
+  ...createConfig(import.meta.dirname),
   {
-    files: ['**/*.ts'],
-    languageOptions: {
-      ecmaVersion: 2022,
-      sourceType: 'module',
-      parserOptions: {
-        tsconfigRootDir: import.meta.dirname,
-      },
-      globals: {
-        process: 'readonly',
-        console: 'readonly',
-        Buffer: 'readonly',
-        __dirname: 'readonly',
-        __filename: 'readonly',
-      },
-    },
-    rules: {
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        { argsIgnorePattern: '^_' },
-      ],
-      '@typescript-eslint/no-explicit-any': 'warn',
-      'no-console': 'warn',
-    },
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'src/migrations/**'],
   },
-  {
-    ignores: ['dist/**', 'node_modules/**', '**/*.js', 'src/migrations/**'],
-  }
-)
+]

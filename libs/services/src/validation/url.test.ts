@@ -38,14 +38,15 @@ describe('validateUrlForFetching', () => {
   })
 
   it('should throw InvalidUrlError for non-string inputs', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(() => validateUrlForFetching(null as any)).toThrow(InvalidUrlError)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(() => validateUrlForFetching(undefined as any)).toThrow(
+    expect(() => validateUrlForFetching(null as unknown as string)).toThrow(
       InvalidUrlError
     )
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(() => validateUrlForFetching(123 as any)).toThrow(InvalidUrlError)
+    expect(() =>
+      validateUrlForFetching(undefined as unknown as string)
+    ).toThrow(InvalidUrlError)
+    expect(() => validateUrlForFetching(123 as unknown as string)).toThrow(
+      InvalidUrlError
+    )
   })
 
   it('should throw InvalidUrlError for empty or whitespace strings', () => {
