@@ -13,8 +13,17 @@ export class InvalidCredentialsError extends AuthenticationError {
 }
 
 export class UserAlreadyExistsError extends AuthenticationError {
-  constructor(username: string) {
-    super(`User with username "${username}" already exists`)
+  /**
+   * @param username the account being created.
+   * @param message overrides the default, which templates `username` in. An
+   *   update that collides on email rather than username has no useful
+   *   username to name, so it says so instead.
+   */
+  constructor(
+    public readonly username: string,
+    message: string = `User with username "${username}" already exists`
+  ) {
+    super(message)
     this.name = 'UserAlreadyExistsError'
   }
 }

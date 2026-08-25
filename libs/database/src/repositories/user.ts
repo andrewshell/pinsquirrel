@@ -5,11 +5,12 @@ import type {
   UserRepository,
   Role,
 } from '@pinsquirrel/domain'
-import { UserStatus } from '@pinsquirrel/domain'
+import { UserAlreadyExistsError, UserStatus } from '@pinsquirrel/domain'
 import { eq, inArray, sql } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { users } from '../schema/users.js'
 import { userRoles } from '../schema/user-roles.js'
+import { isDuplicateKeyError } from './duplicate-key.js'
 
 /**
  * The enum column's values, mapped to the domain enum.
@@ -128,19 +129,41 @@ export class DrizzleUserRepository implements UserRepository {
       this.mapToUser(user, rolesByUserId.get(user.id) ?? [])
     )
   }
+  /**
+   * The unique indexes on `username` and `email_hash` are the ones that make
+   * "one account per username/email" true — the service-level checks before
+   * this call cannot, because two callers can pass them at the same moment.
+   * Reporting the loser as a domain error is what lets the service treat the
+   * race like any other conflict instead of knowing about mysql2 error codes.
+   */
+  private rethrowConflict(
+    error: unknown,
+    username: string,
+    message?: string
+  ): never {
+    if (isDuplicateKeyError(error)) {
+      throw new UserAlreadyExistsError(username, message)
+    }
+    throw error
+  }
+
   async create(data: CreateUserData): Promise<User> {
     const id = crypto.randomUUID()
     const now = new Date()
 
-    await this.db.insert(users).values({
-      id,
-      username: data.username,
-      passwordHash: data.passwordHash,
-      emailHash: data.emailHash || null,
-      emailEncrypted: data.emailEncrypted ?? null,
-      createdAt: now,
-      updatedAt: now,
-    })
+    try {
+      await this.db.insert(users).values({
+        id,
+        username: data.username,
+        passwordHash: data.passwordHash,
+        emailHash: data.emailHash || null,
+        emailEncrypted: data.emailEncrypted ?? null,
+        createdAt: now,
+        updatedAt: now,
+      })
+    } catch (error) {
+      this.rethrowConflict(error, data.username)
+    }
 
     const [created] = await this.db
       .select()
@@ -182,7 +205,17 @@ export class DrizzleUserRepository implements UserRepository {
       updateData.status = data.status
     }
 
-    await this.db.update(users).set(updateData).where(eq(users.id, id))
+    try {
+      await this.db.update(users).set(updateData).where(eq(users.id, id))
+    } catch (error) {
+      // Which of the two indexes was hit is not worth parsing out of the
+      // driver message, and an update usually is not writing a username.
+      this.rethrowConflict(
+        error,
+        data.username ?? '',
+        'Another account already uses that username or email'
+      )
+    }
 
     const [updated] = await this.db
       .select()

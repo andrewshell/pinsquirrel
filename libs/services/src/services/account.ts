@@ -11,6 +11,7 @@ import {
   InvalidResetTokenError,
   ResetTokenExpiredError,
   TooManyResetRequestsError,
+  UserAlreadyExistsError,
 } from '@pinsquirrel/domain'
 import {
   hashPassword,
@@ -104,14 +105,27 @@ export class AccountService {
       : null
 
     // Create user without password (they'll set it via email verification)
-    const user = await this.userRepository.create({
-      username: input.username,
-      passwordHash: null, // No password yet - they'll set it via email verification
-      // Hashed here rather than reusing a binding from the duplicate check:
-      // this is the stored value, and the lookup above hides its own hashing.
-      emailHash: hashEmail(input.email),
-      emailEncrypted,
-    })
+    let user: User
+    try {
+      user = await this.userRepository.create({
+        username: input.username,
+        passwordHash: null, // No password yet - they'll set it via email verification
+        // Hashed here rather than reusing a binding from the duplicate check:
+        // this is the stored value, and the lookup above hides its own hashing.
+        emailHash: hashEmail(input.email),
+        emailEncrypted,
+      })
+    } catch (error) {
+      // Two signups for the same username or email can pass the checks above
+      // at the same moment; the unique indexes are what actually stop the
+      // second one. Answer exactly as if this signup had lost by a
+      // millisecond and been caught by the check — the alternative is a 500
+      // that tells the caller an account exists.
+      if (error instanceof UserAlreadyExistsError) {
+        return { emailFailed: false }
+      }
+      throw error
+    }
 
     // Immediately assign User role
     await this.userRepository.addRole(user.id, Role.User)

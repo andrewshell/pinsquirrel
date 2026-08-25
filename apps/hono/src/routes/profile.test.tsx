@@ -9,7 +9,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import type { MiddlewareHandler } from 'hono'
 import type { ApiKey, User } from '@pinsquirrel/domain'
-import { InvalidCredentialsError, ValidationError } from '@pinsquirrel/domain'
+import {
+  InvalidCredentialsError,
+  UserAlreadyExistsError,
+  ValidationError,
+} from '@pinsquirrel/domain'
 import { formBody } from '../test-support/pin-routes'
 import type { FlashMessage } from '../middleware/session'
 
@@ -124,6 +128,24 @@ describe('profile routes', () => {
       )
 
       expect(await renderedProfile(res)).toMatch(/[Ee]mail updated/)
+    })
+
+    // The unique index on email_hash means another account can own the
+    // address; that is a rejected form, not a server fault.
+    it('reports an address another account already uses', async () => {
+      svc.updateEmail.mockRejectedValue(
+        new UserAlreadyExistsError('alice', 'already in use')
+      )
+
+      const res = await app.request(
+        '/profile',
+        formBody({ intent: 'update-email', email: 'taken@example.com' })
+      )
+
+      expect(res.status).toBe(400)
+      const html = await res.text()
+      expect(html).toMatch(/already/i)
+      expect(html).not.toMatch(/unexpected error/i)
     })
 
     it('clears the address when the field is submitted empty', async () => {
