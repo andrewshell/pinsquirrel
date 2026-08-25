@@ -88,3 +88,8 @@ export {
   ApiKeyLimitExceededError,
   UnauthorizedApiKeyAccessError,
 } from './errors/api-key.js'
+export {
+  isBlockedIpv4,
+  isBlockedIpv6,
+  isBlockedIpAddress,
+} from './ip-address.js'
