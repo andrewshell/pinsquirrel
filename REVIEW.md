@@ -314,7 +314,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `pins.filter(ac.canRead)` after a user-scoped query is either a no-op or silently breaks `pagination.totalCount`; the tag list runs a DB query for unauthenticated callers and then filters everything out ("future public tags").
 - **Fix:** Guard on `ac.user` up front; drop the post-filters. Same file/paths as 1.11 — land together or sequentially.
 
-#### 2.33
+#### 2.33 — **Done**
 
 - **Where:** `apps/admin/src/session.ts:14`; `apps/admin/src/app.tsx:166-229`
 - **Problem:** In-memory sessions never expire, so an unlocked production private key stays resident until process exit; `POST /login` (which takes real production admin credentials) has no rate limit and its catch-all branch swallows the error without logging; cookie lacks `secure`.

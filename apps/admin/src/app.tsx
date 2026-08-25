@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { getSignedCookie, setSignedCookie, deleteCookie } from 'hono/cookie'
+import { loginLimiter, loginRateLimitKey } from './rate-limit.js'
 import {
   AccessControl,
   Role,
@@ -184,6 +185,21 @@ export function createApp(config: AdminConfig): Hono {
     const username = field(body, 'username')
     const password = field(body, 'password')
 
+    // Checked before the environment lookup and before any database work: a
+    // locked-out attempt must cost nothing but the round trip.
+    const limitKey = loginRateLimitKey(c, username)
+    if (loginLimiter.isLimited(limitKey)) {
+      return c.html(
+        <LoginPage
+          environments={config.environments}
+          selected={environment}
+          username={username}
+          error="Too many failed sign-in attempts. Please try again in 15 minutes."
+        />,
+        429
+      )
+    }
+
     let env: AdminEnvironment
     try {
       env = getEnvironment(config, environment)
@@ -214,6 +230,8 @@ export function createApp(config: AdminConfig): Hono {
           403
         )
       }
+      loginLimiter.reset(limitKey)
+
       const id = createSession({
         environment,
         userId: user.id,
@@ -223,17 +241,35 @@ export function createApp(config: AdminConfig): Hono {
         httpOnly: true,
         sameSite: 'Lax',
         path: '/',
+        // Off in local development, where the console is served over plain
+        // http and a Secure cookie would never come back.
+        secure: process.env.NODE_ENV === 'production',
       })
       return c.redirect('/unlock')
     } catch (error) {
-      const message =
+      let message: string
+      if (
         error instanceof ValidationError ||
         error instanceof InvalidCredentialsError
-          ? 'Invalid username or password.'
-          : error instanceof MissingRoleError ||
-              error instanceof AccessNotGrantedError
-            ? 'This account cannot sign in.'
-            : 'Could not connect to this environment.'
+      ) {
+        // Only a wrong password counts. A validation failure or a demoted
+        // account is not a guess, and counting them would let noise lock the
+        // console.
+        if (error instanceof InvalidCredentialsError) {
+          loginLimiter.hit(limitKey)
+        }
+        message = 'Invalid username or password.'
+      } else if (
+        error instanceof MissingRoleError ||
+        error instanceof AccessNotGrantedError
+      ) {
+        message = 'This account cannot sign in.'
+      } else {
+        // The rendered message below is a guess at what went wrong. Whatever
+        // actually happened only exists here.
+        console.error(`[admin] login failed for "${environment}":`, error)
+        message = 'Could not connect to this environment.'
+      }
       return c.html(
         <LoginPage
           environments={config.environments}

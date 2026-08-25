@@ -39,6 +39,7 @@ import type { Hono } from 'hono'
 import type { User } from '@pinsquirrel/domain'
 import type { AdminConfig, AdminEnvironment } from './config.js'
 import { createApp } from './app.js'
+import { loginLimiter } from './rate-limit.js'
 
 const userService = {
   getUserByUsername: vi.fn(),
@@ -183,6 +184,8 @@ function form(fields: Record<string, string>, cookie: string): RequestInit {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  loginLimiter.reset('unknown:root')
+  loginLimiter.reset('unknown:alice')
   app = createApp(makeConfig())
   userService.listByStatus.mockResolvedValue([])
   usersByName()
@@ -206,6 +209,137 @@ describe('POST /login', () => {
     expect(res.status).toBe(302)
     expect(res.headers.get('location')).toBe('/unlock')
     expect(res.headers.get('set-cookie')).toContain('admin_session=')
+  })
+
+  // The credentials this form takes are a production admin's. Without a
+  // counter, an attacker with the URL can guess at them as fast as the process
+  // will answer.
+  it('locks out after five failed attempts on the same username', async () => {
+    authService.login.mockRejectedValue(new InvalidCredentialsError())
+
+    for (let i = 0; i < 5; i++) {
+      const res = await app.request('/login', {
+        method: 'POST',
+        body: new URLSearchParams({
+          environment: 'test',
+          username: 'root',
+          password: `guess-${i}`,
+        }),
+      })
+      expect(res.status).toBe(400)
+    }
+
+    authService.login.mockClear()
+    const res = await app.request('/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        environment: 'test',
+        username: 'root',
+        password: 'guess-5',
+      }),
+    })
+
+    expect(res.status).toBe(429)
+    expect(await res.text()).toMatch(/too many/i)
+    // The database is never asked, so the lockout costs the attacker a round
+    // trip and costs the target nothing.
+    expect(authService.login).not.toHaveBeenCalled()
+  })
+
+  // Otherwise one operator fat-fingering their password would lock the console
+  // for the rest of the window even after they get it right.
+  it('clears the counter once the sign-in succeeds', async () => {
+    authService.login.mockRejectedValue(new InvalidCredentialsError())
+    for (let i = 0; i < 4; i++) {
+      await app.request('/login', {
+        method: 'POST',
+        body: new URLSearchParams({
+          environment: 'test',
+          username: 'root',
+          password: `guess-${i}`,
+        }),
+      })
+    }
+
+    authService.login.mockResolvedValue(adminUser)
+    const ok = await app.request('/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        environment: 'test',
+        username: 'root',
+        password: 'correct-horse',
+      }),
+    })
+    expect(ok.status).toBe(302)
+
+    authService.login.mockRejectedValue(new InvalidCredentialsError())
+    const after = await app.request('/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        environment: 'test',
+        username: 'root',
+        password: 'guess-again',
+      }),
+    })
+    expect(after.status).toBe(400)
+  })
+
+  it('marks the session cookie Secure in production', async () => {
+    const previous = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    try {
+      authService.login.mockResolvedValue(adminUser)
+
+      const res = await app.request('/login', {
+        method: 'POST',
+        body: new URLSearchParams({
+          environment: 'test',
+          username: 'root',
+          password: 'correct-horse',
+        }),
+      })
+
+      expect(res.headers.get('set-cookie')).toContain('Secure')
+    } finally {
+      process.env.NODE_ENV = previous
+    }
+  })
+
+  it('does not mark the cookie Secure outside production', async () => {
+    authService.login.mockResolvedValue(adminUser)
+
+    const res = await app.request('/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        environment: 'test',
+        username: 'root',
+        password: 'correct-horse',
+      }),
+    })
+
+    expect(res.headers.get('set-cookie')).not.toContain('Secure')
+  })
+
+  // The catch-all renders "Could not connect to this environment", which is a
+  // guess. Whatever actually happened has to reach the operator's console or
+  // it is gone.
+  it('logs an unexpected failure instead of swallowing it', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const boom = new Error('connection reset')
+    authService.login.mockRejectedValue(boom)
+
+    const res = await app.request('/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        environment: 'test',
+        username: 'root',
+        password: 'correct-horse',
+      }),
+    })
+
+    expect(res.status).toBe(400)
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining('login'), boom)
+    logged.mockRestore()
   })
 
   it('rejects an environment that is not in the config', async () => {

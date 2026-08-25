@@ -130,7 +130,11 @@ DATABASE_URL=mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel
 [DEPLOYMENT.md](./DEPLOYMENT.md) for what each one does in production.
 
 The admin console is configured by `apps/admin/admin.config.json` instead —
-copy `apps/admin/admin.config.example.json` to get started.
+copy `apps/admin/admin.config.example.json` to get started. It reads three
+environment variables: `PORT` (default `8200`), `ADMIN_HOST` (default
+`127.0.0.1` — set it only to expose the console beyond loopback), and
+`ADMIN_SESSION_TTL_MS` (default 8 hours, after which the unlocked private key
+is dropped from memory).
 
 ### Prerequisites
 
