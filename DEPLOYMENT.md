@@ -42,18 +42,19 @@ The production Docker image includes:
 `apps/hono/.env.example` is the template; the table below is what each variable
 does in production.
 
-| Variable             | Required          | Default       | Purpose                                                                                                                                                                                        |
-| -------------------- | ----------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`       | yes               | —             | MySQL connection string, e.g. `mysql://username:password@hostname:3306/database`                                                                                                               |
-| `NODE_ENV`           | yes in production | `development` | Anything other than `production` drops the `Secure` flag on the session cookie, so an unset value over HTTPS leaks the cookie                                                                  |
-| `PORT`               | no                | `8100`        | HTTP listen port                                                                                                                                                                               |
-| `LOG_LEVEL`          | no                | `info`        | Pino level (`trace`…`fatal`)                                                                                                                                                                   |
-| `MAILGUN_API_KEY`    | no                | —             | Leave empty to disable password-reset and notification email entirely                                                                                                                          |
-| `MAILGUN_DOMAIN`     | with Mailgun      | —             | Sending domain, e.g. `mg.yourdomain.com`                                                                                                                                                       |
-| `MAILGUN_FROM_EMAIL` | with Mailgun      | —             | Envelope from address                                                                                                                                                                          |
-| `MAILGUN_FROM_NAME`  | with Mailgun      | —             | Display name on outgoing mail                                                                                                                                                                  |
-| `NOTIFY_EMAIL`       | no                | —             | Address that receives a notification on each signup                                                                                                                                            |
-| `EMAIL_PUBLIC_KEY`   | no                | —             | When set, signup emails are sealed to this key and this server can never decrypt them. Generate with `pnpm --filter @pinsquirrel/crypto keygen`; the private half stays with the admin console |
+| Variable             | Required           | Default       | Purpose                                                                                                                                                                                                                                                                         |
+| -------------------- | ------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`       | yes                | —             | MySQL connection string, e.g. `mysql://username:password@hostname:3306/database`                                                                                                                                                                                                |
+| `NODE_ENV`           | yes in production  | `development` | Anything other than `production` drops the `Secure` flag on the session cookie, so an unset value over HTTPS leaks the cookie                                                                                                                                                   |
+| `PORT`               | no                 | `8100`        | HTTP listen port                                                                                                                                                                                                                                                                |
+| `LOG_LEVEL`          | no                 | `info`        | Pino level (`trace`…`fatal`)                                                                                                                                                                                                                                                    |
+| `TRUST_PROXY`        | yes behind a proxy | —             | Set to any non-empty value when a reverse proxy (Caddy here) terminates TLS, so `x-forwarded-for`/`x-real-ip` are honoured for IP rate limiting. Leave unset when the app is reachable directly — otherwise a caller forges the header and every IP-keyed limiter is bypassable |
+| `MAILGUN_API_KEY`    | no                 | —             | Leave empty to disable password-reset and notification email entirely                                                                                                                                                                                                           |
+| `MAILGUN_DOMAIN`     | with Mailgun       | —             | Sending domain, e.g. `mg.yourdomain.com`                                                                                                                                                                                                                                        |
+| `MAILGUN_FROM_EMAIL` | with Mailgun       | —             | Envelope from address                                                                                                                                                                                                                                                           |
+| `MAILGUN_FROM_NAME`  | with Mailgun       | —             | Display name on outgoing mail                                                                                                                                                                                                                                                   |
+| `NOTIFY_EMAIL`       | no                 | —             | Address that receives a notification on each signup                                                                                                                                                                                                                             |
+| `EMAIL_PUBLIC_KEY`   | no                 | —             | When set, signup emails are sealed to this key and this server can never decrypt them. Generate with `pnpm --filter @pinsquirrel/crypto keygen`; the private half stays with the admin console                                                                                  |
 
 ### Managed Database Configuration
 
@@ -68,7 +69,7 @@ For managed MySQL databases (DigitalOcean, AWS RDS, etc.):
 
 1. Create new app from GitHub repository
 2. Use `apps/hono/Dockerfile` as build configuration
-3. Set `DATABASE_URL` and `NODE_ENV=production` environment variables
+3. Set `DATABASE_URL`, `NODE_ENV=production` and `TRUST_PROXY=1` environment variables
 4. Deploy managed MySQL database separately
 
 ### Option 2: Docker Compose with Dockge
@@ -83,6 +84,8 @@ services:
     environment:
       - DATABASE_URL=mysql://pinsquirrel:pinsquirrel@mysql:3306/pinsquirrel
       - NODE_ENV=production
+      # The app sits behind Caddy, which sets x-forwarded-for.
+      - TRUST_PROXY=1
     depends_on:
       - mysql
 
@@ -107,6 +110,7 @@ docker run -d \
   -p 8100:8100 \
   -e DATABASE_URL="mysql://user:pass@your-db-host:3306/pinsquirrel" \
   -e NODE_ENV=production \
+  -e TRUST_PROXY=1 \
   your-username/pinsquirrel:latest
 ```
 

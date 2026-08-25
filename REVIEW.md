@@ -72,7 +72,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `urlSchema` uses `z.string().url()`, which in zod 4.4.3 accepts `javascript:` and `data:` **[verified]**. The stored URL is rendered as an `href`, so this is stored XSS. `validateUrlForFetching` already restricts to http(s).
 - **Fix:** Restrict to `http:`/`https:` in `urlSchema`; regression tests for `javascript:` and `data:` rejected. (The broader zod-4 API migration is 3.12, separate PR.)
 
-#### 1.8
+#### 1.8 — **Done**
 
 - **Where:** `apps/hono/src/middleware/rate-limit.ts:17-29`
 - **Problem:** `getClientIp` takes the _last_ `x-forwarded-for` entry (with a comment explaining why) and falls back to the socket address. The residual hole: a direct, non-proxied caller controls that last entry, so it can rotate it per request and defeat every IP-keyed limiter (sign-in, sign-up, forgot-password). Do **not** "fix" by taking the first entry — that is strictly worse.
