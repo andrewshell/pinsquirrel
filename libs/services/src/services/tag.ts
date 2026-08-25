@@ -18,15 +18,19 @@ export class TagService {
   constructor(private readonly tagRepository: TagRepository) {}
 
   /**
-   * Get all tags for a specified user (filtered through access control)
-   * Allows unauthenticated users - they will only see tags they can read (none for now, but future public tags)
+   * Get all tags for a specified user.
+   *
+   * A tag is readable only by its owner, so a caller who is not that user —
+   * unauthenticated or otherwise — can never see one. Answering up front
+   * keeps the query off the database instead of running it and discarding
+   * every row.
    */
   async getUserTags(ac: AccessControl, userId: string): Promise<Tag[]> {
-    // Get all tags for the specified user
-    const tags = await this.tagRepository.findByUserId(userId)
+    if (!ac.canRead({ userId })) {
+      return []
+    }
 
-    // Filter tags through access control - user can only see tags they can read
-    return tags.filter(tag => ac.canRead(tag))
+    return this.tagRepository.findByUserId(userId)
   }
 
   /**
@@ -43,22 +47,19 @@ export class TagService {
   }
 
   /**
-   * Get all tags with pin counts for a specified user (filtered through access control)
-   * Allows unauthenticated users - they will only see tags they can read (none for now, but future public tags)
+   * Get all tags with pin counts for a specified user. Gated exactly like
+   * `getUserTags`.
    */
   async getUserTagsWithCount(
     ac: AccessControl,
     userId: string,
     filter?: PinFilter
   ): Promise<TagWithCount[]> {
-    // Get all tags with counts for the specified user
-    const tags = await this.tagRepository.findByUserIdWithPinCount(
-      userId,
-      filter
-    )
+    if (!ac.canRead({ userId })) {
+      return []
+    }
 
-    // Filter tags through access control - user can only see tags they can read
-    return tags.filter(tag => ac.canRead(tag))
+    return this.tagRepository.findByUserIdWithPinCount(userId, filter)
   }
 
   /**

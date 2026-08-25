@@ -304,7 +304,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `POST /:id/edit` reads the pin up to three times and loads `userTags` before knowing whether it needs them (3 pin reads + 1 tag read on the failure path).
 - **Fix:** Fetch the pin once at the top **inside** the existing `try` (moving it out would turn today's 404 at `:442-444` into a 500); reuse it in the `catch`; load `userTags` only in the error branch.
 
-#### 2.32
+#### 2.32 — **Done**
 
 - **Where:** `libs/services/src/services/pin.ts:276`; `tag.ts:23-29,48-61`
 - **Problem:** `pins.filter(ac.canRead)` after a user-scoped query is either a no-op or silently breaks `pagination.totalCount`; the tag list runs a DB query for unauthenticated callers and then filters everything out ("future public tags").

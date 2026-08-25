@@ -78,22 +78,24 @@ describe('TagService.getUserTags', () => {
     expect(mockRepo.findByUserId).toHaveBeenCalledWith('owner-id')
   })
 
-  it('filters out tags the caller cannot read', async () => {
-    // The repository is asked for a userId, but the result is still gated:
-    // passing someone else's id must not hand back their tags.
+  it('hands back nothing when asked for someone else’s tags', async () => {
+    // Tags are private to their owner, so asking for another user's id can
+    // never produce a readable tag — the repository is never asked.
     vi.mocked(mockRepo.findByUserId).mockResolvedValue([tag, foreignTag])
 
     await expect(
       service.getUserTags(new AccessControl(otherUser), 'owner-id')
-    ).resolves.toEqual([foreignTag])
+    ).resolves.toEqual([])
+    expect(mockRepo.findByUserId).not.toHaveBeenCalled()
   })
 
-  it('returns nothing for an unauthenticated caller', async () => {
+  it('returns nothing for an unauthenticated caller without querying', async () => {
     vi.mocked(mockRepo.findByUserId).mockResolvedValue([tag, foreignTag])
 
     await expect(
       service.getUserTags(new AccessControl(null), 'owner-id')
     ).resolves.toEqual([])
+    expect(mockRepo.findByUserId).not.toHaveBeenCalled()
   })
 })
 
@@ -164,7 +166,7 @@ describe('TagService.getUserTagsWithCount', () => {
     })
   })
 
-  it('filters out tags the caller cannot read', async () => {
+  it('hands back nothing when asked for someone else’s tags', async () => {
     vi.mocked(mockRepo.findByUserIdWithPinCount).mockResolvedValue([
       counted,
       foreignCounted,
@@ -172,15 +174,17 @@ describe('TagService.getUserTagsWithCount', () => {
 
     await expect(
       service.getUserTagsWithCount(new AccessControl(otherUser), 'owner-id')
-    ).resolves.toEqual([foreignCounted])
+    ).resolves.toEqual([])
+    expect(mockRepo.findByUserIdWithPinCount).not.toHaveBeenCalled()
   })
 
-  it('returns nothing for an unauthenticated caller', async () => {
+  it('returns nothing for an unauthenticated caller without querying', async () => {
     vi.mocked(mockRepo.findByUserIdWithPinCount).mockResolvedValue([counted])
 
     await expect(
       service.getUserTagsWithCount(new AccessControl(null), 'owner-id')
     ).resolves.toEqual([])
+    expect(mockRepo.findByUserIdWithPinCount).not.toHaveBeenCalled()
   })
 })
 

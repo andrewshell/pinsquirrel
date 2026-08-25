@@ -243,7 +243,7 @@ export class PinService {
 
     // Get total count for pagination calculation
     const totalCount = await this.pinRepository.countByUserId(
-      ac.user!.id,
+      ac.user.id,
       filter
     )
 
@@ -254,18 +254,14 @@ export class PinService {
       maxPageSize: 100,
     })
 
-    // Fetch pins with pagination
-    const pins = await this.pinRepository.findByUserId(ac.user!.id, filter, {
+    // Fetch pins with pagination. The query is scoped to ac.user, so every
+    // row is readable by definition — filtering here would only be able to
+    // drop rows the pagination count above already counted.
+    const pins = await this.pinRepository.findByUserId(ac.user.id, filter, {
       limit: pagination.pageSize,
       offset: pagination.offset,
     })
 
-    // Filter pins through access control
-    const filteredPins = pins.filter(pin => ac.canRead(pin))
-
-    return {
-      pins: filteredPins,
-      pagination,
-    }
+    return { pins, pagination }
   }
 }
