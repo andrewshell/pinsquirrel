@@ -10,6 +10,15 @@ import { ErrorMessage } from './FlashMessage'
 interface PinFormProps {
   action: string
   submitLabel: string
+  /**
+   * Prefix for the links this form generates, e.g. `/pins` or `/private/pins`.
+   *
+   * The duplicate-URL notice offers to open the existing pin; without this it
+   * always pointed at `/pins/:id/edit`, walking a private-mode user out of
+   * private mode. It travels to the check-url probe on `hx-vals` so the
+   * server-rendered version of that notice can honour it too.
+   */
+  baseUrl: string
   // Field values
   url?: string
   title?: string
@@ -28,6 +37,7 @@ interface PinFormProps {
 export const PinForm: FC<PinFormProps> = ({
   action,
   submitLabel,
+  baseUrl,
   url = '',
   title = '',
   description = '',
@@ -81,15 +91,17 @@ export const PinForm: FC<PinFormProps> = ({
             hx-trigger="change"
             hx-target="#url-check-result"
             hx-swap="innerHTML"
-            hx-params="url"
-            hx-vals={pinId ? JSON.stringify({ exclude: pinId }) : undefined}
+            hx-params="url,exclude,baseUrl"
+            hx-vals={JSON.stringify(
+              pinId ? { baseUrl, exclude: pinId } : { baseUrl }
+            )}
           />
           <div id="url-check-result">
             {duplicatePinId && (
               <p class="text-sm text-destructive font-medium">
                 This URL is already saved.{' '}
                 <a
-                  href={`/pins/${duplicatePinId}/edit`}
+                  href={`${baseUrl}/${duplicatePinId}/edit`}
                   class="underline hover:text-red-800 dark:hover:text-red-200"
                 >
                   Edit instead?

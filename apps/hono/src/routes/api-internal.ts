@@ -8,6 +8,18 @@ import {
 } from '../lib/services'
 import { getAuthUser, requireAuth } from '../middleware/session'
 
+/**
+ * The pin form tells us which list it is being used from, so the duplicate
+ * notice can offer an "Edit instead?" link that stays inside private mode.
+ *
+ * It lands in an `href` inside a hand-built HTML string, so only a plain
+ * absolute path is accepted — a protocol-relative `//host`, a `javascript:`
+ * URL, or an embedded quote all fall back to the public list.
+ */
+function safeBaseUrl(value: string | null): string {
+  return value && /^(\/[A-Za-z0-9_-]+)+$/.test(value) ? value : '/pins'
+}
+
 const apiInternal = new Hono()
 
 // Apply auth middleware to all API routes
@@ -64,8 +76,9 @@ apiInternal.get('/check-url', async c => {
 
   if (isHtmx) {
     if (isDuplicate) {
+      const baseUrl = safeBaseUrl(url.searchParams.get('baseUrl'))
       return c.html(
-        `<p class="text-sm text-destructive font-medium">This URL is already saved. <a href="/pins/${existingPin.id}/edit" class="underline hover:text-destructive/80">Edit instead?</a></p><script>document.getElementById('url').classList.add('border-red-500')</script>`
+        `<p class="text-sm text-destructive font-medium">This URL is already saved. <a href="${baseUrl}/${existingPin.id}/edit" class="underline hover:text-destructive/80">Edit instead?</a></p><script>document.getElementById('url').classList.add('border-red-500')</script>`
       )
     }
     return c.html(

@@ -236,3 +236,48 @@ describe('GET /api/internal/metadata', () => {
     expect(await res.json()).toEqual({ error: 'Page not found at this URL' })
   })
 })
+
+describe('GET /api/internal/check-url — baseUrl', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    svc.findByUserIdAndUrl.mockResolvedValue(makePin({ id: 'pin-9' }))
+  })
+
+  async function duplicateFragment(query: string): Promise<string> {
+    const res = await app.request(`/api/internal/check-url${query}`, {
+      headers: { 'HX-Request': 'true' },
+    })
+    return res.text()
+  }
+
+  it('links to the public edit form by default', async () => {
+    const body = await duplicateFragment('?url=https://example.test/a')
+
+    expect(body).toContain('href="/pins/pin-9/edit"')
+  })
+
+  // A duplicate spotted from /private/pins/new must not link the user out of
+  // private mode.
+  it('links to the caller‘s own edit form when given a baseUrl', async () => {
+    const body = await duplicateFragment(
+      '?url=https://example.test/a&baseUrl=%2Fprivate%2Fpins'
+    )
+
+    expect(body).toContain('href="/private/pins/pin-9/edit"')
+  })
+
+  // The value lands in an href in a raw HTML string, so it is an allowlisted
+  // path shape or nothing.
+  it.each([
+    ['javascript:alert(1)'],
+    ['https://evil.test/pins'],
+    ['/pins" onclick="alert(1)'],
+    ['//evil.test'],
+  ])('falls back to /pins for a %s baseUrl', async baseUrl => {
+    const body = await duplicateFragment(
+      `?url=https://example.test/a&baseUrl=${encodeURIComponent(baseUrl)}`
+    )
+
+    expect(body).toContain('href="/pins/pin-9/edit"')
+  })
+})

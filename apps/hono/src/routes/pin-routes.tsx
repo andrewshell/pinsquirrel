@@ -308,6 +308,7 @@ export function createPinRoutes({
       const formProps = {
         action: `${baseUrl}/new`,
         submitLabel: 'Create Pin' as const,
+        baseUrl,
         url: pinUrl,
         title,
         description: description || '',
@@ -454,6 +455,7 @@ export function createPinRoutes({
       const formProps = {
         action: editAction,
         submitLabel: 'Update Pin' as const,
+        baseUrl,
         url: pinUrl,
         title,
         description: description || '',
