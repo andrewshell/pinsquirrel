@@ -33,8 +33,10 @@ tags.get('/', async c => {
   const readLaterFilter =
     currentFilter === 'toread' ? { readLater: true } : undefined
 
-  // Clean up any tags with no pins before displaying
-  await tagService.deleteTagsWithNoPins(ac, user.id)
+  // No cleanup here: orphaned tags are collected by PinService the moment a
+  // pin write orphans them. Doing it on this GET made a crawler's page view a
+  // destructive write, and raced a concurrent createPin between its tag
+  // insert and its link insert.
 
   // Fetch tags with pin counts
   const userTags = await tagService.getUserTagsWithCount(

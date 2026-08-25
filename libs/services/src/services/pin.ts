@@ -4,6 +4,7 @@ import type {
   Pin,
   PinFilter,
   PinRepository,
+  TagRepository,
   UpdatePinData,
   PaginationOptions,
 } from '@pinsquirrel/domain'
@@ -21,7 +22,27 @@ import { createPinDataSchema, updatePinDataSchema } from '../validation/pin.js'
 import { validationErrorFromZod } from '../validation/zod-error.js'
 
 export class PinService {
-  constructor(private readonly pinRepository: PinRepository) {}
+  constructor(
+    private readonly pinRepository: PinRepository,
+    private readonly tagRepository: TagRepository
+  ) {}
+
+  /**
+   * Collect the user's tags that no longer have any pins.
+   *
+   * A tag is orphaned by a pin write, so it is collected right after one
+   * rather than on the next page view - this used to run on `GET /tags`, a
+   * destructive write that any crawler or link prefetch could trigger.
+   *
+   * Runs only after the pin write has completed, and only over this user's
+   * tags: a concurrent create for the same user can otherwise have inserted
+   * its tag but not yet its `pins_tags` row, and the sweep would take the tag
+   * back out from under it. Wrapping the pin write in a transaction (1.4) is
+   * what closes that window for good.
+   */
+  private async collectOrphanedTags(userId: string): Promise<void> {
+    await this.tagRepository.deleteTagsWithNoPins(userId)
+  }
 
   async createPin(ac: AccessControl, input: CreatePinData): Promise<Pin> {
     // Check if user can create pins as the specified user
@@ -129,6 +150,8 @@ export class PinService {
       throw new PinNotFoundError(id)
     }
 
+    await this.collectOrphanedTags(existingPin.userId)
+
     return updatedPin
   }
 
@@ -144,6 +167,8 @@ export class PinService {
 
     // Delete pin
     await this.pinRepository.delete(pinId)
+
+    await this.collectOrphanedTags(pin.userId)
   }
 
   async getPin(ac: AccessControl, pinId: string): Promise<Pin> {

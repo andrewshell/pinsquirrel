@@ -187,18 +187,4 @@ export class TagService {
       )
     }
   }
-
-  /**
-   * Clean up tags with no pins for a specific user
-   */
-  async deleteTagsWithNoPins(ac: AccessControl, userId: string): Promise<void> {
-    if (!ac.canCreateAs(userId)) {
-      throw new UnauthorizedTagAccessError(
-        '',
-        'User can only clean up their own tags'
-      )
-    }
-
-    await this.tagRepository.deleteTagsWithNoPins(userId)
-  }
 }
