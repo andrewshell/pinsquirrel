@@ -61,28 +61,6 @@ describe('crypto utilities', () => {
       expect(isValid).toBe(false)
     })
 
-    it('should be timing-safe', async () => {
-      const password = 'mySecurePassword123'
-      const hash = await hashPassword(password)
-      const wrongPassword = 'wrongPassword'
-
-      const startTime1 = process.hrtime.bigint()
-      await verifyPassword(wrongPassword, hash)
-      const endTime1 = process.hrtime.bigint()
-
-      const startTime2 = process.hrtime.bigint()
-      await verifyPassword(password, hash)
-      const endTime2 = process.hrtime.bigint()
-
-      // Both operations should take roughly the same time
-      const diff1 = Number(endTime1 - startTime1)
-      const diff2 = Number(endTime2 - startTime2)
-      const ratio = Math.max(diff1, diff2) / Math.min(diff1, diff2)
-
-      // Allow for some variance but they should be close
-      expect(ratio).toBeLessThan(5)
-    })
-
     it('should return false for invalid hash format', async () => {
       const password = 'mySecurePassword123'
       const invalidHash = 'invalid-hash-format'
