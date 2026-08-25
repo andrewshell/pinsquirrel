@@ -375,7 +375,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Bare `.toThrow()`, so a test passes if _any_ rule rejects.
 - **Fix:** Assert the issue message/path.
 
-#### 2.43
+#### 2.43 — **Done**
 
 - **Where:** `libs/database/src/repositories/tag.test.ts:325`
 - **Problem:** `setTimeout(10)` to force `updatedAt` to advance.
