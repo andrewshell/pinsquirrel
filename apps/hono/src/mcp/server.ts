@@ -55,7 +55,7 @@ server.registerTool(
   {
     title: 'Get Pin',
     description: 'Get a single bookmark by its ID.',
-    inputSchema: pinGetInputSchema,
+    inputSchema: pinGetInputSchema.shape,
     annotations: { readOnlyHint: true },
   },
   async ({ id }, extra) => {

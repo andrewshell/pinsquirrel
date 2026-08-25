@@ -19,6 +19,7 @@ import {
   DuplicatePinError,
   PinNotFoundError,
   UnauthorizedPinAccessError,
+  DEFAULT_PAGE_SIZE,
 } from '@pinsquirrel/domain'
 import { pinService, tagService } from '../lib/services'
 import { parsePinForm } from '../lib/form'
@@ -127,7 +128,7 @@ export async function fetchUserPins(
   const ac = new AccessControl(user)
   return pinService.getUserPinsWithPagination(ac, filter, {
     page,
-    pageSize: 25,
+    pageSize: DEFAULT_PAGE_SIZE,
   })
 }
 

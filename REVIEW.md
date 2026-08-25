@@ -449,7 +449,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Cookie options spelled out three times; `...(status ? [status] : [])` where `status ?? 200` works; `ac.user!` right after an `if (!ac.user)` guard; `||` on a number; three domain files import siblings without `.js` while all others use `.js`.
 - **Fix:** Mechanical cleanups; one PR.
 
-#### 3.11
+#### 3.11 — **Done (page-size half; `MAX_KEYS_PER_USER` left to Phase 7b)**
 
 - **Where:** `libs/domain/src/entities/pagination.ts:41-42`, `libs/services/src/services/pin.ts:265-266`, `validation/pin-query.ts:31,38`; `api-key.ts:17` vs `libs/domain/src/errors/api-key.ts:17`
 - **Problem:** Page-size constants live in three places; `MAX_KEYS_PER_USER = 5` is hardcoded again as "(5)" in `ApiKeyLimitExceededError`'s message; `pinGetInputSchema` is a raw shape while `tagListInputSchema` is a `z.object` whose consumer calls `.shape` (`apps/hono/src/mcp/server.ts:80`).
