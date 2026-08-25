@@ -7,6 +7,7 @@ import {
   AccessNotGrantedError,
   UserNotFoundError,
   UserNotEligibleError,
+  ValidationError,
   Role,
   UserStatus,
 } from '@pinsquirrel/domain'
@@ -199,6 +200,24 @@ describe('AuthenticationService', () => {
       await expect(authService.login(loginInput)).rejects.toThrow(
         'Password must be at least 12 characters'
       )
+    })
+
+    it('should report every field error, not just the first', async () => {
+      const loginInput = {
+        username: 'a!', // too short and has an illegal character
+        password: 'short', // too short
+      }
+
+      const error = await authService.login(loginInput).catch((e: unknown) => e)
+
+      expect(error).toBeInstanceOf(ValidationError)
+      expect((error as ValidationError).fields).toEqual({
+        username: [
+          'Username must be at least 3 characters',
+          'Username can only contain letters, numbers, and underscores',
+        ],
+        password: ['Password must be at least 12 characters'],
+      })
     })
   })
 

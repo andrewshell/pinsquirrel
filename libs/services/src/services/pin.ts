@@ -12,9 +12,9 @@ import {
   DuplicatePinError,
   PinNotFoundError,
   UnauthorizedPinAccessError,
-  ValidationError,
 } from '@pinsquirrel/domain'
 import { createPinDataSchema, updatePinDataSchema } from '../validation/pin.js'
+import { validationErrorFromZod } from '../validation/zod-error.js'
 
 export class PinService {
   constructor(private readonly pinRepository: PinRepository) {}
@@ -39,15 +39,7 @@ export class PinService {
       updatedAt: input.updatedAt,
     })
     if (!validationResult.success) {
-      const errors: Record<string, string[]> = {}
-      for (const issue of validationResult.error.issues) {
-        const field = issue.path.join('.') || 'unknown'
-        if (!errors[field]) {
-          errors[field] = []
-        }
-        errors[field].push(issue.message)
-      }
-      throw new ValidationError(errors)
+      throw validationErrorFromZod(validationResult.error)
     }
 
     // Check for duplicate URL. canCreateAs above already established that the
@@ -85,15 +77,7 @@ export class PinService {
       tagNames,
     })
     if (!validationResult.success) {
-      const errors: Record<string, string[]> = {}
-      for (const issue of validationResult.error.issues) {
-        const field = issue.path.join('.') || 'unknown'
-        if (!errors[field]) {
-          errors[field] = []
-        }
-        errors[field].push(issue.message)
-      }
-      throw new ValidationError(errors)
+      throw validationErrorFromZod(validationResult.error)
     }
 
     // Get pin and check ownership

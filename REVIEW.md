@@ -224,7 +224,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 
 ### Duplication
 
-#### 2.19
+#### 2.19 — **Done**
 
 - **Where:** `libs/services/src/services/pin.ts:41-50,87-96`, `api-key.ts:37-46` (shape A); `account.ts:72`, `authentication.ts:54,168` (shape B); `tag.ts:77-80` (shape C)
 - **Problem:** Zod issues → `ValidationError` conversion exists in three shapes: A maps all issues; B does per-field `safeParse` keeping `issues[0]`; C uses `flatten().fieldErrors` with a custom message.
