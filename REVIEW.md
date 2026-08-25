@@ -443,7 +443,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `tag-select.js` initialises only on `DOMContentLoaded` while `tag-input-vanilla.js` and `metadata-fetch.js` also hook `htmx:afterSettle`, so a swapped-in tag-select is dead; `dropdown.js` tracks open state via `data-open` in one place and the `hidden` class in another; `private.tsx:82` detects beacons by `Content-Type: text/plain`.
 - **Fix:** Shared `onReady(selector, init)` helper used by all three; class-only state; `?beacon=1` query flag from `private-mode.js:7`.
 
-#### 3.10
+#### 3.10 — **Done**
 
 - **Where:** `apps/hono/src/middleware/session.ts:124-129,204-209`; `routes/import.tsx:64`, `routes/tags.tsx:123`; `libs/services/src/services/pin.ts:258,270`, `tag.ts:151`; `libs/domain/src/entities/pagination.ts:41`; `libs/domain/src/entities/{access,pin,tag}.ts:1-2`
 - **Problem:** Cookie options spelled out three times; `...(status ? [status] : [])` where `status ?? 200` works; `ac.user!` right after an `if (!ac.user)` guard; `||` on a number; three domain files import siblings without `.js` while all others use `.js`.

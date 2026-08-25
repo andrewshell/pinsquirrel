@@ -33,6 +33,17 @@ const SESSION_DURATION_PERSISTENT = 30 * 24 * 60 * 60 * 1000 // 30 days
 const SESSION_DURATION_TEMPORARY = 24 * 60 * 60 * 1000 // 24 hours (for browser session)
 const PRIVATE_MODE_DURATION = 15 * 60 * 1000 // 15 minutes
 
+// Every write of the session cookie — set, clear on expiry, clear on
+// destroy — has to agree on these, or a cookie set one way is not the cookie
+// deleted the other way. `secure` is read per call rather than at module load
+// so tests can vary NODE_ENV.
+const sessionCookieOptions = () => ({
+  path: '/',
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'Lax' as const,
+})
+
 // Flash message types
 export type FlashType = 'success' | 'error' | 'info' | 'warning'
 export type FlashMessage = { type: FlashType; message: string }
@@ -121,12 +132,7 @@ export function sessionMiddleware(): MiddlewareHandler {
         }
       } else {
         // Session expired or invalid - clear the cookie
-        deleteCookie(c, SESSION_COOKIE_NAME, {
-          path: '/',
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'Lax',
-        })
+        deleteCookie(c, SESSION_COOKIE_NAME, sessionCookieOptions())
       }
     }
 
@@ -182,10 +188,7 @@ export function sessionMiddleware(): MiddlewareHandler {
 
         // Set the session cookie
         setCookie(c, SESSION_COOKIE_NAME, session.id, {
-          path: '/',
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'Lax',
+          ...sessionCookieOptions(),
           ...(keepSignedIn
             ? { maxAge: SESSION_DURATION_PERSISTENT / 1000 }
             : {}),
@@ -201,12 +204,7 @@ export function sessionMiddleware(): MiddlewareHandler {
         }
 
         // Clear the cookie
-        deleteCookie(c, SESSION_COOKIE_NAME, {
-          path: '/',
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'Lax',
-        })
+        deleteCookie(c, SESSION_COOKIE_NAME, sessionCookieOptions())
       },
 
       setFlash(type: FlashType, message: string) {

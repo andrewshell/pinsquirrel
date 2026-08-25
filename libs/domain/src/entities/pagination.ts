@@ -38,7 +38,7 @@ export class Pagination {
   ): Pagination {
     const {
       page = 1,
-      pageSize = options.defaultPageSize || 25,
+      pageSize = options.defaultPageSize ?? 25,
       maxPageSize = 100,
     } = options
 

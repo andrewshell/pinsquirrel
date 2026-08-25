@@ -111,7 +111,7 @@ tags.post('/merge', async c => {
   const userTags = await tagService.getUserTagsWithCount(ac, user.id)
   const tagsWithPins = userTags.filter(tag => tag.pinCount > 0)
 
-  const reject = (errors: Record<string, string[]>, status?: 500) =>
+  const reject = (errors: Record<string, string[]>, status: 200 | 500 = 200) =>
     c.html(
       <TagMergePage
         user={user}
@@ -120,7 +120,7 @@ tags.post('/merge', async c => {
         selectedSourceTags={sourceTagIds}
         selectedDestinationTag={destinationTagId}
       />,
-      ...(status ? ([status] as const) : ([] as const))
+      status
     )
 
   try {

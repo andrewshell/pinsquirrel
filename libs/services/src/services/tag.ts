@@ -98,7 +98,8 @@ export class TagService {
     sourceTagIds: string[],
     targetTagId: string
   ): Promise<void> {
-    if (!ac.user) {
+    const user = ac.user
+    if (!user) {
       throw new UnauthorizedTagAccessError(
         '',
         'User must be authenticated to merge tags'
@@ -159,7 +160,7 @@ export class TagService {
     }
 
     // Perform the merge
-    await this.tagRepository.mergeTags(ac.user!.id, sourceTagIds, targetTagId)
+    await this.tagRepository.mergeTags(user.id, sourceTagIds, targetTagId)
   }
 
   /**
