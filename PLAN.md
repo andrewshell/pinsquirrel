@@ -426,6 +426,24 @@ Approach changed: instead of a hand-written JSX docs page, the v1 routes were re
 > layered over a working API-key system: it is the _only_ way anything authenticates once Phase 7
 > removes `ps_` keys, and Phase 5 cannot start without it.
 
+> **Carried over from the 2026-08-25 codebase review** (PR #109; the review document itself was
+> retired once every item landed). Three constraints the review put in place that Phase 6 must
+> build on rather than around:
+>
+> - **6d cleanup:** extend `MaintenanceService.sweepExpired` (`libs/services`, run hourly from
+>   `apps/hono/src/index.ts`) with the `oauth_clients` / expired-code sweep. Do not add a second
+>   job.
+> - **6d consent page:** the app now sends `Content-Security-Policy: script-src 'self'`. The
+>   consent page must ship with no inline `<script>` or `onclick=` — put behaviour in
+>   `apps/hono/src/static/*.js` and wire it with `onReady()` like the other pages.
+> - **6e CIMD fetch:** the `client_id` URL is attacker-supplied. Fetch it through
+>   `NodeHttpFetcher` (`libs/adapters`), which enforces the private-range check at connect time
+>   (DNS-rebinding safe), never through a bare `fetch()`. `validateUrlForFetching` in
+>   `libs/services` is the pre-check to reuse.
+>
+> Minor loose end, unrelated to OAuth: `MailgunConfig.baseUrl` is honoured by the email service
+> but `apps/hono/src/lib/services.ts` never sets it — only matters if Mailgun EU is ever used.
+
 **Architecture:** PinSquirrel is its own **authorization server**, colocated with the resource
 server. It already has users, MySQL-backed sessions, and a login UI, so the authorize endpoint is
 a consent page reusing `sessionMiddleware()` and the token endpoint mints rows in a table. An
@@ -786,7 +804,7 @@ happens deliberately in one reviewable diff rather than leaking through Phase 6.
 6. **One-way sync**: Extension never writes to PinSquirrel. Locally deleted bookmarks are re-created on next sync.
 7. **Chrome extension is standalone**: No workspace dependency on other packages — communicates only via HTTP API. Build uses esbuild independently (not in Turbo pipeline).
 8. **Read-only API for now**: Only GET endpoints in v1. Write endpoints can be added later when there's a use case beyond the Chrome extension.
-9. **MCP transport**: Streamable HTTP via `@hono/mcp` (`@modelcontextprotocol/hono` does not exist as a published package). Mounted at `/mcp`. Uses the same Bearer token auth as the REST API — `ps_` API keys as shipped, OAuth `pso_` tokens after Phase 6, and OAuth only after Phase 7.
+9. **MCP transport**: Streamable HTTP via `@hono/mcp` (`@modelcontextprotocol/hono` does not exist as a published package). Mounted at `/mcp`. Bearer token auth, sharing the token-validation code with the REST API but with its **own resource identifier** (Decision 18) — `ps_` API keys as shipped, OAuth `pso_` tokens after Phase 6, and OAuth only after Phase 7.
 10. **MCP tools are read-only for now**: Initial implementation ships only `list_pins`, `get_pin`, `list_tags` — matches the read-only v1 REST API. Read-write tools (`create_pin`, `update_pin`, `delete_pin`) are deferred until there's a concrete agent use case.
 11. **API docs via OpenAPI + Scalar**: Instead of a hand-written JSX docs page, v1 routes use `@hono/zod-openapi` to generate an OpenAPI 3.1 spec (`/api/openapi.json`) rendered with Scalar (`/api/docs`). Schema-driven docs stay in sync with route definitions automatically.
 12. **OAuth 2.1 replaces `ps_` API keys — one auth path, not two** (decided 2026-08-17, reversing the 2026-08-16 position that they would coexist). The old reasoning was that the two serve different clients: OAuth for interactive clients that can survive a browser redirect, API keys for scripts, curl, and the Chrome extension. That trade no longer holds up. Nothing external consumes the REST API yet, so there is no migration cost to eat; the Chrome extension has a native OAuth path in MV3 that is _better_ than a pasted key, not worse (Decision 19); and a second live credential type is permanent surface area — separate storage, revocation UI, docs, and a dispatch branch in every auth site — bought for a hypothetical.
@@ -815,9 +833,9 @@ happens deliberately in one reviewable diff rather than leaking through Phase 6.
 
 _All paths below re-verified 2026-08-17 — still present and accurate._
 
-- `libs/services/src/utils/crypto.ts` — `generateSecureToken()`, `hashToken()` for API key generation/hashing
+- `libs/services/src/utils/crypto.ts` — `generateSecureToken()`, `hashToken()`; written for API keys, reused as-is for OAuth `pso_` tokens and codes
 - `libs/domain/src/entities/access.ts` — `AccessControl`, `AccessGateable` for authorization
-- `libs/database/src/repositories/session.ts` — pattern for new DrizzleApiKeyRepository
+- `libs/database/src/repositories/session.ts` — hashed-secret-with-expiry repository pattern (was the model for `DrizzleApiKeyRepository`; now the model for the OAuth token/code repositories)
 - `libs/domain/src/entities/pagination.ts` — `Pagination` class for API response pagination
 - `apps/hono/src/middleware/session.ts` — pattern reference for api-auth middleware
 - `apps/hono/src/lib/services.ts` — already-instantiated service singletons for MCP tool handlers
