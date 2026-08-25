@@ -20,7 +20,10 @@ export class MailgunEmailService implements EmailService {
     this.mailgun = mailgun.client({
       username: 'api',
       key: config.apiKey,
-      // url: config.baseUrl || 'https://api.mailgun.net',
+      // Explicit rather than left to the library's default: baseUrl is the
+      // only way to reach the EU region, and while this line was commented
+      // out an EU config posted to the US API without saying so.
+      url: config.baseUrl ?? 'https://api.mailgun.net',
     })
   }
 
