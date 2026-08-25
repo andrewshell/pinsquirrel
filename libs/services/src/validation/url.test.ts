@@ -110,71 +110,61 @@ describe('validateUrlForFetching', () => {
   })
 
   describe('SSRF Protection', () => {
-    it('should allow public domains', () => {
-      expect(() => validateUrlForFetching('https://example.com')).not.toThrow()
-      expect(() => validateUrlForFetching('https://google.com')).not.toThrow()
-      expect(() =>
-        validateUrlForFetching('https://subdomain.example.org')
-      ).not.toThrow()
-      expect(() =>
-        validateUrlForFetching('http://public-api.service.com')
-      ).not.toThrow()
+    /**
+     * Assert the guard refused a URL the parser accepts.
+     *
+     * Everything this function rejects is an `InvalidUrlError`, so asserting
+     * only the class lets a case pass for the wrong reason — a typo in the
+     * fixture would be rejected by `new URL` and look like a working block.
+     * Parsing it here first means the rejection can only be the SSRF rule.
+     */
+    const expectBlocked = (urlString: string): void => {
+      expect(new URL(urlString).hostname).not.toBe('')
+      expect(() => validateUrlForFetching(urlString)).toThrow(InvalidUrlError)
+    }
+
+    /** Assert the guard let a URL through, and returned that same host. */
+    const expectAllowed = (urlString: string, hostname: string): void => {
+      expect(validateUrlForFetching(urlString).hostname).toBe(hostname)
+    }
+
+    it.each([
+      ['https://example.com', 'example.com'],
+      ['https://google.com', 'google.com'],
+      ['https://subdomain.example.org', 'subdomain.example.org'],
+      ['http://public-api.service.com', 'public-api.service.com'],
+    ])('should allow the public domain %s', (url, hostname) => {
+      expectAllowed(url, hostname)
     })
 
     it('should block localhost variations', () => {
-      expect(() => validateUrlForFetching('http://localhost')).toThrow(
-        InvalidUrlError
-      )
-      expect(() => validateUrlForFetching('https://localhost:3000')).toThrow(
-        InvalidUrlError
-      )
-      expect(() => validateUrlForFetching('http://LOCALHOST')).toThrow(
-        InvalidUrlError
-      ) // case insensitive
+      expectBlocked('http://localhost')
+      expectBlocked('https://localhost:3000')
+      expectBlocked('http://LOCALHOST') // case insensitive
     })
 
     it('should block IPv4 localhost', () => {
-      expect(() => validateUrlForFetching('http://127.0.0.1')).toThrow(
-        InvalidUrlError
-      )
-      expect(() => validateUrlForFetching('https://127.0.0.1:8080')).toThrow(
-        InvalidUrlError
-      )
+      expectBlocked('http://127.0.0.1')
+      expectBlocked('https://127.0.0.1:8080')
     })
 
     it('should block IPv6 localhost', () => {
-      expect(() => validateUrlForFetching('http://[::1]')).toThrow(
-        InvalidUrlError
-      )
-      expect(() => validateUrlForFetching('https://[::1]:3000')).toThrow(
-        InvalidUrlError
-      )
+      expectBlocked('http://[::1]')
+      expectBlocked('https://[::1]:3000')
     })
 
     it('should block private IP ranges', () => {
       // 192.168.x.x range
-      expect(() => validateUrlForFetching('http://192.168.1.1')).toThrow(
-        InvalidUrlError
-      )
-      expect(() => validateUrlForFetching('https://192.168.0.100')).toThrow(
-        InvalidUrlError
-      )
+      expectBlocked('http://192.168.1.1')
+      expectBlocked('https://192.168.0.100')
 
       // 10.x.x.x range
-      expect(() => validateUrlForFetching('http://10.0.0.1')).toThrow(
-        InvalidUrlError
-      )
-      expect(() => validateUrlForFetching('https://10.1.1.1')).toThrow(
-        InvalidUrlError
-      )
+      expectBlocked('http://10.0.0.1')
+      expectBlocked('https://10.1.1.1')
 
-      // 172.16-31.x.x range (basic check for 172.x.x.x)
-      expect(() => validateUrlForFetching('http://172.16.0.1')).toThrow(
-        InvalidUrlError
-      )
-      expect(() => validateUrlForFetching('https://172.20.1.1')).toThrow(
-        InvalidUrlError
-      )
+      // 172.16-31.x.x range
+      expectBlocked('http://172.16.0.1')
+      expectBlocked('https://172.20.1.1')
     })
 
     it.each([
@@ -185,9 +175,7 @@ describe('validateUrlForFetching', () => {
       ['127.1.2.3', '127.0.0.0/8, not just 127.0.0.1'],
       ['172.31.255.255', 'top of 172.16.0.0/12'],
     ])('should block %s (%s)', address => {
-      expect(() => validateUrlForFetching(`http://${address}`)).toThrow(
-        InvalidUrlError
-      )
+      expectBlocked(`http://${address}`)
     })
 
     it.each([
@@ -198,7 +186,7 @@ describe('validateUrlForFetching', () => {
       ['192.169.0.1', 'adjacent to 192.168.0.0/16'],
       ['1.1.1.1', 'a public resolver'],
     ])('should allow public address %s (%s)', address => {
-      expect(() => validateUrlForFetching(`http://${address}`)).not.toThrow()
+      expectAllowed(`http://${address}`, address)
     })
 
     it.each([
@@ -211,18 +199,24 @@ describe('validateUrlForFetching', () => {
       ['[::ffff:169.254.169.254]', 'IPv4-mapped cloud metadata'],
       ['[::ffff:10.0.0.1]', 'IPv4-mapped private range'],
     ])('should block %s (%s)', address => {
-      expect(() => validateUrlForFetching(`http://${address}`)).toThrow(
-        InvalidUrlError
-      )
+      expectBlocked(`http://${address}`)
     })
 
     it.each([
-      ['[2606:4700:4700::1111]', 'a public IPv6 resolver'],
-      ['[::ffff:1.1.1.1]', 'IPv4-mapped public address'],
-      ['[fec0::1]', 'site-local, outside fe80::/10'],
-    ])('should allow public IPv6 address %s (%s)', address => {
-      expect(() => validateUrlForFetching(`http://${address}`)).not.toThrow()
-    })
+      [
+        '[2606:4700:4700::1111]',
+        'a public IPv6 resolver',
+        '[2606:4700:4700::1111]',
+      ],
+      // `URL` rewrites a mapped address to its dotted-quad form.
+      ['[::ffff:1.1.1.1]', 'IPv4-mapped public address', '[::ffff:101:101]'],
+      ['[fec0::1]', 'site-local, outside fe80::/10', '[fec0::1]'],
+    ])(
+      'should allow public IPv6 address %s (%s)',
+      (address, _reason, hostname) => {
+        expectAllowed(`http://${address}`, hostname)
+      }
+    )
 
     it.each([
       ['2130706433', 'decimal 127.0.0.1'],
@@ -233,46 +227,29 @@ describe('validateUrlForFetching', () => {
       ['0', 'decimal 0.0.0.0'],
       ['0300.0250.0.1', 'octal 192.168.0.1'],
     ])('should block %s (%s)', address => {
-      expect(() => validateUrlForFetching(`http://${address}`)).toThrow(
-        InvalidUrlError
-      )
+      expectBlocked(`http://${address}`)
     })
 
     it('should block .localhost domains', () => {
       // RFC 6761 reserves the whole TLD for loopback.
-      expect(() => validateUrlForFetching('http://api.localhost')).toThrow(
-        InvalidUrlError
-      )
+      expectBlocked('http://api.localhost')
     })
 
     it('should block .local domains', () => {
-      expect(() => validateUrlForFetching('http://myserver.local')).toThrow(
-        InvalidUrlError
-      )
-      expect(() => validateUrlForFetching('https://printer.local')).toThrow(
-        InvalidUrlError
-      )
-      expect(() => validateUrlForFetching('http://device.home.local')).toThrow(
-        InvalidUrlError
-      )
+      expectBlocked('http://myserver.local')
+      expectBlocked('https://printer.local')
+      expectBlocked('http://device.home.local')
     })
 
-    it('should allow domains that contain blocked words but are not actually blocked', () => {
-      // These should be allowed - they contain "local" but don't end with .local
-      expect(() =>
-        validateUrlForFetching('https://localhost-api.example.com')
-      ).not.toThrow()
-      expect(() =>
-        validateUrlForFetching('http://localized.service.com')
-      ).not.toThrow()
-
-      // These should be allowed - they contain IP-like numbers but aren't actually private IPs
-      expect(() =>
-        validateUrlForFetching('https://192168.example.com')
-      ).not.toThrow()
-      expect(() =>
-        validateUrlForFetching('http://version10.service.com')
-      ).not.toThrow()
+    it.each([
+      // Contain "local" but do not end in .local
+      ['https://localhost-api.example.com', 'localhost-api.example.com'],
+      ['http://localized.service.com', 'localized.service.com'],
+      // Contain IP-like numbers but are not private IPs
+      ['https://192168.example.com', '192168.example.com'],
+      ['http://version10.service.com', 'version10.service.com'],
+    ])('should allow %s, which only looks blocked', (url, hostname) => {
+      expectAllowed(url, hostname)
     })
   })
 
