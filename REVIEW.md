@@ -402,11 +402,12 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Contains only `semi`/`singleQuote`/`trailingComma`; prettier configs do not cascade, so hono silently loses the root's `arrowParens: "avoid"` and gets the default `"always"`. Deleting it reformats 38 hono files (33 `.ts`/`.tsx` plus five `src/static/*.js`) **[verified]**.
 - **Fix:** Delete it and run `prettier --write apps/hono` in the same PR as 1.1/1.2 (large mechanical diff, no logic change).
 
-#### 3.4
+#### 3.4 — **Done**
 
 - **Where:** `.github/workflows/ci.yml`; root `package.json` lint-staged; `apps/hono/Dockerfile`
 - **Problem:** `quality` job runs `pnpm run quality`, which runs the audit that the separate `audit` job already runs. lint-staged has 8 per-package entries; adding a package means editing lint-staged, the Dockerfile's three `COPY` lists, and root `vitest.config.ts`.
 - **Fix:** Delete the standalone `audit` job from `ci.yml:10-20` and keep `pnpm run audit` inside the root `quality` script, so CLAUDE.md's Quality Check Requirements stay accurate (dropping it from `quality` instead would need a CLAUDE.md edit). Single lint-staged entry `"**/*.{ts,tsx}": "eslint --fix"` (flat config finds the nearest `eslint.config.js`). `COPY --parents` in the Dockerfile (requires `# syntax=docker/dockerfile:1.7-labs` as the first line; none exists today).
+- **Note (when done):** The single entry is `"**/src/**/*.{ts,tsx}"`, not `"**/*.{ts,tsx}"`. Config lookup from the linted file does work under ESLint 10, but the bare glob also hands eslint the five `.ts` files that sit _outside_ any package's `src`: `apps/{hono,admin}/vitest.config.ts` and `apps/hono/tsup.config.ts` fail with `"parserOptions.project" has been provided`, `libs/adapters/vitest.config.ts` with `not found by the project service`, and the root `vitest.config.ts` exits 2 with "couldn't find an eslint.config file" — so a commit touching any of them would be blocked. Scoping to `src` makes lint-staged check exactly what `eslint src` checks, and still needs no edit when a package is added. This also made step 1's `eslint.config.js`/`vitest.config.ts` entries in `libs/adapters/eslint.config.js` `ignores` unnecessary; they are gone. The Dockerfile's third `COPY` list (the runtime stage's per-package `node_modules`) is a deliberate subset, not a manifest list, and was left explicit; `docker build` of every stage was verified locally.
 
 #### 3.5
 
