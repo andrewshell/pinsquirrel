@@ -430,11 +430,12 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Each is imported by exactly one file (`apps/hono/src/lib/services.ts`). They earn separate packages only by isolating `cheerio`/`mailgun.js` from the domain. `libs/crypto` (two consumers + a CLI) is a real seam and should stay.
 - **Fix:** Merge both into one `libs/infrastructure`, removing two config triples. **Blocked on Q12.** Decide Q12 before 2.23 so the shared Mailgun code is written in its final home.
 
-#### 3.8
+#### 3.8 — **Done**
 
 - **Where:** `apps/admin/src/app.tsx:35`, `key.ts`, `runtime.ts:20`, `vitest.config.ts`, `app.test.tsx:359-360`
 - **Problem:** `config = loadConfig()` at module scope forces `vi.resetModules()` gymnastics in tests; `key.ts` is three one-line wrappers over `@pinsquirrel/crypto`; `runtime.ts` hand-builds `DrizzleUserRepository` while hono uses `createRepositories`; coverage excludes `*.test.ts` but not `*.test.tsx`; duplicated assertion.
 - **Fix:** Export `createApp(config)`; inline the crypto calls; use `createRepositories(db).userRepository`; `**/*.test.{ts,tsx}`; delete one assertion.
+- **Note (when done):** `key.ts` and `key.test.ts` are gone — `readFileSync` plus `isEncryptedPrivateKey`/`loadPrivateKey` are called directly, and `libs/crypto/src/private-key.test.ts` already covered the round trip the deleted tests repeated. With the config passed in, `app.test.tsx` drops `vi.resetModules()`, the temp config file and the dynamic `@pinsquirrel/domain` re-import; the unlock tests now build an app per key file and run the real key handling against generated fixtures, so only the sealed-email half of `@pinsquirrel/crypto` stays mocked.
 
 #### 3.9 — **Done**
 
@@ -524,55 +525,63 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 
 Each answer unblocks the listed items.
 
-**Q1** — Is the app always deployed behind exactly one trusted reverse proxy? If yes, `TRUST_PROXY` is a config flag; if no, the rate limiters are bypassable today.  
+**Q1** — Is the app always deployed behind exactly one trusted reverse proxy? If yes, `TRUST_PROXY` is a config flag; if no, the rate limiters are bypassable today.
 _Unblocks: 1.8_
 
-**Q2** — Should `/api/v1` and MCP return 404 for another user's pin (matching HTML routes and the docstring), or is 401 intended for a future shared-pin feature?  
+Yes, it's behind Caddy
+
+**Q2** — Should `/api/v1` and MCP return 404 for another user's pin (matching HTML routes and the docstring), or is 401 intended for a future shared-pin feature?
 _Unblocks: 1.11_
 
-**Q3** — Is anything meant to sweep expired sessions/reset tokens, or is unbounded growth accepted? (Delete the methods, or build the sweep + index.)  
+404 is fine
+
+**Q3** — Is anything meant to sweep expired sessions/reset tokens, or is unbounded growth accepted? (Delete the methods, or build the sweep + index.)
 _Unblocks: 2.5_
 
-**Q4** — Should `grantAccess`/`grantAdmin`/`changePassword`/`updateEmail` take an `AccessControl` like the rest of the services, given admin is the only caller of the first two?  
+Should probably sweep old stuff
+
+**Q4** — Should `grantAccess`/`grantAdmin`/`changePassword`/`updateEmail` take an `AccessControl` like the rest of the services, given admin is the only caller of the first two?
 _Unblocks: 2.26_
 
-**Q5** — Is the tag cleanup on `GET /tags` intentional cheap GC, or leftover from before `deletePin` handled it?  
+Seems like a good idea
+
+**Q5** — Is the tag cleanup on `GET /tags` intentional cheap GC, or leftover from before `deletePin` handled it?
 _Unblocks: 2.28_
 
-**Q6** — Is `GET /signout` kept for a client that can't POST (bookmarklet/extension), or removable?  
+**Q6** — Is `GET /signout` kept for a client that can't POST (bookmarklet/extension), or removable?
 _Unblocks: 1.10_
 
-**Q7** — Was the Mailgun `url:` line commented out deliberately (US-only), or lost in a refactor?  
+**Q7** — Was the Mailgun `url:` line commented out deliberately (US-only), or lost in a refactor?
 _Unblocks: 2.29_
 
-**Q8** — Are `UserService.getUser`/`updateUser` reserved for the Phase 6 OAuth work, or safe to delete now?  
+**Q8** — Are `UserService.getUser`/`updateUser` reserved for the Phase 6 OAuth work, or safe to delete now?
 _Unblocks: 2.1_
 
-**Q9** — Is the weaker lint config on `services`/`domain`/`database`/`crypto`/`mailgun` deliberate? Unifying on `recommendedTypeChecked` will likely surface findings in the auth layer.  
+**Q9** — Is the weaker lint config on `services`/`domain`/`database`/`crypto`/`mailgun` deliberate? Unifying on `recommendedTypeChecked` will likely surface findings in the auth layer.
 _Unblocks: 1.3_
 
-**Q10** — Is the root `vitest.config.ts` used by anything (IDE runner), or is Turbo the only test entry point?  
+**Q10** — Is the root `vitest.config.ts` used by anything (IDE runner), or is Turbo the only test entry point?
 _Unblocks: 3.2_
 
-**Q11** — Is `apps/admin` ever reachable off localhost? Decides whether session TTL / `secure` cookie / login rate limit matter or binding to `127.0.0.1` is enough.  
+**Q11** — Is `apps/admin` ever reachable off localhost? Decides whether session TTL / `secure` cookie / login rate limit matter or binding to `127.0.0.1` is enough.
 _Unblocks: 2.33_
 
-**Q12** — Merge `libs/adapters` + `libs/mailgun` into one infrastructure package, or keep per-dependency isolation?  
+**Q12** — Merge `libs/adapters` + `libs/mailgun` into one infrastructure package, or keep per-dependency isolation?
 _Unblocks: 2.23, 3.7_
 
-**Q13** — For the pin+tag transaction: narrow `DrizzlePinRepository` to depend on `DrizzleTagRepository` (option a), or move the tag upsert into the pin repo (option b)? Both keep `libs/domain` dependency-free.  
+**Q13** — For the pin+tag transaction: narrow `DrizzlePinRepository` to depend on `DrizzleTagRepository` (option a), or move the tag upsert into the pin repo (option b)? Both keep `libs/domain` dependency-free.
 _Unblocks: 1.4_
 
-**Q14** — `email_hash`: unique index (enforces one account per email; migration fails on existing dupes) or plain index?  
+**Q14** — `email_hash`: unique index (enforces one account per email; migration fails on existing dupes) or plain index?
 _Unblocks: 1.6_
 
-**Q15** — Do you want DNS-rebinding defence in `NodeHttpFetcher` (custom `lookup` that re-checks the resolved address), or is the CIDR fix in 1.12 enough for now?  
+**Q15** — Do you want DNS-rebinding defence in `NodeHttpFetcher` (custom `lookup` that re-checks the resolved address), or is the CIDR fix in 1.12 enough for now?
 _Unblocks: 1.12 (2nd half)_
 
-**Q16** — `auth.tsx:280`'s `'Too many'` branch: keep a typed rate-limit error distinguishable from the service, or delete the branch since the middleware already returns 429?  
+**Q16** — `auth.tsx:280`'s `'Too many'` branch: keep a typed rate-limit error distinguishable from the service, or delete the branch since the middleware already returns 429?
 _Unblocks: 2.27_
 
-**Q17** — Should test files be typechecked in every package? `crypto`/`mailgun` exclude them today; unifying on "yes" may surface type errors across test files.  
+**Q17** — Should test files be typechecked in every package? `crypto`/`mailgun` exclude them today; unifying on "yes" may surface type errors across test files.
 _Unblocks: 3.1_
 
 ---

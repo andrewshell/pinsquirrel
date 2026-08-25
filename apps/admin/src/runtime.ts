@@ -1,7 +1,4 @@
-import {
-  createDatabaseClient,
-  DrizzleUserRepository,
-} from '@pinsquirrel/database'
+import { createDatabaseClient, createRepositories } from '@pinsquirrel/database'
 import { AuthenticationService, UserService } from '@pinsquirrel/services'
 import type { AdminEnvironment } from './config.js'
 
@@ -17,7 +14,7 @@ export function getRuntime(env: AdminEnvironment): EnvRuntime {
   let runtime = cache.get(env.name)
   if (!runtime) {
     const db = createDatabaseClient(env.databaseUrl)
-    const userRepository = new DrizzleUserRepository(db)
+    const { userRepository } = createRepositories(db)
     runtime = {
       authService: new AuthenticationService(userRepository),
       userService: new UserService(userRepository),

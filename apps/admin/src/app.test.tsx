@@ -1,19 +1,43 @@
 /**
  * Route tests for the admin app.
  *
- * The app reads its config at module scope (`loadConfig()` in app.tsx), so
- * every test writes a fixture config to a temp file, points ADMIN_CONFIG at
- * it, and imports the app fresh. The database and the key file are mocked;
- * everything else — sessions, signed cookies, the unlock gate — runs for real,
+ * `createApp(config)` takes its config as an argument, so each test builds an
+ * app around the fixture it needs — including which key file the environment
+ * points at. The database and the mail provider are mocked; sessions, signed
+ * cookies, the unlock gate and the private-key handling all run for real,
  * because those gates are exactly what these routes depend on.
  */
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  beforeAll,
+  afterAll,
+} from 'vitest'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Role, UserStatus } from '@pinsquirrel/domain'
+import {
+  generateKeyPair,
+  serializeRawPrivateKey,
+  wrapPrivateKey,
+} from '@pinsquirrel/crypto'
+import {
+  Role,
+  UserStatus,
+  InvalidCredentialsError,
+  AccessNotGrantedError,
+  MissingRoleError,
+  ValidationError,
+  UserNotFoundError,
+  UserNotEligibleError,
+} from '@pinsquirrel/domain'
 import type { Hono } from 'hono'
 import type { User } from '@pinsquirrel/domain'
+import type { AdminConfig, AdminEnvironment } from './config.js'
+import { createApp } from './app.js'
 
 const userService = {
   getUserByUsername: vi.fn(),
@@ -30,50 +54,61 @@ vi.mock('./runtime.js', () => ({
   getRuntime: () => ({ userService, authService }),
 }))
 
-// The real key file is never read. Defaults (set in beforeEach) take the
-// raw-key path so sign-in needs no passphrase; the unlock tests vary them.
-const keyFile = {
-  readKeyFile: vi.fn(),
-  keyNeedsPassphrase: vi.fn(),
-  unlockPrivateKey: vi.fn(),
-}
-
-vi.mock('./key.js', () => keyFile)
-
 const mailer = { sendBulk: vi.fn() }
 
-vi.mock('./mailer.js', () => mailer)
+vi.mock('./mailer.js', () => ({
+  sendBulk: (...args: unknown[]) => mailer.sendBulk(...args) as unknown,
+}))
 
+// Only the sealed-email half is mocked: the waitlist rows are fixtures, but
+// the key handling under /unlock is what several tests are about.
 const crypto = { openSealedEmail: vi.fn() }
 
-vi.mock('@pinsquirrel/crypto', () => crypto)
+vi.mock('@pinsquirrel/crypto', async importActual => ({
+  ...(await importActual<typeof import('@pinsquirrel/crypto')>()),
+  openSealedEmail: (...args: unknown[]) =>
+    crypto.openSealedEmail(...args) as unknown,
+}))
 
 const tempDir = mkdtempSync(join(tmpdir(), 'admin-test-'))
-const configPath = join(tempDir, 'admin.config.json')
+const rawKeyPath = join(tempDir, 'raw-key.json')
+const encryptedKeyPath = join(tempDir, 'encrypted-key.json')
+const PASSPHRASE = 'open sesame'
 
-writeFileSync(
-  configPath,
-  JSON.stringify({
+/** The private key the two fixture files hold, for asserting on decrypts. */
+let privateKey: string
+
+beforeAll(async () => {
+  const pair = await generateKeyPair()
+  privateKey = pair.privateKey
+  writeFileSync(rawKeyPath, serializeRawPrivateKey(privateKey))
+  writeFileSync(encryptedKeyPath, await wrapPrivateKey(privateKey, PASSPHRASE))
+})
+
+afterAll(() => {
+  rmSync(tempDir, { recursive: true, force: true })
+})
+
+/** A one-environment config, by default pointing at the unencrypted key. */
+function makeConfig(env: Partial<AdminEnvironment> = {}): AdminConfig {
+  return {
     sessionSecret: 'test-secret-that-is-long-enough-to-sign-with',
     environments: [
       {
         name: 'test',
         label: 'Test Env',
         databaseUrl: 'mysql://user:pass@localhost:3306/test',
-        privateKeyPath: '/nonexistent/key.json',
+        privateKeyPath: rawKeyPath,
         mailgun: {
           apiKey: 'key-test',
           domain: 'mg.example.com',
           fromEmail: 'noreply@example.com',
         },
+        ...env,
       },
     ],
-  })
-)
-
-afterAll(() => {
-  rmSync(tempDir, { recursive: true, force: true })
-})
+  }
+}
 
 function makeUser(overrides: Partial<User> = {}): User {
   return {
@@ -98,17 +133,6 @@ const adminUser = makeUser({
 })
 
 let app: Hono
-
-/**
- * Domain error classes, re-imported per test.
- *
- * `vi.resetModules()` gives the freshly imported app its own instance of
- * `@pinsquirrel/domain`, so classes from a static import at the top of this
- * file are different objects and every `instanceof` check in the app would
- * miss. These have to come from the same post-reset registry as the app.
- * Enums (Role, UserStatus) compare by value and are unaffected.
- */
-let domain: typeof import('@pinsquirrel/domain')
 
 /** Sign in and unlock, returning the session cookie for later requests. */
 async function signIn(): Promise<string> {
@@ -156,17 +180,11 @@ function form(fields: Record<string, string>, cookie: string): RequestInit {
   }
 }
 
-beforeEach(async () => {
+beforeEach(() => {
   vi.clearAllMocks()
-  vi.resetModules()
-  process.env.ADMIN_CONFIG = configPath
-  domain = await import('@pinsquirrel/domain')
-  app = (await import('./app.js')).app
+  app = createApp(makeConfig())
   userService.listByStatus.mockResolvedValue([])
   usersByName()
-  keyFile.readKeyFile.mockReturnValue('raw-key-contents')
-  keyFile.keyNeedsPassphrase.mockReturnValue(false)
-  keyFile.unlockPrivateKey.mockResolvedValue('unlocked-private-key')
   crypto.openSealedEmail.mockResolvedValue('person@example.com')
   mailer.sendBulk.mockResolvedValue([])
 })
@@ -225,8 +243,8 @@ describe('POST /login', () => {
   })
 
   it.each([
-    ['a wrong password', () => new domain.InvalidCredentialsError()],
-    ['a malformed submission', () => new domain.ValidationError({})],
+    ['a wrong password', () => new InvalidCredentialsError()],
+    ['a malformed submission', () => new ValidationError({})],
   ])(
     'reports %s without naming which half was wrong',
     async (_l, makeError) => {
@@ -247,8 +265,8 @@ describe('POST /login', () => {
   )
 
   it.each([
-    ['without the Admin role', () => new domain.MissingRoleError()],
-    ['still on the waitlist', () => new domain.AccessNotGrantedError()],
+    ['without the Admin role', () => new MissingRoleError()],
+    ['still on the waitlist', () => new AccessNotGrantedError()],
   ])('reports an account %s as unable to sign in', async (_l, makeError) => {
     authService.login.mockRejectedValue(makeError())
 
@@ -284,7 +302,7 @@ describe('POST /login', () => {
   })
 
   it('hands the failed form back with the username and environment filled in', async () => {
-    authService.login.mockRejectedValue(new domain.InvalidCredentialsError())
+    authService.login.mockRejectedValue(new InvalidCredentialsError())
 
     const res = await app.request('/login', {
       method: 'POST',
@@ -319,19 +337,36 @@ describe('unlock', () => {
     return setCookie.split(';')[0]
   }
 
+  /** The key the session holds, as seen by the sealed-email call. */
+  function keyUsedForDecrypt(): unknown {
+    return crypto.openSealedEmail.mock.calls[0][1]
+  }
+
+  it('unlocks a raw key file without prompting', async () => {
+    const cookie = await signInOnly()
+    userService.listByStatus.mockResolvedValue([makeUser()])
+
+    const res = await app.request('/unlock', { headers: { Cookie: cookie } })
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/waitlist')
+
+    await app.request('/waitlist', { headers: { Cookie: cookie } })
+    expect(keyUsedForDecrypt()).toBe(privateKey)
+  })
+
   it('prompts for a passphrase when the key file is encrypted', async () => {
-    keyFile.keyNeedsPassphrase.mockReturnValue(true)
+    app = createApp(makeConfig({ privateKeyPath: encryptedKeyPath }))
     const cookie = await signInOnly()
 
     const res = await app.request('/unlock', { headers: { Cookie: cookie } })
 
     expect(res.status).toBe(200)
     expect(await res.text()).toContain('Passphrase')
-    expect(keyFile.unlockPrivateKey).not.toHaveBeenCalled()
   })
 
   it('leaves the session locked while the passphrase is outstanding', async () => {
-    keyFile.keyNeedsPassphrase.mockReturnValue(true)
+    app = createApp(makeConfig({ privateKeyPath: encryptedKeyPath }))
     const cookie = await signInOnly()
     await app.request('/unlock', { headers: { Cookie: cookie } })
 
@@ -342,9 +377,7 @@ describe('unlock', () => {
   })
 
   it('names the unreadable key file when it cannot be opened', async () => {
-    keyFile.readKeyFile.mockImplementation(() => {
-      throw new Error('ENOENT')
-    })
+    app = createApp(makeConfig({ privateKeyPath: '/nonexistent/key.json' }))
     const cookie = await signInOnly()
 
     const res = await app.request('/unlock', { headers: { Cookie: cookie } })
@@ -354,25 +387,24 @@ describe('unlock', () => {
   })
 
   it('unlocks an encrypted key with the submitted passphrase', async () => {
-    keyFile.keyNeedsPassphrase.mockReturnValue(true)
+    app = createApp(makeConfig({ privateKeyPath: encryptedKeyPath }))
     const cookie = await signInOnly()
+    userService.listByStatus.mockResolvedValue([makeUser()])
 
     const res = await app.request(
       '/unlock',
-      form({ passphrase: 'open sesame' }, cookie)
+      form({ passphrase: PASSPHRASE }, cookie)
     )
 
     expect(res.status).toBe(302)
     expect(res.headers.get('location')).toBe('/waitlist')
-    expect(keyFile.unlockPrivateKey).toHaveBeenCalledWith(
-      'raw-key-contents',
-      'open sesame'
-    )
+
+    await app.request('/waitlist', { headers: { Cookie: cookie } })
+    expect(keyUsedForDecrypt()).toBe(privateKey)
   })
 
   it('rejects a wrong passphrase and keeps the session locked', async () => {
-    keyFile.keyNeedsPassphrase.mockReturnValue(true)
-    keyFile.unlockPrivateKey.mockRejectedValue(new Error('bad mac'))
+    app = createApp(makeConfig({ privateKeyPath: encryptedKeyPath }))
     const cookie = await signInOnly()
 
     const res = await app.request(
@@ -392,12 +424,11 @@ describe('unlock', () => {
   it('redirects an unauthenticated unlock attempt to /login', async () => {
     const res = await app.request('/unlock', {
       method: 'POST',
-      body: new URLSearchParams({ passphrase: 'anything' }),
+      body: new URLSearchParams({ passphrase: PASSPHRASE }),
     })
 
     expect(res.status).toBe(302)
     expect(res.headers.get('location')).toBe('/login')
-    expect(keyFile.unlockPrivateKey).not.toHaveBeenCalled()
   })
 })
 
@@ -605,7 +636,7 @@ describe('GET /waitlist', () => {
   // by the service. Reporting that as a database failure would be a lie.
   it('reports a lost Admin role as such, not as a database failure', async () => {
     const cookie = await signIn()
-    userService.listByStatus.mockRejectedValue(new domain.MissingRoleError())
+    userService.listByStatus.mockRejectedValue(new MissingRoleError())
 
     const res = await app.request('/waitlist', { headers: { Cookie: cookie } })
 
@@ -644,9 +675,7 @@ describe('POST /grant-access', () => {
 
   it('returns 404 when the target was deleted before the grant', async () => {
     const cookie = await signIn()
-    authService.grantAccess.mockRejectedValue(
-      new domain.UserNotFoundError('ghost')
-    )
+    authService.grantAccess.mockRejectedValue(new UserNotFoundError('ghost'))
 
     const res = await app.request(
       '/grant-access',
@@ -660,7 +689,7 @@ describe('POST /grant-access', () => {
   it('refuses to activate a user who has not confirmed their email', async () => {
     const cookie = await signIn()
     authService.grantAccess.mockRejectedValue(
-      new domain.UserNotEligibleError(
+      new UserNotEligibleError(
         UserStatus.Unverified,
         'User "alice" has not confirmed their email yet'
       )
@@ -760,15 +789,12 @@ describe('POST /grant-admin', () => {
 
     expect(res.status).toBe(400)
     expect(authService.grantAdmin).not.toHaveBeenCalled()
-    expect(authService.grantAdmin).not.toHaveBeenCalled()
   })
 
   it('returns 404 when the target is deleted between lookup and grant', async () => {
     const cookie = await signIn()
     usersByName({ bob: makeUser({ username: 'bob', roles: [Role.User] }) })
-    authService.grantAdmin.mockRejectedValue(
-      new domain.UserNotFoundError('user-1')
-    )
+    authService.grantAdmin.mockRejectedValue(new UserNotFoundError('user-1'))
 
     const res = await app.request(
       '/grant-admin',
