@@ -424,7 +424,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Fix:** `mapToUser(row, roles)` like the other repos.
 - **Note (when done):** `attachRoles` now takes a row rather than a half-built `User`. `status` goes through an exhaustive `STATUS_BY_COLUMN` record instead of a cast, so the column's enum and `UserStatus` have to keep agreeing.
 
-#### 3.7
+#### 3.7 — **Skipped (Q12: keep isolation)**
 
 - **Where:** `libs/adapters` (2 classes, 40 lines), `libs/mailgun`
 - **Problem:** Each is imported by exactly one file (`apps/hono/src/lib/services.ts`). They earn separate packages only by isolating `cheerio`/`mailgun.js` from the domain. `libs/crypto` (two consumers + a CLI) is a real seam and should stay.
@@ -550,41 +550,79 @@ Seems like a good idea
 **Q5** — Is the tag cleanup on `GET /tags` intentional cheap GC, or leftover from before `deletePin` handled it?
 _Unblocks: 2.28_
 
+Not sure
+
+_Resolved: move the cleanup into `TagService`/`PinService` after delete/update (a write on GET is wrong regardless)._
+
 **Q6** — Is `GET /signout` kept for a client that can't POST (bookmarklet/extension), or removable?
 _Unblocks: 1.10_
+
+Remove GET
 
 **Q7** — Was the Mailgun `url:` line commented out deliberately (US-only), or lost in a refactor?
 _Unblocks: 2.29_
 
+Not sure
+
+_Resolved: wire `url: config.baseUrl` — it honours what the typed config already promises._
+
 **Q8** — Are `UserService.getUser`/`updateUser` reserved for the Phase 6 OAuth work, or safe to delete now?
 _Unblocks: 2.1_
+
+Whatever makes sense
+
+_Resolved: delete (Phase 6 never references them)._
 
 **Q9** — Is the weaker lint config on `services`/`domain`/`database`/`crypto`/`mailgun` deliberate? Unifying on `recommendedTypeChecked` will likely surface findings in the auth layer.
 _Unblocks: 1.3_
 
+Not deliberate
+
 **Q10** — Is the root `vitest.config.ts` used by anything (IDE runner), or is Turbo the only test entry point?
 _Unblocks: 3.2_
+
+Only turbo
 
 **Q11** — Is `apps/admin` ever reachable off localhost? Decides whether session TTL / `secure` cookie / login rate limit matter or binding to `127.0.0.1` is enough.
 _Unblocks: 2.33_
 
+It might be deployed in the future to a custom domain/subdomain
+
+_Resolved: do the full set — session TTL, `secure` cookie under `NODE_ENV=production`, login rate limit, log unexpected errors._
+
 **Q12** — Merge `libs/adapters` + `libs/mailgun` into one infrastructure package, or keep per-dependency isolation?
 _Unblocks: 2.23, 3.7_
+
+Keep isolation
+
+_Resolved: 2.23 adds the shared sender to `libs/mailgun`; 3.7 skipped._
 
 **Q13** — For the pin+tag transaction: narrow `DrizzlePinRepository` to depend on `DrizzleTagRepository` (option a), or move the tag upsert into the pin repo (option b)? Both keep `libs/domain` dependency-free.
 _Unblocks: 1.4_
 
+Depending on DrizzleTagRepository is fine (already depends on TagRepository)
+
 **Q14** — `email_hash`: unique index (enforces one account per email; migration fails on existing dupes) or plain index?
 _Unblocks: 1.6_
+
+Shouldn't be any existing dupes. production only has one user (me)
 
 **Q15** — Do you want DNS-rebinding defence in `NodeHttpFetcher` (custom `lookup` that re-checks the resolved address), or is the CIDR fix in 1.12 enough for now?
 _Unblocks: 1.12 (2nd half)_
 
+I don't know what this means
+
+_Explained: an attacker registers `evil.example` with DNS pointing at `169.254.169.254`; the hostname passes every string/CIDR check but the fetch lands on the cloud-metadata endpoint. Defence = re-check the resolved IP inside `NodeHttpFetcher`. Resolved: yes, since Phase 6e fetches attacker-supplied URLs._
+
 **Q16** — `auth.tsx:280`'s `'Too many'` branch: keep a typed rate-limit error distinguishable from the service, or delete the branch since the middleware already returns 429?
 _Unblocks: 2.27_
 
+I guess we can delete the branch
+
 **Q17** — Should test files be typechecked in every package? `crypto`/`mailgun` exclude them today; unifying on "yes" may surface type errors across test files.
 _Unblocks: 3.1_
+
+Sure, that seems like a good idea
 
 ---
 
