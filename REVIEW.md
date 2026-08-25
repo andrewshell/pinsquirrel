@@ -230,7 +230,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Zod issues → `ValidationError` conversion exists in three shapes: A maps all issues; B does per-field `safeParse` keeping `issues[0]`; C uses `flatten().fieldErrors` with a custom message.
 - **Fix:** One `validationErrorFromZod(error)` helper in `validation/` covering A and C (**PLAN.md:** Phase 6c adds `validation/oauth.ts` — land the helper first so OAuth doesn't become shape D); convert B's call sites to a single `safeParse` on the whole object so they can use it too (behaviour change: all field errors reported, not the first).
 
-#### 2.20
+#### 2.20 — **Done**
 
 - **Where:** `libs/mailgun/src/email-service.ts:27-178`
 - **Problem:** Four methods repeat the same guard / from-line / `messages.create` / `EmailSendError` block (~40 lines each).

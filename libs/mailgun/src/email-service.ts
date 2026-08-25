@@ -24,6 +24,39 @@ export class MailgunEmailService implements EmailService {
     })
   }
 
+  /**
+   * The one place a message is posted to Mailgun: the from-line, the create
+   * call, and the EmailSendError wrapping. `description` names the mail in the
+   * failure message ("password reset email").
+   */
+  private async send(
+    to: string,
+    subject: string,
+    body: { html: string; text: string },
+    options: { description: string; headers?: Record<string, string> }
+  ): Promise<void> {
+    try {
+      const from = this.config.fromName
+        ? `${this.config.fromName} <${this.config.fromEmail}>`
+        : this.config.fromEmail
+
+      await this.mailgun.messages.create(this.config.domain, {
+        from,
+        to: [to],
+        ...options.headers,
+        subject,
+        ...body,
+      })
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred'
+
+      throw new EmailSendError(
+        `Failed to send ${options.description}: ${errorMessage}`
+      )
+    }
+  }
+
   async sendPasswordResetEmail(
     email: string,
     token: string,
@@ -35,32 +68,15 @@ export class MailgunEmailService implements EmailService {
       )
     }
 
-    try {
-      // Construct the full reset URL with the token
-      const fullResetUrl = `${resetUrl}/${token}`
-      const { html, text } = createPasswordResetEmailTemplate(fullResetUrl)
+    // Construct the full reset URL with the token
+    const fullResetUrl = `${resetUrl}/${token}`
 
-      const from = this.config.fromName
-        ? `${this.config.fromName} <${this.config.fromEmail}>`
-        : this.config.fromEmail
-
-      const messageData = {
-        from,
-        to: [email],
-        subject: 'Reset Your PinSquirrel Password',
-        html,
-        text,
-      }
-
-      await this.mailgun.messages.create(this.config.domain, messageData)
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error occurred'
-
-      throw new EmailSendError(
-        `Failed to send password reset email: ${errorMessage}`
-      )
-    }
+    await this.send(
+      email,
+      'Reset Your PinSquirrel Password',
+      createPasswordResetEmailTemplate(fullResetUrl),
+      { description: 'password reset email' }
+    )
   }
 
   async sendSignupNotificationEmail(
@@ -74,34 +90,15 @@ export class MailgunEmailService implements EmailService {
       )
     }
 
-    try {
-      const { html, text } = createSignupNotificationEmailTemplate(
-        username,
-        userEmail
-      )
-
-      const from = this.config.fromName
-        ? `${this.config.fromName} <${this.config.fromEmail}>`
-        : this.config.fromEmail
-
-      const messageData = {
-        from,
-        to: [notifyEmail],
-        'h:Reply-To': userEmail,
-        subject: `New Signup: ${username}`,
-        html,
-        text,
+    await this.send(
+      notifyEmail,
+      `New Signup: ${username}`,
+      createSignupNotificationEmailTemplate(username, userEmail),
+      {
+        description: 'signup notification email',
+        headers: { 'h:Reply-To': userEmail },
       }
-
-      await this.mailgun.messages.create(this.config.domain, messageData)
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error occurred'
-
-      throw new EmailSendError(
-        `Failed to send signup notification email: ${errorMessage}`
-      )
-    }
+    )
   }
 
   async sendEmailAlreadyRegisteredEmail(
@@ -114,30 +111,12 @@ export class MailgunEmailService implements EmailService {
       )
     }
 
-    try {
-      const { html, text } = createEmailAlreadyRegisteredTemplate(signinUrl)
-
-      const from = this.config.fromName
-        ? `${this.config.fromName} <${this.config.fromEmail}>`
-        : this.config.fromEmail
-
-      const messageData = {
-        from,
-        to: [email],
-        subject: 'PinSquirrel Account Already Exists',
-        html,
-        text,
-      }
-
-      await this.mailgun.messages.create(this.config.domain, messageData)
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error occurred'
-
-      throw new EmailSendError(
-        `Failed to send already-registered email: ${errorMessage}`
-      )
-    }
+    await this.send(
+      email,
+      'PinSquirrel Account Already Exists',
+      createEmailAlreadyRegisteredTemplate(signinUrl),
+      { description: 'already-registered email' }
+    )
   }
 
   async sendUsernameTakenEmail(
@@ -151,29 +130,11 @@ export class MailgunEmailService implements EmailService {
       )
     }
 
-    try {
-      const { html, text } = createUsernameTakenTemplate(username, signupUrl)
-
-      const from = this.config.fromName
-        ? `${this.config.fromName} <${this.config.fromEmail}>`
-        : this.config.fromEmail
-
-      const messageData = {
-        from,
-        to: [email],
-        subject: 'PinSquirrel Username Unavailable',
-        html,
-        text,
-      }
-
-      await this.mailgun.messages.create(this.config.domain, messageData)
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error occurred'
-
-      throw new EmailSendError(
-        `Failed to send username-taken email: ${errorMessage}`
-      )
-    }
+    await this.send(
+      email,
+      'PinSquirrel Username Unavailable',
+      createUsernameTakenTemplate(username, signupUrl),
+      { description: 'username-taken email' }
+    )
   }
 }
