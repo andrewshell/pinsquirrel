@@ -7,18 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  audit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6.0.10
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm audit --prod --audit-level=high
-
+  # `pnpm run quality` ends with `pnpm run audit`, so there is no separate
+  # audit job -- see CLAUDE.md's Quality Check Requirements.
   quality:
     runs-on: ubuntu-latest
     services:

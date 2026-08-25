@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7-labs
 # Build context should be the monorepo root
 FROM node:24-alpine AS base
 RUN corepack enable
@@ -6,13 +7,9 @@ WORKDIR /app
 # Copy package files for dependency installation
 FROM base AS dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/hono/package.json ./apps/hono/
-COPY libs/adapters/package.json ./libs/adapters/
-COPY libs/crypto/package.json ./libs/crypto/
-COPY libs/database/package.json ./libs/database/
-COPY libs/domain/package.json ./libs/domain/
-COPY libs/mailgun/package.json ./libs/mailgun/
-COPY libs/services/package.json ./libs/services/
+# --parents keeps each manifest at its workspace path, so a new package
+# under libs/ needs no edit here.
+COPY --parents apps/hono/package.json libs/*/package.json ./
 RUN pnpm install --frozen-lockfile
 
 # Build hono application (Turbo will build dependencies automatically)
@@ -27,13 +24,9 @@ RUN pnpm --filter @pinsquirrel/hono css:build
 # Production dependencies only
 FROM base AS production-deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/hono/package.json ./apps/hono/
-COPY libs/adapters/package.json ./libs/adapters/
-COPY libs/crypto/package.json ./libs/crypto/
-COPY libs/database/package.json ./libs/database/
-COPY libs/domain/package.json ./libs/domain/
-COPY libs/mailgun/package.json ./libs/mailgun/
-COPY libs/services/package.json ./libs/services/
+# --parents keeps each manifest at its workspace path, so a new package
+# under libs/ needs no edit here.
+COPY --parents apps/hono/package.json libs/*/package.json ./
 RUN npm_config_ignore_scripts=true pnpm install --frozen-lockfile --prod
 
 # Final runtime image
