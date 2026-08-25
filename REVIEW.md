@@ -157,7 +157,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Fix:** Drop hono `mailgun.js`; move `drizzle-kit` to devDependencies; remove `dotenv`; move root `tsx` out. To drop hono's `drizzle-orm`, first add `export { sql } from 'drizzle-orm'` and the client type to `libs/database/src/index.ts` (neither is exported today).
 - **Note (when done):** `drizzle-kit` stayed in `dependencies`. `apps/hono/migrate-and-start.sh` runs `db:migrate` inside the runtime image, whose deps come from `pnpm install --prod` — moving it would break production migrations. Everything else in the item landed.
 
-#### 2.9
+#### 2.9 — **Done**
 
 - **Where:** `bookmarklet.js` (repo root); `apps/hono/.dockerignore`; root `.dockerignore`
 - **Problem:** Root `bookmarklet.js` is unreferenced. `apps/hono/.dockerignore` is dead (only the root one applies to `docker build -f apps/hono/Dockerfile .`); root one still mentions `.react-router`.
