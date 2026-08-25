@@ -138,13 +138,13 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Never called, so expired rows accumulate forever; no index on `expires_at` for when a sweep is added.
 - **Fix:** **Blocked on Q3.** Either (a) delete both methods from the interfaces and implementations, or (b) add an `expires_at` index + migration and a scheduled sweep (a new service method + a cron/startup job). (b) is a feature, not a deletion — keep it out of the dead-code PR. **PLAN.md:** Phase 6d already commits to a scheduled cleanup of expired/stale `oauth_clients` rows; sessions and reset tokens belong in that same job, which makes (b) the likely answer to Q3 and means the sweep should be designed once, in Phase 6, not twice.
 
-#### 2.6
+#### 2.6 — **Skipped (Phase 7 deletes ApiKeyService)**
 
 - **Where:** `libs/services/src/services/api-key.ts:117`
 - **Problem:** `authenticateByKey` is public but only called by `authenticate` at `:104`.
 - **Fix:** Make private; fold its four tests (`api-key.test.ts:248-289`) into the `authenticate` describe block. **PLAN.md:** `ApiKeyService` is deleted wholesale in Phase 7b — skip this unless Phase 7 is more than a few months out.
 
-#### 2.7
+#### 2.7 — **Done**
 
 - **Where:** `apps/hono/.env.example:21`
 - **Problem:** `SESSION_SECRET` documented, never read (sessions are opaque DB ids).
