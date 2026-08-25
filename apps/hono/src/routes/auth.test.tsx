@@ -222,8 +222,19 @@ describe('auth routes', () => {
         expect(res.headers.get('Location')).toBe('/tags?x=1')
       })
 
+      it('honours a plain absolute path', async () => {
+        const res = await app.request(
+          '/signin',
+          form({ username: 'a', password: 'p', redirectTo: '/ok/path' })
+        )
+
+        expect(res.headers.get('Location')).toBe('/ok/path')
+      })
+
       it.each([
         ['//evil.test/pwn', 'protocol-relative URL to another host'],
+        ['/\\evil.test/pwn', 'backslash form browsers normalise to //'],
+        ['/\t/evil.test', 'tab-smuggled protocol-relative URL'],
         ['https://evil.test', 'absolute URL'],
         ['evil.test', 'bare host'],
         ['', 'empty value'],

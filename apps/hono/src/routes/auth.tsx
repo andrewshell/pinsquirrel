@@ -28,6 +28,34 @@ import { ResetPasswordPage } from '../views/pages/reset-password'
 
 const auth = new Hono()
 
+/**
+ * Resolve a post-sign-in `redirectTo` against our own origin and keep it only
+ * if it stays there.
+ *
+ * String prefix checks are not enough: browsers normalise `/\evil.test` to
+ * `//evil.test`, and the URL parser strips tabs and newlines, so `/<tab>/evil`
+ * is protocol-relative too. Parsing is the only way to see what the browser
+ * will see. The resolved path is what gets returned, so any such smuggled
+ * characters are gone from the `Location` header as well.
+ */
+function safeRedirect(
+  redirectTo: string | undefined,
+  requestUrl: string,
+  fallback: string
+): string {
+  if (!redirectTo || !redirectTo.startsWith('/')) return fallback
+
+  const origin = new URL(requestUrl).origin
+
+  try {
+    const resolved = new URL(redirectTo, origin)
+    if (resolved.origin !== origin) return fallback
+    return `${resolved.pathname}${resolved.search}${resolved.hash}`
+  } catch {
+    return fallback
+  }
+}
+
 // GET /signin - Render sign-in form
 auth.get('/signin', async c => {
   const sessionManager = getSessionManager(c)
@@ -100,19 +128,8 @@ auth.post('/signin', async c => {
     // Create session
     await sessionManager.create(user.id, keepSignedIn)
 
-    // Determine redirect destination
-    let destination = '/pins'
-
-    // Use redirectTo from form if provided and is a safe relative path
-    if (
-      redirectTo &&
-      redirectTo.startsWith('/') &&
-      !redirectTo.startsWith('//')
-    ) {
-      destination = redirectTo
-    }
-
-    return c.redirect(destination)
+    // Use redirectTo from the form when it stays on this origin
+    return c.redirect(safeRedirect(redirectTo, c.req.url, '/pins'))
   } catch (error) {
     let errors: Record<string, string[]>
 
