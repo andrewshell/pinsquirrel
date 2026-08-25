@@ -544,6 +544,22 @@ describe('auth routes', () => {
 
       expect(res.status).toBe(500)
     })
+
+    it('does not read a 429 out of an error message', async () => {
+      // The route used to string-match error.message for 'Too many' and answer
+      // 429. Rate limiting is the middleware's job - see the IP-limiter case
+      // above - so a service error is just an error, whatever it happens to say.
+      auth.requestPasswordReset.mockRejectedValue(
+        new Error('Too many open connections to the mail provider')
+      )
+
+      const res = await app.request(
+        '/forgot-password',
+        form({ email: 'a@example.test' })
+      )
+
+      expect(res.status).toBe(500)
+    })
   })
 
   describe('reset-password', () => {
