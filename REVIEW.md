@@ -183,11 +183,12 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `search` builds `%${term}%` without escaping `%`/`_`, so a search for `a_c` matches `abc`, and `100%` matches anything containing `100`.
 - **Fix:** Escape `%`, `_`, `\` before interpolating; regression test.
 
-#### 2.13
+#### 2.13 — **Done**
 
 - **Where:** `apps/hono/src/routes/profile.tsx:60,100`
 - **Problem:** **[bug]** `update-email`/`change-password` success renders omit `apiKeys`, so the API Keys card shows "No API keys yet" right after a successful change. This route renders success four different ways.
 - **Fix:** Use the flash + `redirect('/profile')` pattern `revoke-api-key` already uses for all four intents. **PLAN.md:** Phase 6f adds an OAuth-grants card to this page and Phase 7c removes the API-key intents; the redirect pattern is the right shape for the grants card too, so do this before 6f.
+- **Note (when done):** `create-api-key` still renders inline. Its response body _is_ the payload — the raw key is shown once and is never recoverable — so redirecting would mean persisting a live credential in the sessions table to survive the hop. The other three intents redirect, `emailSuccess`/`passwordSuccess` are gone, and `profile.test.tsx` now covers every intent (part of 2.40).
 
 #### 2.14
 
