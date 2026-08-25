@@ -1,4 +1,5 @@
 import type { FC } from 'hono/jsx'
+import { ChevronDownIcon } from './icons'
 
 interface ViewSettingsProps {
   sortBy: 'created' | 'title'
@@ -79,20 +80,7 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
           data-dropdown="toggle"
         >
           <span>Sort: {getSortLabel(sortBy)}</span>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="opacity-50"
-          >
-            <path d="m6 9 6 6 6-6" />
-          </svg>
+          <ChevronDownIcon size={12} class="opacity-50" />
         </button>
         <div
           class="hidden absolute left-0 mt-1 w-28 bg-background border-2 border-foreground shadow-lg z-50"
@@ -129,20 +117,7 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
           data-dropdown="toggle"
         >
           <span>{getDirectionLabel(sortDirection)}</span>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="opacity-50"
-          >
-            <path d="m6 9 6 6 6-6" />
-          </svg>
+          <ChevronDownIcon size={12} class="opacity-50" />
         </button>
         <div
           class="hidden absolute left-0 mt-1 w-28 bg-background border-2 border-foreground shadow-lg z-50"
@@ -179,20 +154,7 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
           data-dropdown="toggle"
         >
           <span>{getSizeLabel(viewSize)}</span>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="opacity-50"
-          >
-            <path d="m6 9 6 6 6-6" />
-          </svg>
+          <ChevronDownIcon size={12} class="opacity-50" />
         </button>
         <div
           class="hidden absolute left-0 mt-1 w-28 bg-background border-2 border-foreground shadow-lg z-50"
