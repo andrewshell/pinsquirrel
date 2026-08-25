@@ -390,7 +390,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** The base exists but no package extends it. Every package restates all options with drift (`ES2022` vs `ESNext` target; `crypto`/`mailgun` exclude tests from typecheck, others include them; `apps/*` set `declaration` though they never emit).
 - **Fix:** `"extends": "../../tsconfig.base.json"` everywhere, keeping each package's current `include`/`exclude` verbatim. Whether tests should be typechecked uniformly is **Q17**. Pair with 1.3.
 
-#### 3.2
+#### 3.2 — **Done except vitest.config.ts (Q10)**
 
 - **Where:** `turbo.json:12-16`; root `package.json:31`; root `vitest.config.ts`
 - **Problem:** `lint`/`format` `dependsOn: ["^lint"]`/`["^format"]` serialises them for no benefit. `"turbo": "latest"` is unpinned. Root `vitest.config.ts` lists 6 projects and omits `libs/crypto` and `apps/admin`.
