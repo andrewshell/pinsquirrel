@@ -363,7 +363,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Fix:** Route-level tests using the fakes in `src/test-support/pin-routes.tsx`. Pairs with 2.13, 2.16, 2.31. **PLAN.md:** `api-auth.ts` is deleted in Phase 7a and `bearer-auth.ts`/`mcp/auth.ts` are rewritten in Phase 6a with their own tests (6g) — don't write tests for those three now; the profile, `private-mode.ts`, and pin-route gaps still stand.
 - **Note (when done):** The profile intents were covered by 2.13's `profile.test.tsx`. `private-mode.ts` turned out to be covered already — `private.test.tsx` mounts the real middleware, and mutating away either the unlock check or the `HX-Request` branch fails it — so this item added only the pin-route error paths: on both `POST /new` and `POST /:id/edit`, the HTMX-vs-full-page split, the duplicate-URL link to the existing pin, and the generic 500. Verified by mutation; the create-side gaps were found by mutating the create handler while checking the edit ones.
 
-#### 2.41
+#### 2.41 — **Done**
 
 - **Where:** `apps/admin/src/app.test.tsx`
 - **Problem:** `POST /login` failure branches (unknown env, non-admin, bad password), `POST /unlock` (encrypted key, wrong passphrase), `/compose`, `/send` (validation 400, provider 500), `/logout` are untested. The happy-path login is covered via the `signIn()` helper.
