@@ -1,10 +1,18 @@
-import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest'
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  beforeAll,
+  afterAll,
+  vi,
+} from 'vitest'
 import { drizzle } from 'drizzle-orm/mysql2'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import mysql from 'mysql2/promise'
 import type { Pool } from 'mysql2/promise'
 import { DrizzleUserRepository } from './user.js'
-import { UserStatus } from '@pinsquirrel/domain'
+import { Role, UserStatus } from '@pinsquirrel/domain'
 
 describe('DrizzleUserRepository - Integration Tests', () => {
   let testDb: MySql2Database
@@ -146,6 +154,46 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       expect(result.find(u => u.id === waitlisted.id)?.emailEncrypted).toBe(
         'sealed-blob'
       )
+    })
+
+    it('loads every users roles in a single query', async () => {
+      // The admin waitlist calls this for the whole waitlist at once, so a
+      // per-user role lookup is an N+1 that grows with the waitlist.
+      const created = []
+      for (let i = 0; i < 3; i++) {
+        const user = await repository.create({
+          username: `roles-${crypto.randomUUID().slice(0, 8)}`,
+          passwordHash: 'h',
+          emailHash: null,
+        })
+        await repository.update(user.id, { status: UserStatus.Waitlist })
+        await repository.addRole(user.id, Role.User)
+        await repository.addRole(user.id, Role.Admin)
+        created.push(user)
+      }
+
+      const querySpy = vi.spyOn(testPool, 'query')
+      let result: Awaited<ReturnType<typeof repository.findByStatus>>
+      let roleQueries: number
+      try {
+        result = await repository.findByStatus(UserStatus.Waitlist)
+        roleQueries = querySpy.mock.calls.filter(call => {
+          const first = call[0]
+          const text = typeof first === 'string' ? first : (first?.sql ?? '')
+          return text.includes('user_roles')
+        }).length
+      } finally {
+        // mockRestore also clears mock.calls, so read them first.
+        querySpy.mockRestore()
+      }
+      expect(roleQueries).toBe(1)
+
+      expect(result).toHaveLength(created.length)
+      for (const user of created) {
+        const loaded = result.find(u => u.id === user.id)
+        expect(loaded).toBeDefined()
+        expect([...loaded!.roles].sort()).toEqual([Role.Admin, Role.User])
+      }
     })
   })
   describe('create', () => {

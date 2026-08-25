@@ -324,7 +324,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Every list is `WHERE user_id=? ORDER BY created_at DESC LIMIT/OFFSET`, but the only index is `(user_id, url_hash)` → filesort of the user's whole pin set per page.
 - **Fix:** `index('pins_user_id_created_at_idx').on(table.userId, table.createdAt)` + migration.
 
-#### 2.35
+#### 2.35 — **Done**
 
 - **Where:** `libs/database/src/repositories/user.ts:63-79`
 - **Problem:** `findByStatus` (used by the admin waitlist) and `findAll` call `attachRoles` per user (N+1).
