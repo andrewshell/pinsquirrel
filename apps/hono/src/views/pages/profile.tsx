@@ -15,8 +15,6 @@ interface ProfilePageProps {
   user: User
   flash?: FlashMessage | null
   errors?: Record<string, string[]>
-  emailSuccess?: boolean
-  passwordSuccess?: boolean
   apiKeys?: ApiKey[]
   newApiKey?: string
 }
@@ -35,8 +33,6 @@ export function ProfilePage({
   user,
   flash,
   errors,
-  emailSuccess,
-  passwordSuccess,
   apiKeys,
   newApiKey,
 }: ProfilePageProps) {
@@ -122,10 +118,6 @@ export function ProfilePage({
 
               {formError && <ErrorMessage message={formError} />}
 
-              {emailSuccess && (
-                <SuccessMessage message="Email updated successfully" />
-              )}
-
               <div>
                 <label
                   for="email"
@@ -167,10 +159,6 @@ export function ProfilePage({
                 value={user.username}
                 autocomplete="username"
               />
-
-              {passwordSuccess && (
-                <SuccessMessage message="Password changed successfully" />
-              )}
 
               <div>
                 <label

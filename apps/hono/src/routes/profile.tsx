@@ -53,14 +53,13 @@ profile.post('/', async c => {
         email: email === '' ? null : email,
       })
 
-      // Re-fetch user to get updated data
-      const updatedUser = await sessionManager.getUser()
-
-      return c.html(
-        <ProfilePage user={updatedUser || user} emailSuccess={true} />
-      )
+      sessionManager.setFlash('success', 'Email updated successfully!')
+      return c.redirect('/profile')
     }
 
+    // The one intent that does not redirect. Its response body *is* the
+    // payload: the raw key is shown once and never recoverable, so surviving a
+    // redirect would mean writing a live credential into the sessions table.
     if (intent === 'create-api-key') {
       const name = getString(formData['name'])
       const ac = new AccessControl(user)
@@ -97,7 +96,8 @@ profile.post('/', async c => {
         newPassword,
       })
 
-      return c.html(<ProfilePage user={user} passwordSuccess={true} />)
+      sessionManager.setFlash('success', 'Password changed successfully!')
+      return c.redirect('/profile')
     }
 
     // Invalid intent
