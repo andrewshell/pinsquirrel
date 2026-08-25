@@ -251,7 +251,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Desktop and mobile nav repeat the link list and search form; eight hand-written SVG icons are copy-pasted across four files.
 - **Fix:** `views/components/icons.tsx` + a `NavLinks` component rendered twice with a `layout` prop.
 
-#### 2.23
+#### 2.23 — **Done**
 
 - **Where:** `apps/admin/src/mailer.ts` vs `libs/mailgun/src/email-service.ts`
 - **Problem:** Two independent Mailgun clients with different `from` formatting and error mapping; admin has retry/timeout, the lib does not.

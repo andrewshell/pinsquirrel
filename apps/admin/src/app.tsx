@@ -23,6 +23,7 @@ import {
   type AdminConfig,
   type AdminEnvironment,
 } from './config.js'
+import { MailgunEmailService } from '@pinsquirrel/mailgun'
 import { getRuntime } from './runtime.js'
 import {
   createSession,
@@ -31,7 +32,6 @@ import {
   destroySession,
   type AdminSession,
 } from './session.js'
-import { sendBulk } from './mailer.js'
 import {
   LoginPage,
   UnlockPage,
@@ -538,8 +538,7 @@ export function createApp(config: AdminConfig): Hono {
     // Per-recipient send failures are captured inside sendBulk and shown on
     // SentPage; this guard only covers an unexpected provider/client-setup throw.
     try {
-      const results = await sendBulk(
-        env.mailgun,
+      const results = await new MailgunEmailService(env.mailgun).sendBulk(
         recipients,
         subject,
         messageBody
