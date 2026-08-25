@@ -78,8 +78,9 @@ privateRouter.post('/lock', c => {
   const sessionManager = getSessionManager(c)
   sessionManager.lockPrivateMode()
 
-  // For beacon requests (tab close), return 204
-  if (c.req.header('Content-Type')?.includes('text/plain')) {
+  // The tab-close beacon (private-mode.js) marks itself with ?beacon=1 and
+  // has nowhere to follow a redirect to, so answer it with 204.
+  if (c.req.query('beacon') === '1') {
     return c.body(null, 204)
   }
 

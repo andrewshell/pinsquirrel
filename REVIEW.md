@@ -434,7 +434,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `config = loadConfig()` at module scope forces `vi.resetModules()` gymnastics in tests; `key.ts` is three one-line wrappers over `@pinsquirrel/crypto`; `runtime.ts` hand-builds `DrizzleUserRepository` while hono uses `createRepositories`; coverage excludes `*.test.ts` but not `*.test.tsx`; duplicated assertion.
 - **Fix:** Export `createApp(config)`; inline the crypto calls; use `createRepositories(db).userRepository`; `**/*.test.{ts,tsx}`; delete one assertion.
 
-#### 3.9
+#### 3.9 — **Done**
 
 - **Where:** `apps/hono/src/static/tag-select.js:8,244`, `dropdown.js:19,104`; `routes/private.tsx:82`
 - **Problem:** `tag-select.js` initialises only on `DOMContentLoaded` while `tag-input-vanilla.js` and `metadata-fetch.js` also hook `htmx:afterSettle`, so a swapped-in tag-select is dead; `dropdown.js` tracks open state via `data-open` in one place and the `hidden` class in another; `private.tsx:82` detects beacons by `Content-Type: text/plain`.

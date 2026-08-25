@@ -5,11 +5,7 @@
  * Include data-tags='[{id, name, pinCount}]', data-selected='["id1"]', data-multiple="true|false"
  * Optional: data-exclude-source="[name='sourceTagIds']" to exclude IDs from another input
  */
-document.addEventListener('DOMContentLoaded', () => {
-  document
-    .querySelectorAll('[data-tag-select="container"]')
-    .forEach(initTagSelect)
-})
+onReady('[data-tag-select="container"]', initTagSelect)
 
 function initTagSelect(container) {
   const allTags = JSON.parse(container.dataset.tags || '[]')
@@ -241,9 +237,7 @@ function escapeHtml(text) {
  *
  * Shows a summary of the merge operation when both source and destination are selected
  */
-document.addEventListener('DOMContentLoaded', () => {
-  initMergeSummary()
-})
+onReady('#merge-summary', initMergeSummary)
 
 function initMergeSummary() {
   const summaryEl = document.getElementById('merge-summary')
