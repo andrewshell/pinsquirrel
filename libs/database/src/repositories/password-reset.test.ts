@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/mysql2'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import mysql from 'mysql2/promise'
 import type { Pool } from 'mysql2/promise'
+import { insertUser } from '../test-fixtures.js'
 import { DrizzlePasswordResetRepository } from './password-reset.js'
 import type { CreatePasswordResetTokenData } from '@pinsquirrel/domain'
 
@@ -39,16 +40,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
 
   describe('create', () => {
     it('should create a password reset token', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       const tokenData: CreatePasswordResetTokenData = {
         userId,
@@ -80,16 +72,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
 
   describe('findById', () => {
     it('should find password reset token by id', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       const tokenId = crypto.randomUUID()
       const tokenHash = 'hashed_token_123'
@@ -124,16 +107,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
 
   describe('findByTokenHash', () => {
     it('should find password reset token by token hash', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       const tokenData: CreatePasswordResetTokenData = {
         userId,
@@ -159,16 +133,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
 
   describe('findByUserId', () => {
     it('should find all password reset tokens for a user', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       await repository.create({
         userId,
@@ -197,16 +162,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
 
   describe('deleteByUserId', () => {
     it('should delete all tokens for a user', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       await repository.create({
         userId,
@@ -234,16 +190,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
 
   describe('isValidToken', () => {
     it('should return true for valid non-expired token', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       await repository.create({
         userId,
@@ -256,16 +203,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
     })
 
     it('should return false for expired token', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       await repository.create({
         userId,
@@ -285,16 +223,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
 
   describe('deleteExpiredTokens', () => {
     it('should delete only expired tokens', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       await repository.create({
         userId,
@@ -326,16 +255,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
 
   describe('delete', () => {
     it('should delete a specific token by id', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       const createdToken = await repository.create({
         userId,

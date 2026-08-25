@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { createMockUserRepository } from '../test-utils.js'
 import { ApiKeyService } from './api-key.js'
 import type {
   ApiKeyRepository,
@@ -73,16 +74,7 @@ describe('ApiKeyService', () => {
       updateLastUsed: vi.fn(),
       delete: vi.fn(),
     }
-    mockUserRepo = {
-      findById: vi.fn(),
-      findByEmailHash: vi.fn(),
-      findByUsername: vi.fn(),
-      findByStatus: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      addRole: vi.fn(),
-    }
+    mockUserRepo = createMockUserRepository()
     service = new ApiKeyService(mockRepo, mockUserRepo)
   })
 

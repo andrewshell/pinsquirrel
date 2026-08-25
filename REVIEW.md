@@ -254,7 +254,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Two independent Mailgun clients with different `from` formatting and error mapping; admin has retry/timeout, the lib does not.
 - **Fix:** Add `sendBulk`/`sendPlainText` with the retry logic to the shared Mailgun code and have admin use it. Where that code lives is **blocked on Q12** (stays `libs/mailgun`, or merges into an infrastructure package).
 
-#### 2.24
+#### 2.24 — **Done**
 
 - **Where:** Service tests: `account.test.ts`, `api-key.test.ts`, `user.test.ts`, `authentication.test.ts`; database tests: 57 raw `INSERT INTO` statements
 - **Problem:** Four files hand-build the same `UserRepository` `vi.fn()` mock. Database tests bypass the repos under test with raw inserts whose column lists already omit `email_encrypted`/`status` in places.

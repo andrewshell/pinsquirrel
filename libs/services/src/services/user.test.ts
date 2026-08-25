@@ -5,6 +5,7 @@
  * waitlist page. getUser/getUserByUsername/updateUser remain uncovered.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { createMockUserRepository } from '../test-utils.js'
 import { UserService } from './user.js'
 import type { User, UserRepository } from '@pinsquirrel/domain'
 import {
@@ -42,16 +43,7 @@ let service: UserService
 let mockRepo: UserRepository
 
 beforeEach(() => {
-  mockRepo = {
-    findById: vi.fn(),
-    findByEmailHash: vi.fn(),
-    findByUsername: vi.fn(),
-    findByStatus: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    addRole: vi.fn(),
-  }
+  mockRepo = createMockUserRepository()
   service = new UserService(mockRepo)
 })
 

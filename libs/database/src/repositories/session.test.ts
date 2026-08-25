@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/mysql2'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import mysql from 'mysql2/promise'
 import type { Pool } from 'mysql2/promise'
+import { insertUser } from '../test-fixtures.js'
 import { DrizzleSessionRepository } from './session.js'
 import type { CreateSessionData } from '@pinsquirrel/domain'
 
@@ -39,16 +40,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
 
   describe('create', () => {
     it('should create a session', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       const sessionData: CreateSessionData = {
         userId,
@@ -67,16 +59,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
     })
 
     it('should create a session with data', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       const sessionData: CreateSessionData = {
         userId,
@@ -104,16 +87,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
 
   describe('findById', () => {
     it('should find session by id', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       const sessionId = crypto.randomUUID()
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
@@ -144,16 +118,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
 
   describe('findByUserId', () => {
     it('should find all sessions for a user', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       await repository.create({
         userId,
@@ -177,16 +142,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
 
   describe('update', () => {
     it('should update session data', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       const session = await repository.create({
         userId,
@@ -203,16 +159,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
     })
 
     it('should update session expiresAt', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       const session = await repository.create({
         userId,
@@ -237,16 +184,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
 
   describe('delete', () => {
     it('should delete a specific session by id', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       const session = await repository.create({
         userId,
@@ -268,16 +206,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
 
   describe('deleteByUserId', () => {
     it('should delete all sessions for a user', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       await repository.create({
         userId,
@@ -303,16 +232,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
 
   describe('isValidSession', () => {
     it('should return true for valid non-expired session', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       const session = await repository.create({
         userId,
@@ -324,16 +244,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
     })
 
     it('should return false for expired session', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       const session = await repository.create({
         userId,
@@ -352,16 +263,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
 
   describe('deleteExpiredSessions', () => {
     it('should delete only expired sessions', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId, username]
-      )
+      const { id: userId } = await insertUser(testPool)
 
       const expiredSession = await repository.create({
         userId,

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { createMockUserRepository } from '../test-utils.js'
 import { AccountService } from './account.js'
 import { NullEmailService } from './null-email.js'
 import type {
@@ -55,16 +56,7 @@ describe('AccountService', () => {
   }
 
   beforeEach(() => {
-    mockUserRepository = {
-      findById: vi.fn(),
-      findByEmailHash: vi.fn(),
-      findByUsername: vi.fn(),
-      findByStatus: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      addRole: vi.fn(),
-    }
+    mockUserRepository = createMockUserRepository()
 
     mockPasswordResetRepository = {
       findById: vi.fn(),
