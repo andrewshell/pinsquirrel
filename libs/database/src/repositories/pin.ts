@@ -30,6 +30,17 @@ function md5(input: string): string {
 }
 
 /**
+ * Escape the characters MySQL's LIKE treats as wildcards.
+ *
+ * A user searching for `a_c` means those three characters, not "a, anything,
+ * c" — and `100%` should not match every pin containing "100". The backslash
+ * goes first so the escapes we add are not themselves re-escaped.
+ */
+function escapeLikePattern(term: string): string {
+  return term.replace(/[\\%_]/g, '\\$&')
+}
+
+/**
  * The pin columns, listed explicitly because the tag-filtered queries join
  * other tables and `select()` would widen the row to the joined shape.
  */
@@ -104,7 +115,7 @@ export class DrizzlePinRepository implements PinRepository {
     }
 
     if (filter?.search !== undefined && filter.search.trim() !== '') {
-      const searchTerm = `%${filter.search}%`
+      const searchTerm = `%${escapeLikePattern(filter.search)}%`
       const searchCondition = or(
         like(pins.url, searchTerm),
         like(pins.title, searchTerm),
