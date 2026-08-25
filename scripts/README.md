@@ -12,7 +12,7 @@ A comprehensive script that builds the Docker image and pushes it to Docker Hub 
 - 🐳 **Docker Validation**: Checks Docker is running and user is authenticated
 - 🏷️ **Smart Tagging**: Automatically tags with version from package.json + latest
 - 🎯 **Custom Tags**: Support for additional custom tags
-- 🚀 **Multi-platform**: Ready for multi-platform builds
+- 🚀 **Multi-platform**: Builds and pushes `linux/amd64` + `linux/arm64` in one pass
 - 📊 **Progress Feedback**: Clear, colorized output with emojis
 - 🔍 **Dry Run**: Test the script without actually building/pushing
 
@@ -61,9 +61,16 @@ pnpm docker:dry-run
 
 The script creates and pushes the following tags:
 
-- `andrewshell/pinsquirrel:1.0.0` (version from package.json)
+- `andrewshell/pinsquirrel:<version>` (version from the root `package.json`)
 - `andrewshell/pinsquirrel:latest`
 - `andrewshell/pinsquirrel:custom-tag` (if provided)
+
+The image is built for `linux/amd64` and `linux/arm64` with `docker buildx`, and
+all tags are pushed as part of that build. To run what it produced:
+
+```bash
+docker run -p 8100:8100 -e DATABASE_URL=your_db_url andrewshell/pinsquirrel:latest
+```
 
 ### Quality Checks
 
@@ -74,42 +81,6 @@ When quality checks are enabled (default), the script runs:
 3. `pnpm test` - Full test suite
 
 Use `--skip-quality` flag to skip these for faster iterations during development.
-
-### Example Output
-
-```bash
-🐳 PinSquirrel Docker Build & Push Script
-========================================
-
-ℹ️  Checking if Docker is running...
-✅ Docker is running
-ℹ️  Checking Docker Hub authentication...
-✅ Docker Hub authentication verified
-ℹ️  Running quality checks...
-ℹ️  Running TypeScript type checking...
-ℹ️  Running ESLint...
-ℹ️  Running tests...
-✅ All quality checks passed
-ℹ️  Building Docker image...
-ℹ️  Version: 1.0.0
-ℹ️  Building image with tag: andrewshell/pinsquirrel:1.0.0
-ℹ️  Tagging as latest...
-✅ Docker image built successfully
-ℹ️  Pushing Docker image to Docker Hub...
-ℹ️  Pushing andrewshell/pinsquirrel:1.0.0...
-ℹ️  Pushing andrewshell/pinsquirrel:latest...
-✅ All tags pushed successfully
-
-✅ 🐳 Docker image build and push completed!
-
-📦 Image Repository: andrewshell/pinsquirrel
-🏷️  Tags pushed:
-   • andrewshell/pinsquirrel:1.0.0
-   • andrewshell/pinsquirrel:latest
-
-🚀 To run the image:
-   docker run -p 3000:3000 -e DATABASE_URL=your_db_url andrewshell/pinsquirrel:latest
-```
 
 ### Troubleshooting
 
