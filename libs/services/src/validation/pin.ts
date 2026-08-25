@@ -4,9 +4,8 @@ import { z } from 'zod'
 //
 // Only http(s) is allowed. Stored URLs are rendered as `href` attributes, so
 // accepting `javascript:` or `data:` here would be stored XSS — and zod's
-// `.url()` accepts both.
+// `z.url()` accepts both.
 export const urlSchema = z
-  .string()
   .url({ message: 'Must be a valid URL' })
   .max(2048, 'URL must be at most 2048 characters')
   .refine(val => {
