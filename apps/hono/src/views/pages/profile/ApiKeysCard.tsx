@@ -52,7 +52,7 @@ export const ApiKeysCard: FC<ApiKeysCardProps> = ({
               </code>
               <button
                 type="button"
-                onclick="navigator.clipboard.writeText(document.getElementById('api-key-value').textContent);this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000)"
+                data-copy-api-key
                 class="px-3 py-2 text-sm font-bold border-2 border-foreground bg-primary text-primary-foreground neobrutalism-shadow hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
               >
                 Copy
@@ -62,6 +62,7 @@ export const ApiKeysCard: FC<ApiKeysCardProps> = ({
               message="This key will not be shown again. Copy it now and store it securely."
               className="mt-2"
             />
+            <script src="/static/api-key-copy.js" defer></script>
           </div>
         </div>
       )}

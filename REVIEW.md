@@ -216,7 +216,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Casts `formData.x as string` where other routes guard first (`private.tsx:40-41` uses `typeof`, `import.tsx:71` uses `instanceof File` — leave both). Hono's `parseBody()` without `all` does _not_ produce arrays for repeated keys, but a multipart `File` part named `username` is truthy, passes `username || ''` at `:71`, and throws in `rate-limit.ts:79`'s `.toLowerCase()` → 500. `form.ts:4-5`'s docstring repeats the incorrect "repeated input yields an array" claim.
 - **Fix:** Use `getString()` in `auth.tsx` only (applying it to `import.tsx` would break file upload, since `getString` returns `''` for a `File`); fix the `form.ts` docstring.
 
-#### 2.18
+#### 2.18 — **Done**
 
 - **Where:** `apps/hono/src/app.tsx:47`; inline scripts in `views/layouts/base.tsx:10`, `views/pages/profile.tsx:408`, `views/pages/style-guide.tsx:47`, `views/components/PinForm.tsx:99`, `routes/api-internal.ts:64,68`; `onclick=` in `profile.tsx:258,366`, `views/pages/style-guide.tsx:111`, `views/pages/server-error.tsx:32`. (`views/pages/tag-merge.tsx:80` is `<script type="application/json">` — a data island that is never executed, so `script-src 'self'` does not block it; leave it.)
 - **Problem:** `secureHeaders()` ships no CSP because of the inline scripts and handlers.

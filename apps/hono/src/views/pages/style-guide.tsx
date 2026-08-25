@@ -1,5 +1,4 @@
 import type { FC, PropsWithChildren } from 'hono/jsx'
-import { html } from 'hono/html'
 import type { User, Pin } from '@pinsquirrel/domain'
 import { DefaultLayout } from '../layouts/default'
 import { Button } from '../components/ui/Button'
@@ -41,26 +40,6 @@ const Section: FC<
     <div class="space-y-4">{children}</div>
   </section>
 )
-
-// Inline script that syncs the toggle label with current theme on page load.
-// The base layout's darkModeScript (base.tsx:9-36) already reads localStorage.theme on load.
-const darkModeInitScript = html`
-  <script>
-    ;(function () {
-      const label = document.getElementById('style-dark-label')
-      if (!label) return
-      label.textContent = document.documentElement.classList.contains('dark')
-        ? 'Switch to light mode'
-        : 'Switch to dark mode'
-    })()
-  </script>
-`
-
-const toggleDarkOnclick =
-  "var d=document.documentElement.classList.toggle('dark');" +
-  "localStorage.setItem('theme',d?'dark':'light');" +
-  "var l=document.getElementById('style-dark-label');" +
-  "if(l)l.textContent=d?'Switch to light mode':'Switch to dark mode';"
 
 // Fake pins for PinCard rendering (not persisted; render-only)
 const samplePins: Pin[] = [
@@ -108,7 +87,7 @@ export const StyleGuidePage: FC<StyleGuidePageProps> = ({ user }) => {
           variant="outline"
           size="sm"
           aria-label="Toggle dark mode"
-          onclick={toggleDarkOnclick}
+          data-dark-toggle
         >
           <span id="style-dark-label">Toggle dark mode</span>
         </Button>
@@ -116,7 +95,7 @@ export const StyleGuidePage: FC<StyleGuidePageProps> = ({ user }) => {
           This page renders real app components for WCAG 2.2 contrast scanning.
         </p>
       </div>
-      {darkModeInitScript}
+      <script src="/static/style-guide.js" defer></script>
 
       <h1 class="text-3xl font-bold mb-8">Style Guide</h1>
 
