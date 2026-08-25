@@ -66,7 +66,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 
 ### Security / correctness in the app
 
-#### 1.7
+#### 1.7 — **Done**
 
 - **Where:** `libs/services/src/validation/pin.ts:4-7`
 - **Problem:** `urlSchema` uses `z.string().url()`, which in zod 4.4.3 accepts `javascript:` and `data:` **[verified]**. The stored URL is rendered as an `href`, so this is stored XSS. `validateUrlForFetching` already restricts to http(s).

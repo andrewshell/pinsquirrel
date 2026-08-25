@@ -1,10 +1,22 @@
 import { z } from 'zod'
 
 // URL validation
+//
+// Only http(s) is allowed. Stored URLs are rendered as `href` attributes, so
+// accepting `javascript:` or `data:` here would be stored XSS — and zod's
+// `.url()` accepts both.
 export const urlSchema = z
   .string()
   .url({ message: 'Must be a valid URL' })
   .max(2048, 'URL must be at most 2048 characters')
+  .refine(val => {
+    try {
+      const protocol = new URL(val).protocol
+      return protocol === 'http:' || protocol === 'https:'
+    } catch {
+      return false
+    }
+  }, 'URL must use http or https')
 
 // Pin field validations
 export const pinTitleSchema = z
