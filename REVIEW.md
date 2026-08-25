@@ -126,7 +126,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Dead exports: `PasswordResetRequest`, `PasswordResetConfirmation`, `ResetTokenNotFoundError`, `DuplicateTagError`, `InvalidApiKeyError`, `ValidationError.addFieldError/hasFieldError/getFieldErrors`, and the `index.ts` re-export of `FieldErrors` (the type itself is live — it types `ValidationError.fields`).
 - **Fix:** Delete.
 
-#### 2.4
+#### 2.4 — **Done**
 
 - **Where:** `libs/database/src/repositories/user.ts:81-100,185-206`; `tag.ts:161-177`
 - **Problem:** `UserRepository.list()`, `removeRole()`, `setRoles()` and `TagRepository.list()` are not on any domain interface and have zero callers; both `list()`s re-implement `applyPagination` by hand.
