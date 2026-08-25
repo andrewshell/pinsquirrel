@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { AccessControl } from '@pinsquirrel/domain'
 import {
   metadataService,
@@ -31,9 +32,12 @@ apiInternal.get('/metadata', async c => {
       description: metadata.description || '',
     })
   } catch (error) {
+    // Report the failure in the status line, not only in the body: the client
+    // should be able to trust `response.ok`.
     const message = metadataErrorUtils.getUserFriendlyMessage(error as Error)
+    const status = metadataErrorUtils.getHttpStatusForError(error as Error)
 
-    return c.json({ error: message })
+    return c.json({ error: message }, status as ContentfulStatusCode)
   }
 })
 
