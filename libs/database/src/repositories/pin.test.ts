@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/mysql2'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import mysql from 'mysql2/promise'
 import type { Pool } from 'mysql2/promise'
+import { insertPin } from '../test-fixtures.js'
 import { DrizzlePinRepository } from './pin.js'
 import { DrizzleTagRepository } from './tag.js'
 import { DrizzleUserRepository } from './user.js'
@@ -124,16 +125,13 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         name: 'test-tag-2',
       })
 
-      const testPinId = crypto.randomUUID()
-
-      // Insert test pin
-      await testPool.query(
-        `
-        INSERT INTO pins (id, user_id, url, url_hash, title, description, read_later, created_at, updated_at)
-        VALUES (?, ?, 'https://example.com', MD5('https://example.com'), 'Test Pin', 'Test Description', false, '2023-01-01T00:00:00', '2023-01-01T00:00:00')
-      `,
-        [testPinId, testUser.id]
-      )
+      const testPinId = await insertPin(testPool, {
+        userId: testUser.id,
+        url: 'https://example.com',
+        title: 'Test Pin',
+        description: 'Test Description',
+        createdAt: '2023-01-01T00:00:00',
+      })
 
       // Associate tags
       await testPool.query(
@@ -174,28 +172,27 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         emailHash: 'other_hashed_email',
       })
 
-      const pin1Id = crypto.randomUUID()
-      const pin2Id = crypto.randomUUID()
-      const pin3Id = crypto.randomUUID()
-
       // Create pins for test user
-      await testPool.query(
-        `
-        INSERT INTO pins (id, user_id, url, url_hash, title, created_at, updated_at) VALUES
-        (?, ?, 'https://example1.com', MD5('https://example1.com'), 'Pin 1', '2023-01-01T00:00:00', '2023-01-01T00:00:00'),
-        (?, ?, 'https://example2.com', MD5('https://example2.com'), 'Pin 2', '2023-01-02T00:00:00', '2023-01-02T00:00:00')
-      `,
-        [pin1Id, testUser.id, pin2Id, testUser.id]
-      )
+      await insertPin(testPool, {
+        userId: testUser.id,
+        url: 'https://example1.com',
+        title: 'Pin 1',
+        createdAt: '2023-01-01T00:00:00',
+      })
+      await insertPin(testPool, {
+        userId: testUser.id,
+        url: 'https://example2.com',
+        title: 'Pin 2',
+        createdAt: '2023-01-02T00:00:00',
+      })
 
       // Create pin for other user
-      await testPool.query(
-        `
-        INSERT INTO pins (id, user_id, url, url_hash, title, created_at, updated_at) VALUES
-        (?, ?, 'https://example3.com', MD5('https://example3.com'), 'Pin 3', '2023-01-03T00:00:00', '2023-01-03T00:00:00')
-      `,
-        [pin3Id, otherUser.id]
-      )
+      await insertPin(testPool, {
+        userId: otherUser.id,
+        url: 'https://example3.com',
+        title: 'Pin 3',
+        createdAt: '2023-01-03T00:00:00',
+      })
 
       const result = await pinRepository.findByUserId(testUser.id)
 
@@ -211,20 +208,25 @@ describe('DrizzlePinRepository - Integration Tests', () => {
     })
 
     it('should return pins in descending order by createdAt (newest first)', async () => {
-      const pin1Id = crypto.randomUUID()
-      const pin2Id = crypto.randomUUID()
-      const pin3Id = crypto.randomUUID()
-
       // Create pins with different creation times
-      await testPool.query(
-        `
-        INSERT INTO pins (id, user_id, url, url_hash, title, created_at, updated_at) VALUES
-        (?, ?, 'https://example1.com', MD5('https://example1.com'), 'Pin 1', '2023-01-01T00:00:00', '2023-01-01T00:00:00'),
-        (?, ?, 'https://example2.com', MD5('https://example2.com'), 'Pin 2', '2023-01-03T00:00:00', '2023-01-03T00:00:00'),
-        (?, ?, 'https://example3.com', MD5('https://example3.com'), 'Pin 3', '2023-01-02T00:00:00', '2023-01-02T00:00:00')
-      `,
-        [pin1Id, testUser.id, pin2Id, testUser.id, pin3Id, testUser.id]
-      )
+      await insertPin(testPool, {
+        userId: testUser.id,
+        url: 'https://example1.com',
+        title: 'Pin 1',
+        createdAt: '2023-01-01T00:00:00',
+      })
+      await insertPin(testPool, {
+        userId: testUser.id,
+        url: 'https://example2.com',
+        title: 'Pin 2',
+        createdAt: '2023-01-03T00:00:00',
+      })
+      await insertPin(testPool, {
+        userId: testUser.id,
+        url: 'https://example3.com',
+        title: 'Pin 3',
+        createdAt: '2023-01-02T00:00:00',
+      })
 
       const result = await pinRepository.findByUserId(testUser.id)
 
@@ -248,20 +250,25 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         name: 'tag2',
       })
 
-      const pin1Id = crypto.randomUUID()
-      const pin2Id = crypto.randomUUID()
-      const pin3Id = crypto.randomUUID()
-
       // Create pins
-      await testPool.query(
-        `
-        INSERT INTO pins (id, user_id, url, url_hash, title, created_at, updated_at) VALUES
-        (?, ?, 'https://example1.com', MD5('https://example1.com'), 'Pin 1', '2023-01-01T00:00:00', '2023-01-01T00:00:00'),
-        (?, ?, 'https://example2.com', MD5('https://example2.com'), 'Pin 2', '2023-01-02T00:00:00', '2023-01-02T00:00:00'),
-        (?, ?, 'https://example3.com', MD5('https://example3.com'), 'Pin 3', '2023-01-03T00:00:00', '2023-01-03T00:00:00')
-      `,
-        [pin1Id, testUser.id, pin2Id, testUser.id, pin3Id, testUser.id]
-      )
+      const pin1Id = await insertPin(testPool, {
+        userId: testUser.id,
+        url: 'https://example1.com',
+        title: 'Pin 1',
+        createdAt: '2023-01-01T00:00:00',
+      })
+      const pin2Id = await insertPin(testPool, {
+        userId: testUser.id,
+        url: 'https://example2.com',
+        title: 'Pin 2',
+        createdAt: '2023-01-02T00:00:00',
+      })
+      await insertPin(testPool, {
+        userId: testUser.id,
+        url: 'https://example3.com',
+        title: 'Pin 3',
+        createdAt: '2023-01-03T00:00:00',
+      })
 
       // Associate tags
       await testPool.query(
@@ -299,36 +306,31 @@ describe('DrizzlePinRepository - Integration Tests', () => {
 
   describe('findByUserIdAndReadLater', () => {
     it('should find pins by user and read later status', async () => {
-      const pinId1 = crypto.randomUUID()
-      const pinId2 = crypto.randomUUID()
-      const pinId3 = crypto.randomUUID()
-      const url1 = `https://example${pinId1.slice(0, 8)}.com`
-      const url2 = `https://example${pinId2.slice(0, 8)}.com`
-      const url3 = `https://example${pinId3.slice(0, 8)}.com`
+      const url1 = `https://example${crypto.randomUUID().slice(0, 8)}.com`
+      const url2 = `https://example${crypto.randomUUID().slice(0, 8)}.com`
+      const url3 = `https://example${crypto.randomUUID().slice(0, 8)}.com`
 
       // Create pins with different read later status
-      await testPool.query(
-        `
-        INSERT INTO pins (id, user_id, url, url_hash, title, read_later, created_at, updated_at) VALUES
-        (?, ?, ?, MD5(?), 'Pin 1', true, '2023-01-01T00:00:00', '2023-01-01T00:00:00'),
-        (?, ?, ?, MD5(?), 'Pin 2', true, '2023-01-02T00:00:00', '2023-01-02T00:00:00'),
-        (?, ?, ?, MD5(?), 'Pin 3', false, '2023-01-03T00:00:00', '2023-01-03T00:00:00')
-      `,
-        [
-          pinId1,
-          testUser.id,
-          url1,
-          url1,
-          pinId2,
-          testUser.id,
-          url2,
-          url2,
-          pinId3,
-          testUser.id,
-          url3,
-          url3,
-        ]
-      )
+      await insertPin(testPool, {
+        userId: testUser.id,
+        url: url1,
+        title: 'Pin 1',
+        readLater: true,
+        createdAt: '2023-01-01T00:00:00',
+      })
+      await insertPin(testPool, {
+        userId: testUser.id,
+        url: url2,
+        title: 'Pin 2',
+        readLater: true,
+        createdAt: '2023-01-02T00:00:00',
+      })
+      await insertPin(testPool, {
+        userId: testUser.id,
+        url: url3,
+        title: 'Pin 3',
+        createdAt: '2023-01-03T00:00:00',
+      })
 
       const readLaterPins = await pinRepository.findByUserId(testUser.id, {
         readLater: true,
@@ -348,16 +350,14 @@ describe('DrizzlePinRepository - Integration Tests', () => {
 
   describe('findByUserIdAndUrl', () => {
     it('should find pin by user and url', async () => {
-      const pinId = crypto.randomUUID()
-      const testUrl = `https://example-${pinId.slice(0, 8)}.com/page`
+      const testUrl = `https://example-${crypto.randomUUID().slice(0, 8)}.com/page`
 
-      await testPool.query(
-        `
-        INSERT INTO pins (id, user_id, url, url_hash, title, created_at, updated_at) VALUES
-        (?, ?, ?, MD5(?), 'Test Pin', '2023-01-01T00:00:00', '2023-01-01T00:00:00')
-      `,
-        [pinId, testUser.id, testUrl, testUrl]
-      )
+      await insertPin(testPool, {
+        userId: testUser.id,
+        url: testUrl,
+        title: 'Test Pin',
+        createdAt: '2023-01-01T00:00:00',
+      })
 
       const result = await pinRepository.findByUserIdAndUrl(
         testUser.id,

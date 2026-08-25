@@ -11,6 +11,7 @@ import { drizzle } from 'drizzle-orm/mysql2'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import mysql from 'mysql2/promise'
 import type { Pool } from 'mysql2/promise'
+import { insertUser } from '../test-fixtures.js'
 import { DrizzleUserRepository } from './user.js'
 import { Role, UserStatus } from '@pinsquirrel/domain'
 
@@ -50,17 +51,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
 
   describe('findById', () => {
     it('should find user by id', async () => {
-      const userId = crypto.randomUUID()
-      const username = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      // Insert test data directly
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', '2023-01-01T00:00:00', '2023-01-01T00:00:00')
-      `,
-        [userId, username]
-      )
+      const { id: userId, username } = await insertUser(testPool)
 
       const result = await repository.findById(userId)
 
@@ -80,16 +71,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
 
   describe('findByEmailHash', () => {
     it('should find user by email hash', async () => {
-      const testUserId = crypto.randomUUID()
-      const testUsername = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'specific_email_hash', '2023-01-01T00:00:00', '2023-01-01T00:00:00')
-      `,
-        [testUserId, testUsername]
-      )
+      await insertUser(testPool, { emailHash: 'specific_email_hash' })
 
       const result = await repository.findByEmailHash('specific_email_hash')
 
@@ -105,16 +87,9 @@ describe('DrizzleUserRepository - Integration Tests', () => {
 
   describe('findByUsername', () => {
     it('should find user by username', async () => {
-      const userId = crypto.randomUUID()
-      const username = `specific_username-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', '2023-01-01T00:00:00', '2023-01-01T00:00:00')
-      `,
-        [userId, username]
-      )
+      const { username } = await insertUser(testPool, {
+        username: `specific_username-${crypto.randomUUID().slice(0, 8)}`,
+      })
 
       const result = await repository.findByUsername(username)
 
