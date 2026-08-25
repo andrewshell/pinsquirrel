@@ -7,7 +7,11 @@ import type {
   UpdatePinData,
   PaginationOptions,
 } from '@pinsquirrel/domain'
-import { Pagination } from '@pinsquirrel/domain'
+import {
+  Pagination,
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+} from '@pinsquirrel/domain'
 import {
   DuplicatePinError,
   PinNotFoundError,
@@ -250,8 +254,8 @@ export class PinService {
     // Calculate pagination details
     const pagination = Pagination.fromTotalCount(totalCount, {
       ...paginationOptions,
-      defaultPageSize: 25,
-      maxPageSize: 100,
+      defaultPageSize: DEFAULT_PAGE_SIZE,
+      maxPageSize: MAX_PAGE_SIZE,
     })
 
     // Fetch pins with pagination. The query is scoped to ac.user, so every

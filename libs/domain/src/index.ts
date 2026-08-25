@@ -22,7 +22,12 @@ export type {
   UpdateSessionData,
 } from './entities/session.js'
 export type { ApiKey, CreateApiKeyData } from './entities/api-key.js'
-export { Pagination, type PaginationOptions } from './entities/pagination.js'
+export {
+  Pagination,
+  type PaginationOptions,
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+} from './entities/pagination.js'
 export { AccessControl, type AccessGateable } from './entities/access.js'
 
 // Type utilities

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MAX_PAGE_SIZE } from '@pinsquirrel/domain'
 import type { PinFilter } from '@pinsquirrel/domain'
 
 /**
@@ -28,16 +29,18 @@ export const pinListInputSchema = z.object({
     .number()
     .int()
     .min(1)
-    .max(100)
+    .max(MAX_PAGE_SIZE)
     .optional()
-    .describe('Results per page (max 100)'),
+    .describe(`Results per page (max ${MAX_PAGE_SIZE})`),
 })
 
 export type PinListInput = z.infer<typeof pinListInputSchema>
 
-export const pinGetInputSchema = {
+export const pinGetInputSchema = z.object({
   id: z.string().describe('The pin ID'),
-}
+})
+
+export type PinGetInput = z.infer<typeof pinGetInputSchema>
 
 export const tagListInputSchema = z.object({
   withCounts: z.boolean().optional().describe('Include pin counts per tag'),
