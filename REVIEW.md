@@ -298,7 +298,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `username` (`:153,156,331`), `userEmail` (`:157`), `resetUrl` (`:56,60`), `signinUrl` (`:243`), `signupUrl` (`:334`) are interpolated into HTML bodies unescaped; `:56`, `:243` and `:334` are inside `href="…"`, so a `"` breaks the attribute. `username` is regex-restricted by `usernameSchema`; the rest are not. `resetUrl`/`signinUrl`/`signupUrl` are request-derived (`auth.tsx:185,187,188` build them from `url.origin`), so none is a trusted constant. (`:81,174-177,263,352-354` are plain-text bodies — leave those.)
 - **Fix:** Tiny `escapeHtml()` applied in the HTML templates only.
 
-#### 2.31
+#### 2.31 — **Done**
 
 - **Where:** `apps/hono/src/routes/pin-routes.tsx:392-509`
 - **Problem:** `POST /:id/edit` reads the pin up to three times and loads `userTags` before knowing whether it needs them (3 pin reads + 1 tag read on the failure path).

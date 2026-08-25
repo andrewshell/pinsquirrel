@@ -423,6 +423,46 @@ describe('pins routes', () => {
         userId: 'owner-9',
       })
     })
+
+    // The tag list is only needed to re-render the form, and the pin only
+    // needs reading once. A successful edit should pay for neither twice.
+    it('reads the pin once and skips the tag list on success', async () => {
+      await app.request(
+        '/pins/pin-1/edit',
+        formBody({ url: 'https://x.test/b', title: 'Updated' })
+      )
+
+      expect(svc.getPin).toHaveBeenCalledTimes(1)
+      expect(svc.getUserTags).not.toHaveBeenCalled()
+    })
+
+    it('reads the pin once when the update is rejected', async () => {
+      svc.updatePin.mockRejectedValue(new ValidationError({ url: ['invalid'] }))
+
+      const res = await app.request(
+        '/pins/pin-1/edit',
+        formBody({ url: 'nope', title: 'Updated' })
+      )
+
+      expect(res.status).toBe(200)
+      expect(svc.getPin).toHaveBeenCalledTimes(1)
+      expect(svc.getUserTags).toHaveBeenCalledTimes(1)
+    })
+
+    it.each([
+      ['missing', new PinNotFoundError('pin-1')],
+      ['someone else\u2019s', new UnauthorizedPinAccessError('pin-1')],
+    ])('404s on a %s pin without loading the tag list', async (_l, error) => {
+      svc.getPin.mockRejectedValue(error)
+
+      const res = await app.request(
+        '/pins/pin-1/edit',
+        formBody({ url: 'https://x.test/b', title: 'Updated' })
+      )
+
+      expect(res.status).toBe(404)
+      expect(svc.getUserTags).not.toHaveBeenCalled()
+    })
   })
 
   describe('POST /:id/toggle-read', () => {
