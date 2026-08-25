@@ -8,7 +8,13 @@ interface ViewSettingsProps {
   baseUrl?: string
 }
 
-// Build URL with updated view setting
+/**
+ * Build the list URL with one view setting changed.
+ *
+ * The size lives in `?view=`, the same parameter the card routes read, so a
+ * card re-rendered mid-list comes back at the size the list is showing. It used
+ * to be `?size=` here and `?view=` there.
+ */
 function buildViewSettingUrl(
   currentParams: string,
   setting: string,
@@ -193,21 +199,21 @@ export const ViewSettings: FC<ViewSettingsProps> = ({
           data-dropdown="menu"
         >
           <a
-            href={`${baseUrl}?${buildViewSettingUrl(searchParams, 'size', 'expanded')}`}
-            hx-get={`${baseUrl}?${buildViewSettingUrl(searchParams, 'size', 'expanded')}`}
+            href={`${baseUrl}?${buildViewSettingUrl(searchParams, 'view', 'expanded')}`}
+            hx-get={`${baseUrl}?${buildViewSettingUrl(searchParams, 'view', 'expanded')}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
-            hx-push-url={`${baseUrl}?${buildViewSettingUrl(searchParams, 'size', 'expanded')}`}
+            hx-push-url={`${baseUrl}?${buildViewSettingUrl(searchParams, 'view', 'expanded')}`}
             class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
           >
             Expanded
           </a>
           <a
-            href={`${baseUrl}?${buildViewSettingUrl(searchParams, 'size', 'compact')}`}
-            hx-get={`${baseUrl}?${buildViewSettingUrl(searchParams, 'size', 'compact')}`}
+            href={`${baseUrl}?${buildViewSettingUrl(searchParams, 'view', 'compact')}`}
+            hx-get={`${baseUrl}?${buildViewSettingUrl(searchParams, 'view', 'compact')}`}
             hx-target="#pins-content"
             hx-swap="innerHTML"
-            hx-push-url={`${baseUrl}?${buildViewSettingUrl(searchParams, 'size', 'compact')}`}
+            hx-push-url={`${baseUrl}?${buildViewSettingUrl(searchParams, 'view', 'compact')}`}
             class="block px-3 py-2 text-sm hover:bg-accent/10 transition-colors"
           >
             Compact

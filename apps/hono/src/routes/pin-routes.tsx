@@ -54,7 +54,10 @@ export function parsePinQueryParams(c: Context, privateMode = false) {
   const unreadParam = url.searchParams.get('unread')
   const notagsParam = url.searchParams.get('notags')
   const pageParam = url.searchParams.get('page')
-  const sizeParam = url.searchParams.get('size')
+  // `?size=` is the old spelling, kept for one release so bookmarked links
+  // still open compact. Everything emits `?view=` now, matching the card
+  // routes, which never used `size`.
+  const sizeParam = url.searchParams.get('view') ?? url.searchParams.get('size')
   const sortParam = url.searchParams.get('sort')
   const directionParam = url.searchParams.get('direction')
 
@@ -520,37 +523,39 @@ export function createPinRoutes({
 
     const pinId = c.req.param('id')
     const ac = new AccessControl(user)
+    // The card states its own size and filters on the hx-post URL, exactly as
+    // delete-confirm does. Deriving them from `Referer` instead meant a proxy
+    // that strips the header re-rendered a compact card as an expanded one.
+    const { viewSize, searchParams } = takeViewSize(c)
 
-    const existingPin = await pinService.getPin(ac, pinId)
-
-    const updatedPin = await pinService.updatePin(ac, {
-      id: existingPin.id,
-      userId: existingPin.userId,
-      url: existingPin.url,
-      title: existingPin.title,
-      description: existingPin.description,
-      readLater: !existingPin.readLater,
-      isPrivate: existingPin.isPrivate,
-      tagNames: existingPin.tagNames,
-    })
-
-    // Carry the list filters through from wherever the card was clicked.
-    const referer = c.req.header('Referer') || ''
-    let searchParams = ''
     try {
-      searchParams = new URL(referer).search.replace(/^\?/, '')
-    } catch {
-      // Ignore invalid referer
-    }
+      const existingPin = await pinService.getPin(ac, pinId)
 
-    return c.html(
-      <PinCard
-        pin={updatedPin}
-        viewSize="expanded"
-        searchParams={searchParams}
-        baseUrl={baseUrl}
-      />
-    )
+      const updatedPin = await pinService.updatePin(ac, {
+        id: existingPin.id,
+        userId: existingPin.userId,
+        url: existingPin.url,
+        title: existingPin.title,
+        description: existingPin.description,
+        readLater: !existingPin.readLater,
+        isPrivate: existingPin.isPrivate,
+        tagNames: existingPin.tagNames,
+      })
+
+      return c.html(
+        <PinCard
+          pin={updatedPin}
+          viewSize={viewSize}
+          searchParams={searchParams}
+          baseUrl={baseUrl}
+        />
+      )
+    } catch (error) {
+      if (isMissingPin(error)) {
+        return c.text('Pin not found', 404)
+      }
+      throw error
+    }
   })
 
   // GET /:id/delete-confirm — inline delete confirmation (HTMX)
