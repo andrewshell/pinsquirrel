@@ -610,7 +610,9 @@ describe('PinService', () => {
       ).rejects.toThrow(PinNotFoundError)
     })
 
-    it("should throw UnauthorizedPinAccessError for another user's pin", async () => {
+    // Same reason as the private-pin case: an "unauthorized" answer confirms
+    // the id exists, which is exactly what the docstring promises it will not.
+    it("should throw PinNotFoundError for another user's pin", async () => {
       mockPinRepository.findById.mockResolvedValue({
         ...mockPin,
         userId: 'other-user',
@@ -618,7 +620,7 @@ describe('PinService', () => {
 
       await expect(
         pinService.getPublicPin(createMockAccessControl(mockUser), 'pin-123')
-      ).rejects.toThrow(UnauthorizedPinAccessError)
+      ).rejects.toThrow(PinNotFoundError)
     })
   })
 

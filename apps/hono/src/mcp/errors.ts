@@ -26,7 +26,9 @@ export function mapDomainErrorToMcp(err: unknown) {
     err instanceof UnauthorizedPinAccessError ||
     err instanceof UnauthorizedTagAccessError
   ) {
-    message = 'Unauthorized'
+    // "Forbidden", matching the REST 403: the bearer token was already
+    // accepted, so this is never a question about identity.
+    message = 'Forbidden'
   } else {
     message = 'Internal server error'
   }

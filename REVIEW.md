@@ -90,7 +90,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `GET /signout` destroys the session; `csrf()` does not cover GET, so `<img src="/signout">` on any site logs users out.
 - **Fix:** Replace the two header links with a POST form (the `/private/lock` button already does this); delete the GET route. **Blocked on Q6.**
 
-#### 1.11
+#### 1.11 — **Done**
 
 - **Where:** `libs/services/src/services/pin.ts:222-228`; `apps/hono/src/routes/api-v1.ts:185-188`; `apps/hono/src/routes/pin-routes.tsx:126-132`
 - **Problem:** `getPublicPin`'s docstring promises private pins are indistinguishable from missing ones, but a pin owned by _another_ user surfaces as `UnauthorizedPinAccessError`, which `api-v1.ts` maps to **401** — confirming the id exists. `pin.test.ts:589` locks this in. HTML routes deliberately return 404 "so ownership stays opaque". MCP (`mapDomainErrorToMcp`) follows the API.
