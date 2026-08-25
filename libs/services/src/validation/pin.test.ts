@@ -33,6 +33,23 @@ describe('urlSchema', () => {
     })
   })
 
+  it('should reject non-http(s) schemes', () => {
+    const dangerousUrls = [
+      'javascript:alert(1)',
+      'JavaScript:alert(1)',
+      'data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==',
+      'vbscript:msgbox(1)',
+      'ftp://example.com/file.txt',
+      'mailto:someone@example.com',
+      'file:///etc/passwd',
+    ]
+
+    dangerousUrls.forEach(url => {
+      const result = urlSchema.safeParse(url)
+      expect(result.success, `expected ${url} to be rejected`).toBe(false)
+    })
+  })
+
   it('should reject URLs longer than 2048 characters', () => {
     const longUrl = 'https://example.com/' + 'a'.repeat(2030)
     const result = urlSchema.safeParse(longUrl)
