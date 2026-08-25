@@ -72,9 +72,9 @@ describe('MetadataService', () => {
     expect(mockHtmlParser.parseMetadata).not.toHaveBeenCalled()
   })
 
-  it('should handle timeout errors from fetcher', async () => {
+  it('should propagate timeout errors from fetcher', async () => {
     vi.mocked(mockHttpFetcher.fetch).mockRejectedValue(
-      new Error('Request timeout')
+      new FetchTimeoutError('https://example.com')
     )
 
     await expect(service.fetchMetadata('https://example.com')).rejects.toThrow(
@@ -85,9 +85,9 @@ describe('MetadataService', () => {
     expect(mockHtmlParser.parseMetadata).not.toHaveBeenCalled()
   })
 
-  it('should handle HTTP errors from fetcher', async () => {
+  it('should propagate HTTP errors from fetcher with their status intact', async () => {
     vi.mocked(mockHttpFetcher.fetch).mockRejectedValue(
-      new Error('HTTP 404 Not Found')
+      new HttpError(404, 'https://example.com')
     )
 
     const error = await service
