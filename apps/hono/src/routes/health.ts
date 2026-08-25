@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { sql } from 'drizzle-orm'
+import { sql } from '@pinsquirrel/database'
 import { db } from '../lib/db.js'
 import { logger, safeError } from '../lib/logger.js'
 
