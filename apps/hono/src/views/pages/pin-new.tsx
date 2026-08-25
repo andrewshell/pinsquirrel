@@ -80,6 +80,7 @@ export const PinNewPage: FC<PinNewPageProps> = ({
           <PinForm
             action={`${baseUrl}/new`}
             submitLabel="Create Pin"
+            baseUrl={baseUrl}
             url={url}
             title={title}
             description={description}

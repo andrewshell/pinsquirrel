@@ -92,6 +92,7 @@ export const PinEditPage: FC<PinEditPageProps> = ({
           <PinForm
             action={formAction}
             submitLabel="Update Pin"
+            baseUrl={baseUrl}
             pinId={pin.id}
             url={formUrl}
             title={formTitle}

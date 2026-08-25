@@ -196,11 +196,12 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Metadata-fetch failure returns `{ error }` with HTTP 200, so `static/metadata-fetch.js:87` special-cases `!data.error`. `metadataErrorUtils.getHttpStatusForError` exists for exactly this and is never called.
 - **Fix:** `return c.json({ error: message }, metadataErrorUtils.getHttpStatusForError(error))`; simplify the JS. (Do not delete `getHttpStatusForError` as dead code.)
 
-#### 2.15
+#### 2.15 — **Done**
 
 - **Where:** `apps/hono/src/routes/api-internal.ts:64`; `apps/hono/src/views/components/PinForm.tsx:92`
 - **Problem:** The duplicate-URL "Edit instead?" link is hard-coded to `/pins/:id/edit`, so a duplicate detected from `/private/pins/new` links out of private mode.
 - **Fix:** Add a `baseUrl` prop to `PinForm` (it has none today) and emit it via `hx-vals` on the URL-check request; use it in both places.
+- **Note (when done):** `hx-params="url"` on that input filtered the `hx-vals` out — htmx merges vals into the form data _before_ applying `hx-params` — so the existing `exclude` value never reached the server either. Widened to `hx-params="url,exclude,baseUrl"`. The endpoint allowlists `baseUrl` to a plain absolute path, since it is interpolated into an `href` in a hand-built HTML string.
 
 #### 2.16
 

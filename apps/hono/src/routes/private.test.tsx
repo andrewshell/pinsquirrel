@@ -398,6 +398,26 @@ describe('private routes', () => {
       expect(res.headers.get('Location')).toBeNull()
     })
 
+    // The "Edit instead?" escape hatch must stay inside private mode; a link
+    // to /pins/:id/edit walks the user out of it.
+    it('points the duplicate-URL link at the private edit form', async () => {
+      svc.createPin.mockRejectedValue(
+        new DuplicatePinError('https://x.test/a', {
+          id: 'pin-9',
+          createdAt: new Date('2024-01-01'),
+        })
+      )
+
+      const res = await app.request(
+        '/private/pins/new',
+        formBody({ url: 'https://x.test/a', title: 'T' })
+      )
+
+      const html = await res.text()
+      expect(html).toContain('/private/pins/pin-9/edit')
+      expect(html).not.toContain('"/pins/pin-9/edit"')
+    })
+
     it('uses HX-Redirect instead of a 302 for HTMX submissions', async () => {
       svc.createPin.mockResolvedValue(makePin())
 
