@@ -588,6 +588,82 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       expect(remainingTags[0].id).toBe(destinationTag.id)
     })
 
+    it('should not duplicate a pin that carries several source tags and the destination', async () => {
+      const sourceTag1 = await tagRepository.create({
+        userId: testUser.id,
+        name: 'source-tag-1',
+      })
+      const sourceTag2 = await tagRepository.create({
+        userId: testUser.id,
+        name: 'source-tag-2',
+      })
+      const destinationTag = await tagRepository.create({
+        userId: testUser.id,
+        name: 'destination-tag',
+      })
+
+      const bothAndDestPinId = crypto.randomUUID()
+      const sourceOnlyPinId = crypto.randomUUID()
+      const destOnlyPinId = crypto.randomUUID()
+
+      await testPool.query(
+        `
+        INSERT INTO pins (id, user_id, url, url_hash, title, description, read_later, created_at, updated_at) VALUES
+        (?, ?, 'https://example1.com', MD5('https://example1.com'), 'Pin 1', null, false, '2023-01-01T00:00:00', '2023-01-01T00:00:00'),
+        (?, ?, 'https://example2.com', MD5('https://example2.com'), 'Pin 2', null, false, '2023-01-02T00:00:00', '2023-01-02T00:00:00'),
+        (?, ?, 'https://example3.com', MD5('https://example3.com'), 'Pin 3', null, false, '2023-01-03T00:00:00', '2023-01-03T00:00:00')
+      `,
+        [
+          bothAndDestPinId,
+          testUser.id,
+          sourceOnlyPinId,
+          testUser.id,
+          destOnlyPinId,
+          testUser.id,
+        ]
+      )
+
+      await testPool.query(
+        `
+        INSERT INTO pins_tags (pin_id, tag_id) VALUES
+        (?, ?), (?, ?), (?, ?), (?, ?), (?, ?)
+      `,
+        [
+          bothAndDestPinId,
+          sourceTag1.id,
+          bothAndDestPinId,
+          sourceTag2.id,
+          bothAndDestPinId,
+          destinationTag.id,
+          sourceOnlyPinId,
+          sourceTag1.id,
+          destOnlyPinId,
+          destinationTag.id,
+        ]
+      )
+
+      await tagRepository.mergeTags(
+        testUser.id,
+        [sourceTag1.id, sourceTag2.id],
+        destinationTag.id
+      )
+
+      const [rows] = await testPool.query(
+        'SELECT pin_id, tag_id FROM pins_tags ORDER BY pin_id'
+      )
+      const links = rows as { pin_id: string; tag_id: string }[]
+
+      expect(links).toHaveLength(3)
+      expect(links.every(l => l.tag_id === destinationTag.id)).toBe(true)
+      expect(links.map(l => l.pin_id).sort()).toEqual(
+        [bothAndDestPinId, sourceOnlyPinId, destOnlyPinId].sort()
+      )
+
+      const remainingTags = await tagRepository.findByUserId(testUser.id)
+      expect(remainingTags).toHaveLength(1)
+      expect(remainingTags[0].id).toBe(destinationTag.id)
+    })
+
     it('should throw error if source tags are empty', async () => {
       const destinationTag = await tagRepository.create({
         userId: testUser.id,

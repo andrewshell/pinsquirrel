@@ -330,7 +330,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `findByStatus` (used by the admin waitlist) and `findAll` call `attachRoles` per user (N+1).
 - **Fix:** One `inArray(userRoles.userId, ids)` query grouped in memory, like `getPinTags` in `pin.ts:312`. `findAll` goes away in 2.2.
 
-#### 2.36
+#### 2.36 — **Done**
 
 - **Where:** `libs/database/src/repositories/tag.ts:273-306`
 - **Problem:** `mergeTags` does one SELECT + one INSERT per pin and one SELECT per source tag inside the transaction.

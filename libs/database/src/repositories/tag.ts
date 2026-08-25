@@ -1,4 +1,4 @@
-import { eq, and, inArray, count, isNull, sql } from 'drizzle-orm'
+import { eq, and, inArray, count, isNull, notExists, sql } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import type {
   Tag,
@@ -239,52 +239,39 @@ export class DrizzleTagRepository implements TagRepository {
       throw new Error('Destination tag cannot be one of the source tags')
     }
 
-    // Perform merge operation in a transaction
+    // Perform merge operation in a transaction.
+    //
+    // Three statements regardless of how many pins or source tags are
+    // involved; the previous shape was a SELECT + INSERT per pin and a SELECT
+    // per source tag, all inside the transaction.
     await this.db.transaction(async tx => {
-      // Get all pins associated with source tags
-      const pinsWithSourceTags = await tx
-        .select({ pinId: pinsTags.pinId })
-        .from(pinsTags)
-        .where(inArray(pinsTags.tagId, sourceTagIds))
-
-      const uniquePinIds = [...new Set(pinsWithSourceTags.map(p => p.pinId))]
-
-      // For each pin, check if it already has the destination tag
-      // If not, add the destination tag association
-      for (const pinId of uniquePinIds) {
-        const existingAssociation = await tx
-          .select({ pinId: pinsTags.pinId })
-          .from(pinsTags)
-          .where(
-            and(eq(pinsTags.pinId, pinId), eq(pinsTags.tagId, destinationTagId))
-          )
-          .limit(1)
-
-        // If the pin doesn't already have the destination tag, add it
-        if (existingAssociation.length === 0) {
-          await tx.insert(pinsTags).values({
-            pinId,
-            tagId: destinationTagId,
-          })
-        }
-      }
+      // Point every pin that carries a source tag at the destination tag.
+      // pins_tags is keyed on (pin_id, tag_id), so IGNORE is what handles a pin
+      // that already carries the destination.
+      await tx.execute(sql`
+        insert ignore into ${pinsTags} (pin_id, tag_id)
+        select distinct ${pinsTags.pinId}, ${destinationTagId}
+        from ${pinsTags}
+        where ${inArray(pinsTags.tagId, sourceTagIds)}
+      `)
 
       // Remove all associations with source tags
       await tx.delete(pinsTags).where(inArray(pinsTags.tagId, sourceTagIds))
 
-      // Delete source tags that have no remaining pin associations
-      for (const sourceTagId of sourceTagIds) {
-        const remainingAssociations = await tx
-          .select({ tagId: pinsTags.tagId })
-          .from(pinsTags)
-          .where(eq(pinsTags.tagId, sourceTagId))
-          .limit(1)
-
-        // If no associations remain, delete the tag
-        if (remainingAssociations.length === 0) {
-          await tx.delete(tags).where(eq(tags.id, sourceTagId))
-        }
-      }
+      // Delete source tags that have no remaining pin associations. After the
+      // delete above that is all of them, but the guard costs nothing and keeps
+      // a tag that somehow gained a link mid-transaction.
+      await tx.delete(tags).where(
+        and(
+          inArray(tags.id, sourceTagIds),
+          notExists(
+            tx
+              .select({ one: sql`1` })
+              .from(pinsTags)
+              .where(eq(pinsTags.tagId, tags.id))
+          )
+        )
+      )
     })
   }
 
