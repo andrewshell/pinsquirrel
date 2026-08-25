@@ -634,15 +634,21 @@ describe('auth routes', () => {
   })
 
   describe('signout', () => {
-    it.each([
-      ['POST', { method: 'POST' }],
-      ['GET', {}],
-    ])('destroys the session and redirects on %s', async (_m, init) => {
-      const res = await app.request('/signout', init)
+    it('destroys the session and redirects on POST', async () => {
+      const res = await app.request('/signout', { method: 'POST' })
 
       expect(session.destroy).toHaveBeenCalled()
       expect(res.status).toBe(302)
       expect(res.headers.get('Location')).toBe('/signin')
+    })
+
+    it('does not destroy the session on GET', async () => {
+      // csrf() does not cover GET, so a GET route here means an <img
+      // src="/signout"> on any other site signs the user out.
+      const res = await app.request('/signout')
+
+      expect(session.destroy).not.toHaveBeenCalled()
+      expect(res.status).toBe(404)
     })
 
     it('destroys the session even when not signed in', async () => {
