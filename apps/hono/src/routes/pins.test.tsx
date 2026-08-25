@@ -141,6 +141,22 @@ describe('pins routes', () => {
       })
     })
 
+    it.each([
+      ['abc', '?page=abc'],
+      ['0', '?page=0'],
+      ['-3', '?page=-3'],
+      ['1.5', '?page=1.5'],
+      ['empty', '?page='],
+    ])('falls back to page 1 for a %s page param', async (_label, query) => {
+      const res = await app.request(`/pins${query}`)
+
+      expect(res.status).toBe(200)
+      expect(svc.getUserPinsWithPagination.mock.calls[0][2]).toEqual({
+        page: 1,
+        pageSize: 25,
+      })
+    })
+
     it('returns only the content partial for HTMX requests', async () => {
       const full = await app.request('/pins')
       const partial = await app.request('/pins', {
