@@ -455,11 +455,12 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Page-size constants live in three places; `MAX_KEYS_PER_USER = 5` is hardcoded again as "(5)" in `ApiKeyLimitExceededError`'s message; `pinGetInputSchema` is a raw shape while `tagListInputSchema` is a `z.object` whose consumer calls `.shape` (`apps/hono/src/mcp/server.ts:80`).
 - **Fix:** Single exported constants; make both schemas `z.object`. **PLAN.md:** the `MAX_KEYS_PER_USER` half disappears with Phase 7b — only fix the page-size constants and the schema shape.
 
-#### 3.12
+#### 3.12 — **Done**
 
 - **Where:** `libs/services/src/validation/pin.ts:4-7`, `user.ts:19`, and any other `z.string().url()`/`.email()`
 - **Problem:** zod 4 deprecates `z.string().url()`/`.email()` in favour of `z.url()`/`z.email()`.
 - **Fix:** Mechanical migration; separate PR from 1.7 so it does not gate the security fix.
+- **Note (when done):** Two call sites, both in `libs/services/src/validation` — there were no others. 1.7's http(s) refinement on `urlSchema` is untouched; `z.url()` accepts `javascript:` and `data:` exactly as `z.string().url()` did.
 
 #### 3.13
 

@@ -15,7 +15,6 @@ export const passwordSchema = z
   .max(100, 'Password must be at most 100 characters')
 
 export const emailSchema = z
-  .string()
   .email('Invalid email address')
   .max(100, 'Email must be at most 100 characters')
 
