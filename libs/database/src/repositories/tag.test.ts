@@ -362,33 +362,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       expect(result).toBe(false)
     })
   })
-
-  describe('findAll', () => {
-    it('should return all tags', async () => {
-      const tag1Name = `tag1-${crypto.randomUUID().slice(0, 8)}`
-      const tag2Name = `tag2-${crypto.randomUUID().slice(0, 8)}`
-
-      const tag1 = await tagRepository.create({
-        userId: testUser.id,
-        name: tag1Name,
-      })
-      const tag2 = await tagRepository.create({
-        userId: testUser.id,
-        name: tag2Name,
-      })
-
-      const result = await tagRepository.findAll()
-
-      const ourTag1 = result.find(t => t.id === tag1.id)
-      const ourTag2 = result.find(t => t.id === tag2.id)
-
-      expect(ourTag1).toBeDefined()
-      expect(ourTag2).toBeDefined()
-      expect(ourTag1!.name).toBe(tag1Name)
-      expect(ourTag2!.name).toBe(tag2Name)
-    })
-  })
-
   describe('list', () => {
     it('should return tags with limit', async () => {
       for (let i = 1; i <= 5; i++) {

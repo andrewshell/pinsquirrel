@@ -78,7 +78,6 @@ describe('ApiKeyService', () => {
       findByEmailHash: vi.fn(),
       findByUsername: vi.fn(),
       findByStatus: vi.fn(),
-      findAll: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),

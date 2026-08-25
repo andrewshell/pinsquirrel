@@ -119,41 +119,6 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       expect(result).toBeNull()
     })
   })
-
-  describe('findAll', () => {
-    it('should return all users', async () => {
-      const user1Id = crypto.randomUUID()
-      const user2Id = crypto.randomUUID()
-      const user1Name = `user1-${crypto.randomUUID().slice(0, 8)}`
-      const user2Name = `user2-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at) VALUES
-        (?, ?, 'hash1', 'email1', '2023-01-01T00:00:00', '2023-01-01T00:00:00'),
-        (?, ?, 'hash2', 'email2', '2023-01-02T00:00:00', '2023-01-02T00:00:00')
-      `,
-        [user1Id, user1Name, user2Id, user2Name]
-      )
-
-      const result = await repository.findAll()
-
-      // Find our specific users in the results
-      const ourUser1 = result.find(u => u.id === user1Id)
-      const ourUser2 = result.find(u => u.id === user2Id)
-
-      expect(ourUser1).toBeDefined()
-      expect(ourUser2).toBeDefined()
-      expect(ourUser1!.username).toBe(user1Name)
-      expect(ourUser2!.username).toBe(user2Name)
-    })
-
-    it('should return empty array when no users exist', async () => {
-      const result = await repository.findAll()
-      expect(Array.isArray(result)).toBe(true)
-    })
-  })
-
   describe('findByStatus', () => {
     it('returns only users with the given status', async () => {
       const waitlisted = await repository.create({

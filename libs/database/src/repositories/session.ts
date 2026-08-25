@@ -27,10 +27,6 @@ export class DrizzleSessionRepository implements SessionRepository {
       .where(eq(sessions.userId, userId))
   }
 
-  async findAll(): Promise<Session[]> {
-    return await this.db.select().from(sessions)
-  }
-
   async create(data: CreateSessionData): Promise<Session> {
     const id = crypto.randomUUID()
     const now = new Date()
