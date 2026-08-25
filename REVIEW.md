@@ -150,11 +150,12 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `SESSION_SECRET` documented, never read (sessions are opaque DB ids).
 - **Fix:** Delete the line.
 
-#### 2.8
+#### 2.8 — **Done**
 
 - **Where:** `apps/hono/package.json`; `libs/database/package.json`; root `package.json`
 - **Problem:** hono: `mailgun.js` is a direct dep but never imported in `src`; `drizzle-orm` is needed only for a type in `lib/db.ts` and `sql` in `routes/health.ts`. database: `drizzle-kit` is in `dependencies` (only `db:*` scripts use it); `dotenv` never imported. root: `tsx` in `dependencies` is unused there (the per-package `tsx` devDeps in hono/admin/crypto **are** used — leave them).
 - **Fix:** Drop hono `mailgun.js`; move `drizzle-kit` to devDependencies; remove `dotenv`; move root `tsx` out. To drop hono's `drizzle-orm`, first add `export { sql } from 'drizzle-orm'` and the client type to `libs/database/src/index.ts` (neither is exported today).
+- **Note (when done):** `drizzle-kit` stayed in `dependencies`. `apps/hono/migrate-and-start.sh` runs `db:migrate` inside the runtime image, whose deps come from `pnpm install --prod` — moving it would break production migrations. Everything else in the item landed.
 
 #### 2.9
 

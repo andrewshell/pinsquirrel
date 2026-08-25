@@ -38,9 +38,6 @@
     "node": ">=24.0.0"
   },
   "packageManager": "pnpm@11.22.0+sha512.1ff870c4c6133dfd88fb2afc46dd13d47f09c9794b438c6fdb47ca98caf3bc16381ee0be93a091b8e3824cf01f889f46d7d9e20910fb0be1ab0fb5baa80dd621",
-  "dependencies": {
-    "tsx": "^4.23.12"
-  },
   "lint-staged": {
     "apps/hono/src/**/*.{ts,tsx}": "pnpm --filter @pinsquirrel/hono exec eslint --fix",
     "apps/admin/src/**/*.{ts,tsx}": "pnpm --filter @pinsquirrel/admin exec eslint --fix",
