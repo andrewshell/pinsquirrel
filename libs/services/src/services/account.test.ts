@@ -14,6 +14,7 @@ import {
   ResetTokenExpiredError,
   TooManyResetRequestsError,
   Role,
+  UserAlreadyExistsError,
   UserStatus,
 } from '@pinsquirrel/domain'
 
@@ -183,6 +184,27 @@ describe('AccountService', () => {
         mockEmailService.sendEmailAlreadyRegisteredEmail
       ).toHaveBeenCalledWith('test@example.com', 'http://localhost/signin')
       expect(mockUserRepository.create).not.toHaveBeenCalled()
+    })
+
+    // Two signups for the same email can pass the check above at the same
+    // moment; the unique index on email_hash is what stops the second from
+    // landing. The loser must come out of this the same way as a signup that
+    // lost by a millisecond - quietly, revealing nothing about the account.
+    it('answers the same way when the duplicate check loses a race', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.create).mockRejectedValue(
+        new UserAlreadyExistsError('newuser')
+      )
+
+      const result = await accountService.register({
+        username: 'newuser',
+        email: 'test@example.com',
+        signinUrl: 'http://localhost/signin',
+      })
+
+      expect(result).toEqual({ emailFailed: false })
+      expect(mockUserRepository.addRole).not.toHaveBeenCalled()
     })
 
     it('should send already-registered email when both username and email exist', async () => {

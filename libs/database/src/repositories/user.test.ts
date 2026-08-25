@@ -13,7 +13,7 @@ import mysql from 'mysql2/promise'
 import type { Pool } from 'mysql2/promise'
 import { insertUser } from '../test-fixtures.js'
 import { DrizzleUserRepository } from './user.js'
-import { Role, UserStatus } from '@pinsquirrel/domain'
+import { Role, UserAlreadyExistsError, UserStatus } from '@pinsquirrel/domain'
 
 describe('DrizzleUserRepository - Integration Tests', () => {
   let testDb: MySql2Database
@@ -424,6 +424,94 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       const result = await repository.delete('nonexistent-id')
 
       expect(result).toBe(false)
+    })
+  })
+
+  describe('one account per email', () => {
+    it('indexes email_hash, uniquely', async () => {
+      // findByEmailHash runs on every signup and every password-reset request,
+      // both of which an unauthenticated caller can drive. There is no
+      // behavioural assertion for an index, so assert the schema directly.
+      const [result] = await testPool.query(
+        'SHOW INDEX FROM users WHERE Key_name = ?',
+        ['users_email_hash_idx']
+      )
+      const rows = result as { Column_name: string; Non_unique: number }[]
+
+      expect(rows.map(r => r.Column_name)).toEqual(['email_hash'])
+      expect(rows[0].Non_unique).toBe(0)
+    })
+
+    // The registration flow checks for an existing email before inserting, so
+    // this is the race: two signups pass that check at the same time and the
+    // loser hits the constraint. It must arrive as a domain error, not as a
+    // mysql2 ER_DUP_ENTRY that every caller would have to know about.
+    it('reports a second account on the same email as a domain error', async () => {
+      await repository.create({
+        username: 'first-owner',
+        passwordHash: 'hashed',
+        emailHash: 'shared_email_hash',
+      })
+
+      await expect(
+        repository.create({
+          username: 'second-owner',
+          passwordHash: 'hashed',
+          emailHash: 'shared_email_hash',
+        })
+      ).rejects.toBeInstanceOf(UserAlreadyExistsError)
+    })
+
+    it('reports a duplicate username as the same domain error', async () => {
+      await repository.create({
+        username: 'taken',
+        passwordHash: 'hashed',
+        emailHash: 'one_email_hash',
+      })
+
+      await expect(
+        repository.create({
+          username: 'taken',
+          passwordHash: 'hashed',
+          emailHash: 'another_email_hash',
+        })
+      ).rejects.toBeInstanceOf(UserAlreadyExistsError)
+    })
+
+    it('reports moving an email onto an account that already has it', async () => {
+      await repository.create({
+        username: 'owner',
+        passwordHash: 'hashed',
+        emailHash: 'owned_email_hash',
+      })
+      const other = await repository.create({
+        username: 'other',
+        passwordHash: 'hashed',
+        emailHash: 'other_email_hash',
+      })
+
+      await expect(
+        repository.update(other.id, { emailHash: 'owned_email_hash' })
+      ).rejects.toBeInstanceOf(UserAlreadyExistsError)
+    })
+
+    // A unique index in MySQL does not constrain NULLs, which is what makes it
+    // usable here: email is optional, and accounts without one are not all the
+    // same account.
+    it('allows any number of accounts with no email', async () => {
+      await repository.create({
+        username: 'no-email-1',
+        passwordHash: 'hashed',
+        emailHash: null,
+      })
+
+      const second = await repository.create({
+        username: 'no-email-2',
+        passwordHash: 'hashed',
+        emailHash: null,
+      })
+
+      expect(second.emailHash).toBeNull()
     })
   })
 })

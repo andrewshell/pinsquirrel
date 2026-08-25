@@ -58,11 +58,12 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `fetchOrCreateByNames` is SELECT-then-INSERT; two concurrent saves of the same new tag (browser + extension/API) race into a `tags_user_id_name_idx` duplicate-key error.
 - **Fix:** `insert … onDuplicateKeyUpdate({ set: { id: sql.raw('id') } })` then re-select by name, or catch `ER_DUP_ENTRY` and re-read. Regression test: two parallel `fetchOrCreateByNames` calls with the same new name both succeed.
 
-#### 1.6
+#### 1.6 — **Done**
 
 - **Where:** `libs/database/src/schema/users.ts:13`
 - **Problem:** No index on `email_hash`, but `findByEmailHash` (`user.ts:41`) runs on every signup and password-reset request — a full table scan that an unauthenticated caller can drive.
 - **Fix:** Add an index + migration. A `uniqueIndex` also adds a constraint (one account per email) and the migration fails if duplicates exist today; a plain `index` does not. **Blocked on Q14.**
+- **Note (when done):** `uniqueIndex`, per Q14. With the constraint in place a duplicate arrives as a mysql2 `ER_DUP_ENTRY` rather than as anything a service could catch, so `DrizzleUserRepository.create`/`update` now translate it to `UserAlreadyExistsError` (which existed and had no thrower). `AccountService.register` catches it and returns the same non-revealing answer its own duplicate check gives, so losing the race is indistinguishable from losing by a millisecond. `updateEmail` had no duplicate check at all and would have 500ed; the profile route now renders it as a 400 on the email field.
 
 ### Security / correctness in the app
 

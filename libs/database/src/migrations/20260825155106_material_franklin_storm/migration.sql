@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `users_email_hash_idx` ON `users` (`email_hash`);

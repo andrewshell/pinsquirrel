@@ -3,6 +3,7 @@ import {
   AccessControl,
   ApiKeyLimitExceededError,
   InvalidCredentialsError,
+  UserAlreadyExistsError,
   ValidationError,
 } from '@pinsquirrel/domain'
 import { accountService, apiKeyService, authService } from '../lib/services'
@@ -123,6 +124,20 @@ profile.post('/', async c => {
           user={user}
           apiKeys={apiKeys}
           errors={{ _form: [error.message] }}
+        />,
+        400
+      )
+    }
+
+    // One account per email is a database constraint, so a taken address
+    // reaches us as a thrown error rather than a validation failure. It is
+    // still a rejected form, not a server fault.
+    if (error instanceof UserAlreadyExistsError) {
+      return c.html(
+        <ProfilePage
+          user={user}
+          apiKeys={apiKeys}
+          errors={{ email: ['That email address is already in use'] }}
         />,
         400
       )
