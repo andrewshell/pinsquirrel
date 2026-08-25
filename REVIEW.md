@@ -369,7 +369,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `POST /login` failure branches (unknown env, non-admin, bad password), `POST /unlock` (encrypted key, wrong passphrase), `/compose`, `/send` (validation 400, provider 500), `/logout` are untested. The happy-path login is covered via the `signIn()` helper.
 - **Fix:** One test per branch.
 
-#### 2.42
+#### 2.42 — **Done**
 
 - **Where:** `libs/services/src/validation/user.test.ts` (10 of 10), `url.test.ts` (8 of 21)
 - **Problem:** Bare `.toThrow()`, so a test passes if _any_ rule rejects.
