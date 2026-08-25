@@ -58,16 +58,38 @@ function buildActionUrl(
   return `${baseUrl}/${pinId}/${action}${searchParams ? `?${searchParams}` : ''}`
 }
 
-// Build delete-confirm URL with view size
-function buildDeleteConfirmUrl(
+/**
+ * Build a URL for one of the HTMX endpoints that swaps this card in place.
+ *
+ * The card states its own size on the request, so what comes back matches what
+ * the user is looking at. `toggle-read` used to omit it and read the filters
+ * off `Referer` instead, which came back expanded every time.
+ */
+function buildCardActionUrl(
   pinId: string,
+  action: string,
   viewSize: string,
   searchParams: string,
   baseUrl: string
 ): string {
   const params = new URLSearchParams(searchParams)
   params.set('view', viewSize)
-  return `${baseUrl}/${pinId}/delete-confirm?${params.toString()}`
+  return `${baseUrl}/${pinId}/${action}?${params.toString()}`
+}
+
+function buildDeleteConfirmUrl(
+  pinId: string,
+  viewSize: string,
+  searchParams: string,
+  baseUrl: string
+): string {
+  return buildCardActionUrl(
+    pinId,
+    'delete-confirm',
+    viewSize,
+    searchParams,
+    baseUrl
+  )
 }
 
 interface PinDeleteConfirmProps {
@@ -309,7 +331,13 @@ export const PinCard: FC<PinCardProps> = ({
               <button
                 type="button"
                 class="text-primary hover:text-primary/80 font-bold hover:underline"
-                hx-post={`${baseUrl}/${pin.id}/toggle-read`}
+                hx-post={buildCardActionUrl(
+                  pin.id,
+                  'toggle-read',
+                  viewSize,
+                  searchParams,
+                  baseUrl
+                )}
                 hx-swap="outerHTML"
                 hx-target={`#pin-${pin.id}`}
               >

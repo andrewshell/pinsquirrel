@@ -203,11 +203,12 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Fix:** Add a `baseUrl` prop to `PinForm` (it has none today) and emit it via `hx-vals` on the URL-check request; use it in both places.
 - **Note (when done):** `hx-params="url"` on that input filtered the `hx-vals` out — htmx merges vals into the form data _before_ applying `hx-params` — so the existing `exclude` value never reached the server either. Widened to `hx-params="url,exclude,baseUrl"`. The endpoint allowlists `baseUrl` to a plain absolute path, since it is interpolated into an `href` in a hand-built HTML string.
 
-#### 2.16
+#### 2.16 — **Done**
 
 - **Where:** `apps/hono/src/routes/pin-routes.tsx:512-548`
 - **Problem:** `POST /:id/toggle-read` has no `isMissingPin` handling, so a missing/foreign pin 500s while sibling routes 404. It derives the filter query string from `Referer` (`:532-538`) and hard-codes `view: 'expanded'` (`:543`), so a toggle on a compact card comes back expanded. The list uses `?size=`, `delete-confirm`/`card` use `?view=` — three conventions.
 - **Fix:** Same `try/isMissingPin` block as siblings; carry `view` and the filter params explicitly on the `hx-post` URL like `delete-confirm` does; drop the `Referer` parsing. Standardise on `?view=`: change the reader at `:57` **and** the six emitters in `views/components/ViewSettings.tsx:196-210`. This changes a user-visible URL — either accept that bookmarked `?size=compact` links fall back to expanded, or keep reading `size` as a deprecated alias for one release.
+- **Note (when done):** `size` is still read as a deprecated alias; nothing emits it. `buildDeleteConfirmUrl` in `PinCard.tsx` became `buildCardActionUrl`, which the toggle-read button now uses too.
 
 #### 2.17
 

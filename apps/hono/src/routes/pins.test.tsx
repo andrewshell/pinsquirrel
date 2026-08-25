@@ -157,6 +157,35 @@ describe('pins routes', () => {
       })
     })
 
+    // The compact card is the only thing rendering this wrapper class.
+    const COMPACT_CARD = 'class="py-1 hover:bg-accent/5 transition-all"'
+
+    it('renders compact cards for ?view=compact', async () => {
+      const html = await (await app.request('/pins?view=compact')).text()
+
+      expect(html).toContain(COMPACT_CARD)
+    })
+
+    // `?size=` is the previous spelling; bookmarked links keep working for now.
+    it('still honours the deprecated ?size=compact', async () => {
+      const html = await (await app.request('/pins?size=compact')).text()
+
+      expect(html).toContain(COMPACT_CARD)
+    })
+
+    it('renders expanded cards by default', async () => {
+      const html = await (await app.request('/pins')).text()
+
+      expect(html).not.toContain(COMPACT_CARD)
+    })
+
+    it('offers the view-size links as ?view=', async () => {
+      const html = await (await app.request('/pins')).text()
+
+      expect(html).toContain('view=compact')
+      expect(html).not.toContain('size=compact')
+    })
+
     it('returns only the content partial for HTMX requests', async () => {
       const full = await app.request('/pins')
       const partial = await app.request('/pins', {
@@ -413,28 +442,45 @@ describe('pins routes', () => {
       expect(html).not.toContain('<html')
     })
 
-    it('carries the referer query string into the re-rendered card', async () => {
+    // The filters travel on the request the card itself emits, so a stripped
+    // or rewritten Referer cannot change what comes back.
+    it('carries the list filters from its own query string', async () => {
       svc.getPin.mockResolvedValue(makePin())
       svc.updatePin.mockResolvedValue(makePin())
 
-      const res = await app.request('/pins/pin-1/toggle-read', {
+      const res = await app.request('/pins/pin-1/toggle-read?tag=foo', {
         method: 'POST',
-        headers: { Referer: 'https://app.test/pins?tag=foo' },
+        headers: { Referer: 'https://app.test/pins?tag=elsewhere' },
       })
 
-      expect(await res.text()).toContain('tag=foo')
+      const html = await res.text()
+      expect(html).toContain('tag=foo')
+      expect(html).not.toContain('tag=elsewhere')
     })
 
-    it('tolerates a malformed referer', async () => {
+    it('re-renders the card at the size it was clicked at', async () => {
       svc.getPin.mockResolvedValue(makePin())
       svc.updatePin.mockResolvedValue(makePin())
 
-      const res = await app.request('/pins/pin-1/toggle-read', {
+      const res = await app.request('/pins/pin-1/toggle-read?view=compact', {
         method: 'POST',
-        headers: { Referer: 'not-a-url' },
       })
 
-      expect(res.status).toBe(200)
+      // The compact card threads its own size through the delete-confirm link.
+      expect(await res.text()).toContain('view=compact')
+    })
+
+    it.each([
+      ['missing', new PinNotFoundError('pin-1')],
+      ['someone else\u2019s', new UnauthorizedPinAccessError('pin-1')],
+    ])('404s on a %s pin', async (_label, error) => {
+      svc.getPin.mockRejectedValue(error)
+
+      const res = await app.request('/pins/pin-1/toggle-read', {
+        method: 'POST',
+      })
+
+      expect(res.status).toBe(404)
     })
   })
 
