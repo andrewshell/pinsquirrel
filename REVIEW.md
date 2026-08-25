@@ -210,7 +210,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Fix:** Same `try/isMissingPin` block as siblings; carry `view` and the filter params explicitly on the `hx-post` URL like `delete-confirm` does; drop the `Referer` parsing. Standardise on `?view=`: change the reader at `:57` **and** the six emitters in `views/components/ViewSettings.tsx:196-210`. This changes a user-visible URL — either accept that bookmarked `?size=compact` links fall back to expanded, or keep reading `size` as a deprecated alias for one release.
 - **Note (when done):** `size` is still read as a deprecated alias; nothing emits it. `buildDeleteConfirmUrl` in `PinCard.tsx` became `buildCardActionUrl`, which the toggle-read button now uses too.
 
-#### 2.17
+#### 2.17 — **Done**
 
 - **Where:** `apps/hono/src/routes/auth.tsx:62-65,174-175,256,336-337`; `apps/hono/src/lib/form.ts:4-5`
 - **Problem:** Casts `formData.x as string` where other routes guard first (`private.tsx:40-41` uses `typeof`, `import.tsx:71` uses `instanceof File` — leave both). Hono's `parseBody()` without `all` does _not_ produce arrays for repeated keys, but a multipart `File` part named `username` is truthy, passes `username || ''` at `:71`, and throws in `rate-limit.ts:79`'s `.toLowerCase()` → 500. `form.ts:4-5`'s docstring repeats the incorrect "repeated input yields an array" claim.
