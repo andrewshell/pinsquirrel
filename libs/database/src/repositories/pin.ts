@@ -4,7 +4,6 @@ import type {
   Pin,
   PinFilter,
   PinRepository,
-  TagRepository,
   UpdatePinData,
 } from '@pinsquirrel/domain'
 import {
@@ -24,6 +23,8 @@ import { applyPagination } from './pagination.js'
 import { pins } from '../schema/pins.js'
 import { pinsTags } from '../schema/pins-tags.js'
 import { tags } from '../schema/tags.js'
+import type { Executor } from './executor.js'
+import type { DrizzleTagRepository } from './tag.js'
 
 function md5(input: string): string {
   return createHash('md5').update(input).digest('hex')
@@ -58,9 +59,16 @@ const PIN_COLUMNS = {
 }
 
 export class DrizzlePinRepository implements PinRepository {
+  /**
+   * The tag dependency is the Drizzle class, not the `TagRepository`
+   * interface: `create` and `update` write the pin and its tag links in one
+   * transaction, and only the class exposes an upsert that accepts the
+   * transaction handle. Keeping the handle off the domain interface is what
+   * keeps `libs/domain` free of Drizzle.
+   */
   constructor(
     private db: MySql2Database,
-    private tagRepository: TagRepository
+    private tagRepository: DrizzleTagRepository
   ) {}
 
   private getOrderBy(filter?: PinFilter) {
@@ -200,111 +208,136 @@ export class DrizzlePinRepository implements PinRepository {
     return results.length > 0 ? results[0] : null
   }
 
+  /**
+   * The pin row and its tag links are one unit of work — a failure part-way
+   * through used to leave a pin with none of the tags it was saved with.
+   */
   async create(data: CreatePinData): Promise<Pin> {
     const id = crypto.randomUUID()
     const now = new Date()
 
-    await this.db.insert(pins).values({
-      id,
-      userId: data.userId,
-      url: data.url,
-      urlHash: md5(data.url),
-      title: data.title,
-      description: data.description,
-      readLater: data.readLater,
-      isPrivate: data.isPrivate,
-      createdAt: data.createdAt ?? now,
-      updatedAt: data.updatedAt ?? now,
-    })
+    return this.db.transaction(async tx => {
+      await tx.insert(pins).values({
+        id,
+        userId: data.userId,
+        url: data.url,
+        urlHash: md5(data.url),
+        title: data.title,
+        description: data.description,
+        readLater: data.readLater,
+        isPrivate: data.isPrivate,
+        createdAt: data.createdAt ?? now,
+        updatedAt: data.updatedAt ?? now,
+      })
 
-    const [newPin] = await this.db
-      .select()
-      .from(pins)
-      .where(eq(pins.id, id))
-      .limit(1)
+      const [newPin] = await tx
+        .select()
+        .from(pins)
+        .where(eq(pins.id, id))
+        .limit(1)
 
-    // Handle tags if provided
-    let pinTags: (typeof tags.$inferSelect)[] = []
-    if (data.tagNames && data.tagNames.length > 0) {
-      // Fetch or create tags
-      const createdTags = await this.tagRepository.fetchOrCreateByNames(
-        data.userId,
-        data.tagNames
-      )
-
-      // Associate tags with pin
-      if (createdTags.length > 0) {
-        await this.db.insert(pinsTags).values(
-          createdTags.map(tag => ({
-            pinId: id,
-            tagId: tag.id,
-          }))
+      // Handle tags if provided
+      let pinTags: (typeof tags.$inferSelect)[] = []
+      if (data.tagNames && data.tagNames.length > 0) {
+        // Fetch or create tags
+        const createdTags = await this.tagRepository.fetchOrCreateByNamesIn(
+          tx,
+          data.userId,
+          data.tagNames
         )
-        pinTags = createdTags
-      }
-    }
 
-    return this.mapToPin(newPin, pinTags)
+        // Associate tags with pin
+        if (createdTags.length > 0) {
+          await tx.insert(pinsTags).values(
+            createdTags.map(tag => ({
+              pinId: id,
+              tagId: tag.id,
+            }))
+          )
+          pinTags = createdTags
+        }
+      }
+
+      return this.mapToPin(newPin, pinTags)
+    })
   }
 
+  /**
+   * As `create`: the pin row, the link delete and the link insert commit
+   * together or not at all, so a failure cannot leave a pin whose old tags
+   * were removed and whose new ones were never written.
+   */
   async update(data: UpdatePinData): Promise<Pin | null> {
     const { id, ...updateFields } = data
 
-    const existing = await this.findById(id)
-    if (!existing) {
-      return null
-    }
-
-    const updateValues: Partial<typeof pins.$inferInsert> = {
-      url: updateFields.url,
-      title: updateFields.title,
-      description: updateFields.description,
-      readLater: updateFields.readLater,
-      isPrivate: updateFields.isPrivate,
-      updatedAt: new Date(),
-    }
-
-    // Update urlHash if url changed
-    if (updateFields.url !== undefined) {
-      updateValues.urlHash = md5(updateFields.url)
-    }
-
-    await this.db.update(pins).set(updateValues).where(eq(pins.id, id))
-
-    const [updatedPin] = await this.db
-      .select()
-      .from(pins)
-      .where(eq(pins.id, id))
-      .limit(1)
-
-    // Handle tag updates if provided
-    const tagsByPinId = await this.getPinTags([id])
-    let pinTags = tagsByPinId.get(id) || []
-    if (updateFields.tagNames !== undefined) {
-      // Remove all existing tag associations
-      await this.db.delete(pinsTags).where(eq(pinsTags.pinId, id))
-
-      // Add new tag associations
-      if (updateFields.tagNames.length > 0) {
-        const createdTags = await this.tagRepository.fetchOrCreateByNames(
-          existing.userId,
-          updateFields.tagNames
-        )
-
-        await this.db.insert(pinsTags).values(
-          createdTags.map(tag => ({
-            pinId: id,
-            tagId: tag.id,
-          }))
-        )
-
-        pinTags = createdTags
-      } else {
-        pinTags = []
+    return this.db.transaction(async tx => {
+      // Only the owner is needed here, to resolve tag names against the right
+      // user. `findById` would also read the pin's tags, which are either
+      // about to be replaced or re-read below.
+      const [existing] = await tx
+        .select({ userId: pins.userId })
+        .from(pins)
+        .where(eq(pins.id, id))
+        .limit(1)
+      if (!existing) {
+        return null
       }
-    }
 
-    return this.mapToPin(updatedPin, pinTags)
+      const updateValues: Partial<typeof pins.$inferInsert> = {
+        url: updateFields.url,
+        title: updateFields.title,
+        description: updateFields.description,
+        readLater: updateFields.readLater,
+        isPrivate: updateFields.isPrivate,
+        updatedAt: new Date(),
+      }
+
+      // Update urlHash if url changed
+      if (updateFields.url !== undefined) {
+        updateValues.urlHash = md5(updateFields.url)
+      }
+
+      await tx.update(pins).set(updateValues).where(eq(pins.id, id))
+
+      const [updatedPin] = await tx
+        .select()
+        .from(pins)
+        .where(eq(pins.id, id))
+        .limit(1)
+
+      let pinTags: (typeof tags.$inferSelect)[]
+      if (updateFields.tagNames !== undefined) {
+        // Remove all existing tag associations
+        await tx.delete(pinsTags).where(eq(pinsTags.pinId, id))
+
+        // Add new tag associations
+        if (updateFields.tagNames.length > 0) {
+          const createdTags = await this.tagRepository.fetchOrCreateByNamesIn(
+            tx,
+            existing.userId,
+            updateFields.tagNames
+          )
+
+          await tx.insert(pinsTags).values(
+            createdTags.map(tag => ({
+              pinId: id,
+              tagId: tag.id,
+            }))
+          )
+
+          pinTags = createdTags
+        } else {
+          pinTags = []
+        }
+      } else {
+        // Tags were not part of the update, so the links already in the table
+        // are the answer. Only read them in this branch: the other one knows
+        // what the tags are without asking.
+        pinTags = (await this.getPinTags([id], tx)).get(id) ?? []
+      }
+
+      return this.mapToPin(updatedPin, pinTags)
+    })
   }
 
   async delete(id: string): Promise<boolean> {
@@ -321,13 +354,14 @@ export class DrizzlePinRepository implements PinRepository {
   }
 
   private async getPinTags(
-    pinIds: string[]
+    pinIds: string[],
+    executor: Executor = this.db
   ): Promise<Map<string, (typeof tags.$inferSelect)[]>> {
     if (pinIds.length === 0) {
       return new Map()
     }
 
-    const result = await this.db
+    const result = await executor
       .select({
         pinId: pinsTags.pinId,
         tag: tags,

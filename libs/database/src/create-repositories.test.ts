@@ -27,7 +27,9 @@ describe('createRepositories', () => {
   })
 
   // The whole point of the factory: the pin repository composes the tag
-  // repository, and no consumer should have to know that to wire it up.
+  // repository, and no consumer should have to know that to wire it up. It
+  // needs the Drizzle class, not any `TagRepository` — the tag upsert it runs
+  // inside its own transaction only exists there.
   it('gives the pin repository the same tag repository it returns', () => {
     const repos = createRepositories(db)
 
@@ -36,5 +38,6 @@ describe('createRepositories', () => {
     ).tagRepository
 
     expect(composed).toBe(repos.tagRepository)
+    expect(composed).toBeInstanceOf(DrizzleTagRepository)
   })
 })
