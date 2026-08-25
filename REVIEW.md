@@ -292,7 +292,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `baseUrl` is typed and tested but the `url:` line in the client constructor is commented out, so an EU-region config silently hits the US API. The test asserts nothing about it.
 - **Fix:** Pass `url: config.baseUrl` and make the test assert on it, or delete the field and the test. **Blocked on Q7.**
 
-#### 2.30
+#### 2.30 — **Done**
 
 - **Where:** `libs/mailgun/src/templates.ts:56,60,153-157,243,331,334`
 - **Problem:** `username` (`:153,156,331`), `userEmail` (`:157`), `resetUrl` (`:56,60`), `signinUrl` (`:243`), `signupUrl` (`:334`) are interpolated into HTML bodies unescaped; `:56`, `:243` and `:334` are inside `href="…"`, so a `"` breaks the attribute. `username` is regex-restricted by `usernameSchema`; the rest are not. `resetUrl`/`signinUrl`/`signupUrl` are request-derived (`auth.tsx:185,187,188` build them from `url.origin`), so none is a trusted constant. (`:81,174-177,263,352-354` are plain-text bodies — leave those.)

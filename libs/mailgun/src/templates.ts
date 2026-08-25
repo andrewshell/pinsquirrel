@@ -1,3 +1,17 @@
+/**
+ * Escape a value for interpolation into an HTML email body or a quoted
+ * attribute. Every value these templates interpolate is user- or
+ * request-derived, so none may be trusted as markup.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 export function createPasswordResetEmailTemplate(resetUrl: string): {
   html: string
   text: string
@@ -53,11 +67,11 @@ export function createPasswordResetEmailTemplate(resetUrl: string): {
         <p>I received a request to reset your PinSquirrel password. If you made this request, click the button below to set a new password:</p>
 
         <p style="text-align: center;">
-            <a href="${resetUrl}" class="button">Reset Password</a>
+            <a href="${escapeHtml(resetUrl)}" class="button">Reset Password</a>
         </p>
 
         <p>Or copy and paste this link into your browser:</p>
-        <p style="word-break: break-all; color: #007bff;">${resetUrl}</p>
+        <p style="word-break: break-all; color: #007bff;">${escapeHtml(resetUrl)}</p>
 
         <p>This link will expire in 15 minutes for security reasons.</p>
 
@@ -150,11 +164,11 @@ export function createSignupNotificationEmailTemplate(
 
         <div class="celebration">🎉</div>
 
-        <p><strong>Yay! ${username} just signed up for PinSquirrel.</strong></p>
+        <p><strong>Yay! ${escapeHtml(username)} just signed up for PinSquirrel.</strong></p>
 
         <div class="user-info">
-            <p><strong>Username:</strong> ${username}</p>
-            <p><strong>Email:</strong> ${userEmail}</p>
+            <p><strong>Username:</strong> ${escapeHtml(username)}</p>
+            <p><strong>Email:</strong> ${escapeHtml(userEmail)}</p>
         </div>
 
         <p>You can reply to this email to send them a welcome message directly!</p>
@@ -240,7 +254,7 @@ export function createEmailAlreadyRegisteredTemplate(signinUrl: string): {
         <p>Someone tried to create a new PinSquirrel account using your email address. If this was you, you already have an account. You can sign in or reset your password instead.</p>
 
         <p style="text-align: center;">
-            <a href="${signinUrl}" class="button">Sign In</a>
+            <a href="${escapeHtml(signinUrl)}" class="button">Sign In</a>
         </p>
 
         <p>If you didn't attempt to register, you can safely ignore this email.</p>
@@ -328,10 +342,10 @@ export function createUsernameTakenTemplate(
 
         <p>Hello,</p>
 
-        <p>We received your registration request for PinSquirrel, but the username <strong>${username}</strong> is already taken. Please try registering again with a different username.</p>
+        <p>We received your registration request for PinSquirrel, but the username <strong>${escapeHtml(username)}</strong> is already taken. Please try registering again with a different username.</p>
 
         <p style="text-align: center;">
-            <a href="${signupUrl}" class="button">Try Again</a>
+            <a href="${escapeHtml(signupUrl)}" class="button">Try Again</a>
         </p>
 
         <p>If you didn't attempt to register, you can safely ignore this email.</p>
