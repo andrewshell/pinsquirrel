@@ -23,7 +23,7 @@
     "@pinsquirrel/mailgun": "workspace:*",
     "@pinsquirrel/services": "workspace:*",
     "dotenv": "^17.4.2",
-    "hono": "^4.13.2"
+    "hono": "^4.13.3"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
