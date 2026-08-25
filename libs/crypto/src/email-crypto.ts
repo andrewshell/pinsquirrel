@@ -1,3 +1,10 @@
+/*
+ * The exported entry points are `async` even though every primitive below is
+ * a synchronous `node:crypto` call: the promise is the contract every caller
+ * already awaits, and keeping it leaves room for an implementation that has
+ * to do real asynchronous work.
+ */
+/* eslint-disable @typescript-eslint/require-await */
 import {
   generateKeyPairSync,
   createPublicKey,
@@ -23,7 +30,7 @@ const TAG_LEN = 16
 const PUBLIC_KEY_LEN = 32
 
 function rawPublicKey(key: KeyObject): Buffer {
-  const jwk = key.export({ format: 'jwk' }) as JsonWebKey
+  const jwk = key.export({ format: 'jwk' })
   return Buffer.from(jwk.x as string, 'base64url')
 }
 

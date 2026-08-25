@@ -1,19 +1,8 @@
-// @ts-check
-import js from '@eslint/js'
-import tseslint from 'typescript-eslint'
+import { createConfig } from '../../eslint.config.base.js'
 
-export default tseslint.config(
-  {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**'],
-  },
-  js.configs.recommended,
-  ...tseslint.configs.strictTypeChecked,
-  {
-    languageOptions: {
-      parserOptions: {
-        projectService: true,
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
-  }
-)
+export default [
+  // Strict: this package is the only place that talks to the network and to
+  // third-party HTML, so the extra rules earn their keep here.
+  ...createConfig(import.meta.dirname, { strict: true }),
+  { ignores: ['dist/**', 'node_modules/**', 'coverage/**'] },
+]
