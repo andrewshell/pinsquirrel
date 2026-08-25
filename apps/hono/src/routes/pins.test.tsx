@@ -354,6 +354,55 @@ describe('pins routes', () => {
       expect(res.status).toBe(200)
     })
 
+    it('returns only the form fragment when the rejected submit came from HTMX', async () => {
+      svc.createPin.mockRejectedValue(
+        new ValidationError({ url: ['Must be a valid URL'] })
+      )
+
+      const res = await app.request('/pins/new', {
+        ...formBody({ url: 'nope', title: 'T' }),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'HX-Request': 'true',
+        },
+      })
+
+      const html = await res.text()
+      expect(html).toContain('Must be a valid URL')
+      expect(html).not.toContain('<html')
+    })
+
+    it('offers a link to the pin that already holds the URL', async () => {
+      svc.createPin.mockRejectedValue(
+        new DuplicatePinError('https://x.test/a', {
+          id: 'pin-existing',
+          createdAt: new Date('2024-01-01'),
+        })
+      )
+
+      const res = await app.request(
+        '/pins/new',
+        formBody({ url: 'https://x.test/a', title: 'T' })
+      )
+
+      expect(await res.text()).toContain('/pins/pin-existing/edit')
+    })
+
+    it('reports an unexpected failure as a 500 without losing the form', async () => {
+      svc.createPin.mockRejectedValue(new Error('database on fire'))
+
+      const res = await app.request(
+        '/pins/new',
+        formBody({ url: 'https://x.test/a', title: 'Half-typed' })
+      )
+
+      const html = await res.text()
+      expect(res.status).toBe(500)
+      expect(html).toContain('Failed to create pin')
+      expect(html).toContain('Half-typed')
+      expect(html).not.toContain('database on fire')
+    })
+
     it('uses HX-Redirect instead of a 302 for HTMX submissions', async () => {
       svc.createPin.mockResolvedValue(makePin())
 
@@ -462,6 +511,86 @@ describe('pins routes', () => {
 
       expect(res.status).toBe(404)
       expect(svc.getUserTags).not.toHaveBeenCalled()
+    })
+
+    it('shows the field error and keeps the submitted values on the page', async () => {
+      svc.updatePin.mockRejectedValue(
+        new ValidationError({ url: ['Must be a valid URL'] })
+      )
+
+      const res = await app.request(
+        '/pins/pin-1/edit',
+        formBody({ url: 'nope', title: 'Half-typed' })
+      )
+
+      const html = await res.text()
+      expect(html).toContain('Must be a valid URL')
+      expect(html).toContain('Half-typed')
+      expect(html).toContain('<html')
+    })
+
+    it('returns only the form fragment when the rejected submit came from HTMX', async () => {
+      svc.updatePin.mockRejectedValue(
+        new ValidationError({ url: ['Must be a valid URL'] })
+      )
+
+      const res = await app.request('/pins/pin-1/edit', {
+        ...formBody({ url: 'nope', title: 'Updated' }),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'HX-Request': 'true',
+        },
+      })
+
+      const html = await res.text()
+      expect(res.status).toBe(200)
+      expect(html).toContain('Must be a valid URL')
+      expect(html).not.toContain('<html')
+    })
+
+    it('offers a link to the pin that already holds the URL', async () => {
+      svc.updatePin.mockRejectedValue(
+        new DuplicatePinError('https://x.test/b', {
+          id: 'pin-existing',
+          createdAt: new Date('2024-01-01'),
+        })
+      )
+
+      const res = await app.request(
+        '/pins/pin-1/edit',
+        formBody({ url: 'https://x.test/b', title: 'Updated' })
+      )
+
+      expect(res.status).toBe(200)
+      expect(res.headers.get('Location')).toBeNull()
+      expect(await res.text()).toContain('/pins/pin-existing/edit')
+    })
+
+    it('reports an unexpected failure as a 500 without losing the form', async () => {
+      svc.updatePin.mockRejectedValue(new Error('database on fire'))
+
+      const res = await app.request(
+        '/pins/pin-1/edit',
+        formBody({ url: 'https://x.test/b', title: 'Updated' })
+      )
+
+      const html = await res.text()
+      expect(res.status).toBe(500)
+      expect(html).toContain('Failed to update pin')
+      expect(html).not.toContain('database on fire')
+    })
+
+    it('uses HX-Redirect instead of a 302 for HTMX submissions', async () => {
+      const res = await app.request('/pins/pin-1/edit?tag=foo', {
+        ...formBody({ url: 'https://x.test/b', title: 'Updated' }),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'HX-Request': 'true',
+        },
+      })
+
+      expect(res.status).toBe(200)
+      expect(res.headers.get('HX-Redirect')).toBe('/pins?tag=foo')
     })
   })
 
