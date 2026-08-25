@@ -333,14 +333,20 @@ describe('DrizzleTagRepository - Integration Tests', () => {
     })
 
     it('should update only updatedAt when no fields provided', async () => {
+      // Backdate the row rather than sleeping. The claim is that `update`
+      // writes a fresh timestamp; a 10ms nap only made the two values likely
+      // to differ, and left the suite slower for it.
+      await testPool.query('UPDATE tags SET updated_at = ? WHERE id = ?', [
+        new Date(Date.now() - 60_000),
+        existingTagId,
+      ])
+
       const originalTag = await tagRepository.findById(existingTagId)
       const updateData = {
         id: existingTagId,
         userId: testUser.id,
         name: originalTag!.name,
       }
-
-      await new Promise(resolve => setTimeout(resolve, 10))
 
       const result = await tagRepository.update(existingTagId, updateData)
 
