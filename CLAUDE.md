@@ -7,10 +7,12 @@ Guidance for Claude Code working in this repository.
 pnpm monorepo orchestrated with Turbo:
 
 - `apps/hono/` — Hono + HTMX application (main app, dev port 8100)
+- `apps/admin/` — Local operator console for contacting the waitlist (dev port 8200, `pnpm admin`). Not deployed; configured by `admin.config.json` (see `admin.config.example.json`)
 - `libs/services/` — Business logic and validation (Zod). Dependency-injected services (e.g. `AuthenticationService`, `PinService`)
 - `libs/database/` — Drizzle ORM (MySQL) schema and repositories. Implements interfaces from `@pinsquirrel/domain`
 - `libs/domain/` — Domain entities (User, Pin, Tag) and repository interfaces. **No external dependencies — pure domain logic**
 - `libs/adapters/` — External service adapters
+- `libs/crypto/` — Sealing signup emails to a public key, plus the `keygen` CLI (`pnpm --filter @pinsquirrel/crypto keygen`)
 - `libs/mailgun/` — Email service implementation
 
 Workspace packages depend on each other via the `workspace:*` protocol, e.g. `"@pinsquirrel/domain": "workspace:*"`.
@@ -196,7 +198,7 @@ Key constraints:
 
 - pnpm only — never npm or yarn. Node `>=24.0.0`.
 - TypeScript strict mode enabled across all packages.
-- ESLint v9 flat config with type-aware rules and accessibility checks.
+- ESLint v10 flat config with type-aware rules and accessibility checks.
 - Prettier: single quotes, no semicolons, 2-space indent, trailing commas.
 
 ## Local Development with Docker

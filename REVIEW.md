@@ -462,37 +462,37 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 
 ## 4. Documentation drift
 
-#### 4.1
+#### 4.1 — **Done**
 
 - **Where:** `CLAUDE.md`
 - **Problem:** Repository structure omits `apps/admin` (local operator console, port 8200, `pnpm admin`, config in `admin.config.json`) and `libs/crypto` (email sealing + `keygen` CLI), though line 31 references `apps/admin/src/runtime.ts`. Says "ESLint v9" (v10) and "type-aware rules" (true in 3 of 8 packages until 1.3).
 - **Fix:** Add both packages to the structure list; change "v9" to "v10". Leave the "type-aware rules" sentence for 1.3's PR, which is what makes it true.
 
-#### 4.2
+#### 4.2 — **Done**
 
 - **Where:** `README.md:34,65,69,79-81,97-108,105,123,128,147,155`
 - **Problem:** Says PostgreSQL / port 5432 / `postgresql://` (project is MySQL on 3306); Node >= 22 (it's 24); documents `--filter @pinsquirrel/services dev` and `database dev` scripts that don't exist; `pnpm test --filter X` has the arguments in the wrong order; tree omits admin/crypto.
 - **Fix:** Sync with `.env.example`, `engines`, and the real scripts; fix argument order to `pnpm --filter X test`.
 
-#### 4.3
+#### 4.3 — **Done**
 
 - **Where:** `DEPLOYMENT.md:40-45,102-125,190-191`
 - **Problem:** Env-var list is `DATABASE_URL`/`PORT` only; omits `MAILGUN_*`, `NOTIFY_EMAIL`, `EMAIL_PUBLIC_KEY`, `LOG_LEVEL`, `NODE_ENV` (which gates the `secure` cookie in `session.ts:127`), and `TRUST_PROXY` once 1.8 lands. Inlined `migrate-and-start.sh` is stale vs the real script (`d85abda`). Says `/health` returns `{"status":"ok"}`; it returns `status/database/uptime/timestamp` and 503 when degraded.
 - **Fix:** Env-var table mirroring `apps/hono/.env.example`; link to the script instead of inlining it; document the real health payload and 503.
 
-#### 4.4
+#### 4.4 — **Done**
 
 - **Where:** `scripts/README.md:111` and "Example Output"
 - **Problem:** Example runs the image on port 3000 (app is 8100); the output transcript no longer matches the script.
 - **Fix:** Fix the port; delete or regenerate the transcript.
 
-#### 4.5
+#### 4.5 — **Done**
 
 - **Where:** Root `.env.example`
 - **Problem:** Duplicates one variable from `apps/hono/.env.example` and references a `pinsquirrel_dev` DB nothing uses.
 - **Fix:** Delete it and point README at `apps/hono/.env.example`.
 
-#### 4.6
+#### 4.6 — **Done**
 
 - **Where:** `STYLE.md`
 - **Problem:** Accurate for hono; admin uses its own inline dark stylesheet (`views.tsx:5-30`).

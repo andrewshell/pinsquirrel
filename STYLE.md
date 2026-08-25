@@ -4,6 +4,8 @@
 
 This guide defines the Neo Brutalism design system used throughout the Hono app. Use these patterns to maintain visual consistency when creating new components.
 
+`apps/admin` is deliberately out of scope: it is a local operator tool nobody but the maintainer sees, so it ships its own small inline dark stylesheet (`apps/admin/src/views.tsx`) rather than pulling in Tailwind and this design system.
+
 ## 1. Design Philosophy
 
 Neo Brutalism is characterized by:

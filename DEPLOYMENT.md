@@ -37,12 +37,24 @@ The production Docker image includes:
 
 ## Environment Setup
 
-### Required Environment Variables
+### Environment Variables
 
-```bash
-DATABASE_URL=mysql://username:password@hostname:3306/database
-PORT=8100  # Optional, defaults to 8100
-```
+`apps/hono/.env.example` is the template; the table below is what each variable
+does in production.
+
+| Variable             | Required          | Default       | Purpose                                                                                                                                                                                        |
+| -------------------- | ----------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`       | yes               | —             | MySQL connection string, e.g. `mysql://username:password@hostname:3306/database`                                                                                                               |
+| `NODE_ENV`           | yes in production | `development` | Anything other than `production` drops the `Secure` flag on the session cookie, so an unset value over HTTPS leaks the cookie                                                                  |
+| `PORT`               | no                | `8100`        | HTTP listen port                                                                                                                                                                               |
+| `LOG_LEVEL`          | no                | `info`        | Pino level (`trace`…`fatal`)                                                                                                                                                                   |
+| `SESSION_SECRET`     | no                | —             | Present in `.env.example` but not read — sessions are opaque database ids                                                                                                                      |
+| `MAILGUN_API_KEY`    | no                | —             | Leave empty to disable password-reset and notification email entirely                                                                                                                          |
+| `MAILGUN_DOMAIN`     | with Mailgun      | —             | Sending domain, e.g. `mg.yourdomain.com`                                                                                                                                                       |
+| `MAILGUN_FROM_EMAIL` | with Mailgun      | —             | Envelope from address                                                                                                                                                                          |
+| `MAILGUN_FROM_NAME`  | with Mailgun      | —             | Display name on outgoing mail                                                                                                                                                                  |
+| `NOTIFY_EMAIL`       | no                | —             | Address that receives a notification on each signup                                                                                                                                            |
+| `EMAIL_PUBLIC_KEY`   | no                | —             | When set, signup emails are sealed to this key and this server can never decrypt them. Generate with `pnpm --filter @pinsquirrel/crypto keygen`; the private half stays with the admin console |
 
 ### Managed Database Configuration
 
@@ -57,7 +69,7 @@ For managed MySQL databases (DigitalOcean, AWS RDS, etc.):
 
 1. Create new app from GitHub repository
 2. Use `apps/hono/Dockerfile` as build configuration
-3. Set `DATABASE_URL` environment variable
+3. Set `DATABASE_URL` and `NODE_ENV=production` environment variables
 4. Deploy managed MySQL database separately
 
 ### Option 2: Docker Compose with Dockge
@@ -71,6 +83,7 @@ services:
       - '8100:8100'
     environment:
       - DATABASE_URL=mysql://pinsquirrel:pinsquirrel@mysql:3306/pinsquirrel
+      - NODE_ENV=production
     depends_on:
       - mysql
 
@@ -94,6 +107,7 @@ volumes:
 docker run -d \
   -p 8100:8100 \
   -e DATABASE_URL="mysql://user:pass@your-db-host:3306/pinsquirrel" \
+  -e NODE_ENV=production \
   your-username/pinsquirrel:latest
 ```
 
@@ -101,28 +115,11 @@ docker run -d \
 
 ### Migration Script (`migrate-and-start.sh`)
 
-```bash
-#!/bin/sh
-set -e
-
-echo "Starting production deployment..."
-
-# Run database migrations
-echo "Running database migrations..."
-pnpm --filter @pinsquirrel/database db:migrate
-
-# Check migration exit code
-if [ $? -ne 0 ]; then
-  echo "Database migration failed! Exiting."
-  exit 1
-fi
-
-echo "Database migrations completed successfully."
-
-# Start the application
-echo "Starting PinSquirrel Hono application..."
-pnpm --filter @pinsquirrel/hono start
-```
+The container entrypoint is [`apps/hono/migrate-and-start.sh`](./apps/hono/migrate-and-start.sh).
+It defaults `NODE_ENV` to `production`, runs `db:migrate`, exits non-zero if the
+migration fails, and only then starts the app. Read the script rather than a copy
+of it here — the comments explain why each step is the way it is (notably the
+`--config.verify-deps-before-run=false` flag the runtime image needs).
 
 ### Migration Safety
 
@@ -160,6 +157,7 @@ docker logs <container-id>
 
 # Expected output:
 # Starting production deployment...
+# NODE_ENV: production
 # Running database migrations...
 # Database migrations completed successfully.
 # Starting PinSquirrel Hono application...
@@ -188,14 +186,35 @@ The application exposes a health check endpoint:
 
 ```bash
 curl http://localhost:8100/health
-# Returns: {"status":"ok"}
 ```
 
-Use this endpoint to monitor:
+Healthy — HTTP 200:
 
-- Application startup success
-- Database connectivity
-- Container readiness
+```json
+{
+  "status": "ok",
+  "database": "connected",
+  "uptime": 421,
+  "timestamp": "2026-08-25T12:00:00.000Z"
+}
+```
+
+Database unreachable — **HTTP 503**, with `status` `degraded` and an added
+`error` field:
+
+```json
+{
+  "status": "degraded",
+  "database": "disconnected",
+  "error": "database unavailable",
+  "uptime": 421,
+  "timestamp": "2026-08-25T12:00:00.000Z"
+}
+```
+
+Point your orchestrator's health check at the status code, not the body: a
+degraded response is a real 503, so container readiness follows database
+connectivity without parsing JSON.
 
 ### Backup Strategy
 
