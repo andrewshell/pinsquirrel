@@ -388,45 +388,4 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       expect(deletedCount).toBe(0)
     })
   })
-
-  describe('findAll', () => {
-    it('should find all sessions', async () => {
-      const userId1 = crypto.randomUUID()
-      const username1 = `testuser-${crypto.randomUUID().slice(0, 8)}`
-      const userId2 = crypto.randomUUID()
-      const username2 = `testuser-${crypto.randomUUID().slice(0, 8)}`
-
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId1, username1]
-      )
-      await testPool.query(
-        `
-        INSERT INTO users (id, username, password_hash, email_hash, created_at, updated_at)
-        VALUES (?, ?, 'hashed_password', 'hashed_email', NOW(), NOW())
-      `,
-        [userId2, username2]
-      )
-
-      await repository.create({
-        userId: userId1,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      })
-      await repository.create({
-        userId: userId2,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      })
-
-      const result = await repository.findAll()
-      expect(result).toHaveLength(2)
-    })
-
-    it('should return empty array when no sessions exist', async () => {
-      const result = await repository.findAll()
-      expect(result).toEqual([])
-    })
-  })
 })

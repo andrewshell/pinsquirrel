@@ -71,13 +71,6 @@ export class DrizzleUserRepository implements UserRepository {
     )
   }
 
-  async findAll(): Promise<User[]> {
-    const results = await this.db.select().from(users)
-    return await Promise.all(
-      results.map(user => this.attachRoles(user as User))
-    )
-  }
-
   async list(limit?: number, offset?: number): Promise<User[]> {
     let results
     if (limit !== undefined && offset !== undefined) {

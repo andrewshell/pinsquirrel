@@ -35,10 +35,6 @@ export class DrizzlePasswordResetRepository implements PasswordResetRepository {
       .where(eq(passwordResetTokens.userId, userId))
   }
 
-  async findAll(): Promise<PasswordResetToken[]> {
-    return await this.db.select().from(passwordResetTokens)
-  }
-
   async create(
     data: CreatePasswordResetTokenData
   ): Promise<PasswordResetToken> {

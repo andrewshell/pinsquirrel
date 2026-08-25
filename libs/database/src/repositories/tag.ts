@@ -153,11 +153,6 @@ export class DrizzleTagRepository implements TagRepository {
     }))
   }
 
-  async findAll(): Promise<Tag[]> {
-    const result = await this.db.select().from(tags)
-    return result.map(this.mapToTag)
-  }
-
   async list(limit?: number, offset?: number): Promise<Tag[]> {
     const baseQuery = this.db.select().from(tags)
 

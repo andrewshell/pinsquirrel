@@ -114,7 +114,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `UserService.getUser` and `updateUser` have no callers; `updateUser` passes raw `UpdateUserData` (including `status`, `passwordHash`) to the repo with no validation. `user.test.ts:5` notes they're untested.
 - **Fix:** Delete both. **Blocked on Q8.** **PLAN.md:** Phase 6 never references `UserService.getUser`/`updateUser` (verified by grep), which points toward "delete".
 
-#### 2.2
+#### 2.2 — **Done**
 
 - **Where:** `libs/domain/src/interfaces/repository.ts:3`
 - **Problem:** Generic `Repository.findAll` is implemented by four Drizzle repos and called by none; `PinRepository`/`ApiKeyRepository` don't extend it, so the base interface buys nothing.
