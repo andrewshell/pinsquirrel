@@ -12,6 +12,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import {
   AccessControl,
+  type Pin,
   type PinFilter,
   type User,
   ValidationError,
@@ -422,10 +423,13 @@ export function createPinRoutes({
       tagNames,
     } = parsePinForm(formData)
 
-    const userTags = await tagService.getUserTags(ac, user.id)
+    // Read once, inside the try: the 404 for a missing or foreign pin comes
+    // out of this handler's own error mapping, so hoisting the read above the
+    // try would turn it into a 500.
+    let existingPin: Pin | undefined
 
     try {
-      const existingPin = await pinService.getPin(ac, pinId)
+      existingPin = await pinService.getPin(ac, pinId)
 
       await pinService.updatePin(ac, {
         id: pinId,
@@ -445,14 +449,15 @@ export function createPinRoutes({
       }
       return c.redirect(redirectTarget)
     } catch (error) {
-      let pin
-      try {
-        pin = await pinService.getPin(ac, pinId)
-      } catch {
+      // Nothing to re-render if the pin was never readable in the first place.
+      if (!existingPin || isMissingPin(error)) {
         return c.text('Pin not found', 404)
       }
 
+      const pin = existingPin
       const isHtmx = !!c.req.header('HX-Request')
+      // Only the error path re-renders the form, so only it needs the tags.
+      const userTags = await tagService.getUserTags(ac, user.id)
       const userTagNames = userTags.map(t => t.name)
 
       const formProps = {
@@ -503,10 +508,6 @@ export function createPinRoutes({
         return c.html(
           <PinEditPage {...pageProps} duplicatePinId={duplicatePinId} />
         )
-      }
-
-      if (isMissingPin(error)) {
-        return c.text('Pin not found', 404)
       }
 
       const errors = { _form: ['Failed to update pin. Please try again.'] }
