@@ -30,16 +30,23 @@ vi.mock('./runtime.js', () => ({
   getRuntime: () => ({ userService, authService }),
 }))
 
-// The key file is never read in tests; the unlock flow takes the raw-key path.
-vi.mock('./key.js', () => ({
-  readKeyFile: () => 'raw-key-contents',
-  keyNeedsPassphrase: () => false,
-  unlockPrivateKey: () => Promise.resolve('unlocked-private-key'),
-}))
+// The real key file is never read. Defaults (set in beforeEach) take the
+// raw-key path so sign-in needs no passphrase; the unlock tests vary them.
+const keyFile = {
+  readKeyFile: vi.fn(),
+  keyNeedsPassphrase: vi.fn(),
+  unlockPrivateKey: vi.fn(),
+}
 
-vi.mock('@pinsquirrel/crypto', () => ({
-  openSealedEmail: () => Promise.resolve('person@example.com'),
-}))
+vi.mock('./key.js', () => keyFile)
+
+const mailer = { sendBulk: vi.fn() }
+
+vi.mock('./mailer.js', () => mailer)
+
+const crypto = { openSealedEmail: vi.fn() }
+
+vi.mock('@pinsquirrel/crypto', () => crypto)
 
 const tempDir = mkdtempSync(join(tmpdir(), 'admin-test-'))
 const configPath = join(tempDir, 'admin.config.json')
@@ -157,6 +164,402 @@ beforeEach(async () => {
   app = (await import('./app.js')).app
   userService.listByStatus.mockResolvedValue([])
   usersByName()
+  keyFile.readKeyFile.mockReturnValue('raw-key-contents')
+  keyFile.keyNeedsPassphrase.mockReturnValue(false)
+  keyFile.unlockPrivateKey.mockResolvedValue('unlocked-private-key')
+  crypto.openSealedEmail.mockResolvedValue('person@example.com')
+  mailer.sendBulk.mockResolvedValue([])
+})
+
+describe('POST /login', () => {
+  it('signs an admin in and sends them to the unlock step', async () => {
+    authService.login.mockResolvedValue(adminUser)
+
+    const res = await app.request('/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        environment: 'test',
+        username: 'root',
+        password: 'correct-horse',
+      }),
+    })
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/unlock')
+    expect(res.headers.get('set-cookie')).toContain('admin_session=')
+  })
+
+  it('rejects an environment that is not in the config', async () => {
+    const res = await app.request('/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        environment: 'production',
+        username: 'root',
+        password: 'correct-horse',
+      }),
+    })
+
+    expect(res.status).toBe(400)
+    expect(await res.text()).toContain('Unknown environment')
+    expect(authService.login).not.toHaveBeenCalled()
+  })
+
+  // A non-admin with valid credentials must not get a session cookie: the
+  // waitlist routes rebuild the AccessControl per request, but /unlock would
+  // already have read the private key onto the session.
+  it('refuses a valid non-admin account without opening a session', async () => {
+    authService.login.mockResolvedValue(makeUser({ roles: [Role.User] }))
+
+    const res = await app.request('/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        environment: 'test',
+        username: 'alice',
+        password: 'correct-horse',
+      }),
+    })
+
+    expect(res.status).toBe(403)
+    expect(await res.text()).toContain('not an admin')
+    expect(res.headers.get('set-cookie')).toBeNull()
+  })
+
+  it.each([
+    ['a wrong password', () => new domain.InvalidCredentialsError()],
+    ['a malformed submission', () => new domain.ValidationError({})],
+  ])(
+    'reports %s without naming which half was wrong',
+    async (_l, makeError) => {
+      authService.login.mockRejectedValue(makeError())
+
+      const res = await app.request('/login', {
+        method: 'POST',
+        body: new URLSearchParams({
+          environment: 'test',
+          username: 'root',
+          password: 'nope',
+        }),
+      })
+
+      expect(res.status).toBe(400)
+      expect(await res.text()).toContain('Invalid username or password')
+    }
+  )
+
+  it.each([
+    ['without the Admin role', () => new domain.MissingRoleError()],
+    ['still on the waitlist', () => new domain.AccessNotGrantedError()],
+  ])('reports an account %s as unable to sign in', async (_l, makeError) => {
+    authService.login.mockRejectedValue(makeError())
+
+    const res = await app.request('/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        environment: 'test',
+        username: 'root',
+        password: 'correct-horse',
+      }),
+    })
+
+    expect(res.status).toBe(400)
+    expect(await res.text()).toContain('This account cannot sign in')
+  })
+
+  it('reports an unreachable database as a connection problem', async () => {
+    authService.login.mockRejectedValue(new Error('ECONNREFUSED'))
+
+    const res = await app.request('/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        environment: 'test',
+        username: 'root',
+        password: 'correct-horse',
+      }),
+    })
+
+    const body = await res.text()
+    expect(res.status).toBe(400)
+    expect(body).toContain('Could not connect to this environment')
+    expect(body).not.toContain('ECONNREFUSED')
+  })
+
+  it('hands the failed form back with the username and environment filled in', async () => {
+    authService.login.mockRejectedValue(new domain.InvalidCredentialsError())
+
+    const res = await app.request('/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        environment: 'test',
+        username: 'root',
+        password: 'nope',
+      }),
+    })
+
+    const body = await res.text()
+    expect(body).toContain('value="root"')
+    expect(body).toContain('selected')
+    expect(body).not.toContain('nope')
+  })
+})
+
+describe('unlock', () => {
+  /** Sign in without unlocking, so the key file behaviour can be varied. */
+  async function signInOnly(): Promise<string> {
+    authService.login.mockResolvedValue(adminUser)
+    const res = await app.request('/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        environment: 'test',
+        username: 'root',
+        password: 'correct-horse',
+      }),
+    })
+    const setCookie = res.headers.get('set-cookie')
+    if (!setCookie) throw new Error('sign-in did not set a session cookie')
+    return setCookie.split(';')[0]
+  }
+
+  it('prompts for a passphrase when the key file is encrypted', async () => {
+    keyFile.keyNeedsPassphrase.mockReturnValue(true)
+    const cookie = await signInOnly()
+
+    const res = await app.request('/unlock', { headers: { Cookie: cookie } })
+
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('Passphrase')
+    expect(keyFile.unlockPrivateKey).not.toHaveBeenCalled()
+  })
+
+  it('leaves the session locked while the passphrase is outstanding', async () => {
+    keyFile.keyNeedsPassphrase.mockReturnValue(true)
+    const cookie = await signInOnly()
+    await app.request('/unlock', { headers: { Cookie: cookie } })
+
+    const res = await app.request('/waitlist', { headers: { Cookie: cookie } })
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/unlock')
+  })
+
+  it('names the unreadable key file when it cannot be opened', async () => {
+    keyFile.readKeyFile.mockImplementation(() => {
+      throw new Error('ENOENT')
+    })
+    const cookie = await signInOnly()
+
+    const res = await app.request('/unlock', { headers: { Cookie: cookie } })
+
+    expect(res.status).toBe(500)
+    expect(await res.text()).toContain('/nonexistent/key.json')
+  })
+
+  it('unlocks an encrypted key with the submitted passphrase', async () => {
+    keyFile.keyNeedsPassphrase.mockReturnValue(true)
+    const cookie = await signInOnly()
+
+    const res = await app.request(
+      '/unlock',
+      form({ passphrase: 'open sesame' }, cookie)
+    )
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/waitlist')
+    expect(keyFile.unlockPrivateKey).toHaveBeenCalledWith(
+      'raw-key-contents',
+      'open sesame'
+    )
+  })
+
+  it('rejects a wrong passphrase and keeps the session locked', async () => {
+    keyFile.keyNeedsPassphrase.mockReturnValue(true)
+    keyFile.unlockPrivateKey.mockRejectedValue(new Error('bad mac'))
+    const cookie = await signInOnly()
+
+    const res = await app.request(
+      '/unlock',
+      form({ passphrase: 'wrong' }, cookie)
+    )
+
+    expect(res.status).toBe(400)
+    expect(await res.text()).toContain('Incorrect passphrase')
+
+    const waitlist = await app.request('/waitlist', {
+      headers: { Cookie: cookie },
+    })
+    expect(waitlist.headers.get('location')).toBe('/unlock')
+  })
+
+  it('redirects an unauthenticated unlock attempt to /login', async () => {
+    const res = await app.request('/unlock', {
+      method: 'POST',
+      body: new URLSearchParams({ passphrase: 'anything' }),
+    })
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/login')
+    expect(keyFile.unlockPrivateKey).not.toHaveBeenCalled()
+  })
+})
+
+describe('GET /compose', () => {
+  it('counts only the waitlisted people whose email could be opened', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockResolvedValue([
+      makeUser({ id: 'a' }),
+      makeUser({ id: 'b' }),
+      makeUser({ id: 'c', emailEncrypted: null }),
+    ])
+    crypto.openSealedEmail
+      .mockResolvedValueOnce('one@example.com')
+      .mockRejectedValueOnce(new Error('wrong key'))
+
+    const res = await app.request('/compose', { headers: { Cookie: cookie } })
+
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('to 1 waitlisted person')
+  })
+
+  it('reports a database failure instead of an empty compose form', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockRejectedValue(new Error('connection lost'))
+
+    const res = await app.request('/compose', { headers: { Cookie: cookie } })
+
+    expect(res.status).toBe(500)
+    expect(await res.text()).toContain('reach the Test Env database')
+  })
+
+  it('redirects to /login when unauthenticated', async () => {
+    const res = await app.request('/compose')
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/login')
+  })
+})
+
+describe('POST /send', () => {
+  it.each([
+    ['no subject', { subject: '', body: 'Hello' }],
+    ['no message', { subject: 'Hi', body: '   ' }],
+  ])('rejects a submission with %s before any DB work', async (_l, fields) => {
+    const cookie = await signIn()
+
+    const res = await app.request('/send', form(fields, cookie))
+
+    expect(res.status).toBe(400)
+    expect(await res.text()).toContain('Subject and message are both required')
+    expect(userService.listByStatus).not.toHaveBeenCalled()
+    expect(mailer.sendBulk).not.toHaveBeenCalled()
+  })
+
+  // The form carries no recipient list; they are re-read and decrypted here so
+  // plaintext addresses never make the round trip through the browser.
+  it('sends to the addresses read from the database', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockResolvedValue([makeUser()])
+    mailer.sendBulk.mockResolvedValue([
+      { recipient: 'person@example.com', ok: true },
+    ])
+
+    const res = await app.request(
+      '/send',
+      form({ subject: 'Hi', body: 'Hello', to: 'attacker@example.com' }, cookie)
+    )
+
+    expect(res.status).toBe(200)
+    expect(mailer.sendBulk).toHaveBeenCalledWith(
+      expect.objectContaining({ domain: 'mg.example.com' }),
+      ['person@example.com'],
+      'Hi',
+      'Hello'
+    )
+  })
+
+  it('reports which recipients the provider accepted and which it did not', async () => {
+    const cookie = await signIn()
+    mailer.sendBulk.mockResolvedValue([
+      { recipient: 'one@example.com', ok: true },
+      { recipient: 'two@example.com', ok: false, error: 'mailbox full' },
+    ])
+
+    const res = await app.request(
+      '/send',
+      form({ subject: 'Hi', body: 'Hello' }, cookie)
+    )
+
+    const html = await res.text()
+    expect(html).toContain('1 delivered')
+    expect(html).toContain('1 failed')
+    expect(html).toContain('mailbox full')
+  })
+
+  it('keeps the drafted message when the recipient lookup fails', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockRejectedValue(new Error('connection lost'))
+
+    const res = await app.request(
+      '/send',
+      form({ subject: 'Launch day', body: 'We are open' }, cookie)
+    )
+
+    const html = await res.text()
+    expect(res.status).toBe(500)
+    expect(html).toContain('reach the Test Env database')
+    expect(html).toContain('Launch day')
+    expect(html).toContain('We are open')
+    expect(mailer.sendBulk).not.toHaveBeenCalled()
+  })
+
+  it('keeps the drafted message when the provider is unreachable', async () => {
+    const cookie = await signIn()
+    mailer.sendBulk.mockRejectedValue(new Error('mailgun 503'))
+
+    const res = await app.request(
+      '/send',
+      form({ subject: 'Launch day', body: 'We are open' }, cookie)
+    )
+
+    const html = await res.text()
+    expect(res.status).toBe(500)
+    expect(html).toContain('reach the email provider')
+    expect(html).toContain('Launch day')
+    expect(html).not.toContain('mailgun 503')
+  })
+
+  it('redirects to /login when unauthenticated', async () => {
+    const res = await app.request('/send', {
+      method: 'POST',
+      body: new URLSearchParams({ subject: 'Hi', body: 'Hello' }),
+    })
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/login')
+    expect(mailer.sendBulk).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /logout', () => {
+  it('drops the session so the cookie cannot be replayed', async () => {
+    const cookie = await signIn()
+
+    const res = await app.request('/logout', form({}, cookie))
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/login')
+
+    const replayed = await app.request('/waitlist', {
+      headers: { Cookie: cookie },
+    })
+    expect(replayed.headers.get('location')).toBe('/login')
+  })
+
+  it('clears the cookie and redirects even without a session', async () => {
+    const res = await app.request('/logout', { method: 'POST' })
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/login')
+    expect(res.headers.get('set-cookie')).toContain('admin_session=;')
+  })
 })
 
 describe('GET /waitlist', () => {
