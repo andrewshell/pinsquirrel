@@ -181,11 +181,17 @@ function errorResponse(c: Context, err: unknown) {
   if (err instanceof PinNotFoundError || err instanceof TagNotFoundError) {
     return c.json({ error: err.message }, 404)
   }
+  // 403, not 401: apiKeyAuth already answered "who are you?" before any
+  // handler ran, so a failure past that point is authorization, and the two
+  // must stay distinguishable (the authentication 401 is the one that carries
+  // WWW-Authenticate). Surfaces that must not confirm an id exists - notably
+  // getPublicPin - throw PinNotFoundError from the service instead of relying
+  // on the status here.
   if (
     err instanceof UnauthorizedPinAccessError ||
     err instanceof UnauthorizedTagAccessError
   ) {
-    return c.json({ error: 'Unauthorized' }, 401)
+    return c.json({ error: 'Forbidden' }, 403)
   }
   return c.json({ error: 'Internal server error' }, 500)
 }

@@ -5,6 +5,7 @@ import {
   Pagination,
   PinNotFoundError,
   TagNotFoundError,
+  UnauthorizedPinAccessError,
 } from '@pinsquirrel/domain'
 
 const mockAuthenticate = vi.fn()
@@ -225,6 +226,20 @@ describe('api-v1 routes', () => {
         headers: { Authorization: 'Bearer ps_ok' },
       })
       expect(res.status).toBe(404)
+    })
+
+    // 401 is the answer to "who are you?", which apiKeyAuth already settled
+    // before the handler ran. An authorization failure past that point is 403,
+    // so the two never get confused - and the surfaces that must not confirm
+    // an id exists throw PinNotFoundError from the service instead.
+    it('maps an authorization failure to 403, not 401', async () => {
+      mockGetPublicPin.mockRejectedValue(
+        new UnauthorizedPinAccessError('pin-1')
+      )
+      const res = await app.request('/api/v1/pins/pin-1', {
+        headers: { Authorization: 'Bearer ps_ok' },
+      })
+      expect(res.status).toBe(403)
     })
   })
 
