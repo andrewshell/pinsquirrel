@@ -236,7 +236,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Four methods repeat the same guard / from-line / `messages.create` / `EmailSendError` block (~40 lines each).
 - **Fix:** Private `send(to, subject, { html, text }, headers?)` helper.
 
-#### 2.21
+#### 2.21 — **Done**
 
 - **Where:** `apps/hono/src/views/pages/profile.tsx` (452 lines)
 - **Problem:** Five cards plus a 40-line inline bookmarklet script in one component.
