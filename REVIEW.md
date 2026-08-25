@@ -165,7 +165,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 
 ### Correctness bugs
 
-#### 2.10
+#### 2.10 — **Done**
 
 - **Where:** `libs/services/src/services/metadata.ts:30-65`; `libs/adapters/src/node-http-fetcher.ts` (`NodeHttpFetcher`)
 - **Problem:** Fetch errors are classified by `message.includes('timeout')` and a regex on `'HTTP (\d+)'`, coupling the service to the adapter's error strings; the outer `catch` then re-checks `instanceof` for errors it just threw.

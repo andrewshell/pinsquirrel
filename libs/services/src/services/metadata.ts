@@ -8,6 +8,7 @@ import {
   UnsupportedProtocolError,
   FetchTimeoutError,
   HttpError,
+  MetadataError,
   ParseError,
 } from '@pinsquirrel/domain'
 import { validateUrlForFetching } from '../validation/url.js'
@@ -19,49 +20,24 @@ export class MetadataService {
   ) {}
 
   async fetchMetadata(url: string): Promise<MetadataResult> {
+    // Throws InvalidUrlError / UnsupportedProtocolError
+    validateUrlForFetching(url)
+
+    let html: string
     try {
-      // Validate URL before fetching
-      validateUrlForFetching(url)
-
-      // Fetch HTML content
-      let html: string
-      try {
-        html = await this.httpFetcher.fetch(url)
-      } catch (error) {
-        if (error instanceof Error) {
-          // Map common HTTP fetcher errors to specific types
-          if (error.message.includes('timeout')) {
-            throw new FetchTimeoutError(url)
-          }
-          if (error.message.includes('HTTP')) {
-            const statusMatch = error.message.match(/HTTP (\d+)/)
-            const status = statusMatch ? parseInt(statusMatch[1], 10) : 500
-            throw new HttpError(status, url)
-          }
-        }
-        // Re-throw unknown errors as generic fetch errors
-        throw new HttpError(500, url)
-      }
-
-      // Parse metadata
-      try {
-        return this.htmlParser.parseMetadata(html)
-      } catch {
-        throw new ParseError(url)
-      }
+      html = await this.httpFetcher.fetch(url)
     } catch (error) {
-      // Re-throw specific errors as-is, wrap unknown errors
-      if (
-        error instanceof InvalidUrlError ||
-        error instanceof UnsupportedProtocolError ||
-        error instanceof FetchTimeoutError ||
-        error instanceof HttpError ||
-        error instanceof ParseError
-      ) {
+      // Fetchers classify their own failures (FetchTimeoutError, HttpError);
+      // anything else is a transport failure we cannot attribute.
+      if (error instanceof MetadataError) {
         throw error
       }
+      throw new HttpError(500, url)
+    }
 
-      // Fallback for any unexpected errors
+    try {
+      return this.htmlParser.parseMetadata(html)
+    } catch {
       throw new ParseError(url)
     }
   }
