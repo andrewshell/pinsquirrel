@@ -177,6 +177,74 @@ describe('validateUrlForFetching', () => {
       )
     })
 
+    it.each([
+      ['0.0.0.0', 'this host'],
+      ['0.1.2.3', '0.0.0.0/8'],
+      ['169.254.169.254', 'cloud metadata (169.254.0.0/16)'],
+      ['169.254.0.1', 'link-local'],
+      ['127.1.2.3', '127.0.0.0/8, not just 127.0.0.1'],
+      ['172.31.255.255', 'top of 172.16.0.0/12'],
+    ])('should block %s (%s)', address => {
+      expect(() => validateUrlForFetching(`http://${address}`)).toThrow(
+        InvalidUrlError
+      )
+    })
+
+    it.each([
+      ['172.15.0.1', 'below 172.16.0.0/12'],
+      ['172.32.0.1', 'above 172.16.0.0/12'],
+      ['172.100.5.5', 'well outside 172.16.0.0/12'],
+      ['11.0.0.1', 'adjacent to 10.0.0.0/8'],
+      ['192.169.0.1', 'adjacent to 192.168.0.0/16'],
+      ['1.1.1.1', 'a public resolver'],
+    ])('should allow public address %s (%s)', address => {
+      expect(() => validateUrlForFetching(`http://${address}`)).not.toThrow()
+    })
+
+    it.each([
+      ['[::]', 'IPv6 unspecified'],
+      ['[fc00::1]', 'IPv6 unique local (fc00::/7)'],
+      ['[fd12:3456:789a::1]', 'IPv6 unique local (fd00::/8)'],
+      ['[fe80::1]', 'IPv6 link-local (fe80::/10)'],
+      ['[febf::1]', 'top of IPv6 link-local'],
+      ['[::ffff:127.0.0.1]', 'IPv4-mapped loopback'],
+      ['[::ffff:169.254.169.254]', 'IPv4-mapped cloud metadata'],
+      ['[::ffff:10.0.0.1]', 'IPv4-mapped private range'],
+    ])('should block %s (%s)', address => {
+      expect(() => validateUrlForFetching(`http://${address}`)).toThrow(
+        InvalidUrlError
+      )
+    })
+
+    it.each([
+      ['[2606:4700:4700::1111]', 'a public IPv6 resolver'],
+      ['[::ffff:1.1.1.1]', 'IPv4-mapped public address'],
+      ['[fec0::1]', 'site-local, outside fe80::/10'],
+    ])('should allow public IPv6 address %s (%s)', address => {
+      expect(() => validateUrlForFetching(`http://${address}`)).not.toThrow()
+    })
+
+    it.each([
+      ['2130706433', 'decimal 127.0.0.1'],
+      ['0x7f000001', 'hex 127.0.0.1'],
+      ['0177.0.0.1', 'octal 127.0.0.1'],
+      ['127.1', 'short-form 127.0.0.1'],
+      ['0xa000001', 'hex 10.0.0.1'],
+      ['0', 'decimal 0.0.0.0'],
+      ['0300.0250.0.1', 'octal 192.168.0.1'],
+    ])('should block %s (%s)', address => {
+      expect(() => validateUrlForFetching(`http://${address}`)).toThrow(
+        InvalidUrlError
+      )
+    })
+
+    it('should block .localhost domains', () => {
+      // RFC 6761 reserves the whole TLD for loopback.
+      expect(() => validateUrlForFetching('http://api.localhost')).toThrow(
+        InvalidUrlError
+      )
+    })
+
     it('should block .local domains', () => {
       expect(() => validateUrlForFetching('http://myserver.local')).toThrow(
         InvalidUrlError

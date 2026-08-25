@@ -96,7 +96,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `getPublicPin`'s docstring promises private pins are indistinguishable from missing ones, but a pin owned by _another_ user surfaces as `UnauthorizedPinAccessError`, which `api-v1.ts` maps to **401** — confirming the id exists. `pin.test.ts:589` locks this in. HTML routes deliberately return 404 "so ownership stays opaque". MCP (`mapDomainErrorToMcp`) follows the API.
 - **Fix:** **PLAN.md:** Phase 6a rewrites the _authentication_ 401 in `mcp/auth.ts`/`api-auth.ts` to carry `WWW-Authenticate`; that is a different 401 from this _authorization_ one — don't conflate them, but coordinate edits to `errorResponse`/`mapDomainErrorToMcp` with whoever does 6a. In `getPublicPin`, map `!canRead` to `PinNotFoundError` (exactly what `TagService.getUserTagById` at `tag.ts:36-42` does); update `pin.test.ts:589`; align `errorResponse` in `api-v1.ts` and `mapDomainErrorToMcp`. **Blocked on Q2. After 2.25** (error constructors change). Touches the same `pin.ts` auth paths as 2.32.
 
-#### 1.12
+#### 1.12 — **Done (CIDR half); DNS half blocked on Q15**
 
 - **Where:** `libs/services/src/validation/url.ts:41-69`
 - **Problem:** SSRF guard is prefix-string matching: blocks all of `172.*` (only `172.16/12` is private) but misses `169.254.*` (cloud metadata), `0.0.0.0`, IPv6 ULA/link-local, `::ffff:`-mapped IPv4, and decimal/hex IP forms.
