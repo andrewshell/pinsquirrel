@@ -1,4 +1,5 @@
 import type {
+  AccessControl,
   UserRepository,
   PasswordResetRepository,
   EmailService,
@@ -12,6 +13,7 @@ import {
   ResetTokenExpiredError,
   TooManyResetRequestsError,
   UserAlreadyExistsError,
+  UnauthorizedUserAccessError,
 } from '@pinsquirrel/domain'
 import {
   hashPassword,
@@ -159,10 +161,22 @@ export class AccountService {
     return { emailFailed }
   }
 
-  async updateEmail(input: {
-    userId: string
-    email: string | null
-  }): Promise<void> {
+  /**
+   * Change a user's own email. Only the account holder may do this: the sealed
+   * copy is the waitlist's contact address, so letting anyone else rewrite it
+   * would redirect that contact.
+   */
+  async updateEmail(
+    ac: AccessControl,
+    input: {
+      userId: string
+      email: string | null
+    }
+  ): Promise<void> {
+    if (!ac.canUpdate({ userId: input.userId })) {
+      throw new UnauthorizedUserAccessError(input.userId)
+    }
+
     // Validate email if provided
     if (input.email !== null) {
       const emailResult = emailSchema.safeParse(input.email)

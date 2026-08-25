@@ -27,3 +27,19 @@ export class UserNotEligibleError extends UserError {
     this.name = 'UserNotEligibleError'
   }
 }
+
+/**
+ * A user-account operation was attempted by someone other than that user.
+ *
+ * Distinct from `InvalidCredentialsError`: the credentials were never checked,
+ * because the caller had no business touching this account in the first place.
+ */
+export class UnauthorizedUserAccessError extends UserError {
+  constructor(
+    public readonly userId: string,
+    message: string = `Unauthorized access to user with ID "${userId}"`
+  ) {
+    super(message)
+    this.name = 'UnauthorizedUserAccessError'
+  }
+}

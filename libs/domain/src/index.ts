@@ -63,6 +63,7 @@ export {
   UserError,
   UserNotFoundError,
   UserNotEligibleError,
+  UnauthorizedUserAccessError,
 } from './errors/user.js'
 export {
   PinError,
