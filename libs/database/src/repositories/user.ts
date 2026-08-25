@@ -6,7 +6,7 @@ import type {
   Role,
   UserStatus,
 } from '@pinsquirrel/domain'
-import { eq, sql } from 'drizzle-orm'
+import { eq, inArray, sql } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { users } from '../schema/users.js'
 import { userRoles } from '../schema/user-roles.js'
@@ -15,15 +15,38 @@ export class DrizzleUserRepository implements UserRepository {
   constructor(private db: MySql2Database) {}
 
   private async attachRoles(user: User): Promise<User> {
-    const roles = await this.db
-      .select()
-      .from(userRoles)
-      .where(eq(userRoles.userId, user.id))
+    const rolesByUserId = await this.getRoles([user.id])
 
     return {
       ...user,
-      roles: roles.map(r => r.role as Role),
+      roles: rolesByUserId.get(user.id) ?? [],
     }
+  }
+
+  /**
+   * Roles for a batch of users, grouped by user id.
+   *
+   * `findByStatus` loads the whole admin waitlist at once, so a per-user role
+   * lookup is an N+1 that grows with the waitlist.
+   */
+  private async getRoles(userIds: string[]): Promise<Map<string, Role[]>> {
+    if (userIds.length === 0) {
+      return new Map()
+    }
+
+    const rows = await this.db
+      .select()
+      .from(userRoles)
+      .where(inArray(userRoles.userId, userIds))
+
+    const rolesByUserId = new Map<string, Role[]>()
+    for (const row of rows) {
+      const existing = rolesByUserId.get(row.userId) ?? []
+      existing.push(row.role as Role)
+      rolesByUserId.set(row.userId, existing)
+    }
+
+    return rolesByUserId
   }
 
   async findById(id: string): Promise<User | null> {
@@ -65,9 +88,12 @@ export class DrizzleUserRepository implements UserRepository {
       .from(users)
       .where(eq(users.status, status))
 
-    return await Promise.all(
-      results.map(user => this.attachRoles(user as User))
-    )
+    const rolesByUserId = await this.getRoles(results.map(user => user.id))
+
+    return results.map(user => ({
+      ...(user as User),
+      roles: rolesByUserId.get(user.id) ?? [],
+    }))
   }
   async create(data: CreateUserData): Promise<User> {
     const id = crypto.randomUUID()
