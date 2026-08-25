@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { MailgunEmailService } from './email-service.js'
 import type { MailgunConfig } from './types.js'
 import { EmailSendError } from '@pinsquirrel/domain'
