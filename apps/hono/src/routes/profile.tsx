@@ -49,7 +49,7 @@ profile.post('/', async c => {
     if (intent === 'update-email') {
       const email = getString(formData['email'])
 
-      await accountService.updateEmail({
+      await accountService.updateEmail(new AccessControl(user), {
         userId: user.id,
         email: email === '' ? null : email,
       })
@@ -91,7 +91,7 @@ profile.post('/', async c => {
       const currentPassword = getString(formData['currentPassword'])
       const newPassword = getString(formData['newPassword'])
 
-      await authService.changePassword({
+      await authService.changePassword(new AccessControl(user), {
         userId: user.id,
         currentPassword,
         newPassword,

@@ -271,7 +271,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Constructors take an _id_ and template it (`Tag with ID "${id}" not found`), but callers pass full sentences → messages like `Tag with ID "Target tag with ID x not found" not found`.
 - **Fix:** Give them `(id: string, message?: string)`; pass ids at the call sites. (`UnauthorizedApiKeyAccessError` takes `(message?)` only — align it to the same signature.) Prerequisite for 1.11.
 
-#### 2.26
+#### 2.26 — **Done**
 
 - **Where:** `libs/services/src/services/authentication.ts:84,122,143`; `account.ts:161`
 - **Problem:** `grantAccess`, `grantAdmin`, `changePassword`, `updateEmail` take a bare `userId` with no `AccessControl`, while `UserService.listByStatus` argues in a comment that services must carry their own authorization.

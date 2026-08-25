@@ -15,6 +15,8 @@ import {
   TooManyResetRequestsError,
   Role,
   UserAlreadyExistsError,
+  UnauthorizedUserAccessError,
+  AccessControl,
   UserStatus,
 } from '@pinsquirrel/domain'
 
@@ -47,6 +49,9 @@ describe('AccountService', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
   }
+
+  /** The AccessControl a signed-in user has over their own account. */
+  const selfAc = (id: string) => new AccessControl({ ...mockUser, id })
 
   const mockPasswordResetToken: PasswordResetToken = {
     id: 'reset-123',
@@ -430,7 +435,7 @@ describe('AccountService', () => {
       vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
       vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
 
-      await accountService.updateEmail({
+      await accountService.updateEmail(selfAc('123'), {
         userId: '123',
         email: 'newemail@example.com',
       })
@@ -448,7 +453,7 @@ describe('AccountService', () => {
       vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
       vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
 
-      await accountService.updateEmail({
+      await accountService.updateEmail(selfAc('123'), {
         userId: '123',
         email: null,
       })
@@ -473,7 +478,7 @@ describe('AccountService', () => {
       vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
       vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
 
-      await service.updateEmail({
+      await service.updateEmail(selfAc('123'), {
         userId: '123',
         email: 'newemail@example.com',
       })
@@ -487,11 +492,34 @@ describe('AccountService', () => {
 
     it('should throw validation error for invalid email', async () => {
       await expect(
-        accountService.updateEmail({
+        accountService.updateEmail(selfAc('123'), {
           userId: '123',
           email: 'invalid-email',
         })
       ).rejects.toThrow('Invalid email address')
+    })
+
+    it("should refuse to change another user's email", async () => {
+      const userA = new AccessControl({ ...mockUser, id: 'user-a' })
+
+      await expect(
+        accountService.updateEmail(userA, {
+          userId: 'user-b',
+          email: 'attacker@example.com',
+        })
+      ).rejects.toThrow(UnauthorizedUserAccessError)
+      expect(mockUserRepository.findById).not.toHaveBeenCalled()
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('should refuse an anonymous caller', async () => {
+      await expect(
+        accountService.updateEmail(new AccessControl(null), {
+          userId: 'user-a',
+          email: 'attacker@example.com',
+        })
+      ).rejects.toThrow(UnauthorizedUserAccessError)
+      expect(mockUserRepository.findById).not.toHaveBeenCalled()
     })
   })
 

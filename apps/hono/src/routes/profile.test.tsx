@@ -10,6 +10,7 @@ import { Hono } from 'hono'
 import type { MiddlewareHandler } from 'hono'
 import type { ApiKey, User } from '@pinsquirrel/domain'
 import {
+  AccessControl,
   InvalidCredentialsError,
   UserAlreadyExistsError,
   ValidationError,
@@ -113,10 +114,10 @@ describe('profile routes', () => {
       )
 
       const html = await renderedProfile(res)
-      expect(svc.updateEmail).toHaveBeenCalledWith({
-        userId: testUser.id,
-        email: 'new@example.com',
-      })
+      expect(svc.updateEmail).toHaveBeenCalledWith(
+        new AccessControl(testUser),
+        { userId: testUser.id, email: 'new@example.com' }
+      )
       expect(html).toContain('Laptop Key')
       expect(html).not.toContain('No API keys yet')
     })
@@ -154,10 +155,10 @@ describe('profile routes', () => {
         formBody({ intent: 'update-email', email: '' })
       )
 
-      expect(svc.updateEmail).toHaveBeenCalledWith({
-        userId: testUser.id,
-        email: null,
-      })
+      expect(svc.updateEmail).toHaveBeenCalledWith(
+        new AccessControl(testUser),
+        { userId: testUser.id, email: null }
+      )
     })
   })
 

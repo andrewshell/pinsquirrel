@@ -9,6 +9,8 @@ import {
   UserNotFoundError,
   UserNotEligibleError,
   ValidationError,
+  UnauthorizedUserAccessError,
+  AccessControl,
   Role,
   UserStatus,
 } from '@pinsquirrel/domain'
@@ -44,6 +46,16 @@ describe('AuthenticationService', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
   }
+
+  /** An admin caller, for the grant operations. */
+  const adminAc = new AccessControl({
+    ...mockUser,
+    id: 'admin-1',
+    roles: [Role.User, Role.Admin],
+  })
+
+  /** The AccessControl a signed-in user has over their own account. */
+  const selfAc = (id: string) => new AccessControl({ ...mockUser, id })
 
   beforeEach(() => {
     mockUserRepository = createMockUserRepository()
@@ -213,6 +225,53 @@ describe('AuthenticationService', () => {
     })
   })
 
+  describe('authorization', () => {
+    it('should refuse grantAccess for a caller without the Admin role', async () => {
+      const nonAdmin = new AccessControl({ ...mockUser, roles: [Role.User] })
+
+      await expect(
+        authService.grantAccess(nonAdmin, 'someone-else')
+      ).rejects.toThrow(MissingRoleError)
+      expect(mockUserRepository.findById).not.toHaveBeenCalled()
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('should refuse grantAdmin for a caller without the Admin role', async () => {
+      const nonAdmin = new AccessControl({ ...mockUser, roles: [Role.User] })
+
+      await expect(
+        authService.grantAdmin(nonAdmin, 'someone-else')
+      ).rejects.toThrow(MissingRoleError)
+      expect(mockUserRepository.findById).not.toHaveBeenCalled()
+      expect(mockUserRepository.addRole).not.toHaveBeenCalled()
+    })
+
+    it('should refuse changePassword for another user', async () => {
+      const userA = new AccessControl({ ...mockUser, id: 'user-a' })
+
+      await expect(
+        authService.changePassword(userA, {
+          userId: 'user-b',
+          currentPassword: 'currentpass123',
+          newPassword: 'newpass1234567',
+        })
+      ).rejects.toThrow(UnauthorizedUserAccessError)
+      expect(mockUserRepository.findById).not.toHaveBeenCalled()
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('should refuse changePassword for an anonymous caller', async () => {
+      await expect(
+        authService.changePassword(new AccessControl(null), {
+          userId: 'user-a',
+          currentPassword: 'currentpass123',
+          newPassword: 'newpass1234567',
+        })
+      ).rejects.toThrow(UnauthorizedUserAccessError)
+      expect(mockUserRepository.findById).not.toHaveBeenCalled()
+    })
+  })
+
   describe('grantAccess', () => {
     it('should move a waitlisted user to active', async () => {
       const waitlistedUser = { ...mockUser, status: UserStatus.Waitlist }
@@ -220,7 +279,7 @@ describe('AuthenticationService', () => {
       vi.mocked(mockUserRepository.findById).mockResolvedValue(waitlistedUser)
       vi.mocked(mockUserRepository.update).mockResolvedValue(activatedUser)
 
-      const result = await authService.grantAccess(waitlistedUser.id)
+      const result = await authService.grantAccess(adminAc, waitlistedUser.id)
 
       expect(mockUserRepository.update).toHaveBeenCalledWith(
         waitlistedUser.id,
@@ -233,7 +292,7 @@ describe('AuthenticationService', () => {
       const activeUser = { ...mockUser, status: UserStatus.Active }
       vi.mocked(mockUserRepository.findById).mockResolvedValue(activeUser)
 
-      const result = await authService.grantAccess(activeUser.id)
+      const result = await authService.grantAccess(adminAc, activeUser.id)
 
       expect(mockUserRepository.update).not.toHaveBeenCalled()
       expect(result.status).toBe(UserStatus.Active)
@@ -242,9 +301,9 @@ describe('AuthenticationService', () => {
     it('should throw UserNotFoundError when the user does not exist', async () => {
       vi.mocked(mockUserRepository.findById).mockResolvedValue(null)
 
-      await expect(authService.grantAccess('missing-id')).rejects.toThrow(
-        UserNotFoundError
-      )
+      await expect(
+        authService.grantAccess(adminAc, 'missing-id')
+      ).rejects.toThrow(UserNotFoundError)
       expect(mockUserRepository.update).not.toHaveBeenCalled()
     })
 
@@ -260,9 +319,9 @@ describe('AuthenticationService', () => {
       }
       vi.mocked(mockUserRepository.findById).mockResolvedValue(unverified)
 
-      await expect(authService.grantAccess(unverified.id)).rejects.toThrow(
-        UserNotEligibleError
-      )
+      await expect(
+        authService.grantAccess(adminAc, unverified.id)
+      ).rejects.toThrow(UserNotEligibleError)
       expect(mockUserRepository.update).not.toHaveBeenCalled()
     })
   })
@@ -275,7 +334,7 @@ describe('AuthenticationService', () => {
         .mockResolvedValueOnce(plainUser)
         .mockResolvedValueOnce(adminUser)
 
-      const result = await authService.grantAdmin(plainUser.id)
+      const result = await authService.grantAdmin(adminAc, plainUser.id)
 
       expect(mockUserRepository.addRole).toHaveBeenCalledWith(
         plainUser.id,
@@ -291,7 +350,7 @@ describe('AuthenticationService', () => {
         .mockResolvedValueOnce(plainUser)
         .mockResolvedValueOnce(adminUser)
 
-      const result = await authService.grantAdmin(plainUser.id)
+      const result = await authService.grantAdmin(adminAc, plainUser.id)
 
       expect(result.roles).toContain(Role.User)
       expect(mockUserRepository.update).not.toHaveBeenCalled()
@@ -301,7 +360,7 @@ describe('AuthenticationService', () => {
       const adminUser = { ...mockUser, roles: [Role.User, Role.Admin] }
       vi.mocked(mockUserRepository.findById).mockResolvedValue(adminUser)
 
-      const result = await authService.grantAdmin(adminUser.id)
+      const result = await authService.grantAdmin(adminAc, adminUser.id)
 
       expect(mockUserRepository.addRole).not.toHaveBeenCalled()
       expect(result.roles).toContain(Role.Admin)
@@ -310,9 +369,9 @@ describe('AuthenticationService', () => {
     it('should throw UserNotFoundError when the user does not exist', async () => {
       vi.mocked(mockUserRepository.findById).mockResolvedValue(null)
 
-      await expect(authService.grantAdmin('missing-id')).rejects.toThrow(
-        UserNotFoundError
-      )
+      await expect(
+        authService.grantAdmin(adminAc, 'missing-id')
+      ).rejects.toThrow(UserNotFoundError)
       expect(mockUserRepository.addRole).not.toHaveBeenCalled()
     })
 
@@ -322,9 +381,9 @@ describe('AuthenticationService', () => {
         .mockResolvedValueOnce(plainUser)
         .mockResolvedValueOnce(null)
 
-      await expect(authService.grantAdmin(plainUser.id)).rejects.toThrow(
-        UserNotFoundError
-      )
+      await expect(
+        authService.grantAdmin(adminAc, plainUser.id)
+      ).rejects.toThrow(UserNotFoundError)
     })
   })
 
@@ -334,7 +393,7 @@ describe('AuthenticationService', () => {
       vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
       vi.mocked(verifyPassword).mockResolvedValue(true)
 
-      await authService.changePassword({
+      await authService.changePassword(selfAc('123'), {
         userId: '123',
         currentPassword: 'currentpass123',
         newPassword: 'newpass1234567',
@@ -357,7 +416,7 @@ describe('AuthenticationService', () => {
       vi.mocked(verifyPassword).mockResolvedValue(false)
 
       await expect(
-        authService.changePassword({
+        authService.changePassword(selfAc('123'), {
           userId: '123',
           currentPassword: 'wrongpass123',
           newPassword: 'newpass1234567',
@@ -371,7 +430,7 @@ describe('AuthenticationService', () => {
       vi.mocked(mockUserRepository.findById).mockResolvedValue(null)
 
       await expect(
-        authService.changePassword({
+        authService.changePassword(selfAc('999'), {
           userId: '999',
           currentPassword: 'currentpass123',
           newPassword: 'newpass1234567',
@@ -381,7 +440,7 @@ describe('AuthenticationService', () => {
 
     it('should throw validation error for invalid current password', async () => {
       await expect(
-        authService.changePassword({
+        authService.changePassword(selfAc('123'), {
           userId: '123',
           currentPassword: 'short', // too short
           newPassword: 'newpass1234567',
@@ -391,7 +450,7 @@ describe('AuthenticationService', () => {
 
     it('should throw validation error for invalid new password', async () => {
       await expect(
-        authService.changePassword({
+        authService.changePassword(selfAc('123'), {
           userId: '123',
           currentPassword: 'currentpass123',
           newPassword: 'short', // too short

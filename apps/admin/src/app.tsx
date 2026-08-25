@@ -333,7 +333,8 @@ export function createApp(config: AdminConfig): Hono {
     }
 
     try {
-      const updated = await getRuntime(env).authService.grantAccess(userId)
+      const ac = await adminAccessControl(env, viewer.username)
+      const updated = await getRuntime(env).authService.grantAccess(ac, userId)
       return renderWaitlist(c, env, viewer, {
         notice: `Granted access to ${updated.username}.`,
       })
@@ -383,6 +384,7 @@ export function createApp(config: AdminConfig): Hono {
 
     try {
       const { userService, authService } = getRuntime(env)
+      const ac = await adminAccessControl(env, viewer.username)
       const user = await userService.getUserByUsername(username)
 
       if (!user) {
@@ -403,7 +405,7 @@ export function createApp(config: AdminConfig): Hono {
         })
       }
 
-      const updated = await authService.grantAdmin(user.id)
+      const updated = await authService.grantAdmin(ac, user.id)
       return renderWaitlist(c, env, viewer, {
         notice: `Granted the Admin role to ${updated.username}.`,
       })

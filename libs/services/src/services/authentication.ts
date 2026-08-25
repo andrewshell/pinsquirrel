@@ -1,4 +1,4 @@
-import type { UserRepository, User } from '@pinsquirrel/domain'
+import type { AccessControl, UserRepository, User } from '@pinsquirrel/domain'
 import { Role, UserStatus } from '@pinsquirrel/domain'
 import {
   InvalidCredentialsError,
@@ -7,6 +7,7 @@ import {
   AccessNotGrantedError,
   UserNotFoundError,
   UserNotEligibleError,
+  UnauthorizedUserAccessError,
 } from '@pinsquirrel/domain'
 import { hashPassword, verifyPassword, getDummyHash } from '../utils/crypto.js'
 import { credentialsSchema, passwordChangeSchema } from '../validation/user.js'
@@ -64,9 +65,15 @@ export class AuthenticationService {
   /**
    * Grant a user access to the application, moving them off the early-access
    * waitlist and into the active state. Idempotent: granting an already-active
-   * user is a no-op. Intended for manual/admin use.
+   * user is a no-op. Admin-only, and checked here rather than by the caller:
+   * apps/admin is the only caller today, but the rule belongs to the
+   * operation, not to whichever transport happens to reach it.
    */
-  async grantAccess(userId: string): Promise<User> {
+  async grantAccess(ac: AccessControl, userId: string): Promise<User> {
+    if (!ac.hasRole(Role.Admin)) {
+      throw new MissingRoleError()
+    }
+
     const user = await this.userRepository.findById(userId)
     if (!user) {
       throw new UserNotFoundError(userId)
@@ -103,8 +110,14 @@ export class AuthenticationService {
    *
    * Roles are additive: existing roles and the user's status are left
    * untouched. Idempotent — granting to an existing admin is a no-op.
+   *
+   * Admin-only, enforced here for the same reason as grantAccess.
    */
-  async grantAdmin(userId: string): Promise<User> {
+  async grantAdmin(ac: AccessControl, userId: string): Promise<User> {
+    if (!ac.hasRole(Role.Admin)) {
+      throw new MissingRoleError()
+    }
+
     const user = await this.userRepository.findById(userId)
     if (!user) {
       throw new UserNotFoundError(userId)
@@ -125,11 +138,22 @@ export class AuthenticationService {
     return updated
   }
 
-  async changePassword(input: {
-    userId: string
-    currentPassword: string
-    newPassword: string
-  }): Promise<void> {
+  /**
+   * Change a user's own password. Only the account holder may do this — an
+   * admin cannot change someone else's password through this path.
+   */
+  async changePassword(
+    ac: AccessControl,
+    input: {
+      userId: string
+      currentPassword: string
+      newPassword: string
+    }
+  ): Promise<void> {
+    if (!ac.canUpdate({ userId: input.userId })) {
+      throw new UnauthorizedUserAccessError(input.userId)
+    }
+
     // Validate inputs at service boundary
     const result = passwordChangeSchema.safeParse(input)
     if (!result.success) {

@@ -33,6 +33,7 @@ import {
   ValidationError,
   UserNotFoundError,
   UserNotEligibleError,
+  AccessControl,
 } from '@pinsquirrel/domain'
 import type { Hono } from 'hono'
 import type { User } from '@pinsquirrel/domain'
@@ -669,7 +670,12 @@ describe('POST /grant-access', () => {
     )
 
     expect(res.status).toBe(200)
-    expect(authService.grantAccess).toHaveBeenCalledWith('user-1')
+    // The grant carries the signed-in admin's own AccessControl, so the
+    // service decides the rule rather than trusting this app's session gate.
+    expect(authService.grantAccess).toHaveBeenCalledWith(
+      new AccessControl(adminUser),
+      'user-1'
+    )
     expect(await res.text()).toContain('Granted access to alice')
   })
 
@@ -745,7 +751,10 @@ describe('POST /grant-admin', () => {
     )
 
     expect(res.status).toBe(200)
-    expect(authService.grantAdmin).toHaveBeenCalledWith('user-1')
+    expect(authService.grantAdmin).toHaveBeenCalledWith(
+      new AccessControl(adminUser),
+      'user-1'
+    )
     expect(await res.text()).toContain('Granted the Admin role to bob')
   })
 
