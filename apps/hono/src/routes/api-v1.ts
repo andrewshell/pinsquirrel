@@ -178,20 +178,23 @@ function errorResponse(c: Context, err: unknown) {
   if (err instanceof ValidationError) {
     return c.json({ error: 'Invalid request' }, 400)
   }
-  if (err instanceof PinNotFoundError || err instanceof TagNotFoundError) {
-    return c.json({ error: err.message }, 404)
-  }
-  // 403, not 401: apiKeyAuth already answered "who are you?" before any
-  // handler ran, so a failure past that point is authorization, and the two
-  // must stay distinguishable (the authentication 401 is the one that carries
-  // WWW-Authenticate). Surfaces that must not confirm an id exists - notably
-  // getPublicPin - throw PinNotFoundError from the service instead of relying
-  // on the status here.
+  // 404, not 403, and with the id left out of the body: a pin or tag owned by
+  // another user is indistinguishable from one that does not exist, which is
+  // the rule the HTML routes already follow so ownership stays opaque. This
+  // 404 is unrelated to apiKeyAuth's 401 - that one answers "who are you?" and
+  // is settled before any handler runs (it is the one that carries
+  // WWW-Authenticate).
   if (
-    err instanceof UnauthorizedPinAccessError ||
+    err instanceof PinNotFoundError ||
+    err instanceof UnauthorizedPinAccessError
+  ) {
+    return c.json({ error: 'Pin not found' }, 404)
+  }
+  if (
+    err instanceof TagNotFoundError ||
     err instanceof UnauthorizedTagAccessError
   ) {
-    return c.json({ error: 'Forbidden' }, 403)
+    return c.json({ error: 'Tag not found' }, 404)
   }
   return c.json({ error: 'Internal server error' }, 500)
 }

@@ -6,6 +6,7 @@ import {
   PinNotFoundError,
   TagNotFoundError,
   UnauthorizedPinAccessError,
+  UnauthorizedTagAccessError,
 } from '@pinsquirrel/domain'
 
 const mockAuthenticate = vi.fn()
@@ -226,20 +227,24 @@ describe('api-v1 routes', () => {
         headers: { Authorization: 'Bearer ps_ok' },
       })
       expect(res.status).toBe(404)
+      // Same body as the foreign-pin case below: the id must not be echoed
+      // back, or the message alone tells the caller the pin exists.
+      expect(await res.json()).toEqual({ error: 'Pin not found' })
     })
 
-    // 401 is the answer to "who are you?", which apiKeyAuth already settled
-    // before the handler ran. An authorization failure past that point is 403,
-    // so the two never get confused - and the surfaces that must not confirm
-    // an id exists throw PinNotFoundError from the service instead.
-    it('maps an authorization failure to 403, not 401', async () => {
+    // Ownership stays opaque, exactly as the HTML routes have it: another
+    // user's pin is reported as missing, never as "exists but not yours".
+    // This is a different 401 from the one apiKeyAuth returns - that one
+    // answers "who are you?" and is settled before any handler runs.
+    it('reports another user’s pin as not found, not 401 or 403', async () => {
       mockGetPublicPin.mockRejectedValue(
         new UnauthorizedPinAccessError('pin-1')
       )
       const res = await app.request('/api/v1/pins/pin-1', {
         headers: { Authorization: 'Bearer ps_ok' },
       })
-      expect(res.status).toBe(403)
+      expect(res.status).toBe(404)
+      expect(await res.json()).toEqual({ error: 'Pin not found' })
     })
   })
 
@@ -307,6 +312,17 @@ describe('api-v1 routes', () => {
         headers: { Authorization: 'Bearer ps_ok' },
       })
       expect(res.status).toBe(404)
+    })
+
+    it('reports another user’s tag as not found', async () => {
+      mockGetUserTagById.mockRejectedValue(
+        new UnauthorizedTagAccessError('tag-1')
+      )
+      const res = await app.request('/api/v1/tags/tag-1/pins', {
+        headers: { Authorization: 'Bearer ps_ok' },
+      })
+      expect(res.status).toBe(404)
+      expect(await res.json()).toEqual({ error: 'Tag not found' })
     })
   })
 })
