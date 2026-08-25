@@ -58,11 +58,8 @@ importRoute.post('/', async c => {
 
   const ac = new AccessControl(user)
 
-  const fail = (message: string, status?: 500) =>
-    c.html(
-      <ImportPage user={user} errors={{ _form: [message] }} />,
-      ...(status ? ([status] as const) : ([] as const))
-    )
+  const fail = (message: string, status: 200 | 500 = 200) =>
+    c.html(<ImportPage user={user} errors={{ _form: [message] }} />, status)
 
   try {
     const formData = await c.req.parseBody()

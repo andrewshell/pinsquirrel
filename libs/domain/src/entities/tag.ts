@@ -1,4 +1,4 @@
-import type { AccessGateable } from './access'
+import type { AccessGateable } from './access.js'
 
 export interface Tag extends AccessGateable {
   id: string

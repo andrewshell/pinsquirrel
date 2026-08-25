@@ -1,5 +1,5 @@
-import type { User } from './user'
-import type { Role } from './role'
+import type { User } from './user.js'
+import type { Role } from './role.js'
 
 export interface AccessGateable {
   userId: string
