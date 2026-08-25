@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import type { MiddlewareHandler } from 'hono'
 import type { TagRepository } from '@pinsquirrel/domain'
+import { Pagination } from '@pinsquirrel/domain'
 import { TagService } from '@pinsquirrel/services'
 import { makeTag, testUser } from '../test-support/pin-routes'
 
@@ -20,6 +21,10 @@ const repo = {
   findByUserIdWithPinCount: vi.fn(),
   mergeTags: vi.fn(),
   deleteTagsWithNoPins: vi.fn(),
+}
+
+const pins = {
+  getUserPinsWithPagination: vi.fn(),
 }
 
 const session = {
@@ -31,7 +36,10 @@ const session = {
 // service, so mocking the service wholesale would stop these tests exercising
 // the very thing they exist to pin down.
 vi.mock('../lib/services', () => ({
-  pinService: { getUserPinsWithPagination: vi.fn() },
+  pinService: {
+    getUserPinsWithPagination: (...a: unknown[]) =>
+      pins.getUserPinsWithPagination(...a) as unknown,
+  },
   tagService: new TagService({
     findById: (...a: unknown[]) => repo.findById(...a) as unknown,
     findByUserIdWithPinCount: (...a: unknown[]) =>
@@ -82,6 +90,25 @@ describe('tag merge routes', () => {
     repo.findById.mockImplementation((id: string) =>
       Promise.resolve(makeTag({ id, name: id }))
     )
+  })
+
+  // A GET that writes: crawlers and link prefetch triggered the cleanup, and
+  // it raced a concurrent createPin between the tag insert and the link
+  // insert. Orphans are now collected where they are made, in PinService.
+  describe('GET /tags', () => {
+    beforeEach(() => {
+      pins.getUserPinsWithPagination.mockResolvedValue({
+        pins: [],
+        pagination: Pagination.fromTotalCount(0),
+      })
+    })
+
+    it('deletes nothing', async () => {
+      const res = await app.request('/tags')
+
+      expect(res.status).toBe(200)
+      expect(repo.deleteTagsWithNoPins).not.toHaveBeenCalled()
+    })
   })
 
   describe('GET /tags/merge', () => {

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest'
 import { PinService } from './pin.js'
 import type {
   PinRepository,
+  TagRepository,
   Pin,
   User,
   AccessControl,
@@ -25,6 +26,7 @@ describe('PinService', () => {
     countByUserId: Mock
     updateCreatedAt: Mock
   }
+  let mockTagRepository: { deleteTagsWithNoPins: Mock }
 
   const mockPin: Pin = {
     id: 'pin-123',
@@ -77,7 +79,12 @@ describe('PinService', () => {
       updateCreatedAt: vi.fn(),
     }
 
-    pinService = new PinService(mockPinRepository as unknown as PinRepository)
+    mockTagRepository = { deleteTagsWithNoPins: vi.fn() }
+
+    pinService = new PinService(
+      mockPinRepository as unknown as PinRepository,
+      mockTagRepository as unknown as TagRepository
+    )
   })
 
   describe('createPin', () => {
@@ -236,6 +243,46 @@ describe('PinService', () => {
           tagNames: [],
         })
       ).rejects.toThrow(UnauthorizedPinAccessError)
+    })
+
+    // Dropping the last pin off a tag orphans it just as deleting the pin
+    // does, so the same collection runs here.
+    it("removes the owner's now-orphaned tags", async () => {
+      mockPinRepository.findById.mockResolvedValue(mockPin)
+      mockPinRepository.update.mockResolvedValue({ ...mockPin, tagNames: [] })
+
+      await pinService.updatePin(createMockAccessControl(mockUser), {
+        id: 'pin-123',
+        userId: 'user-123',
+        url: 'https://example.com',
+        title: 'Example',
+        description: 'Description',
+        readLater: false,
+        isPrivate: false,
+        tagNames: [],
+      })
+
+      expect(mockTagRepository.deleteTagsWithNoPins).toHaveBeenCalledWith(
+        mockPin.userId
+      )
+    })
+
+    it('does not collect tags when the update never happened', async () => {
+      mockPinRepository.findById.mockResolvedValue(null)
+
+      await expect(
+        pinService.updatePin(createMockAccessControl(mockUser), {
+          id: 'pin-123',
+          userId: 'user-123',
+          url: 'https://example.com',
+          title: 'Updated',
+          description: null,
+          readLater: false,
+          isPrivate: false,
+          tagNames: [],
+        })
+      ).rejects.toThrow(PinNotFoundError)
+      expect(mockTagRepository.deleteTagsWithNoPins).not.toHaveBeenCalled()
     })
 
     it('should throw PinNotFoundError if pin does not exist', async () => {
@@ -419,6 +466,29 @@ describe('PinService', () => {
       await expect(
         pinService.deletePin(createMockAccessControl(mockUser), 'pin-123')
       ).rejects.toThrow(new UnauthorizedPinAccessError('pin-123'))
+    })
+
+    // Deleting the last pin carrying a tag is the moment the tag is orphaned,
+    // so that is where it gets collected. This used to happen on GET /tags -
+    // a write on a read, triggered by any crawler.
+    it("removes the owner's now-orphaned tags", async () => {
+      mockPinRepository.findById.mockResolvedValue(mockPin)
+      mockPinRepository.delete.mockResolvedValue(true)
+
+      await pinService.deletePin(createMockAccessControl(mockUser), 'pin-123')
+
+      expect(mockTagRepository.deleteTagsWithNoPins).toHaveBeenCalledWith(
+        mockPin.userId
+      )
+    })
+
+    it('does not collect tags when the delete never happened', async () => {
+      mockPinRepository.findById.mockResolvedValue(null)
+
+      await expect(
+        pinService.deletePin(createMockAccessControl(mockUser), 'pin-123')
+      ).rejects.toThrow(PinNotFoundError)
+      expect(mockTagRepository.deleteTagsWithNoPins).not.toHaveBeenCalled()
     })
   })
 

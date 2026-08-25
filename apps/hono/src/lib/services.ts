@@ -66,7 +66,7 @@ export const accountService = new AccountService(
   emailService,
   emailSealer
 )
-export const pinService = new PinService(pinRepository)
+export const pinService = new PinService(pinRepository, tagRepository)
 export const pinboardService = new PinboardService(pinService)
 export const tagService = new TagService(tagRepository)
 export const userService = new UserService(userRepository)

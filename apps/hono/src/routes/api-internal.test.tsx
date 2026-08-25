@@ -9,7 +9,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import type { MiddlewareHandler } from 'hono'
-import type { Pin, PinRepository } from '@pinsquirrel/domain'
+import type { Pin, PinRepository, TagRepository } from '@pinsquirrel/domain'
 import { MetadataService, PinService } from '@pinsquirrel/services'
 import {
   FetchTimeoutError,
@@ -37,10 +37,14 @@ vi.mock('../lib/services', () => ({
     getUserFriendlyMessage: (error: Error) =>
       MetadataService.getUserFriendlyMessage(error),
   },
-  pinService: new PinService({
-    findByUserIdAndUrl: (...a: unknown[]) =>
-      svc.findByUserIdAndUrl(...a) as unknown,
-  } as unknown as PinRepository),
+  // The tag repository is unreachable from check-url: it only ever reads.
+  pinService: new PinService(
+    {
+      findByUserIdAndUrl: (...a: unknown[]) =>
+        svc.findByUserIdAndUrl(...a) as unknown,
+    } as unknown as PinRepository,
+    {} as unknown as TagRepository
+  ),
 }))
 
 vi.mock('../middleware/session', () => ({

@@ -280,11 +280,12 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `error.message.includes('Too many')` decides on a 429 by string-matching; the rate-limit middleware on `:243` already covers this route.
 - **Fix:** Either throw and check a typed `RateLimitedError` from the service, or delete the branch as redundant. **Blocked on Q16.**
 
-#### 2.28
+#### 2.28 — **Done**
 
 - **Where:** `apps/hono/src/routes/tags.tsx:37`
 - **Problem:** `GET /tags` calls `deleteTagsWithNoPins` — a destructive write on a GET that crawlers/prefetch trigger, and which races a concurrent `createPin` between tag insert and link insert.
 - **Fix:** Move the cleanup into `TagService`/`PinService` after delete/update, or a scheduled job. **Blocked on Q5.**
+- **Note (when done):** It went into `PinService`, which now takes a `TagRepository` alongside its `PinRepository` and collects orphans right after the pin write in `updatePin`/`deletePin` — the moment a tag becomes orphaned. `TagService.deleteTagsWithNoPins` had no caller left and is gone; the repository method stays. Cleanup deliberately runs _after_ the write completes and is scoped to the one user's tags, so it cannot take back a tag a concurrent `createPin` inserted but has not yet linked; 1.4's transaction closes that window properly.
 
 #### 2.29
 

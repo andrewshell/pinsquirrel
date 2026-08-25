@@ -501,25 +501,3 @@ describe('TagService.deleteTag', () => {
     ).rejects.toBeInstanceOf(TagNotFoundError)
   })
 })
-
-describe('TagService.deleteTagsWithNoPins', () => {
-  it('cleans up the caller’s own orphan tags', async () => {
-    await service.deleteTagsWithNoPins(new AccessControl(owner), 'owner-id')
-
-    expect(mockRepo.deleteTagsWithNoPins).toHaveBeenCalledWith('owner-id')
-  })
-
-  it('refuses to clean up another user’s tags', async () => {
-    await expect(
-      service.deleteTagsWithNoPins(new AccessControl(owner), 'other-id')
-    ).rejects.toBeInstanceOf(UnauthorizedTagAccessError)
-    expect(mockRepo.deleteTagsWithNoPins).not.toHaveBeenCalled()
-  })
-
-  it('refuses an unauthenticated caller', async () => {
-    await expect(
-      service.deleteTagsWithNoPins(new AccessControl(null), 'owner-id')
-    ).rejects.toBeInstanceOf(UnauthorizedTagAccessError)
-    expect(mockRepo.deleteTagsWithNoPins).not.toHaveBeenCalled()
-  })
-})
