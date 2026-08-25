@@ -11,12 +11,3 @@ export interface CreatePasswordResetTokenData {
   tokenHash: string
   expiresAt: Date
 }
-
-export interface PasswordResetRequest {
-  email: string
-}
-
-export interface PasswordResetConfirmation {
-  token: string
-  newPassword: string
-}

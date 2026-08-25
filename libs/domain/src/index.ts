@@ -15,8 +15,6 @@ export type {
 export type {
   PasswordResetToken,
   CreatePasswordResetTokenData,
-  PasswordResetRequest,
-  PasswordResetConfirmation,
 } from './entities/password-reset-token.js'
 export type {
   Session,
@@ -51,7 +49,6 @@ export {
   PasswordResetError,
   InvalidResetTokenError,
   ResetTokenExpiredError,
-  ResetTokenNotFoundError,
   TooManyResetRequestsError,
   EmailSendError,
   MissingRoleError,
@@ -70,7 +67,6 @@ export {
   TagError,
   TagNotFoundError,
   UnauthorizedTagAccessError,
-  DuplicateTagError,
 } from './errors/pin.js'
 export {
   MetadataError,
@@ -81,11 +77,9 @@ export {
   ParseError,
 } from './errors/metadata.js'
 export { ValidationError } from './errors/validation.js'
-export type { FieldErrors } from './errors/validation.js'
 export {
   ApiKeyError,
   ApiKeyNotFoundError,
   ApiKeyLimitExceededError,
-  InvalidApiKeyError,
   UnauthorizedApiKeyAccessError,
 } from './errors/api-key.js'

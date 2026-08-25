@@ -49,10 +49,3 @@ export class UnauthorizedTagAccessError extends TagError {
     this.name = 'UnauthorizedTagAccessError'
   }
 }
-
-export class DuplicateTagError extends TagError {
-  constructor(name: string) {
-    super(`Tag with name "${name}" already exists`)
-    this.name = 'DuplicateTagError'
-  }
-}

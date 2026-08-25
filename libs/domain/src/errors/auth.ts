@@ -49,13 +49,6 @@ export class ResetTokenExpiredError extends PasswordResetError {
   }
 }
 
-export class ResetTokenNotFoundError extends PasswordResetError {
-  constructor() {
-    super('Password reset token not found')
-    this.name = 'ResetTokenNotFoundError'
-  }
-}
-
 export class TooManyResetRequestsError extends PasswordResetError {
   constructor() {
     super('Too many password reset requests. Please try again later.')

@@ -20,27 +20,4 @@ export class ValidationError extends Error {
     this.name = 'ValidationError'
     this.fields = fields
   }
-
-  /**
-   * Add an additional field error
-   */
-  addFieldError(field: string, message: string): ValidationError {
-    const newFields = { ...this.fields }
-    newFields[field] = [...(newFields[field] || []), message]
-    return new ValidationError(newFields, this.message)
-  }
-
-  /**
-   * Check if a specific field has errors
-   */
-  hasFieldError(field: string): boolean {
-    return !!(this.fields[field] && this.fields[field].length > 0)
-  }
-
-  /**
-   * Get errors for a specific field
-   */
-  getFieldErrors(field: string): string[] {
-    return this.fields[field] || []
-  }
 }

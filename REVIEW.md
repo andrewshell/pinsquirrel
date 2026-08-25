@@ -120,7 +120,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Generic `Repository.findAll` is implemented by four Drizzle repos and called by none; `PinRepository`/`ApiKeyRepository` don't extend it, so the base interface buys nothing.
 - **Fix:** Delete `findAll` from the interface and the four implementations. This removes the `findAll` half of 2.35's N+1; `findByStatus` still needs that fix.
 
-#### 2.3
+#### 2.3 — **Done**
 
 - **Where:** `libs/domain/src/entities/password-reset-token.ts:15-22`, `errors/auth.ts:52`, `errors/pin.ts:53`, `errors/api-key.ts:22`, `errors/validation.ts:27-45`, `index.ts:84`
 - **Problem:** Dead exports: `PasswordResetRequest`, `PasswordResetConfirmation`, `ResetTokenNotFoundError`, `DuplicateTagError`, `InvalidApiKeyError`, `ValidationError.addFieldError/hasFieldError/getFieldErrors`, and the `index.ts` re-export of `FieldErrors` (the type itself is live — it types `ValidationError.fields`).

@@ -19,13 +19,6 @@ export class ApiKeyLimitExceededError extends ApiKeyError {
   }
 }
 
-export class InvalidApiKeyError extends ApiKeyError {
-  constructor() {
-    super('Invalid or expired API key')
-    this.name = 'InvalidApiKeyError'
-  }
-}
-
 export class UnauthorizedApiKeyAccessError extends ApiKeyError {
   constructor(message: string = 'Not authorized to access this API key') {
     super(message)
