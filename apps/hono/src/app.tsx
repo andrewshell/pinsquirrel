@@ -3,7 +3,6 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { csrf } from 'hono/csrf'
 import { HTTPException } from 'hono/http-exception'
 import { logger, safeError } from './lib/logger.js'
-import { secureHeaders } from 'hono/secure-headers'
 
 import { NotFoundPage } from './views/pages/not-found'
 import { ServerErrorPage } from './views/pages/server-error'
@@ -26,6 +25,7 @@ import { mcpRoutes } from './routes/mcp'
 import { seoRoutes } from './routes/seo'
 import { markdownNegotiation } from './middleware/markdown-negotiation'
 import { sessionMiddleware } from './middleware/session'
+import { securityHeaders } from './middleware/security-headers'
 
 // Create the Hono app
 const app = new Hono()
@@ -44,7 +44,7 @@ app.use('*', async (c, next) => {
     'request'
   )
 })
-app.use('*', secureHeaders())
+app.use('*', securityHeaders())
 
 // Serve static files (must run before session middleware so CSS/JS load
 // even if the database is unavailable)

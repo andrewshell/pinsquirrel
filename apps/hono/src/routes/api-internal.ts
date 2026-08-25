@@ -75,15 +75,16 @@ apiInternal.get('/check-url', async c => {
   const isHtmx = c.req.header('HX-Request') === 'true'
 
   if (isHtmx) {
+    // The URL input's red outline follows the presence of the
+    // data-url-duplicate marker below; metadata-fetch.js applies it after the
+    // swap. Answering with a script instead would need a CSP exception.
     if (isDuplicate) {
       const baseUrl = safeBaseUrl(url.searchParams.get('baseUrl'))
       return c.html(
-        `<p class="text-sm text-destructive font-medium">This URL is already saved. <a href="${baseUrl}/${existingPin.id}/edit" class="underline hover:text-destructive/80">Edit instead?</a></p><script>document.getElementById('url').classList.add('border-red-500')</script>`
+        `<p class="text-sm text-destructive font-medium" data-url-duplicate>This URL is already saved. <a href="${baseUrl}/${existingPin.id}/edit" class="underline hover:text-destructive/80">Edit instead?</a></p>`
       )
     }
-    return c.html(
-      `<script>document.getElementById('url').classList.remove('border-red-500')</script>`
-    )
+    return c.html('')
   }
 
   if (isDuplicate) {

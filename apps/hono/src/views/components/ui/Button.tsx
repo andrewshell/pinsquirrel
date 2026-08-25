@@ -11,7 +11,9 @@ interface ButtonProps {
   class?: string
   disabled?: boolean
   'aria-label'?: string
-  onclick?: string
+  // No `onclick`: the app ships a `script-src 'self'` CSP, so an inline
+  // handler would not run. Use a data attribute and a listener in
+  // src/static/*.js.
   'hx-get'?: string
   'hx-post'?: string
   'hx-delete'?: string

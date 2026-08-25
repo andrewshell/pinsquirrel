@@ -75,7 +75,9 @@ export const PinForm: FC<PinFormProps> = ({
         {/* Form-level errors */}
         {errors?._form && <ErrorMessage message={errors._form.join('. ')} />}
 
-        {/* URL field */}
+        {/* URL field. A duplicate URL is reported by the warning below rather
+            than through Input's own error slot, so the red outline has to be
+            passed in as a class. */}
         <div class="space-y-2">
           <Label for="url">URL</Label>
           <Input
@@ -86,6 +88,7 @@ export const PinForm: FC<PinFormProps> = ({
             value={url}
             placeholder="https://example.com"
             error={duplicatePinId ? undefined : errors?.url?.join('. ')}
+            class={duplicatePinId ? 'border-red-500' : undefined}
             helpText="Enter the web address you want to save as a pin"
             data-url-input
             hx-get="/api/internal/check-url"
@@ -99,7 +102,10 @@ export const PinForm: FC<PinFormProps> = ({
           />
           <div id="url-check-result">
             {duplicatePinId && (
-              <p class="text-sm text-destructive font-medium">
+              <p
+                class="text-sm text-destructive font-medium"
+                data-url-duplicate
+              >
                 This URL is already saved.{' '}
                 <a
                   href={`${baseUrl}/${duplicatePinId}/edit`}
@@ -108,13 +114,6 @@ export const PinForm: FC<PinFormProps> = ({
                   Edit instead?
                 </a>
               </p>
-            )}
-            {duplicatePinId && (
-              <script
-                dangerouslySetInnerHTML={{
-                  __html: `document.getElementById('url').classList.add('border-red-500')`,
-                }}
-              />
             )}
           </div>
         </div>

@@ -29,7 +29,7 @@ export const ServerErrorPage: FC<ServerErrorPageProps> = ({
             </a>
             <button
               type="button"
-              onclick="window.location.reload()"
+              data-reload-button
               class="inline-block px-6 py-3 bg-secondary text-secondary-foreground font-medium border-2 border-foreground neobrutalism-shadow
                      hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
                      active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
@@ -38,6 +38,7 @@ export const ServerErrorPage: FC<ServerErrorPageProps> = ({
               Try Again
             </button>
           </div>
+          <script src="/static/reload-button.js" defer></script>
         </div>
       </div>
     </BaseLayout>

@@ -142,7 +142,9 @@ describe('GET /api/internal/check-url', () => {
 
       expect(body).toContain('This URL is already saved')
       expect(body).toContain('/pins/pin-9/edit')
-      expect(body).toContain("classList.add('border-red-500')")
+      // The marker the static JS reads to outline the URL input. A script in
+      // the fragment would need a CSP exception.
+      expect(body).toContain('data-url-duplicate')
     })
 
     it('clears the warning when the URL is free', async () => {
@@ -150,8 +152,7 @@ describe('GET /api/internal/check-url', () => {
         await get('?url=https://example.test/new', true)
       ).text()
 
-      expect(body).toContain("classList.remove('border-red-500')")
-      expect(body).not.toContain('already saved')
+      expect(body).toBe('')
     })
 
     it('clears the warning for the excluded pin', async () => {
@@ -161,7 +162,7 @@ describe('GET /api/internal/check-url', () => {
         await get('?url=https://example.test/a&exclude=pin-9', true)
       ).text()
 
-      expect(body).toContain("classList.remove('border-red-500')")
+      expect(body).toBe('')
     })
 
     // Only the literal string 'true' selects the fragment; any other value

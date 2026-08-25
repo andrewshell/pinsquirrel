@@ -159,3 +159,21 @@ function initMetadataFetch(form) {
 }
 
 onReady('[data-metadata-fetch]', initMetadataFetch)
+
+/**
+ * The duplicate-URL outline.
+ *
+ * /api/internal/check-url answers with a fragment that either carries a
+ * [data-url-duplicate] warning or is empty. The URL input's red outline
+ * follows that marker, so the answer needs no script of its own.
+ */
+document.addEventListener('htmx:afterSwap', event => {
+  const target = event.detail && event.detail.target
+  if (!target || target.id !== 'url-check-result') return
+
+  const urlInput = document.getElementById('url')
+  if (!urlInput) return
+
+  const isDuplicate = !!target.querySelector('[data-url-duplicate]')
+  urlInput.classList.toggle('border-red-500', isDuplicate)
+})
