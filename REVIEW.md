@@ -399,11 +399,12 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Fix:** `"extends": "../../tsconfig.base.json"` everywhere, keeping each package's current `include`/`exclude` verbatim. Whether tests should be typechecked uniformly is **Q17**. Pair with 1.3.
 - **Note (when done):** Tests are typechecked everywhere (Q17); the only error that surfaced was `libs/mailgun/src/email-service.test.ts` importing vitest's `Mock` as a value under `verbatimModuleSyntax`. The `ES2022`/`ESNext` drift resolved to the base's `ESNext`, and `crypto`/`mailgun` lost the `*.config.ts` half of their `include` along with the test excludes that made it necessary. The two apps set `declaration`/`declarationMap` to `false`: they never emit declarations (hono builds with tsup, admin runs under tsx).
 
-#### 3.2 — **Done except vitest.config.ts (Q10)**
+#### 3.2 — **Done**
 
 - **Where:** `turbo.json:12-16`; root `package.json:31`; root `vitest.config.ts`
 - **Problem:** `lint`/`format` `dependsOn: ["^lint"]`/`["^format"]` serialises them for no benefit. `"turbo": "latest"` is unpinned. Root `vitest.config.ts` lists 6 projects and omits `libs/crypto` and `apps/admin`.
 - **Fix:** Remove the two `dependsOn`; pin `turbo` to `^2.10.10`; glob the vitest projects or delete the root file (**blocked on Q10**).
+- **Note (when done):** The root `vitest.config.ts` is deleted rather than globbed (Q10: Turbo is the only test entry point), and the root `vite`/`vitest` devDependencies went with it — nothing else at the root imported them, and every package carries its own `vitest`.
 
 #### 3.3 — **Done**
 
