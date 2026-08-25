@@ -229,12 +229,14 @@ export const Header: FC<HeaderProps> = ({
                   >
                     <AccountLinks layout="desktop" username={user.username} />
                     <hr class="border-foreground/20" />
-                    <a
-                      href="/signout"
-                      class="block px-4 py-2 text-sm hover:bg-accent/10 transition-colors"
-                    >
-                      Sign Out
-                    </a>
+                    <form method="post" action="/signout">
+                      <button
+                        type="submit"
+                        class="block w-full text-left px-4 py-2 text-sm hover:bg-accent/10 transition-colors cursor-pointer"
+                      >
+                        Sign Out
+                      </button>
+                    </form>
                   </div>
                 </div>
               </div>
@@ -293,9 +295,11 @@ export const Header: FC<HeaderProps> = ({
                       />
                       <AccountLinks layout="mobile" username={user.username} />
                       <hr class="border-foreground/20" />
-                      <Button href="/signout" variant="outline" class="w-full">
-                        Sign Out
-                      </Button>
+                      <form method="post" action="/signout">
+                        <Button type="submit" variant="outline" class="w-full">
+                          Sign Out
+                        </Button>
+                      </form>
                     </>
                   ) : (
                     <>

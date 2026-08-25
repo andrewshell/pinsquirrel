@@ -403,15 +403,9 @@ auth.post('/reset-password/:token', async c => {
   }
 })
 
-// POST /signout - Process sign out
+// POST /signout - Process sign out. POST only: csrf() does not guard GET, so a
+// GET twin would let <img src="/signout"> on any site sign the user out.
 auth.post('/signout', async c => {
-  const sessionManager = getSessionManager(c)
-  await sessionManager.destroy()
-  return c.redirect('/signin')
-})
-
-// GET /signout - Also support GET for convenience
-auth.get('/signout', async c => {
   const sessionManager = getSessionManager(c)
   await sessionManager.destroy()
   return c.redirect('/signin')

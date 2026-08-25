@@ -84,7 +84,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Open-redirect check allows `/\evil.com`, which browsers normalise to `//evil.com`.
 - **Fix:** Also reject `startsWith('/\\')`, or parse with `new URL(redirectTo, origin)` and require `.origin === origin`. Regression test.
 
-#### 1.10
+#### 1.10 — **Done**
 
 - **Where:** `apps/hono/src/routes/auth.tsx:396-400`; `apps/hono/src/views/components/Header.tsx:250,388`
 - **Problem:** `GET /signout` destroys the session; `csrf()` does not cover GET, so `<img src="/signout">` on any site logs users out.
