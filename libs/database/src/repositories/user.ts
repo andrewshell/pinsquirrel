@@ -4,23 +4,57 @@ import type {
   User,
   UserRepository,
   Role,
-  UserStatus,
 } from '@pinsquirrel/domain'
+import { UserStatus } from '@pinsquirrel/domain'
 import { eq, inArray, sql } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { users } from '../schema/users.js'
 import { userRoles } from '../schema/user-roles.js'
 
+/**
+ * The enum column's values, mapped to the domain enum.
+ *
+ * Exhaustive by construction: a value added to the column and not to
+ * `UserStatus` (or the other way round) fails to compile here rather than
+ * arriving as an unrecognised status at runtime.
+ */
+const STATUS_BY_COLUMN: Record<
+  (typeof users.$inferSelect)['status'],
+  UserStatus
+> = {
+  unverified: UserStatus.Unverified,
+  waitlist: UserStatus.Waitlist,
+  active: UserStatus.Active,
+}
+
 export class DrizzleUserRepository implements UserRepository {
   constructor(private db: MySql2Database) {}
 
-  private async attachRoles(user: User): Promise<User> {
-    const rolesByUserId = await this.getRoles([user.id])
-
+  /**
+   * Build the entity column by column, like the other repositories.
+   *
+   * The casts this replaces spread a row into a `User` and asserted the
+   * result, so a renamed or dropped column would have compiled and failed at
+   * runtime. Naming each field means the schema and the entity have to agree.
+   */
+  private mapToUser(row: typeof users.$inferSelect, roles: Role[]): User {
     return {
-      ...user,
-      roles: rolesByUserId.get(user.id) ?? [],
+      id: row.id,
+      username: row.username,
+      passwordHash: row.passwordHash,
+      emailHash: row.emailHash,
+      emailEncrypted: row.emailEncrypted,
+      roles,
+      status: STATUS_BY_COLUMN[row.status],
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
     }
+  }
+
+  private async attachRoles(row: typeof users.$inferSelect): Promise<User> {
+    const rolesByUserId = await this.getRoles([row.id])
+
+    return this.mapToUser(row, rolesByUserId.get(row.id) ?? [])
   }
 
   /**
@@ -57,7 +91,7 @@ export class DrizzleUserRepository implements UserRepository {
       .limit(1)
 
     if (!result[0]) return null
-    return await this.attachRoles(result[0] as User)
+    return await this.attachRoles(result[0])
   }
 
   async findByEmailHash(emailHash: string): Promise<User | null> {
@@ -68,7 +102,7 @@ export class DrizzleUserRepository implements UserRepository {
       .limit(1)
 
     if (!result[0]) return null
-    return await this.attachRoles(result[0] as User)
+    return await this.attachRoles(result[0])
   }
 
   async findByUsername(username: string): Promise<User | null> {
@@ -79,7 +113,7 @@ export class DrizzleUserRepository implements UserRepository {
       .limit(1)
 
     if (!result[0]) return null
-    return await this.attachRoles(result[0] as User)
+    return await this.attachRoles(result[0])
   }
 
   async findByStatus(status: UserStatus): Promise<User[]> {
@@ -90,10 +124,9 @@ export class DrizzleUserRepository implements UserRepository {
 
     const rolesByUserId = await this.getRoles(results.map(user => user.id))
 
-    return results.map(user => ({
-      ...(user as User),
-      roles: rolesByUserId.get(user.id) ?? [],
-    }))
+    return results.map(user =>
+      this.mapToUser(user, rolesByUserId.get(user.id) ?? [])
+    )
   }
   async create(data: CreateUserData): Promise<User> {
     const id = crypto.randomUUID()
@@ -116,7 +149,7 @@ export class DrizzleUserRepository implements UserRepository {
       .limit(1)
 
     // New users start with empty roles array
-    return { ...created, roles: [] } as User
+    return this.mapToUser(created, [])
   }
 
   async update(id: string, data: UpdateUserData): Promise<User | null> {
@@ -158,7 +191,7 @@ export class DrizzleUserRepository implements UserRepository {
       .limit(1)
 
     if (!updated) return null
-    return await this.attachRoles(updated as User)
+    return await this.attachRoles(updated)
   }
 
   async delete(id: string): Promise<boolean> {
