@@ -4,6 +4,7 @@ import {
   text,
   timestamp,
   boolean,
+  index,
   uniqueIndex,
 } from 'drizzle-orm/mysql-core'
 import { users } from './users'
@@ -32,6 +33,11 @@ export const pins = mysqlTable(
     userIdUrlHashIdx: uniqueIndex('pins_user_id_url_hash_idx').on(
       table.userId,
       table.urlHash
+    ),
+    // Every list is WHERE user_id = ? ORDER BY created_at DESC LIMIT/OFFSET.
+    userIdCreatedAtIdx: index('pins_user_id_created_at_idx').on(
+      table.userId,
+      table.createdAt
     ),
   })
 )

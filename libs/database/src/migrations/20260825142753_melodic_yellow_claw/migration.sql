@@ -1,0 +1,1 @@
+CREATE INDEX `pins_user_id_created_at_idx` ON `pins` (`user_id`,`created_at`);

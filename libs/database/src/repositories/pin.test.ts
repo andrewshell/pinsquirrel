@@ -1209,4 +1209,27 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       expect(saved!.isPrivate).toBe(true)
     })
   })
+
+  describe('indexes', () => {
+    it('should index (user_id, created_at) for the list query', async () => {
+      // Every list is WHERE user_id = ? ORDER BY created_at DESC LIMIT/OFFSET.
+      // Without this composite index MySQL filesorts the user's whole pin set
+      // on every page. There is no behavioural assertion for an index, so
+      // assert the schema directly.
+      const [result] = await testPool.query(
+        'SHOW INDEX FROM pins WHERE Key_name = ?',
+        ['pins_user_id_created_at_idx']
+      )
+      const rows = result as {
+        Seq_in_index: number
+        Column_name: string
+      }[]
+
+      expect(
+        rows
+          .sort((a, b) => a.Seq_in_index - b.Seq_in_index)
+          .map(r => r.Column_name)
+      ).toEqual(['user_id', 'created_at'])
+    })
+  })
 })
