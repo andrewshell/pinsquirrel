@@ -5,6 +5,7 @@ import { MailgunEmailService } from '@pinsquirrel/mailgun'
 import {
   AccountService,
   ApiKeyService,
+  MaintenanceService,
   NullEmailService,
   AuthenticationService,
   MetadataService,
@@ -20,6 +21,7 @@ import {
   tagRepository,
   pinRepository,
   passwordResetRepository,
+  sessionRepository,
 } from './db'
 
 // Create utility instances for metadata service
@@ -72,6 +74,10 @@ export const tagService = new TagService(tagRepository)
 export const userService = new UserService(userRepository)
 export const apiKeyService = new ApiKeyService(apiKeyRepository, userRepository)
 export const metadataService = new MetadataService(httpFetcher, htmlParser)
+export const maintenanceService = new MaintenanceService(
+  sessionRepository,
+  passwordResetRepository
+)
 
 // Export static utilities for error handling
 export const metadataErrorUtils = {

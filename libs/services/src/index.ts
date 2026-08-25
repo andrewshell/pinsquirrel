@@ -4,6 +4,7 @@ export {
   type EmailSealer,
 } from './services/authentication.js'
 export { AccountService } from './services/account.js'
+export { MaintenanceService, type SweepResult } from './services/maintenance.js'
 export {
   NullEmailService,
   EmailNotConfiguredError,

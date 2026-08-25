@@ -251,6 +251,19 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
       const deletedCount = await repository.deleteExpiredTokens()
       expect(deletedCount).toBe(0)
     })
+
+    it('indexes expires_at, which the sweep scans on', async () => {
+      // The scheduled sweep runs `DELETE ... WHERE expires_at < now` against
+      // the whole table. There is no behavioural assertion for an index, so
+      // assert the schema directly.
+      const [result] = await testPool.query(
+        'SHOW INDEX FROM password_reset_tokens WHERE Key_name = ?',
+        ['password_reset_tokens_expires_at_idx']
+      )
+      const rows = result as { Column_name: string }[]
+
+      expect(rows.map(r => r.Column_name)).toEqual(['expires_at'])
+    })
   })
 
   describe('delete', () => {
