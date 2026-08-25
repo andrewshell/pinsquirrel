@@ -78,7 +78,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `getClientIp` takes the _last_ `x-forwarded-for` entry (with a comment explaining why) and falls back to the socket address. The residual hole: a direct, non-proxied caller controls that last entry, so it can rotate it per request and defeat every IP-keyed limiter (sign-in, sign-up, forgot-password). Do **not** "fix" by taking the first entry — that is strictly worse.
 - **Fix:** Honor `x-forwarded-for`/`x-real-ip` only when a `TRUST_PROXY` env var is set; keep the last-entry rule in that case; otherwise use the socket address. Document in DEPLOYMENT.md (4.3). **Blocked on Q1.** **PLAN.md:** Phase 6f extends `rate-limit.ts` to `/mcp`, `/api/v1/*`, `/oauth/token`, `/oauth/register` — every one of those inherits this hole, so land it before 6f.
 
-#### 1.9
+#### 1.9 — **Done**
 
 - **Where:** `apps/hono/src/routes/auth.tsx:106-111`
 - **Problem:** Open-redirect check allows `/\evil.com`, which browsers normalise to `//evil.com`.
