@@ -1,10 +1,12 @@
 /**
  * Helpers for reading Hono's `parseBody()` output.
  *
- * `parseBody()` returns `string | File | (string | File)[]` per field: a repeated
- * input yields an array, a file input yields a File, and an absent field yields
- * undefined. Handlers want a plain string, so every one of them used to declare
- * its own coercion inline.
+ * `parseBody()` returns `string | File` per field: a file input yields a File
+ * and an absent field yields undefined. Repeated keys do **not** produce an
+ * array unless it is called with `{ all: true }` — the last value wins. What
+ * matters to handlers is that the value is not necessarily a string: casting it
+ * to one lets a multipart File through as a truthy non-string, which then
+ * explodes on the first `.toLowerCase()` downstream.
  */
 
 /** Anything `c.req.parseBody()` can produce for a single field. */
@@ -16,8 +18,10 @@ export type FormBody = Record<string, FormValue>
 /**
  * Coerce one parsed form field to a string.
  *
- * Repeated fields collapse to their first entry; files, numbers, and missing
- * fields become `''` rather than being stringified.
+ * Files, numbers, and missing fields become `''` rather than being
+ * stringified. Arrays collapse to their first entry — `parseBody()` only
+ * produces one under `{ all: true }`, which nothing here uses, but the shape is
+ * handled rather than cast away.
  */
 export function getString(value: FormValue): string {
   if (typeof value === 'string') return value

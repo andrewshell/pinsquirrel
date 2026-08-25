@@ -9,6 +9,7 @@ import {
   ResetTokenExpiredError,
 } from '@pinsquirrel/domain'
 import { accountService, authService } from '../lib/services'
+import { getString } from '../lib/form'
 import { logger, safeError } from '../lib/logger.js'
 import { getSessionManager } from '../middleware/session'
 import {
@@ -59,10 +60,10 @@ auth.post('/signin', async c => {
   const sessionManager = getSessionManager(c)
   const formData = await c.req.parseBody()
 
-  const username = formData.username as string
-  const password = formData.password as string
+  const username = getString(formData.username)
+  const password = getString(formData.password)
   const keepSignedIn = formData.keepSignedIn === 'true'
-  const redirectTo = formData.redirectTo as string | undefined
+  const redirectTo = getString(formData.redirectTo) || undefined
 
   // Two keys, two attacks. The IP:username key stops guessing at one account;
   // the IP-only key stops one address spraying a password across many
@@ -171,8 +172,8 @@ auth.post(
   async c => {
     const formData = await c.req.parseBody()
 
-    const username = formData.username as string
-    const email = formData.email as string
+    const username = getString(formData.username)
+    const email = getString(formData.email)
 
     // Build the reset URL for password verification email
     const url = new URL(c.req.url)
@@ -253,7 +254,7 @@ auth.post(
     }
 
     const formData = await c.req.parseBody()
-    const email = formData.email as string
+    const email = getString(formData.email)
 
     // Build the reset URL
     const url = new URL(c.req.url)
@@ -333,8 +334,8 @@ auth.post('/reset-password/:token', async c => {
   }
 
   const formData = await c.req.parseBody()
-  const newPassword = formData.newPassword as string
-  const confirmPassword = formData.confirmPassword as string
+  const newPassword = getString(formData.newPassword)
+  const confirmPassword = getString(formData.confirmPassword)
 
   // Check password confirmation
   if (newPassword !== confirmPassword) {

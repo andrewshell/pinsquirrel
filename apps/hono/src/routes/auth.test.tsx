@@ -91,7 +91,10 @@ vi.mock('../middleware/rate-limit', () => ({
   },
   signupLimiter: {},
   forgotPasswordLimiter: {},
-  signinRateLimitKey: (_c: unknown, username: string) => `ip:${username}`,
+  // Lowercased like the real one: it is what turns a non-string username into
+  // a 500, so a fake that skipped it would hide the bug.
+  signinRateLimitKey: (_c: unknown, username: string) =>
+    `ip:${username.toLowerCase()}`,
   getClientIp: () => 'ip',
   rateLimitByIp: (): MiddlewareHandler => async (c, next) => {
     if (limiter.ipLimited() as boolean) return c.text('Too many requests', 429)
@@ -168,6 +171,23 @@ describe('auth routes', () => {
       expect(session.create).toHaveBeenCalledWith('user-1', false)
       expect(res.status).toBe(302)
       expect(res.headers.get('Location')).toBe('/pins')
+    })
+
+    // parseBody() hands back a File for a multipart file part. Casting it to
+    // string made it a truthy non-string that reached `.toLowerCase()` in the
+    // rate limiter, so anyone could 500 the sign-in form with a curl -F.
+    it('does not crash when a field arrives as an uploaded file', async () => {
+      auth.login.mockRejectedValue(
+        new ValidationError({ username: ['Username is required'] })
+      )
+      const body = new FormData()
+      body.set('username', new File(['x'], 'username.txt'))
+      body.set('password', 'pw')
+
+      const res = await app.request('/signin', { method: 'POST', body })
+
+      expect(res.status).toBe(400)
+      expect(auth.login).toHaveBeenCalledWith({ username: '', password: 'pw' })
     })
 
     it('passes keepSignedIn only for the literal string "true"', async () => {
