@@ -82,7 +82,7 @@ export function TagMergePage({
           id="tags-data"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify(
-              tags.map((t) => ({
+              tags.map(t => ({
                 id: t.id,
                 name: t.name,
                 pinCount: t.pinCount,

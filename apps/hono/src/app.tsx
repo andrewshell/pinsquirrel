@@ -80,7 +80,7 @@ app.route('/api/internal', apiInternalRoutes)
 app.route('/api', apiRoutes)
 
 // Home page - redirects logged-in users to /pins
-app.get('/', async (c) => {
+app.get('/', async c => {
   const sessionManager = getSessionManager(c)
 
   // Redirect logged-in users to their pins page
@@ -96,7 +96,7 @@ app.get('/', async (c) => {
 })
 
 // 404 Not Found handler
-app.notFound((c) => {
+app.notFound(c => {
   return c.html(<NotFoundPage />, 404)
 })
 

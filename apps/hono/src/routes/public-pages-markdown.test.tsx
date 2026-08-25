@@ -16,15 +16,15 @@ describe('Public pages — markdown content negotiation', () => {
     app.use('/privacy', markdownNegotiation())
     app.use('/terms', markdownNegotiation())
 
-    app.get('/', (c) =>
+    app.get('/', c =>
       c.html(
         <DefaultLayout title="Home" user={null}>
           <HomePage />
         </DefaultLayout>
       )
     )
-    app.get('/privacy', (c) => c.html(<PrivacyPage user={null} />))
-    app.get('/terms', (c) => c.html(<TermsPage user={null} />))
+    app.get('/privacy', c => c.html(<PrivacyPage user={null} />))
+    app.get('/terms', c => c.html(<TermsPage user={null} />))
   })
 
   it('serves markdown for /privacy when requested', async () => {

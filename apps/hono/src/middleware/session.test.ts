@@ -51,7 +51,7 @@ describe('Session Middleware', () => {
 
   describe('without session cookie', () => {
     it('provides session manager with null session', async () => {
-      app.get('/test', (c) => {
+      app.get('/test', c => {
         const manager = getSessionManager(c)
         return c.json({
           isAuthenticated: manager.isAuthenticated(),
@@ -84,7 +84,7 @@ describe('Session Middleware', () => {
     })
 
     it('loads session from database', async () => {
-      app.get('/test', (c) => {
+      app.get('/test', c => {
         const manager = getSessionManager(c)
         return c.json({
           isAuthenticated: manager.isAuthenticated(),
@@ -117,7 +117,7 @@ describe('Session Middleware', () => {
       }
       mockFindUserById.mockResolvedValue(mockUser)
 
-      app.get('/test', async (c) => {
+      app.get('/test', async c => {
         const manager = getSessionManager(c)
         const user = await manager.getUser()
         return c.json({
@@ -143,7 +143,7 @@ describe('Session Middleware', () => {
     })
 
     it('clears cookie and returns null session', async () => {
-      app.get('/test', (c) => {
+      app.get('/test', c => {
         const manager = getSessionManager(c)
         return c.json({
           isAuthenticated: manager.isAuthenticated(),
@@ -175,7 +175,7 @@ describe('Session Middleware', () => {
       }
       mockCreate.mockResolvedValue(newSession)
 
-      app.post('/login', async (c) => {
+      app.post('/login', async c => {
         const manager = getSessionManager(c)
         await manager.create('user-456', true)
         return c.json({ success: true })
@@ -207,7 +207,7 @@ describe('Session Middleware', () => {
       }
       mockCreate.mockResolvedValue(newSession)
 
-      app.post('/login', async (c) => {
+      app.post('/login', async c => {
         const manager = getSessionManager(c)
         await manager.create('user-456', false)
         return c.json({ success: true })
@@ -244,7 +244,7 @@ describe('Session Middleware', () => {
     })
 
     it('destroys session and clears cookie', async () => {
-      app.post('/logout', async (c) => {
+      app.post('/logout', async c => {
         const manager = getSessionManager(c)
         await manager.destroy()
         return c.json({ success: true })
@@ -282,7 +282,7 @@ describe('Session Middleware', () => {
     })
 
     it('sets flash message', async () => {
-      app.post('/action', (c) => {
+      app.post('/action', c => {
         const manager = getSessionManager(c)
         manager.setFlash('success', 'Action completed!')
         return c.json({ success: true })
@@ -313,7 +313,7 @@ describe('Session Middleware', () => {
       }
       mockFindById.mockResolvedValue(sessionWithFlash)
 
-      app.get('/page', (c) => {
+      app.get('/page', c => {
         const manager = getSessionManager(c)
         const flash = manager.getFlash()
         return c.json({ flash })
@@ -351,7 +351,7 @@ describe('requireAuth Middleware', () => {
   })
 
   it('redirects to signin when not authenticated', async () => {
-    app.get('/protected', requireAuth(), (c) => {
+    app.get('/protected', requireAuth(), c => {
       return c.json({ protected: true })
     })
 
@@ -375,7 +375,7 @@ describe('requireAuth Middleware', () => {
     // request only counts as authenticated if the user row is actually there.
     mockFindUserById.mockResolvedValue({ id: 'user-456', username: 'alice' })
 
-    app.get('/protected', requireAuth(), (c) => {
+    app.get('/protected', requireAuth(), c => {
       return c.json({ protected: true })
     })
 
@@ -391,7 +391,7 @@ describe('requireAuth Middleware', () => {
   })
 
   it('uses custom redirect path', async () => {
-    app.get('/admin', requireAuth('/admin/login'), (c) => {
+    app.get('/admin', requireAuth('/admin/login'), c => {
       return c.json({ admin: true })
     })
 
@@ -419,7 +419,7 @@ describe('requireAuth Middleware', () => {
     it('exposes the resolved user to handlers via getAuthUser', async () => {
       mockFindUserById.mockResolvedValue({ id: 'user-456', username: 'alice' })
 
-      app.get('/protected', requireAuth(), (c) => {
+      app.get('/protected', requireAuth(), c => {
         return c.json({ username: getAuthUser(c).username })
       })
 
@@ -432,7 +432,7 @@ describe('requireAuth Middleware', () => {
     it('resolves the user exactly once per request', async () => {
       mockFindUserById.mockResolvedValue({ id: 'user-456', username: 'alice' })
 
-      app.get('/protected', requireAuth(), (c) => {
+      app.get('/protected', requireAuth(), c => {
         getAuthUser(c)
         getAuthUser(c)
         return c.json({ ok: true })
@@ -468,7 +468,7 @@ describe('requireAuth Middleware', () => {
       // ownership checks.
       mockFindUserById.mockResolvedValue({ id: 'user-456', username: 'alice' })
 
-      app.get('/unguarded', (c) => c.json({ id: getAuthUser(c).id }))
+      app.get('/unguarded', c => c.json({ id: getAuthUser(c).id }))
 
       const res = await app.request('/unguarded', authedRequest)
 
@@ -479,7 +479,7 @@ describe('requireAuth Middleware', () => {
       mockIsValidSession.mockResolvedValue(false)
       mockFindById.mockResolvedValue(null)
 
-      app.get('/protected', requireAuth(), (c) => c.json({ ok: true }))
+      app.get('/protected', requireAuth(), c => c.json({ ok: true }))
 
       const res = await app.request('/protected')
 
@@ -515,7 +515,7 @@ describe('Private Mode', () => {
   })
 
   it('should report private mode as locked by default', async () => {
-    app.get('/test', (c) => {
+    app.get('/test', c => {
       const manager = getSessionManager(c)
       return c.json({
         isPrivateUnlocked: manager.isPrivateUnlocked(),
@@ -531,7 +531,7 @@ describe('Private Mode', () => {
   })
 
   it('should unlock private mode and persist to session', async () => {
-    app.post('/unlock', (c) => {
+    app.post('/unlock', c => {
       const manager = getSessionManager(c)
       manager.unlockPrivateMode()
       return c.json({
@@ -567,7 +567,7 @@ describe('Private Mode', () => {
     }
     mockFindById.mockResolvedValue(sessionWithPrivate)
 
-    app.post('/lock', (c) => {
+    app.post('/lock', c => {
       const manager = getSessionManager(c)
       manager.lockPrivateMode()
       return c.json({
@@ -604,7 +604,7 @@ describe('Private Mode', () => {
     }
     mockFindById.mockResolvedValue(sessionWithExpiredPrivate)
 
-    app.get('/test', (c) => {
+    app.get('/test', c => {
       const manager = getSessionManager(c)
       return c.json({
         isPrivateUnlocked: manager.isPrivateUnlocked(),
@@ -631,7 +631,7 @@ describe('Private Mode', () => {
     }
     mockFindById.mockResolvedValue(sessionWithActivePrivate)
 
-    app.get('/test', (c) => {
+    app.get('/test', c => {
       const manager = getSessionManager(c)
       return c.json({
         isPrivateUnlocked: manager.isPrivateUnlocked(),

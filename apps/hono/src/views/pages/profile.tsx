@@ -301,7 +301,7 @@ export function ProfilePage({
                 <h3 class="text-sm font-medium text-foreground">
                   Your API Keys
                 </h3>
-                {apiKeys.map((key) => (
+                {apiKeys.map(key => (
                   <div class="flex items-center justify-between p-3 border-2 border-foreground bg-background">
                     <div class="space-y-1">
                       <div class="text-sm font-medium text-foreground">

@@ -193,7 +193,7 @@ function errorResponse(c: Context, err: unknown) {
 // --- Route handlers ---------------------------------------------------------
 
 // GET /api/v1/pins - list pins (excludes private pins)
-apiV1.get('/pins', async (c) => {
+apiV1.get('/pins', async c => {
   const user = getApiUser(c)
   const ac = new AccessControl(user)
 
@@ -216,7 +216,7 @@ apiV1.get('/pins', async (c) => {
 })
 
 // GET /api/v1/pins/:id - single pin
-apiV1.get('/pins/:id', async (c) => {
+apiV1.get('/pins/:id', async c => {
   const user = getApiUser(c)
   const ac = new AccessControl(user)
   const id = c.req.param('id')
@@ -230,7 +230,7 @@ apiV1.get('/pins/:id', async (c) => {
 })
 
 // GET /api/v1/tags - list user's tags
-apiV1.get('/tags', async (c) => {
+apiV1.get('/tags', async c => {
   const user = getApiUser(c)
   const ac = new AccessControl(user)
 
@@ -250,7 +250,7 @@ apiV1.get('/tags', async (c) => {
 })
 
 // GET /api/v1/tags/:id/pins - pins for a tag (by tag id, excludes private)
-apiV1.get('/tags/:id/pins', async (c) => {
+apiV1.get('/tags/:id/pins', async c => {
   const user = getApiUser(c)
   const ac = new AccessControl(user)
   const tagId = c.req.param('id')

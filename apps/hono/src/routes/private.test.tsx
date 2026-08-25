@@ -124,7 +124,7 @@ describe('private routes', () => {
       ['/private/pins/pin-1/edit', 'GET'],
       ['/private/pins/pin-1/card', 'GET'],
       ['/private/pins/pin-1/delete', 'GET'],
-    ])('gates %s while locked', async (path) => {
+    ])('gates %s while locked', async path => {
       session.isPrivateUnlocked.mockReturnValue(false)
 
       const res = await app.request(path)

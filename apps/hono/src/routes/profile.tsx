@@ -20,7 +20,7 @@ const profile = new Hono()
 profile.use('*', requireAuth())
 
 // GET /profile - Show profile page
-profile.get('/', async (c) => {
+profile.get('/', async c => {
   const sessionManager = getSessionManager(c)
   const user = getAuthUser(c)
 
@@ -35,7 +35,7 @@ profile.get('/', async (c) => {
 })
 
 // POST /profile - Handle form submissions
-profile.post('/', async (c) => {
+profile.post('/', async c => {
   const sessionManager = getSessionManager(c)
   const user = getAuthUser(c)
 

@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-metadata-fetch]').forEach(initMetadataFetch)
 })
 
-document.addEventListener('htmx:afterSettle', (event) => {
+document.addEventListener('htmx:afterSettle', event => {
   const target = event.detail.target
   const forms = target.querySelectorAll
     ? target.querySelectorAll('[data-metadata-fetch]')

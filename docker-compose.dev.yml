@@ -7,11 +7,11 @@ services:
       MYSQL_PASSWORD: pinsquirrel
       MYSQL_ROOT_PASSWORD: pinsquirrel
     ports:
-      - "3306:3306"
+      - '3306:3306'
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
       interval: 5s
       timeout: 5s
       retries: 5

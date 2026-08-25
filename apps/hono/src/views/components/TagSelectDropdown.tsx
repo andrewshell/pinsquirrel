@@ -19,12 +19,12 @@ export const TagSelectDropdown: FC<TagSelectDropdownProps> = ({
   excludeSourceSelector,
 }) => {
   const tagsJson = JSON.stringify(
-    tags.map((t) => ({ id: t.id, name: t.name, pinCount: t.pinCount }))
+    tags.map(t => ({ id: t.id, name: t.name, pinCount: t.pinCount }))
   )
   const selectedJson = JSON.stringify(selectedIds)
 
   // Get selected tags for initial render
-  const selectedTags = tags.filter((t) => selectedIds.includes(t.id))
+  const selectedTags = tags.filter(t => selectedIds.includes(t.id))
 
   return (
     <div
@@ -53,7 +53,7 @@ export const TagSelectDropdown: FC<TagSelectDropdownProps> = ({
               {placeholder}
             </span>
           ) : multiple ? (
-            selectedTags.map((tag) => (
+            selectedTags.map(tag => (
               <span
                 key={tag.id}
                 class="inline-flex items-center gap-1 px-2 py-1 bg-secondary text-secondary-foreground border-2 border-foreground text-xs"
@@ -115,7 +115,7 @@ export const TagSelectDropdown: FC<TagSelectDropdownProps> = ({
           role="listbox"
           data-tag-select="list"
         >
-          {tags.map((tag) => {
+          {tags.map(tag => {
             const isSelected = selectedIds.includes(tag.id)
             return (
               <button

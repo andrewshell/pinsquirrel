@@ -42,7 +42,7 @@ const importRoute = new Hono()
 importRoute.use('*', requireAuth())
 
 // GET /import - Show import form
-importRoute.get('/', async (c) => {
+importRoute.get('/', async c => {
   const sessionManager = getSessionManager(c)
   const user = getAuthUser(c)
 
@@ -52,7 +52,7 @@ importRoute.get('/', async (c) => {
 })
 
 // POST /import - Process import
-importRoute.post('/', async (c) => {
+importRoute.post('/', async c => {
   const sessionManager = getSessionManager(c)
   const user = getAuthUser(c)
 
@@ -93,15 +93,11 @@ importRoute.post('/', async (c) => {
       'Pinboard import started'
     )
 
-    const result = await pinboardService.importPins(
-      ac,
-      user.id,
-      pins,
-      (error) =>
-        logger.error(
-          { userId: user.id, err: safeError(error) },
-          'Failed to import pin'
-        )
+    const result = await pinboardService.importPins(ac, user.id, pins, error =>
+      logger.error(
+        { userId: user.id, err: safeError(error) },
+        'Failed to import pin'
+      )
     )
 
     logger.info(

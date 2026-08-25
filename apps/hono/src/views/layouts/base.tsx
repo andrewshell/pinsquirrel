@@ -23,7 +23,7 @@ const darkModeScript = html`
       // Listen for system preference changes
       window
         .matchMedia('(prefers-color-scheme: dark)')
-        .addEventListener('change', (e) => {
+        .addEventListener('change', e => {
           if (!localStorage.getItem('theme')) {
             if (e.matches) {
               document.documentElement.classList.add('dark')

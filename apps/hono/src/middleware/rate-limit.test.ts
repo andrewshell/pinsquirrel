@@ -8,7 +8,7 @@ describe('getClientIp', () => {
 
   beforeEach(() => {
     app = new Hono()
-    app.get('/test', (c) => {
+    app.get('/test', c => {
       return c.text(getClientIp(c))
     })
   })
@@ -59,7 +59,7 @@ describe('rateLimitByIp', () => {
   beforeEach(() => {
     limiter = new RateLimiter({ maxAttempts: 2, windowMs: 60_000 })
     app = new Hono()
-    app.post('/test', rateLimitByIp(limiter, 'Rate limited.'), (c) =>
+    app.post('/test', rateLimitByIp(limiter, 'Rate limited.'), c =>
       c.text('ok')
     )
   })
@@ -110,7 +110,7 @@ describe('signinRateLimitKey', () => {
   it('builds key from IP and lowercase username', async () => {
     const app = new Hono()
     let key = ''
-    app.get('/test', (c) => {
+    app.get('/test', c => {
       key = signinRateLimitKey(c, 'UserName')
       return c.text('ok')
     })

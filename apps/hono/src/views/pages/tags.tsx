@@ -37,7 +37,7 @@ function getFontSizeClass(pinCount: number, pinCounts: number[]): string {
     sizeMin[i] = pinCountsCopy[sizeStep * i]
   }
 
-  const i = sizeMin.findIndex((size) => size > pinCount)
+  const i = sizeMin.findIndex(size => size > pinCount)
   if (i === -1) {
     return sizeClasses[sizeClasses.length - 1]
   } else {
@@ -88,7 +88,7 @@ export function TagsPage({
   )
 
   // Get all pin counts for sizing calculation
-  const pinCounts = tags.map((tag) => tag.pinCount)
+  const pinCounts = tags.map(tag => tag.pinCount)
 
   return (
     <DefaultLayout title="Tags" user={user} currentPath="/tags" width="narrow">
@@ -173,7 +173,7 @@ export function TagsPage({
           )}
 
           {/* Tag links */}
-          {sortedTags.map((tag) => {
+          {sortedTags.map(tag => {
             const fontSizeClass = getFontSizeClass(tag.pinCount, pinCounts)
             const fontWeightClass = getFontWeightClass(tag.pinCount)
             const tagUrl = buildTagUrl(tag.name, currentFilter)

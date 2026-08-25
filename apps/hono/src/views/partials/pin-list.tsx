@@ -124,7 +124,7 @@ export const PinListPartial: FC<PinListPartialProps> = ({
         <EmptyState hasFilters={hasFilters} baseUrl={baseUrl} />
       ) : (
         <div class={viewSize === 'compact' ? 'space-y-1' : 'space-y-4'}>
-          {pins.map((pin) => (
+          {pins.map(pin => (
             <PinCard
               pin={pin}
               viewSize={viewSize}
