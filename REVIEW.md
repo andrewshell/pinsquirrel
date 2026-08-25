@@ -177,7 +177,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `parseInt('abc', 10)` → `NaN` → `Pagination.fromTotalCount` (`libs/domain/src/entities/pagination.ts:46`) computes a `NaN` offset → 500 on `?page=abc`.
 - **Fix:** Validate with `Number.isInteger(n) && n >= 1 ? n : 1`; regression test `GET /pins?page=abc` → 200.
 
-#### 2.12
+#### 2.12 — **Done**
 
 - **Where:** `libs/database/src/repositories/pin.ts:106-116`
 - **Problem:** `search` builds `%${term}%` without escaping `%`/`_`, so a search for `a_c` matches `abc`, and `100%` matches anything containing `100`.

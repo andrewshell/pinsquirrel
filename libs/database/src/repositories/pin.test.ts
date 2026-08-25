@@ -852,6 +852,52 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       expect(result[0].title).toBe('Angular Documentation')
       expect(result[0].readLater).toBe(true)
     })
+
+    describe('LIKE wildcards in the search term', () => {
+      beforeEach(async () => {
+        await pinRepository.create({
+          userId: testUser.id,
+          url: 'https://example.com/underscore',
+          title: 'a_c literal underscore',
+          description: 'has 100% coverage and a back\\slash',
+          readLater: false,
+          isPrivate: false,
+          tagNames: [],
+        })
+      })
+
+      it('treats _ as a literal character, not a single-character wildcard', async () => {
+        const result = await pinRepository.findByUserId(testUser.id, {
+          search: 'a_c',
+        })
+
+        expect(result.map(p => p.title)).toEqual(['a_c literal underscore'])
+      })
+
+      it('treats % as a literal character, not a multi-character wildcard', async () => {
+        const result = await pinRepository.findByUserId(testUser.id, {
+          search: '100%',
+        })
+
+        expect(result.map(p => p.title)).toEqual(['a_c literal underscore'])
+      })
+
+      it('treats a backslash as a literal character', async () => {
+        const result = await pinRepository.findByUserId(testUser.id, {
+          search: 'back\\slash',
+        })
+
+        expect(result.map(p => p.title)).toEqual(['a_c literal underscore'])
+      })
+
+      it('finds nothing for a wildcard that would otherwise match everything', async () => {
+        const result = await pinRepository.findByUserId(testUser.id, {
+          search: '%',
+        })
+
+        expect(result.map(p => p.title)).toEqual(['a_c literal underscore'])
+      })
+    })
   })
 
   describe('countByUserId with search', () => {
