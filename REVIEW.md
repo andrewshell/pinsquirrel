@@ -134,11 +134,12 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** `UserRepository.list()`, `removeRole()`, `setRoles()` and `TagRepository.list()` are not on any domain interface and have zero callers; both `list()`s re-implement `applyPagination` by hand.
 - **Fix:** Delete.
 
-#### 2.5
+#### 2.5 — **Done**
 
 - **Where:** `libs/database/src/repositories/session.ts` (`deleteExpiredSessions`), `password-reset.ts:111-117` (`deleteExpiredTokens`); interfaces `libs/domain/src/interfaces/session-repository.ts:15`, `password-reset-repository.ts:15`
 - **Problem:** Never called, so expired rows accumulate forever; no index on `expires_at` for when a sweep is added.
 - **Fix:** **Blocked on Q3.** Either (a) delete both methods from the interfaces and implementations, or (b) add an `expires_at` index + migration and a scheduled sweep (a new service method + a cron/startup job). (b) is a feature, not a deletion — keep it out of the dead-code PR. **PLAN.md:** Phase 6d already commits to a scheduled cleanup of expired/stale `oauth_clients` rows; sessions and reset tokens belong in that same job, which makes (b) the likely answer to Q3 and means the sweep should be designed once, in Phase 6, not twice.
+- **Note (when done):** (b), per Q3. `expires_at` indexes on both tables, a `MaintenanceService.sweepExpired` in `libs/services` that calls both repositories, and one unref'd hourly `setInterval` started from `apps/hono/src/index.ts` (also sweeping at boot, so a process that restarts more often than the interval still sweeps). No scheduler and no lock: two instances sweeping at once would each delete rows the other already deleted, which is harmless, and a failed sweep is logged without stopping the schedule. Phase 6d's `oauth_clients` cleanup belongs inside `sweepExpired`, not in a second job.
 
 #### 2.6 — **Skipped (Phase 7 deletes ApiKeyService)**
 
