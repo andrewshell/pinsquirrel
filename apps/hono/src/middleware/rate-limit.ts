@@ -14,19 +14,29 @@ function socketAddress(c: Context): string | undefined {
 }
 
 export function getClientIp(c: Context): string {
-  const xff = c.req.header('x-forwarded-for')
-  if (xff) {
-    // The last entry, not the first: a single trusted proxy appends the peer
-    // it actually received from, so anything earlier is client-supplied and
-    // spoofable.
-    const parts = xff.split(',')
-    return parts[parts.length - 1].trim()
+  // Forwarding headers are only worth anything when something the operator
+  // controls writes them. Without TRUST_PROXY the app is reachable directly,
+  // so a caller can set x-forwarded-for itself and rotate it per request to
+  // get a fresh budget from every IP-keyed limiter - the socket peer is the
+  // only thing it cannot forge. Read per call rather than at module load so
+  // the deployment's env is what decides, not import order.
+  if (process.env.TRUST_PROXY) {
+    const xff = c.req.header('x-forwarded-for')
+    if (xff) {
+      // The last entry, not the first: a single trusted proxy appends the peer
+      // it actually received from, so anything earlier is client-supplied and
+      // spoofable.
+      const parts = xff.split(',')
+      return parts[parts.length - 1].trim()
+    }
+    // No proxy header means the request did not come through the reverse proxy.
+    // Falling back to the socket peer keeps each such caller in its own bucket;
+    // a single shared literal here would let one attacker exhaust the limit for
+    // everyone else at once.
+    const realIp = c.req.header('x-real-ip')
+    if (realIp) return realIp
   }
-  // No proxy header means the request did not come through the reverse proxy.
-  // Falling back to the socket peer keeps each such caller in its own bucket;
-  // a single shared literal here would let one attacker exhaust the limit for
-  // everyone else at once.
-  return c.req.header('x-real-ip') ?? socketAddress(c) ?? 'unknown'
+  return socketAddress(c) ?? 'unknown'
 }
 
 export const signinLimiter = new RateLimiter({
