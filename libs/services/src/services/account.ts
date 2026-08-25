@@ -11,7 +11,6 @@ import {
   InvalidResetTokenError,
   ResetTokenExpiredError,
   TooManyResetRequestsError,
-  ValidationError,
 } from '@pinsquirrel/domain'
 import {
   hashPassword,
@@ -22,8 +21,9 @@ import {
 import {
   emailSchema,
   passwordSchema,
-  usernameSchema,
+  registrationSchema,
 } from '../validation/user.js'
+import { validationErrorFromZod } from '../validation/zod-error.js'
 import type { EmailSealer } from './authentication.js'
 
 /**
@@ -54,22 +54,9 @@ export class AccountService {
     signupUrl?: string
   }): Promise<{ emailFailed: boolean }> {
     // Validate inputs at service boundary
-    const errors: Record<string, string[]> = {}
-
-    const usernameResult = usernameSchema.safeParse(input.username)
-    if (!usernameResult.success) {
-      errors.username = [
-        usernameResult.error.issues[0]?.message || 'Invalid username',
-      ]
-    }
-
-    const emailResult = emailSchema.safeParse(input.email)
-    if (!emailResult.success) {
-      errors.email = [emailResult.error.issues[0]?.message || 'Invalid email']
-    }
-
-    if (Object.keys(errors).length > 0) {
-      throw new ValidationError(errors)
+    const result = registrationSchema.safeParse(input)
+    if (!result.success) {
+      throw validationErrorFromZod(result.error)
     }
 
     // Check for existing username and email
@@ -166,8 +153,8 @@ export class AccountService {
     if (input.email !== null) {
       const emailResult = emailSchema.safeParse(input.email)
       if (!emailResult.success) {
-        throw new ValidationError({
-          email: [emailResult.error.issues[0]?.message || 'Invalid email'],
+        throw validationErrorFromZod(emailResult.error, {
+          fallbackField: 'email',
         })
       }
     }
@@ -201,8 +188,8 @@ export class AccountService {
     // Validate email at service boundary
     const emailResult = emailSchema.safeParse(input.email)
     if (!emailResult.success) {
-      throw new ValidationError({
-        email: [emailResult.error.issues[0]?.message || 'Invalid email'],
+      throw validationErrorFromZod(emailResult.error, {
+        fallbackField: 'email',
       })
     }
 
@@ -271,10 +258,8 @@ export class AccountService {
     // Validate password at service boundary
     const passwordResult = passwordSchema.safeParse(input.newPassword)
     if (!passwordResult.success) {
-      throw new ValidationError({
-        newPassword: [
-          passwordResult.error.issues[0]?.message || 'Invalid password',
-        ],
+      throw validationErrorFromZod(passwordResult.error, {
+        fallbackField: 'newPassword',
       })
     }
 

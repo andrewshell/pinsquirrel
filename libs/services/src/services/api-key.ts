@@ -9,10 +9,10 @@ import {
   ApiKeyLimitExceededError,
   ApiKeyNotFoundError,
   UnauthorizedApiKeyAccessError,
-  ValidationError,
 } from '@pinsquirrel/domain'
 import { generateSecureToken, hashToken } from '../utils/crypto.js'
 import { apiKeyNameSchema } from '../validation/api-key.js'
+import { validationErrorFromZod } from '../validation/zod-error.js'
 
 const MAX_KEYS_PER_USER = 5
 
@@ -35,15 +35,7 @@ export class ApiKeyService {
 
     const result = apiKeyNameSchema.safeParse(input.name)
     if (!result.success) {
-      const errors: Record<string, string[]> = {}
-      for (const issue of result.error.issues) {
-        const field = issue.path.join('.') || 'name'
-        if (!errors[field]) {
-          errors[field] = []
-        }
-        errors[field].push(issue.message)
-      }
-      throw new ValidationError(errors)
+      throw validationErrorFromZod(result.error, { fallbackField: 'name' })
     }
 
     const count = await this.apiKeyRepository.countByUserId(input.userId)

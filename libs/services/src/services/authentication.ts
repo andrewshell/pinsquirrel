@@ -3,14 +3,14 @@ import { Role, UserStatus } from '@pinsquirrel/domain'
 import {
   InvalidCredentialsError,
   EmailVerificationRequiredError,
-  ValidationError,
   MissingRoleError,
   AccessNotGrantedError,
   UserNotFoundError,
   UserNotEligibleError,
 } from '@pinsquirrel/domain'
 import { hashPassword, verifyPassword, getDummyHash } from '../utils/crypto.js'
-import { usernameSchema, passwordSchema } from '../validation/user.js'
+import { credentialsSchema, passwordChangeSchema } from '../validation/user.js'
+import { validationErrorFromZod } from '../validation/zod-error.js'
 
 /**
  * Seals an email so the waitlist can be contacted later. Implemented with a
@@ -34,24 +34,9 @@ export class AuthenticationService {
 
   async login(input: { username: string; password: string }): Promise<User> {
     // Validate inputs at service boundary
-    const errors: Record<string, string[]> = {}
-
-    const usernameResult = usernameSchema.safeParse(input.username)
-    if (!usernameResult.success) {
-      errors.username = [
-        usernameResult.error.issues[0]?.message || 'Invalid username',
-      ]
-    }
-
-    const passwordResult = passwordSchema.safeParse(input.password)
-    if (!passwordResult.success) {
-      errors.password = [
-        passwordResult.error.issues[0]?.message || 'Invalid password',
-      ]
-    }
-
-    if (Object.keys(errors).length > 0) {
-      throw new ValidationError(errors)
+    const result = credentialsSchema.safeParse(input)
+    if (!result.success) {
+      throw validationErrorFromZod(result.error)
     }
 
     const user = await this.userRepository.findByUsername(input.username)
@@ -146,26 +131,9 @@ export class AuthenticationService {
     newPassword: string
   }): Promise<void> {
     // Validate inputs at service boundary
-    const errors: Record<string, string[]> = {}
-
-    const currentPasswordResult = passwordSchema.safeParse(
-      input.currentPassword
-    )
-    if (!currentPasswordResult.success) {
-      errors.currentPassword = [
-        currentPasswordResult.error.issues[0]?.message || 'Invalid password',
-      ]
-    }
-
-    const newPasswordResult = passwordSchema.safeParse(input.newPassword)
-    if (!newPasswordResult.success) {
-      errors.newPassword = [
-        newPasswordResult.error.issues[0]?.message || 'Invalid password',
-      ]
-    }
-
-    if (Object.keys(errors).length > 0) {
-      throw new ValidationError(errors)
+    const result = passwordChangeSchema.safeParse(input)
+    if (!result.success) {
+      throw validationErrorFromZod(result.error)
     }
 
     const user = await this.userRepository.findById(input.userId)

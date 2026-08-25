@@ -12,6 +12,7 @@ import {
   ValidationError,
 } from '@pinsquirrel/domain'
 import { createTagDataSchema } from '../validation/pin.js'
+import { validationErrorFromZod } from '../validation/zod-error.js'
 
 export class TagService {
   constructor(private readonly tagRepository: TagRepository) {}
@@ -75,10 +76,9 @@ export class TagService {
     const validationResult = createTagDataSchema.safeParse({ name: input.name })
 
     if (!validationResult.success) {
-      throw new ValidationError(
-        validationResult.error.flatten().fieldErrors,
-        'Invalid tag data'
-      )
+      throw validationErrorFromZod(validationResult.error, {
+        message: 'Invalid tag data',
+      })
     }
 
     const createData: CreateTagData = {
