@@ -84,22 +84,23 @@ function initMetadataFetch(form) {
       )
       const data = await response.json()
 
-      if (response.ok && !data.error) {
-        // Set title (always for manual refresh, only if empty for auto)
-        if (overwrite || originalTitle.trim() === '') {
-          titleInput.value = data.title || ''
-        }
-
-        // Set description if available and (overwrite or empty)
-        if (descriptionInput) {
-          if (overwrite || descriptionInput.value.trim() === '') {
-            descriptionInput.value = data.description || ''
-          }
-        }
-      } else {
+      if (!response.ok) {
         // Restore original title on error
         titleInput.value = originalTitle
         console.warn('Metadata fetch error:', data.error)
+        return
+      }
+
+      // Set title (always for manual refresh, only if empty for auto)
+      if (overwrite || originalTitle.trim() === '') {
+        titleInput.value = data.title || ''
+      }
+
+      // Set description if available and (overwrite or empty)
+      if (descriptionInput) {
+        if (overwrite || descriptionInput.value.trim() === '') {
+          descriptionInput.value = data.description || ''
+        }
       }
     } catch (error) {
       // Restore original title on error

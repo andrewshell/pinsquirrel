@@ -5,26 +5,38 @@
  * two shapes: an HTMX fragment for the live form and JSON for anything else.
  * Nothing verified either. These assert what it does today, before the lookup
  * moves behind PinService.
- *
- * The sibling /metadata endpoint in this file remains untested — it is not in
- * the blast radius of this change.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import type { MiddlewareHandler } from 'hono'
 import type { Pin, PinRepository } from '@pinsquirrel/domain'
-import { PinService } from '@pinsquirrel/services'
+import { MetadataService, PinService } from '@pinsquirrel/services'
+import {
+  FetchTimeoutError,
+  HttpError,
+  InvalidUrlError,
+} from '@pinsquirrel/domain'
 import { testUser } from '../test-support/pin-routes'
 
 const svc = {
   findByUserIdAndUrl: vi.fn(),
+  fetchMetadata: vi.fn(),
 }
 
 // A real PinService over a mocked repository, so the assertions below still
 // prove which query runs — not merely that one mock called another.
 vi.mock('../lib/services', () => ({
-  metadataService: { fetchMetadata: vi.fn() },
-  metadataErrorUtils: { getUserFriendlyMessage: () => 'nope' },
+  metadataService: {
+    fetchMetadata: (...a: unknown[]) => svc.fetchMetadata(...a) as unknown,
+  },
+  // The real mappers, so the assertions below prove the endpoint reports the
+  // status the domain error actually carries.
+  metadataErrorUtils: {
+    getHttpStatusForError: (error: Error) =>
+      MetadataService.getHttpStatusForError(error),
+    getUserFriendlyMessage: (error: Error) =>
+      MetadataService.getUserFriendlyMessage(error),
+  },
   pinService: new PinService({
     findByUserIdAndUrl: (...a: unknown[]) =>
       svc.findByUserIdAndUrl(...a) as unknown,
@@ -162,5 +174,65 @@ describe('GET /api/internal/check-url', () => {
 
       expect(await res.json()).toEqual({ exists: false })
     })
+  })
+})
+
+describe('GET /api/internal/metadata', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('requires a url parameter', async () => {
+    const res = await app.request('/api/internal/metadata')
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'Missing url parameter' })
+  })
+
+  it('returns the fetched title and description', async () => {
+    svc.fetchMetadata.mockResolvedValue({
+      title: 'Example',
+      description: 'A description',
+    })
+
+    const res = await app.request(
+      '/api/internal/metadata?url=https://example.test/a'
+    )
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({
+      title: 'Example',
+      description: 'A description',
+    })
+  })
+
+  // The failure status is the whole point: the client should be able to tell a
+  // failure from a success without inspecting the body for an `error` key.
+  it.each([
+    ['a remote 404', new HttpError(404, 'https://example.test/a'), 422],
+    ['a remote 500', new HttpError(500, 'https://example.test/a'), 502],
+    ['a timeout', new FetchTimeoutError('https://example.test/a'), 408],
+    ['a bad URL', new InvalidUrlError('nope'), 400],
+  ])('reports %s with its own status', async (_label, error, status) => {
+    svc.fetchMetadata.mockRejectedValue(error)
+
+    const res = await app.request(
+      '/api/internal/metadata?url=https://example.test/a'
+    )
+
+    expect(res.status).toBe(status)
+    expect(res.ok).toBe(false)
+  })
+
+  it('explains the failure in the body', async () => {
+    svc.fetchMetadata.mockRejectedValue(
+      new HttpError(404, 'https://example.test/a')
+    )
+
+    const res = await app.request(
+      '/api/internal/metadata?url=https://example.test/a'
+    )
+
+    expect(await res.json()).toEqual({ error: 'Page not found at this URL' })
   })
 })
