@@ -462,11 +462,12 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Fix:** Mechanical migration; separate PR from 1.7 so it does not gate the security fix.
 - **Note (when done):** Two call sites, both in `libs/services/src/validation` — there were no others. 1.7's http(s) refinement on `urlSchema` is untouched; `z.url()` accepts `javascript:` and `data:` exactly as `z.string().url()` did.
 
-#### 3.13
+#### 3.13 — **Needs decision: only the maintainer can edit the permission allowlist**
 
 - **Where:** `.claude/settings.local.json`
 - **Problem:** Already git-ignored via `*.local.*`, but contains stale `@pinsquirrel/core`/`web` allow rules from the React era.
 - **Fix:** Local cleanup, no PR.
+- **Note:** The stale entries to drop are the six `@pinsquirrel/core` / `@pinsquirrel/web` `test:coverage`/`test`/`lint` rules, the `DATABASE_URL="postgresql://…:5432/pinsquirrel_test" … db:migrate` rule (the project is MySQL on 3306), the `curl … http://localhost:5173/signin` rule (Vite-era port), and the one-off `node -e "…md5…"` experiment. Everything else is still in use.
 
 ---
 
