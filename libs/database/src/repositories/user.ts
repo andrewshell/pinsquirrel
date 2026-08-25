@@ -6,11 +6,10 @@ import type {
   Role,
   UserStatus,
 } from '@pinsquirrel/domain'
-import { eq, and, sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { users } from '../schema/users.js'
 import { userRoles } from '../schema/user-roles.js'
-import { OFFSET_WITHOUT_LIMIT } from './pagination.js'
 
 export class DrizzleUserRepository implements UserRepository {
   constructor(private db: MySql2Database) {}
@@ -70,28 +69,6 @@ export class DrizzleUserRepository implements UserRepository {
       results.map(user => this.attachRoles(user as User))
     )
   }
-
-  async list(limit?: number, offset?: number): Promise<User[]> {
-    let results
-    if (limit !== undefined && offset !== undefined) {
-      results = await this.db.select().from(users).limit(limit).offset(offset)
-    } else if (limit !== undefined) {
-      results = await this.db.select().from(users).limit(limit)
-    } else if (offset !== undefined) {
-      results = await this.db
-        .select()
-        .from(users)
-        .limit(OFFSET_WITHOUT_LIMIT)
-        .offset(offset)
-    } else {
-      results = await this.db.select().from(users)
-    }
-
-    return await Promise.all(
-      results.map(user => this.attachRoles(user as User))
-    )
-  }
-
   async create(data: CreateUserData): Promise<User> {
     const id = crypto.randomUUID()
     const now = new Date()
@@ -173,28 +150,5 @@ export class DrizzleUserRepository implements UserRepository {
         createdAt: new Date(),
       })
       .onDuplicateKeyUpdate({ set: { createdAt: sql`created_at` } })
-  }
-
-  async removeRole(userId: string, role: Role): Promise<void> {
-    await this.db
-      .delete(userRoles)
-      .where(and(eq(userRoles.userId, userId), eq(userRoles.role, role)))
-  }
-
-  async setRoles(userId: string, roles: Role[]): Promise<void> {
-    // Delete all existing roles
-    await this.db.delete(userRoles).where(eq(userRoles.userId, userId))
-
-    // Add new roles
-    if (roles.length > 0) {
-      const now = new Date()
-      await this.db.insert(userRoles).values(
-        roles.map(role => ({
-          userId,
-          role,
-          createdAt: now,
-        }))
-      )
-    }
   }
 }

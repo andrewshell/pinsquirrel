@@ -362,56 +362,6 @@ describe('DrizzleTagRepository - Integration Tests', () => {
       expect(result).toBe(false)
     })
   })
-  describe('list', () => {
-    it('should return tags with limit', async () => {
-      for (let i = 1; i <= 5; i++) {
-        await tagRepository.create({
-          userId: testUser.id,
-          name: `tag${i}-${crypto.randomUUID().slice(0, 8)}`,
-        })
-      }
-
-      const result = await tagRepository.list(3)
-      expect(result.length).toBeGreaterThanOrEqual(3)
-    })
-
-    it('should return tags with offset', async () => {
-      for (let i = 1; i <= 5; i++) {
-        await tagRepository.create({
-          userId: testUser.id,
-          name: `tag${i}-${crypto.randomUUID().slice(0, 8)}`,
-        })
-      }
-
-      const result = await tagRepository.list(undefined, 2)
-      expect(result.length).toBeGreaterThanOrEqual(3)
-    })
-
-    it('should return tags with both limit and offset', async () => {
-      for (let i = 1; i <= 5; i++) {
-        await tagRepository.create({
-          userId: testUser.id,
-          name: `tag${i}-${crypto.randomUUID().slice(0, 8)}`,
-        })
-      }
-
-      const result = await tagRepository.list(2, 2)
-      expect(result).toHaveLength(2)
-    })
-
-    it('should return all tags when no limit or offset provided', async () => {
-      for (let i = 1; i <= 3; i++) {
-        await tagRepository.create({
-          userId: testUser.id,
-          name: `tag${i}-${crypto.randomUUID().slice(0, 8)}`,
-        })
-      }
-
-      const result = await tagRepository.list()
-      expect(result.length).toBeGreaterThanOrEqual(3)
-    })
-  })
-
   describe('findByUserIdWithPinCount', () => {
     it('should return tags with pin counts', async () => {
       const tag1 = await tagRepository.create({

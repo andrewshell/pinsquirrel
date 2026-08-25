@@ -10,7 +10,6 @@ import type {
 import { tags } from '../schema/tags.js'
 import { pinsTags } from '../schema/pins-tags.js'
 import { pins } from '../schema/pins.js'
-import { OFFSET_WITHOUT_LIMIT } from './pagination.js'
 
 export class DrizzleTagRepository implements TagRepository {
   constructor(private db: MySql2Database) {}
@@ -152,25 +151,6 @@ export class DrizzleTagRepository implements TagRepository {
       pinCount: Number(row.pinCount),
     }))
   }
-
-  async list(limit?: number, offset?: number): Promise<Tag[]> {
-    const baseQuery = this.db.select().from(tags)
-
-    let query
-    if (limit !== undefined && offset !== undefined) {
-      query = baseQuery.limit(limit).offset(offset)
-    } else if (limit !== undefined) {
-      query = baseQuery.limit(limit)
-    } else if (offset !== undefined) {
-      query = baseQuery.limit(OFFSET_WITHOUT_LIMIT).offset(offset)
-    } else {
-      query = baseQuery
-    }
-
-    const result = await query
-    return result.map(this.mapToTag)
-  }
-
   async create(data: CreateTagData): Promise<Tag> {
     const id = crypto.randomUUID()
     const now = new Date()
