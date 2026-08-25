@@ -108,7 +108,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 
 ### Dead code (verified by grep across `apps/` and `libs/`, tests excluded)
 
-#### 2.1
+#### 2.1 — **Done**
 
 - **Where:** `libs/services/src/services/user.ts:21-39,67-87`
 - **Problem:** `UserService.getUser` and `updateUser` have no callers; `updateUser` passes raw `UpdateUserData` (including `status`, `passwordHash`) to the repo with no validation. `user.test.ts:5` notes they're untested.
