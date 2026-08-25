@@ -287,9 +287,7 @@ describe('api-v1 routes', () => {
     })
 
     it('returns 404 when tag service throws TagNotFoundError', async () => {
-      mockGetUserTagById.mockRejectedValue(
-        new TagNotFoundError('Tag with ID "tag-1" not found')
-      )
+      mockGetUserTagById.mockRejectedValue(new TagNotFoundError('tag-1'))
       const res = await app.request('/api/v1/tags/tag-1/pins', {
         headers: { Authorization: 'Bearer ps_ok' },
       })

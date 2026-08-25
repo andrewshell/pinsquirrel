@@ -20,7 +20,15 @@ export class ApiKeyLimitExceededError extends ApiKeyError {
 }
 
 export class UnauthorizedApiKeyAccessError extends ApiKeyError {
-  constructor(message: string = 'Not authorized to access this API key') {
+  /**
+   * Same shape as the pin and tag errors: an id first, an optional message
+   * second. Pass `''` for the id when the refusal is about the caller rather
+   * than one key.
+   */
+  constructor(
+    public readonly apiKeyId: string,
+    message: string = `Not authorized to access API key "${apiKeyId}"`
+  ) {
     super(message)
     this.name = 'UnauthorizedApiKeyAccessError'
   }

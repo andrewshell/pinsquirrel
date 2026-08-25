@@ -36,7 +36,7 @@ export class TagService {
   async getUserTagById(ac: AccessControl, tagId: string): Promise<Tag> {
     const tag = await this.tagRepository.findById(tagId)
     if (!tag || !ac.canRead(tag)) {
-      throw new TagNotFoundError(`Tag with ID "${tagId}" not found`)
+      throw new TagNotFoundError(tagId)
     }
     return tag
   }
@@ -66,6 +66,7 @@ export class TagService {
   async createTag(ac: AccessControl, input: CreateTagData): Promise<Tag> {
     if (!ac.canCreateAs(input.userId)) {
       throw new UnauthorizedTagAccessError(
+        '',
         'User can only create tags for themselves'
       )
     }
@@ -98,6 +99,7 @@ export class TagService {
   ): Promise<void> {
     if (!ac.user) {
       throw new UnauthorizedTagAccessError(
+        '',
         'User must be authenticated to merge tags'
       )
     }
@@ -124,11 +126,17 @@ export class TagService {
     // Verify the target tag belongs to the user
     const targetTag = await this.tagRepository.findById(targetTagId)
     if (!targetTag) {
-      throw new TagNotFoundError(`Target tag with ID ${targetTagId} not found`)
+      throw new TagNotFoundError(
+        targetTagId,
+        `Target tag with ID "${targetTagId}" not found`
+      )
     }
 
     if (!ac.canUpdate(targetTag)) {
-      throw new UnauthorizedTagAccessError('User can only merge tags they own')
+      throw new UnauthorizedTagAccessError(
+        targetTag.id,
+        'User can only merge tags they own'
+      )
     }
 
     // Verify all source tags belong to the user
@@ -136,12 +144,14 @@ export class TagService {
       const sourceTag = await this.tagRepository.findById(sourceTagId)
       if (!sourceTag) {
         throw new TagNotFoundError(
-          `Source tag with ID ${sourceTagId} not found`
+          sourceTagId,
+          `Source tag with ID "${sourceTagId}" not found`
         )
       }
 
       if (!ac.canUpdate(sourceTag)) {
         throw new UnauthorizedTagAccessError(
+          sourceTagId,
           'User can only merge tags they own'
         )
       }
@@ -157,16 +167,22 @@ export class TagService {
   async deleteTag(ac: AccessControl, tagId: string): Promise<void> {
     const tag = await this.tagRepository.findById(tagId)
     if (!tag) {
-      throw new TagNotFoundError(`Tag with ID ${tagId} not found`)
+      throw new TagNotFoundError(tagId)
     }
 
     if (!ac.canDelete(tag)) {
-      throw new UnauthorizedTagAccessError('User can only delete tags they own')
+      throw new UnauthorizedTagAccessError(
+        tagId,
+        'User can only delete tags they own'
+      )
     }
 
     const deleted = await this.tagRepository.delete(tagId)
     if (!deleted) {
-      throw new TagNotFoundError(`Tag with ID ${tagId} could not be deleted`)
+      throw new TagNotFoundError(
+        tagId,
+        `Tag with ID "${tagId}" could not be deleted`
+      )
     }
   }
 
@@ -176,6 +192,7 @@ export class TagService {
   async deleteTagsWithNoPins(ac: AccessControl, userId: string): Promise<void> {
     if (!ac.canCreateAs(userId)) {
       throw new UnauthorizedTagAccessError(
+        '',
         'User can only clean up their own tags'
       )
     }

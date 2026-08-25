@@ -13,8 +13,18 @@ export class PinNotFoundError extends PinError {
 }
 
 export class UnauthorizedPinAccessError extends PinError {
-  constructor(pinId: string) {
-    super(`Unauthorized access to pin with ID "${pinId}"`)
+  /**
+   * @param pinId the pin being accessed, or `''` when the refusal is about the
+   *   caller rather than one pin ("must be signed in to list pins").
+   * @param message overrides the default, which templates `pinId` in. Callers
+   *   used to pass a whole sentence as `pinId` and get it nested inside that
+   *   template.
+   */
+  constructor(
+    public readonly pinId: string,
+    message: string = `Unauthorized access to pin with ID "${pinId}"`
+  ) {
+    super(message)
     this.name = 'UnauthorizedPinAccessError'
   }
 }
@@ -37,15 +47,27 @@ export class TagError extends Error {
 }
 
 export class TagNotFoundError extends TagError {
-  constructor(tagId: string) {
-    super(`Tag with ID "${tagId}" not found`)
+  /** @param message overrides the default, which templates `tagId` in. */
+  constructor(
+    public readonly tagId: string,
+    message: string = `Tag with ID "${tagId}" not found`
+  ) {
+    super(message)
     this.name = 'TagNotFoundError'
   }
 }
 
 export class UnauthorizedTagAccessError extends TagError {
-  constructor(tagId: string) {
-    super(`Unauthorized access to tag with ID "${tagId}"`)
+  /**
+   * @param tagId the tag being accessed, or `''` when the refusal is about the
+   *   caller rather than one tag.
+   * @param message overrides the default, which templates `tagId` in.
+   */
+  constructor(
+    public readonly tagId: string,
+    message: string = `Unauthorized access to tag with ID "${tagId}"`
+  ) {
+    super(message)
     this.name = 'UnauthorizedTagAccessError'
   }
 }

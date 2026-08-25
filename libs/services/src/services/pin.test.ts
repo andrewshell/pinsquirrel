@@ -409,6 +409,17 @@ describe('PinService', () => {
         pinService.deletePin(createMockAccessControl(mockUser), 'pin-123')
       ).rejects.toThrow(UnauthorizedPinAccessError)
     })
+
+    // The constructor templates the id into the message, so a call site that
+    // passes a sentence gets it nested inside the template.
+    it('names the pin once in the message', async () => {
+      const otherUserPin = { ...mockPin, userId: 'other-user' }
+      mockPinRepository.findById.mockResolvedValue(otherUserPin)
+
+      await expect(
+        pinService.deletePin(createMockAccessControl(mockUser), 'pin-123')
+      ).rejects.toThrow(new UnauthorizedPinAccessError('pin-123'))
+    })
   })
 
   describe('getUserPins', () => {
@@ -431,6 +442,19 @@ describe('PinService', () => {
       await expect(
         pinService.getUserPins(createMockAccessControl(null))
       ).rejects.toThrow(UnauthorizedPinAccessError)
+    })
+
+    // No pin is involved in this refusal, so the message stands on its own
+    // rather than being wrapped in the id template.
+    it('explains that the caller must be signed in', async () => {
+      await expect(
+        pinService.getUserPins(createMockAccessControl(null))
+      ).rejects.toThrow(
+        new UnauthorizedPinAccessError(
+          '',
+          'User must be authenticated to export pins'
+        )
+      )
     })
   })
 
