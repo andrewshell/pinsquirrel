@@ -39,7 +39,8 @@ Root-level (Turbo orchestrates across packages):
 | `pnpm dev`                                     | Start Hono dev server (port 8100)                    |
 | `pnpm build`                                   | Build all packages                                   |
 | `pnpm test`                                    | Run all tests                                        |
-| `pnpm typecheck` / `pnpm lint` / `pnpm format` | Type check / ESLint / Prettier                       |
+| `pnpm typecheck` / `pnpm lint` / `pnpm format` | Type check / ESLint / Prettier (write mode)          |
+| `pnpm format:check`                            | `prettier --check .` at the repo root — the gate     |
 | `pnpm quality`                                 | All checks: typecheck + lint + test + format + audit |
 | `pnpm run audit`                               | `pnpm audit --prod --audit-level=high` (matches CI)  |
 | `pnpm db:up` / `pnpm db:down`                  | Start / stop dev MySQL container                     |
@@ -132,7 +133,7 @@ Before considering any work "done", **ALL of the following must pass**:
 1. **Type Check**: `pnpm typecheck` - Must pass with zero errors
 2. **Lint**: `pnpm lint` - Must pass with zero errors (warnings should be addressed)
 3. **Tests**: `pnpm test` - All tests must pass (100% success rate)
-4. **Format**: `pnpm format` - Code must be properly formatted
+4. **Format**: `pnpm format:check` - Code must be properly formatted. This is the gate (`prettier --check .` from the repo root, covering every file, not just package `src/`); `pnpm format` is the write-mode fix for it.
 5. **Audit**: `pnpm run audit` - No high-severity advisories in production dependencies (matches CI)
 
 **Quick Quality Check Commands:**
@@ -142,7 +143,7 @@ Before considering any work "done", **ALL of the following must pass**:
 pnpm quality
 
 # Or run individually:
-pnpm typecheck && pnpm lint && pnpm test && pnpm format && pnpm run audit
+pnpm typecheck && pnpm lint && pnpm test && pnpm format:check && pnpm run audit
 ```
 
 **If ANY check fails:**
@@ -150,7 +151,7 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm format && pnpm run audit
 - Fix typecheck errors first
 - Then fix lint errors
 - Then fix test failures
-- Then run format
+- Then run `pnpm format` to fix formatting
 - Finally resolve any audit findings (upgrade the offending package, or add a `pnpm.overrides` entry pinning a safe version)
 - Re-run all checks until 100% pass
 

@@ -28,7 +28,7 @@ import { ResetPasswordPage } from '../views/pages/reset-password'
 const auth = new Hono()
 
 // GET /signin - Render sign-in form
-auth.get('/signin', async (c) => {
+auth.get('/signin', async c => {
   const sessionManager = getSessionManager(c)
 
   // Already logged in, redirect to home
@@ -55,7 +55,7 @@ auth.get('/signin', async (c) => {
 })
 
 // POST /signin - Process sign-in form
-auth.post('/signin', async (c) => {
+auth.post('/signin', async c => {
   const sessionManager = getSessionManager(c)
   const formData = await c.req.parseBody()
 
@@ -150,7 +150,7 @@ auth.post('/signin', async (c) => {
 })
 
 // GET /signup - Render sign-up form
-auth.get('/signup', (c) => {
+auth.get('/signup', c => {
   const sessionManager = getSessionManager(c)
 
   // Already logged in, redirect to home
@@ -168,7 +168,7 @@ auth.post(
     signupLimiter,
     'Too many sign-up attempts. Please try again later.'
   ),
-  async (c) => {
+  async c => {
     const formData = await c.req.parseBody()
 
     const username = formData.username as string
@@ -226,7 +226,7 @@ auth.post(
 )
 
 // GET /forgot-password - Render forgot password form
-auth.get('/forgot-password', (c) => {
+auth.get('/forgot-password', c => {
   const sessionManager = getSessionManager(c)
 
   // Already logged in, redirect to home
@@ -244,7 +244,7 @@ auth.post(
     forgotPasswordLimiter,
     'Too many password reset requests. Please try again later.'
   ),
-  async (c) => {
+  async c => {
     const sessionManager = getSessionManager(c)
 
     // Already logged in, redirect to home
@@ -303,7 +303,7 @@ auth.post(
 )
 
 // GET /reset-password/:token - Render reset password form
-auth.get('/reset-password/:token', async (c) => {
+auth.get('/reset-password/:token', async c => {
   const sessionManager = getSessionManager(c)
 
   // Already logged in, redirect to home
@@ -326,7 +326,7 @@ auth.get('/reset-password/:token', async (c) => {
 })
 
 // POST /reset-password/:token - Process reset password form
-auth.post('/reset-password/:token', async (c) => {
+auth.post('/reset-password/:token', async c => {
   const token = c.req.param('token')
   if (!token) {
     return c.redirect('/forgot-password')
@@ -386,14 +386,14 @@ auth.post('/reset-password/:token', async (c) => {
 })
 
 // POST /signout - Process sign out
-auth.post('/signout', async (c) => {
+auth.post('/signout', async c => {
   const sessionManager = getSessionManager(c)
   await sessionManager.destroy()
   return c.redirect('/signin')
 })
 
 // GET /signout - Also support GET for convenience
-auth.get('/signout', async (c) => {
+auth.get('/signout', async c => {
   const sessionManager = getSessionManager(c)
   await sessionManager.destroy()
   return c.redirect('/signin')

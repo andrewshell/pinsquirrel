@@ -39,7 +39,7 @@ export const TagInput: FC<TagInputProps> = ({
           data-tag-input="pills"
         >
           {/* Initial tags rendered server-side (will be replaced by JS) */}
-          {initialTags.map((tag) => (
+          {initialTags.map(tag => (
             <span
               class="inline-flex items-center gap-1 px-2 py-1 text-sm font-medium bg-secondary text-secondary-foreground border-2 border-foreground"
               data-tag-pill={tag}

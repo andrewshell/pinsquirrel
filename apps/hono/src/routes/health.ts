@@ -8,7 +8,7 @@ import { logger, safeError } from '../lib/logger.js'
 // models. See middleware/session.ts for the other deliberate exception.
 const healthRoutes = new Hono()
 
-healthRoutes.get('/', async (c) => {
+healthRoutes.get('/', async c => {
   let database: 'connected' | 'disconnected' = 'disconnected'
   let error: string | undefined
 

@@ -42,7 +42,7 @@ function initTagSelect(container) {
     const searchTerm = searchInput?.value?.toLowerCase().trim() || ''
     const excludedIds = getExcludedIds()
 
-    return allTags.filter((tag) => {
+    return allTags.filter(tag => {
       // Exclude IDs from source selection
       if (excludedIds.includes(tag.id)) return false
       // Filter by search term
@@ -55,14 +55,14 @@ function initTagSelect(container) {
 
   // Render the display area (pills or selected text)
   function renderDisplay() {
-    const selectedTags = allTags.filter((t) => selectedIds.includes(t.id))
+    const selectedTags = allTags.filter(t => selectedIds.includes(t.id))
 
     if (selectedTags.length === 0) {
       display.innerHTML = `<span class="text-muted-foreground" data-tag-select="placeholder">${container.querySelector('[data-tag-select="placeholder"]')?.textContent || 'Select tags...'}</span>`
     } else if (isMultiple) {
       display.innerHTML = selectedTags
         .map(
-          (tag) => `
+          tag => `
         <span class="inline-flex items-center gap-1 px-2 py-1 bg-secondary text-secondary-foreground border-2 border-foreground text-xs"
               data-tag-select="pill" data-tag-id="${escapeHtml(tag.id)}">
           ${escapeHtml(tag.name)}
@@ -95,7 +95,7 @@ function initTagSelect(container) {
     emptyState?.classList.add('hidden')
 
     list.innerHTML = filtered
-      .map((tag) => {
+      .map(tag => {
         const isSelected = selectedIds.includes(tag.id)
         return `
         <button type="button" role="option" aria-selected="${isSelected}"
@@ -137,7 +137,7 @@ function initTagSelect(container) {
     if (isMultiple) {
       // Toggle selection
       if (selectedIds.includes(tagId)) {
-        selectedIds = selectedIds.filter((id) => id !== tagId)
+        selectedIds = selectedIds.filter(id => id !== tagId)
       } else {
         selectedIds.push(tagId)
       }
@@ -156,21 +156,21 @@ function initTagSelect(container) {
 
   // Remove tag from selection
   function removeTag(tagId) {
-    selectedIds = selectedIds.filter((id) => id !== tagId)
+    selectedIds = selectedIds.filter(id => id !== tagId)
     renderDisplay()
     if (isOpen) renderList()
     hiddenInput.dispatchEvent(new Event('change', { bubbles: true }))
   }
 
   // Event: Click trigger to toggle
-  trigger.addEventListener('click', (e) => {
+  trigger.addEventListener('click', e => {
     // Don't toggle if clicking remove button
     if (e.target.closest('[data-tag-select="remove"]')) return
     toggleDropdown(!isOpen)
   })
 
   // Event: Click remove button on pill
-  display.addEventListener('click', (e) => {
+  display.addEventListener('click', e => {
     const removeBtn = e.target.closest('[data-tag-select="remove"]')
     if (removeBtn) {
       e.preventDefault()
@@ -185,7 +185,7 @@ function initTagSelect(container) {
   })
 
   // Event: Click on option
-  list.addEventListener('click', (e) => {
+  list.addEventListener('click', e => {
     const option = e.target.closest('[data-tag-select="option"]')
     if (option) {
       // Stop propagation to prevent the "click outside" handler from closing
@@ -198,7 +198,7 @@ function initTagSelect(container) {
   })
 
   // Event: Keyboard navigation
-  container.addEventListener('keydown', (e) => {
+  container.addEventListener('keydown', e => {
     if (e.key === 'Escape' && isOpen) {
       toggleDropdown(false)
       trigger.focus()
@@ -206,7 +206,7 @@ function initTagSelect(container) {
   })
 
   // Event: Click outside to close
-  document.addEventListener('click', (e) => {
+  document.addEventListener('click', e => {
     if (isOpen && !container.contains(e.target)) {
       toggleDropdown(false)
     }
@@ -219,9 +219,9 @@ function initTagSelect(container) {
       sourceInput.addEventListener('change', () => {
         // If current selection is now excluded, clear it
         const excludedIds = getExcludedIds()
-        const wasSelected = selectedIds.some((id) => excludedIds.includes(id))
+        const wasSelected = selectedIds.some(id => excludedIds.includes(id))
         if (wasSelected) {
-          selectedIds = selectedIds.filter((id) => !excludedIds.includes(id))
+          selectedIds = selectedIds.filter(id => !excludedIds.includes(id))
           renderDisplay()
         }
         if (isOpen) renderList()
@@ -278,7 +278,7 @@ function initMergeSummary() {
     if (sourceIds.length > 0 && destId) {
       // Calculate total pin count from source tags
       const totalPinCount = sourceIds.reduce((sum, id) => {
-        const tag = allTags.find((t) => t.id === id)
+        const tag = allTags.find(t => t.id === id)
         return sum + (tag?.pinCount || 0)
       }, 0)
 

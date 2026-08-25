@@ -6,7 +6,7 @@ const mcpRoute = new Hono()
 
 mcpRoute.use('*', mcpAuth())
 
-mcpRoute.all('/', async (c) => {
+mcpRoute.all('/', async c => {
   return mcpTransport.handleRequest(c)
 })
 

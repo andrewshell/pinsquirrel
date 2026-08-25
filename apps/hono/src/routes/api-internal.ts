@@ -15,7 +15,7 @@ apiInternal.use('*', requireAuth())
 // GET /api/internal/metadata - Fetch metadata for a URL
 // Gated by requireAuth above; the handler itself needs no user, it just must
 // not be reachable anonymously.
-apiInternal.get('/metadata', async (c) => {
+apiInternal.get('/metadata', async c => {
   const url = new URL(c.req.url)
   const targetUrl = url.searchParams.get('url')
 
@@ -38,7 +38,7 @@ apiInternal.get('/metadata', async (c) => {
 })
 
 // GET /api/internal/check-url - Check if a URL is already saved
-apiInternal.get('/check-url', async (c) => {
+apiInternal.get('/check-url', async c => {
   const user = getAuthUser(c)
 
   const url = new URL(c.req.url)

@@ -9,7 +9,7 @@ const exportRoute = new Hono()
 exportRoute.use('*', requireAuth())
 
 // GET /export/pinboard.json - Export pins in Pinboard format
-exportRoute.get('/pinboard.json', async (c) => {
+exportRoute.get('/pinboard.json', async c => {
   const user = getAuthUser(c)
 
   const pins = await pinboardService.exportPins(new AccessControl(user))

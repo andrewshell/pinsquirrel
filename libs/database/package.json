@@ -10,10 +10,10 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/**/*.ts",
+    "lint": "eslint src",
     "lint:fix": "eslint src/**/*.ts --fix",
-    "format": "prettier --write src/**/*.ts",
-    "format:check": "prettier --check src/**/*.ts",
+    "format": "prettier --write src",
+    "format:check": "prettier --check src",
     "pretest": "docker exec pinsquirrel-mysql-1 mysql -u root -ppinsquirrel -e 'CREATE DATABASE IF NOT EXISTS pinsquirrel_test; GRANT ALL PRIVILEGES ON pinsquirrel_test.* TO pinsquirrel@\"%\"; FLUSH PRIVILEGES;' 2>/dev/null || true",
     "test": "vitest --run",
     "test:watch": "vitest --watch --coverage",

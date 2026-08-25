@@ -23,12 +23,12 @@ function getOrigin(requestUrl: string): string {
   return `${url.protocol}//${url.host}`
 }
 
-seo.get('/robots.txt', (c) => {
+seo.get('/robots.txt', c => {
   const origin = getOrigin(c.req.url)
   const lines = [
     'User-agent: *',
     'Content-Signal: search=yes, ai-train=yes, ai-input=yes',
-    ...DISALLOWED_PATHS.map((p) => `Disallow: ${p}`),
+    ...DISALLOWED_PATHS.map(p => `Disallow: ${p}`),
     '',
     `Sitemap: ${origin}/sitemap.xml`,
     '',
@@ -38,10 +38,10 @@ seo.get('/robots.txt', (c) => {
   })
 })
 
-seo.get('/sitemap.xml', (c) => {
+seo.get('/sitemap.xml', c => {
   const origin = getOrigin(c.req.url)
   const urls = PUBLIC_PATHS.map(
-    (p) => `  <url>\n    <loc>${origin}${p}</loc>\n  </url>`
+    p => `  <url>\n    <loc>${origin}${p}</loc>\n  </url>`
   ).join('\n')
   const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

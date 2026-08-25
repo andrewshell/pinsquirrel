@@ -12,7 +12,7 @@ describe('markdownNegotiation middleware', () => {
   })
 
   it('returns markdown when the request prefers it', async () => {
-    app.get('/', (c) =>
+    app.get('/', c =>
       c.html(
         '<!doctype html><html><body><main><h1>Hi</h1><p>There</p></main></body></html>'
       )
@@ -33,7 +33,7 @@ describe('markdownNegotiation middleware', () => {
   it('passes through HTML when the request does not prefer markdown', async () => {
     const html =
       '<!doctype html><html><body><main><h1>Hi</h1></main></body></html>'
-    app.get('/', (c) => c.html(html))
+    app.get('/', c => c.html(html))
 
     const res = await app.request('/', {
       headers: { Accept: 'text/html' },
@@ -46,7 +46,7 @@ describe('markdownNegotiation middleware', () => {
   })
 
   it('passes through HTML when no Accept header is sent', async () => {
-    app.get('/', (c) => c.html('<main><h1>Hi</h1></main>'))
+    app.get('/', c => c.html('<main><h1>Hi</h1></main>'))
 
     const res = await app.request('/')
 
@@ -56,7 +56,7 @@ describe('markdownNegotiation middleware', () => {
   })
 
   it('passes through redirects unchanged even when markdown is preferred', async () => {
-    app.get('/', (c) => c.redirect('/elsewhere'))
+    app.get('/', c => c.redirect('/elsewhere'))
 
     const res = await app.request('/', {
       headers: { Accept: 'text/markdown' },
@@ -70,7 +70,7 @@ describe('markdownNegotiation middleware', () => {
   })
 
   it('passes through non-HTML responses (JSON) unchanged', async () => {
-    app.get('/', (c) => c.json({ ok: true }))
+    app.get('/', c => c.json({ ok: true }))
 
     const res = await app.request('/', {
       headers: { Accept: 'text/markdown' },

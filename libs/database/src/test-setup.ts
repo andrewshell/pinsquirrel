@@ -30,6 +30,8 @@ export async function setup() {
       migrationsFolder: migrationsPath,
     })
   } catch (error) {
+    // Vitest swallows the stack of a setup failure, so log it before rethrowing.
+    // eslint-disable-next-line no-console
     console.error('Error in test setup:', error)
     throw error
   } finally {

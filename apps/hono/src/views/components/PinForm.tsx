@@ -172,8 +172,8 @@ export const PinForm: FC<PinFormProps> = ({
             tags
               ? tags
                   .split(',')
-                  .map((t) => t.trim())
-                  .filter((t) => t)
+                  .map(t => t.trim())
+                  .filter(t => t)
               : []
           }
           allTags={userTags}

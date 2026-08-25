@@ -114,25 +114,33 @@ Use `--skip-quality` flag to skip these for faster iterations during development
 ### Troubleshooting
 
 **Docker not running:**
+
 ```bash
 ❌ Docker is not running. Please start Docker and try again.
 ```
+
 → Start Docker Desktop or Docker daemon
 
 **Not authenticated:**
+
 ```bash
 ⚠️  Not logged into Docker Hub. Attempting login...
 ```
+
 → The script will automatically prompt for Docker Hub login
 
 **Quality checks fail:**
+
 ```bash
 ❌ TypeScript type checking failed
 ```
+
 → Fix the reported issues or use `--skip-quality` flag
 
 **Wrong directory:**
+
 ```bash
 ❌ Please run this script from the project root directory
 ```
+
 → Run from the repository root where package.json is located

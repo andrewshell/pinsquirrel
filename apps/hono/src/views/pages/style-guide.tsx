@@ -220,13 +220,13 @@ export const StyleGuidePage: FC<StyleGuidePageProps> = ({ user }) => {
         title="Buttons"
         source="views/components/ui/Button.tsx"
       >
-        {buttonVariants.map((variant) => (
+        {buttonVariants.map(variant => (
           <div class="space-y-2">
             <p class="text-sm font-medium">
               Variant: <code>{variant}</code>
             </p>
             <div class="flex flex-wrap items-center gap-3">
-              {buttonSizes.map((size) => (
+              {buttonSizes.map(size => (
                 <Button variant={variant} size={size}>
                   {size === 'icon' ? '+' : `${variant}/${size}`}
                 </Button>
@@ -410,13 +410,13 @@ export const StyleGuidePage: FC<StyleGuidePageProps> = ({ user }) => {
       >
         <div class="space-y-2">
           <p class="text-sm font-medium">Expanded view</p>
-          {samplePins.map((pin) => (
+          {samplePins.map(pin => (
             <PinCard pin={pin} viewSize="expanded" searchParams="" />
           ))}
         </div>
         <div class="space-y-2">
           <p class="text-sm font-medium">Compact view</p>
-          {samplePins.map((pin) => (
+          {samplePins.map(pin => (
             <PinCard pin={pin} viewSize="compact" searchParams="" />
           ))}
         </div>

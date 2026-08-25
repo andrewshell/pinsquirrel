@@ -16,7 +16,7 @@ const tags = new Hono()
 tags.use('*', requireAuth())
 
 // GET /tags - Show tags cloud page
-tags.get('/', async (c) => {
+tags.get('/', async c => {
   const sessionManager = getSessionManager(c)
   const user = getAuthUser(c)
 
@@ -65,7 +65,7 @@ tags.get('/', async (c) => {
 })
 
 // GET /tags/merge - Show tag merge page
-tags.get('/merge', async (c) => {
+tags.get('/merge', async c => {
   const sessionManager = getSessionManager(c)
   const user = getAuthUser(c)
 
@@ -75,7 +75,7 @@ tags.get('/merge', async (c) => {
   const userTags = await tagService.getUserTagsWithCount(ac, user.id)
 
   // Filter to only tags with pins
-  const tagsWithPins = userTags.filter((tag) => tag.pinCount > 0)
+  const tagsWithPins = userTags.filter(tag => tag.pinCount > 0)
 
   // Get flash message if any
   const flash = sessionManager.getFlash()
@@ -84,7 +84,7 @@ tags.get('/merge', async (c) => {
 })
 
 // POST /tags/merge - Perform tag merge
-tags.post('/merge', async (c) => {
+tags.post('/merge', async c => {
   const sessionManager = getSessionManager(c)
   const user = getAuthUser(c)
 
@@ -98,18 +98,18 @@ tags.post('/merge', async (c) => {
   const sourceTagIdsRaw = formData['sourceTagIds']
   if (Array.isArray(sourceTagIdsRaw)) {
     sourceTagIds = sourceTagIdsRaw
-      .map((v) => (typeof v === 'string' ? v : ''))
-      .filter((v) => v.length > 0)
+      .map(v => (typeof v === 'string' ? v : ''))
+      .filter(v => v.length > 0)
   } else if (typeof sourceTagIdsRaw === 'string' && sourceTagIdsRaw) {
     // Split comma-separated IDs from hidden input
-    sourceTagIds = sourceTagIdsRaw.split(',').filter((v) => v.length > 0)
+    sourceTagIds = sourceTagIdsRaw.split(',').filter(v => v.length > 0)
   }
 
   const destinationTagId = getString(formData['destinationTagId'])
 
   // Fetch tags for re-rendering on error
   const userTags = await tagService.getUserTagsWithCount(ac, user.id)
-  const tagsWithPins = userTags.filter((tag) => tag.pinCount > 0)
+  const tagsWithPins = userTags.filter(tag => tag.pinCount > 0)
 
   const reject = (errors: Record<string, string[]>, status?: 500) =>
     c.html(

@@ -10,10 +10,10 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/**/*.ts",
+    "lint": "eslint src",
     "lint:fix": "eslint src/**/*.ts --fix",
-    "format": "prettier --write src/**/*.ts",
-    "format:check": "prettier --check src/**/*.ts",
+    "format": "prettier --write src",
+    "format:check": "prettier --check src",
     "test": "vitest --run",
     "test:watch": "vitest --watch --coverage",
     "test:coverage": "vitest --run --coverage"

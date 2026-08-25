@@ -27,7 +27,7 @@ export class RateLimiter {
   hit(key: string): RateLimitResult {
     const now = Date.now()
     const cutoff = now - this.windowMs
-    const timestamps = (this.attempts.get(key) ?? []).filter((t) => t > cutoff)
+    const timestamps = (this.attempts.get(key) ?? []).filter(t => t > cutoff)
     timestamps.push(now)
     this.attempts.set(key, timestamps)
 
@@ -44,7 +44,7 @@ export class RateLimiter {
     const timestamps = this.attempts.get(key)
     if (!timestamps) return false
 
-    const recent = timestamps.filter((t) => t > cutoff)
+    const recent = timestamps.filter(t => t > cutoff)
     return recent.length >= this.maxAttempts
   }
 
@@ -63,7 +63,7 @@ export class RateLimiter {
     const now = Date.now()
     const cutoff = now - this.windowMs
     for (const [key, timestamps] of this.attempts) {
-      const recent = timestamps.filter((t) => t > cutoff)
+      const recent = timestamps.filter(t => t > cutoff)
       if (recent.length === 0) {
         this.attempts.delete(key)
       } else {

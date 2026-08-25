@@ -165,7 +165,7 @@ describe('import routes', () => {
 
     it.each([['href'], ['description'], ['time']])(
       'rejects an export whose first entry is missing %s',
-      async (field) => {
+      async field => {
         const res = await app.request(
           '/import',
           upload(JSON.stringify([{ ...pinboardPin(), [field]: '' }]))

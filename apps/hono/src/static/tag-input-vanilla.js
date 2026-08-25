@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .forEach(initTagInput)
 })
 
-document.addEventListener('htmx:afterSettle', (event) => {
+document.addEventListener('htmx:afterSettle', event => {
   const target = event.detail.target
   const containers = target.querySelectorAll
     ? target.querySelectorAll('[data-tag-input="container"]')
@@ -41,10 +41,10 @@ function initTagInput(container) {
   function renderTags() {
     // Clear existing pills (but keep input)
     const existingPills = pillsContainer.querySelectorAll('[data-tag-pill]')
-    existingPills.forEach((pill) => pill.remove())
+    existingPills.forEach(pill => pill.remove())
 
     // Add pills before input
-    tags.forEach((tag) => {
+    tags.forEach(tag => {
       const pill = document.createElement('span')
       pill.className =
         'inline-flex items-center gap-1 px-2 py-1 text-sm font-medium bg-secondary text-secondary-foreground border-2 border-foreground'
@@ -64,7 +64,7 @@ function initTagInput(container) {
     const searchTerm = input.value.toLowerCase().trim()
     if (!searchTerm) return []
     return allTags
-      .filter((t) => t.toLowerCase().includes(searchTerm) && !tags.includes(t))
+      .filter(t => t.toLowerCase().includes(searchTerm) && !tags.includes(t))
       .slice(0, 10)
   }
 
@@ -103,7 +103,7 @@ function initTagInput(container) {
   }
 
   function removeTag(tag) {
-    tags = tags.filter((t) => t !== tag)
+    tags = tags.filter(t => t !== tag)
     renderTags()
     input.focus()
   }
@@ -127,7 +127,7 @@ function initTagInput(container) {
     }, 200)
   })
 
-  input.addEventListener('keydown', (e) => {
+  input.addEventListener('keydown', e => {
     const filtered = getFilteredSuggestions()
 
     switch (e.key) {
@@ -173,7 +173,7 @@ function initTagInput(container) {
   })
 
   // Click on suggestion
-  suggestions.addEventListener('click', (e) => {
+  suggestions.addEventListener('click', e => {
     const suggestion = e.target.closest('[data-suggestion]')
     if (suggestion) {
       addTag(suggestion.dataset.suggestion)
@@ -181,7 +181,7 @@ function initTagInput(container) {
   })
 
   // Click to remove tag
-  pillsContainer.addEventListener('click', (e) => {
+  pillsContainer.addEventListener('click', e => {
     const removeBtn = e.target.closest('[data-remove-tag]')
     if (removeBtn) {
       removeTag(removeBtn.dataset.removeTag)

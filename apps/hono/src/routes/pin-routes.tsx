@@ -156,7 +156,7 @@ export function createPinRoutes({
   const routes = new Hono()
 
   // GET / — list pins with filtering and pagination
-  routes.get('/', async (c) => {
+  routes.get('/', async c => {
     const sessionManager = getSessionManager(c)
     const user = getAuthUser(c)
     const isHtmx = !!c.req.header('HX-Request')
@@ -205,7 +205,7 @@ export function createPinRoutes({
   })
 
   // GET /new — pin creation form
-  routes.get('/new', async (c) => {
+  routes.get('/new', async c => {
     const sessionManager = getSessionManager(c)
     const user = getAuthUser(c)
     const ac = new AccessControl(user)
@@ -240,7 +240,7 @@ export function createPinRoutes({
       <PinNewPage
         user={user}
         flash={sessionManager.getFlash()}
-        userTags={userTags.map((t) => t.name)}
+        userTags={userTags.map(t => t.name)}
         url={prefillUrl}
         title={prefillTitle}
         description={prefillDescription}
@@ -253,7 +253,7 @@ export function createPinRoutes({
   })
 
   // POST /new — create a pin
-  routes.post('/new', async (c) => {
+  routes.post('/new', async c => {
     const sessionManager = getSessionManager(c)
     const user = getAuthUser(c)
     const ac = new AccessControl(user)
@@ -299,7 +299,7 @@ export function createPinRoutes({
       return c.redirect(baseUrl)
     } catch (error) {
       const isHtmx = !!c.req.header('HX-Request')
-      const userTagNames = userTags.map((t) => t.name)
+      const userTagNames = userTags.map(t => t.name)
 
       const formProps = {
         action: `${baseUrl}/new`,
@@ -353,7 +353,7 @@ export function createPinRoutes({
   })
 
   // GET /:id/edit — pin edit form
-  routes.get('/:id/edit', async (c) => {
+  routes.get('/:id/edit', async c => {
     const sessionManager = getSessionManager(c)
     const user = getAuthUser(c)
 
@@ -374,7 +374,7 @@ export function createPinRoutes({
           user={user}
           pin={pin}
           flash={sessionManager.getFlash()}
-          userTags={userTags.map((t) => t.name)}
+          userTags={userTags.map(t => t.name)}
           returnParams={returnParams}
           baseUrl={baseUrl}
           privateMode={privateMode}
@@ -389,7 +389,7 @@ export function createPinRoutes({
   })
 
   // POST /:id/edit — update a pin
-  routes.post('/:id/edit', async (c) => {
+  routes.post('/:id/edit', async c => {
     const sessionManager = getSessionManager(c)
     const user = getAuthUser(c)
 
@@ -445,7 +445,7 @@ export function createPinRoutes({
       }
 
       const isHtmx = !!c.req.header('HX-Request')
-      const userTagNames = userTags.map((t) => t.name)
+      const userTagNames = userTags.map(t => t.name)
 
       const formProps = {
         action: editAction,
@@ -509,7 +509,7 @@ export function createPinRoutes({
   })
 
   // POST /:id/toggle-read — flip read-later and swap the card (HTMX)
-  routes.post('/:id/toggle-read', async (c) => {
+  routes.post('/:id/toggle-read', async c => {
     const user = getAuthUser(c)
 
     const pinId = c.req.param('id')
@@ -548,7 +548,7 @@ export function createPinRoutes({
   })
 
   // GET /:id/delete-confirm — inline delete confirmation (HTMX)
-  routes.get('/:id/delete-confirm', async (c) => {
+  routes.get('/:id/delete-confirm', async c => {
     const user = getAuthUser(c)
 
     const pinId = c.req.param('id')
@@ -575,7 +575,7 @@ export function createPinRoutes({
   })
 
   // DELETE /:id — delete and return the refreshed list (HTMX)
-  routes.delete('/:id', async (c) => {
+  routes.delete('/:id', async c => {
     const user = getAuthUser(c)
 
     const pinId = c.req.param('id')
@@ -622,7 +622,7 @@ export function createPinRoutes({
   })
 
   // GET /:id/card — re-render one card (HTMX, used to cancel a confirmation)
-  routes.get('/:id/card', async (c) => {
+  routes.get('/:id/card', async c => {
     const user = getAuthUser(c)
 
     const pinId = c.req.param('id')
@@ -649,7 +649,7 @@ export function createPinRoutes({
   })
 
   // GET /:id/delete — full-page confirmation (non-JS fallback)
-  routes.get('/:id/delete', async (c) => {
+  routes.get('/:id/delete', async c => {
     const user = getAuthUser(c)
 
     const pinId = c.req.param('id')
@@ -675,7 +675,7 @@ export function createPinRoutes({
   })
 
   // POST /:id/delete — delete from the full-page confirmation
-  routes.post('/:id/delete', async (c) => {
+  routes.post('/:id/delete', async c => {
     const sessionManager = getSessionManager(c)
     const user = getAuthUser(c)
 

@@ -29,8 +29,8 @@ export function getString(value: FormValue): string {
 export function parseTagNames(input: string): string[] {
   return input
     .split(',')
-    .map((tag) => tag.trim())
-    .filter((tag) => tag.length > 0)
+    .map(tag => tag.trim())
+    .filter(tag => tag.length > 0)
 }
 
 export interface PinFormFields {

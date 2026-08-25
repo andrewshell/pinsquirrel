@@ -19,7 +19,7 @@ const privateRouter = new Hono()
 privateRouter.use('*', requireAuth())
 
 // GET /private/unlock — Password form
-privateRouter.get('/unlock', async (c) => {
+privateRouter.get('/unlock', async c => {
   const sessionManager = getSessionManager(c)
   const user = getAuthUser(c)
 
@@ -32,7 +32,7 @@ privateRouter.get('/unlock', async (c) => {
 })
 
 // POST /private/unlock — Verify password and unlock
-privateRouter.post('/unlock', async (c) => {
+privateRouter.post('/unlock', async c => {
   const sessionManager = getSessionManager(c)
   const user = getAuthUser(c)
 
@@ -74,7 +74,7 @@ privateRouter.post('/unlock', async (c) => {
 })
 
 // POST /private/lock — Lock private mode and redirect
-privateRouter.post('/lock', (c) => {
+privateRouter.post('/lock', c => {
   const sessionManager = getSessionManager(c)
   sessionManager.lockPrivateMode()
 

@@ -134,7 +134,7 @@ describe('auth routes', () => {
       '/signup',
       '/forgot-password',
       '/reset-password/tok-1',
-    ])('redirects %s to /pins when already authenticated', async (path) => {
+    ])('redirects %s to /pins when already authenticated', async path => {
       session.isAuthenticated.mockReturnValue(true)
 
       const res = await app.request(path)
@@ -207,7 +207,7 @@ describe('auth routes', () => {
         ['https://evil.test', 'absolute URL'],
         ['evil.test', 'bare host'],
         ['', 'empty value'],
-      ])('ignores %s (%s) and falls back to /pins', async (redirectTo) => {
+      ])('ignores %s (%s) and falls back to /pins', async redirectTo => {
         const res = await app.request(
           '/signin',
           form({ username: 'a', password: 'p', redirectTo })
