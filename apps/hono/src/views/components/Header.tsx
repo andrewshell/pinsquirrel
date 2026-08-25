@@ -1,5 +1,13 @@
 import type { User } from '@pinsquirrel/domain'
 import type { FC } from 'hono/jsx'
+import {
+  CloseIcon,
+  LockIcon,
+  MenuIcon,
+  PlusIcon,
+  SearchIcon,
+  UserIcon,
+} from './icons'
 import { Button } from './ui/Button'
 
 interface HeaderProps {
@@ -8,13 +16,110 @@ interface HeaderProps {
   privateMode?: boolean
 }
 
+/**
+ * The header renders the same navigation twice — once for the desktop bar and
+ * once inside the mobile menu panel — so the link list, the account list and
+ * the search form each live in one component that takes a `layout`.
+ */
+type Layout = 'desktop' | 'mobile'
+
+type HtmxAttrs = Record<string, string>
+
+const linkClass: Record<Layout, string> = {
+  desktop:
+    'text-base font-bold text-foreground hover:text-primary uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all',
+  mobile:
+    'block px-4 py-2 text-center font-bold uppercase hover:bg-accent/10 transition-colors',
+}
+
+const accountLinkClass: Record<Layout, string> = {
+  desktop: 'block px-4 py-2 text-sm hover:bg-accent/10 transition-colors',
+  mobile:
+    'block px-4 py-2 text-center font-bold uppercase hover:bg-accent/10 transition-colors',
+}
+
+const NavLinks: FC<{
+  layout: Layout
+  pinsBase: string
+  privateMode: boolean
+}> = ({ layout, pinsBase, privateMode }) => (
+  <>
+    <a href={pinsBase} class={linkClass[layout]}>
+      {privateMode ? 'Private' : 'Pins'}
+    </a>
+    <a href="/tags" class={linkClass[layout]}>
+      Tags
+    </a>
+  </>
+)
+
+const AccountLinks: FC<{ layout: Layout; username: string }> = ({
+  layout,
+  username,
+}) => (
+  <>
+    <a href="/profile" class={accountLinkClass[layout]}>
+      {layout === 'mobile' ? username : 'Profile'}
+    </a>
+    <a href="/import" class={accountLinkClass[layout]}>
+      Import
+    </a>
+    <a href="/private/unlock" class={accountLinkClass[layout]}>
+      Private Pins
+    </a>
+  </>
+)
+
+const SearchForm: FC<{
+  layout: Layout
+  pinsBase: string
+  htmxAttrs: HtmxAttrs
+}> = ({ layout, pinsBase, htmxAttrs }) =>
+  layout === 'desktop' ? (
+    <form
+      action={pinsBase}
+      method="get"
+      class="hidden items-center gap-2"
+      data-search="form"
+      {...htmxAttrs}
+    >
+      <input
+        type="text"
+        name="search"
+        placeholder="Search pins..."
+        class="w-64 px-3 py-2 text-sm border-4 border-foreground bg-background focus:outline-none focus:ring-2 focus:ring-accent"
+        data-search="input"
+      />
+      <Button type="submit" size="icon" aria-label="Search">
+        <SearchIcon />
+      </Button>
+    </form>
+  ) : (
+    <form
+      action={pinsBase}
+      method="get"
+      class="flex items-center gap-2 mb-4"
+      {...htmxAttrs}
+    >
+      <input
+        type="text"
+        name="search"
+        placeholder="Search pins..."
+        class="flex-1 px-3 py-2 text-sm border-4 border-foreground bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+      />
+      <Button type="submit" size="icon" aria-label="Search">
+        <SearchIcon size={20} />
+      </Button>
+    </form>
+  )
+
 export const Header: FC<HeaderProps> = ({
   user,
   currentPath,
   privateMode = false,
 }) => {
   const pinsBase = privateMode ? '/private/pins' : '/pins'
-  const htmxAttrs =
+  const htmxAttrs: HtmxAttrs =
     currentPath === pinsBase
       ? {
           'hx-get': pinsBase,
@@ -58,52 +163,19 @@ export const Header: FC<HeaderProps> = ({
               <div class="flex items-center space-x-4">
                 {/* Nav links - hidden when search is open */}
                 <div class="flex items-center space-x-4" data-nav="links">
-                  <a
-                    href={pinsBase}
-                    class="text-base font-bold text-foreground hover:text-primary uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
-                  >
-                    {privateMode ? 'Private' : 'Pins'}
-                  </a>
-                  <a
-                    href="/tags"
-                    class="text-base font-bold text-foreground hover:text-primary uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
-                  >
-                    Tags
-                  </a>
+                  <NavLinks
+                    layout="desktop"
+                    pinsBase={pinsBase}
+                    privateMode={privateMode}
+                  />
                 </div>
 
                 {/* Search input - visible when toggled */}
-                <form
-                  action={pinsBase}
-                  method="get"
-                  class="hidden items-center gap-2"
-                  data-search="form"
-                  {...htmxAttrs}
-                >
-                  <input
-                    type="text"
-                    name="search"
-                    placeholder="Search pins..."
-                    class="w-64 px-3 py-2 text-sm border-4 border-foreground bg-background focus:outline-none focus:ring-2 focus:ring-accent"
-                    data-search="input"
-                  />
-                  <Button type="submit" size="icon" aria-label="Search">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <circle cx="11" cy="11" r="8" />
-                      <path d="m21 21-4.3-4.3" />
-                    </svg>
-                  </Button>
-                </form>
+                <SearchForm
+                  layout="desktop"
+                  pinsBase={pinsBase}
+                  htmxAttrs={htmxAttrs}
+                />
 
                 {/* Search toggle - shows magnifying glass when closed, X when open */}
                 <button
@@ -113,38 +185,13 @@ export const Header: FC<HeaderProps> = ({
                   data-search="toggle"
                 >
                   {/* Magnifying glass icon - visible when search is closed */}
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    data-search="icon-open"
-                  >
-                    <circle cx="11" cy="11" r="8" />
-                    <path d="m21 21-4.3-4.3" />
-                  </svg>
+                  <SearchIcon size={20} data-search="icon-open" />
                   {/* X icon - visible when search is open */}
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
+                  <CloseIcon
+                    size={20}
                     class="hidden"
                     data-search="icon-close"
-                  >
-                    <path d="M18 6 6 18" />
-                    <path d="m6 6 12 12" />
-                  </svg>
+                  />
                 </button>
 
                 {/* Create Pin Button */}
@@ -153,20 +200,7 @@ export const Header: FC<HeaderProps> = ({
                   size="icon"
                   aria-label="Create Pin"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M5 12h14" />
-                    <path d="M12 5v14" />
-                  </svg>
+                  <PlusIcon />
                 </Button>
 
                 {/* Lock button - only in private mode */}
@@ -178,27 +212,7 @@ export const Header: FC<HeaderProps> = ({
                       size="icon"
                       aria-label="Lock private pins"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      >
-                        <rect
-                          width="18"
-                          height="11"
-                          x="3"
-                          y="11"
-                          rx="2"
-                          ry="2"
-                        />
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                      </svg>
+                      <LockIcon />
                     </Button>
                   </form>
                 )}
@@ -206,45 +220,14 @@ export const Header: FC<HeaderProps> = ({
                 {/* User Dropdown */}
                 <div class="relative" data-dropdown="container">
                   <Button variant="outline" data-dropdown="toggle">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <circle cx="12" cy="10" r="3" />
-                      <path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662" />
-                    </svg>
+                    <UserIcon />
                     {user.username}
                   </Button>
                   <div
                     class="hidden absolute right-0 mt-2 w-48 bg-background border-4 border-foreground shadow-lg z-50"
                     data-dropdown="menu"
                   >
-                    <a
-                      href="/profile"
-                      class="block px-4 py-2 text-sm hover:bg-accent/10 transition-colors"
-                    >
-                      Profile
-                    </a>
-                    <a
-                      href="/import"
-                      class="block px-4 py-2 text-sm hover:bg-accent/10 transition-colors"
-                    >
-                      Import
-                    </a>
-                    <a
-                      href="/private/unlock"
-                      class="block px-4 py-2 text-sm hover:bg-accent/10 transition-colors"
-                    >
-                      Private Pins
-                    </a>
+                    <AccountLinks layout="desktop" username={user.username} />
                     <hr class="border-foreground/20" />
                     <a
                       href="/signout"
@@ -275,20 +258,7 @@ export const Header: FC<HeaderProps> = ({
                 size="icon"
                 aria-label="Create Pin"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M5 12h14" />
-                  <path d="M12 5v14" />
-                </svg>
+                <PlusIcon />
               </Button>
             )}
             <div data-dropdown="container">
@@ -298,21 +268,7 @@ export const Header: FC<HeaderProps> = ({
                 data-dropdown="toggle"
                 aria-label="Toggle menu"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <line x1="4" x2="20" y1="12" y2="12" />
-                  <line x1="4" x2="20" y1="6" y2="6" />
-                  <line x1="4" x2="20" y1="18" y2="18" />
-                </svg>
+                <MenuIcon size={24} />
               </button>
 
               {/* Mobile Menu Panel */}
@@ -324,66 +280,18 @@ export const Header: FC<HeaderProps> = ({
                   {user ? (
                     <>
                       {/* Mobile Search */}
-                      <form
-                        action={pinsBase}
-                        method="get"
-                        class="flex items-center gap-2 mb-4"
-                        {...htmxAttrs}
-                      >
-                        <input
-                          type="text"
-                          name="search"
-                          placeholder="Search pins..."
-                          class="flex-1 px-3 py-2 text-sm border-4 border-foreground bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                        />
-                        <Button type="submit" size="icon" aria-label="Search">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          >
-                            <circle cx="11" cy="11" r="8" />
-                            <path d="m21 21-4.3-4.3" />
-                          </svg>
-                        </Button>
-                      </form>
+                      <SearchForm
+                        layout="mobile"
+                        pinsBase={pinsBase}
+                        htmxAttrs={htmxAttrs}
+                      />
 
-                      <a
-                        href={pinsBase}
-                        class="block px-4 py-2 text-center font-bold uppercase hover:bg-accent/10 transition-colors"
-                      >
-                        {privateMode ? 'Private' : 'Pins'}
-                      </a>
-                      <a
-                        href="/tags"
-                        class="block px-4 py-2 text-center font-bold uppercase hover:bg-accent/10 transition-colors"
-                      >
-                        Tags
-                      </a>
-                      <a
-                        href="/profile"
-                        class="block px-4 py-2 text-center font-bold uppercase hover:bg-accent/10 transition-colors"
-                      >
-                        {user.username}
-                      </a>
-                      <a
-                        href="/import"
-                        class="block px-4 py-2 text-center font-bold uppercase hover:bg-accent/10 transition-colors"
-                      >
-                        Import
-                      </a>
-                      <a
-                        href="/private/unlock"
-                        class="block px-4 py-2 text-center font-bold uppercase hover:bg-accent/10 transition-colors"
-                      >
-                        Private Pins
-                      </a>
+                      <NavLinks
+                        layout="mobile"
+                        pinsBase={pinsBase}
+                        privateMode={privateMode}
+                      />
+                      <AccountLinks layout="mobile" username={user.username} />
                       <hr class="border-foreground/20" />
                       <Button href="/signout" variant="outline" class="w-full">
                         Sign Out

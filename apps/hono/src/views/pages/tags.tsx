@@ -3,6 +3,7 @@ import { DefaultLayout } from '../layouts/default'
 import { FlashMessage as FlashMessageComponent } from '../components/FlashMessage'
 import type { FlashMessage } from '../../middleware/session'
 import { Button } from '../components/ui/Button'
+import { MergeIcon } from '../components/icons'
 
 export type TagFilterType = 'all' | 'toread'
 
@@ -127,21 +128,7 @@ export function TagsPage({
         {/* Merge button - only show if more than 1 tag */}
         {tags.length > 1 && (
           <Button href="/tags/merge" variant="secondary" size="sm">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="m8 6 4-4 4 4" />
-              <path d="M12 2v10.3a4 4 0 0 1-1.172 2.872L4 22" />
-              <path d="m20 22-5-5" />
-            </svg>
+            <MergeIcon />
             Merge Tags
           </Button>
         )}

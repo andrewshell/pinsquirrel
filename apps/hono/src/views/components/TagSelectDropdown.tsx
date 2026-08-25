@@ -1,5 +1,6 @@
 import type { FC } from 'hono/jsx'
 import type { TagWithCount } from '@pinsquirrel/domain'
+import { CheckIcon, ChevronDownIcon } from './icons'
 
 interface TagSelectDropdownProps {
   tags: TagWithCount[]
@@ -77,21 +78,10 @@ export const TagSelectDropdown: FC<TagSelectDropdownProps> = ({
           )}
         </div>
         {/* Chevron icon */}
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+        <ChevronDownIcon
           class="opacity-50 flex-shrink-0 ml-2"
           data-tag-select="chevron"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
+        />
       </button>
 
       {/* Dropdown panel */}
@@ -132,22 +122,7 @@ export const TagSelectDropdown: FC<TagSelectDropdownProps> = ({
               >
                 {/* Checkmark space */}
                 <div class="flex items-center justify-center w-4 h-4">
-                  {isSelected && (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      data-tag-select="check"
-                    >
-                      <path d="M20 6 9 17l-5-5" />
-                    </svg>
-                  )}
+                  {isSelected && <CheckIcon data-tag-select="check" />}
                 </div>
                 <span class="flex-1" data-tag-select="option-name">
                   {tag.name}

@@ -1,4 +1,11 @@
 import type { FC } from 'hono/jsx'
+import {
+  ChevronDownIcon,
+  CloseIcon,
+  FunnelIcon,
+  SearchIcon,
+  TagIcon,
+} from './icons'
 
 interface FilterHeaderProps {
   activeTag?: string
@@ -80,35 +87,10 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
                 data-dropdown="toggle"
               >
                 {/* Filter icon */}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-                </svg>
+                <FunnelIcon size={12} />
                 <span>{getReadFilterLabel(readFilter)}</span>
                 {/* Chevron down icon */}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="ml-1"
-                >
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
+                <ChevronDownIcon size={12} class="ml-1" />
               </button>
               <div
                 class="hidden absolute left-0 mt-1 w-32 bg-background border-2 border-foreground shadow-lg z-50"
@@ -151,20 +133,7 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
             {hasActiveTag && (
               <div class="inline-flex items-center gap-1 bg-secondary text-secondary-foreground px-2 py-1 text-sm font-medium border-2 border-foreground">
                 {/* Tag icon */}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />
-                  <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" />
-                </svg>
+                <TagIcon size={12} />
                 <span>{activeTag}</span>
                 <a
                   href={`${baseUrl}?${buildClearFilterUrl(searchParams, 'tag')}`}
@@ -175,20 +144,7 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
                   class="ml-1 hover:bg-destructive hover:text-destructive-foreground rounded-sm p-0.5 transition-colors"
                   aria-label={`Remove ${activeTag} tag filter`}
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M18 6 6 18" />
-                    <path d="m6 6 12 12" />
-                  </svg>
+                  <CloseIcon size={12} />
                 </a>
               </div>
             )}
@@ -197,20 +153,7 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
             {hasActiveSearch && (
               <div class="inline-flex items-center gap-1 bg-secondary text-secondary-foreground px-2 py-1 text-sm font-medium border-2 border-foreground">
                 {/* Search icon */}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.3-4.3" />
-                </svg>
+                <SearchIcon size={12} />
                 <span>"{searchQuery}"</span>
                 <a
                   href={`${baseUrl}?${buildClearFilterUrl(searchParams, 'search')}`}
@@ -221,20 +164,7 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
                   class="ml-1 hover:bg-destructive hover:text-destructive-foreground rounded-sm p-0.5 transition-colors"
                   aria-label="Clear search"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M18 6 6 18" />
-                    <path d="m6 6 12 12" />
-                  </svg>
+                  <CloseIcon size={12} />
                 </a>
               </div>
             )}
@@ -243,20 +173,7 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
             {noTags && (
               <div class="inline-flex items-center gap-1 bg-secondary text-secondary-foreground px-2 py-1 text-sm font-medium border-2 border-foreground">
                 {/* Tag icon */}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />
-                  <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" />
-                </svg>
+                <TagIcon size={12} />
                 <span>Untagged</span>
                 <a
                   href={`${baseUrl}?${buildClearFilterUrl(searchParams, 'notags')}`}
@@ -267,20 +184,7 @@ export const FilterHeader: FC<FilterHeaderProps> = ({
                   class="ml-1 hover:bg-destructive hover:text-destructive-foreground rounded-sm p-0.5 transition-colors"
                   aria-label="Clear untagged filter"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M18 6 6 18" />
-                    <path d="m6 6 12 12" />
-                  </svg>
+                  <CloseIcon size={12} />
                 </a>
               </div>
             )}

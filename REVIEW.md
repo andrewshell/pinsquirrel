@@ -242,7 +242,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Problem:** Five cards plus a 40-line inline bookmarklet script in one component.
 - **Fix:** Split into `profile/{AccountCard,EmailForm,PasswordForm,ApiKeysCard,BookmarkletCard}.tsx`; move the bookmarklet builder to `src/static/bookmarklet.js`. Prerequisite for 2.18. **PLAN.md:** Phase 6f adds an OAuth-grants card here and Phase 7c deletes `ApiKeysCard` — splitting first makes both of those one-file changes.
 
-#### 2.22
+#### 2.22 — **Done**
 
 - **Where:** `apps/hono/src/views/components/Header.tsx` (410 lines); SVG icons also in `PinForm.tsx`, `tag-merge.tsx`, `FilterHeader.tsx`
 - **Problem:** Desktop and mobile nav repeat the link list and search form; eight hand-written SVG icons are copy-pasted across four files.
