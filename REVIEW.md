@@ -287,7 +287,7 @@ thought. What follows is the mess and the risk, ordered by how much it matters.
 - **Fix:** Move the cleanup into `TagService`/`PinService` after delete/update, or a scheduled job. **Blocked on Q5.**
 - **Note (when done):** It went into `PinService`, which now takes a `TagRepository` alongside its `PinRepository` and collects orphans right after the pin write in `updatePin`/`deletePin` — the moment a tag becomes orphaned. `TagService.deleteTagsWithNoPins` had no caller left and is gone; the repository method stays. Cleanup deliberately runs _after_ the write completes and is scoped to the one user's tags, so it cannot take back a tag a concurrent `createPin` inserted but has not yet linked; 1.4's transaction closes that window properly.
 
-#### 2.29
+#### 2.29 — **Done**
 
 - **Where:** `libs/mailgun/src/types.ts:4` (`MailgunConfig.baseUrl`); `email-service.ts` client construction; `email-service.test.ts:66-69`
 - **Problem:** `baseUrl` is typed and tested but the `url:` line in the client constructor is commented out, so an EU-region config silently hits the US API. The test asserts nothing about it.

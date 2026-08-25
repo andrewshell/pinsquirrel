@@ -3,16 +3,15 @@ import { MailgunEmailService } from './email-service.js'
 import type { MailgunConfig } from './types.js'
 import { EmailSendError } from '@pinsquirrel/domain'
 
-// Mock mailgun.js
+// Mock mailgun.js. The client factory is shared rather than created per
+// instance so the tests can assert what the service hands it.
+const mockClientFactory = vi.hoisted(() =>
+  vi.fn(() => ({ messages: { create: vi.fn() } }))
+)
+
 vi.mock('mailgun.js', () => ({
   default: vi.fn(function () {
-    return {
-      client: vi.fn(() => ({
-        messages: {
-          create: vi.fn(),
-        },
-      })),
-    }
+    return { client: mockClientFactory }
   }),
 }))
 
@@ -63,14 +62,28 @@ describe('MailgunEmailService', () => {
       expect(service).toBeInstanceOf(MailgunEmailService)
     })
 
-    it('should create service with custom baseUrl', () => {
+    // baseUrl was typed and tested but the url: line in the client
+    // constructor was commented out, so an EU-region config silently posted
+    // to the US API - and the test asserted nothing that would notice.
+    it('points the client at a custom baseUrl', () => {
       const configWithBaseUrl: MailgunConfig = {
         ...mockConfig,
         baseUrl: 'https://api.eu.mailgun.net',
       }
 
-      const service = new MailgunEmailService(configWithBaseUrl)
-      expect(service).toBeInstanceOf(MailgunEmailService)
+      new MailgunEmailService(configWithBaseUrl)
+
+      expect(mockClientFactory).toHaveBeenCalledWith(
+        expect.objectContaining({ url: 'https://api.eu.mailgun.net' })
+      )
+    })
+
+    it('falls back to the US API when no baseUrl is given', () => {
+      new MailgunEmailService(mockConfig)
+
+      expect(mockClientFactory).toHaveBeenCalledWith(
+        expect.objectContaining({ url: 'https://api.mailgun.net' })
+      )
     })
   })
 
