@@ -17,10 +17,12 @@ is the only way to reach either one. OAuth has been driven end to end by real cl
 Code over CIMD and a loopback redirect, claude.ai as a custom connector over the fixed callback —
 and in process against the real app and a real database in `apps/hono/src/oauth-e2e.test.ts`.
 
-The Chrome extension is scaffolded and no further. `apps/chrome-extension/` builds a loadable
-Manifest V3 extension — esbuild bundles the two entry points into `dist/` alongside the manifest,
-popup shell and placeholder icons — but `src/background.ts` and `src/popup.ts` are empty. There is
-no auth, no API client and no sync yet.
+The Chrome extension has a scaffold and an OAuth client. `apps/chrome-extension/` builds a
+loadable Manifest V3 extension — esbuild bundles the two entry points into `dist/` alongside the
+manifest, popup shell and placeholder icons — and `src/auth.ts` can now connect, refresh and
+disconnect against a real server, over `src/storage.ts` and `src/oauth-metadata.ts`. What is left
+is everything that uses it: `src/background.ts` and `src/popup.ts` are still empty, and there is
+no API client and no sync.
 
 ### Ground rules for new work
 
@@ -97,28 +99,51 @@ the `https://pinsquirrel.com/api/v1` resource.
 
 ### 5b. OAuth client
 
-- [ ] Create `apps/chrome-extension/src/auth.ts`: authorization-code + PKCE via
+- [x] Create `apps/chrome-extension/src/auth.ts`: authorization-code + PKCE via
       `chrome.identity.launchWebAuthFlow` (Decision 17)
   - Redirect URI is `chrome.identity.getRedirectURL()` →
     `https://<extension-id>.chromiumapp.org/`. That is a fixed HTTPS callback, so none of the
     loopback port-matching rules the server carries for native clients apply here
-  - Register the extension as a CIMD client if it can host a metadata document, otherwise DCR
-  - Generate the PKCE verifier with `crypto.getRandomValues`; `S256` only
+  - ~~Register the extension as a CIMD client if it can host a metadata document, otherwise
+    DCR~~ — DCR, and there was never a choice: a CIMD `client_id` is an HTTPS URL the _client_
+    publishes a document at, and an extension has no origin to serve one from. The `client_id`
+    is cached in `chrome.storage.local` keyed by base URL; `invalid_client` from the exchange
+    drops it and runs the flow once more against a fresh registration
+  - Generate the PKCE verifier with `crypto.getRandomValues`; `S256` only. `src/pkce.ts`, pinned
+    to the RFC 7636 Appendix B vector
   - Request `resource=https://pinsquirrel.com/api/v1` (RFC 8707), not the `/mcp` resource.
-    A token minted for `/mcp` must not work here (Decision 16)
+    A token minted for `/mcp` must not work here (Decision 16). The identifier is read out of
+    the protected-resource document rather than assembled, so it matches the audience byte for
+    byte
   - Request `offline_access` so the service worker can refresh without reopening a browser tab
-- [ ] Token storage and refresh
+  - Endpoints are discovered, not hardcoded: `src/oauth-metadata.ts` reads
+    `/.well-known/oauth-protected-resource/api/v1`, follows `authorization_servers[0]` to the
+    authorization-server document, and takes every endpoint from there. The RFC 9207 `iss` on
+    the redirect is checked against the issuer it named
+- [x] Token storage and refresh
   - Persist tokens in `chrome.storage.local`; never in `chrome.storage.sync` (it replicates
-    across a user's machines and is not a secret store)
+    across a user's machines and is not a secret store). `src/storage.ts` is the only module
+    that names a storage area
   - Refresh on `401`, then retry once; on `invalid_grant`, drop the tokens and re-prompt consent
+    — `authorizedFetch()` does the retry, and the re-prompt signal is a distinguishable
+    `ReauthorizationRequiredError`. The user's `selectedTagIds` survive it
   - Refresh-token rotation is mandatory server-side. Always persist the new refresh token from
     the response that invalidated the old one, or the next refresh fails
+  - Concurrent refreshes share one in-flight promise. Two refreshes of the same token means one
+    loses the rotation race, and the server revokes the whole family for a replay
+- [x] `disconnect()`: `POST /oauth/revoke` the refresh token (which stands for the whole grant
+      server-side), then clear storage — including the cached registration — whether or not the
+      revocation reached the server
 
 ### 5c. API client
 
-- [ ] Create `apps/chrome-extension/src/types.ts` with the shared types (Tag, Pin, Pagination, ExtensionStorage)
+- [ ] Add Tag, Pin and Pagination to `apps/chrome-extension/src/types.ts`, which 5b created with
+      `ExtensionStorage` and `StoredTokens` in it. `ExtensionStorage` carries two keys 5d's list
+      did not name: `clientId`, and `registeredClients` (base URL → dynamically registered
+      `client_id`)
 - [ ] Create `apps/chrome-extension/src/api-client.ts`
-  - `PinSquirrelApiClient` class (baseUrl + a token provider from 5b)
+  - `PinSquirrelApiClient` class (baseUrl + `authorizedFetch` from 5b, which owns the token, the
+    expiry and the `401` retry)
   - `getTags(withCounts?)` → fetch `/api/v1/tags`
   - `getPinsForTag(tagId, page?, pageSize?)` → fetch `/api/v1/tags/:id/pins`
   - `getAllPinsForTag(tagId)` → paginate through all pages
@@ -130,8 +155,11 @@ the `https://pinsquirrel.com/api/v1` resource.
   - Main view (configured): tag checkboxes, "Sync Now" button, last sync time, status,
     "Disconnect". Disconnect revokes the token server-side through `POST /oauth/revoke`, then
     clears local storage
-  - Stores config in `chrome.storage.local`:
-    `{ baseUrl, accessToken, refreshToken, expiresAt, selectedTagIds, lastSyncAt, lastSyncError }`
+  - Stores config in `chrome.storage.local` through `src/storage.ts`. 5b already writes
+    `baseUrl`, `clientId`, `accessToken`, `refreshToken`, `expiresAt` and `registeredClients`;
+    what is left for the popup is `selectedTagIds`, `lastSyncAt` and `lastSyncError`
+  - Connect calls `connect(baseUrl)`, Disconnect calls `disconnect()`, and a
+    `ReauthorizationRequiredError` out of any call is what puts the popup back on Connect
 
 ### 5e. Bookmark sync
 
