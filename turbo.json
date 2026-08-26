@@ -14,6 +14,13 @@
     "test": {
       "outputs": ["coverage/**"]
     },
+    "@pinsquirrel/hono#test": {
+      // Both suites talk to the same test database, and libs/database's setup
+      // drops every table before it migrates. Ordering them keeps that drop
+      // from landing in the middle of the OAuth end-to-end run.
+      "dependsOn": ["@pinsquirrel/database#test"],
+      "outputs": ["coverage/**"]
+    },
     "typecheck": {},
     "start": {
       "dependsOn": ["build"],

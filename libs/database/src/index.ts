@@ -7,6 +7,10 @@ export type { MySql2Database as DatabaseClient } from 'drizzle-orm/mysql2'
 // dependency of their own.
 export { sql } from 'drizzle-orm'
 
+// Schema migrations, for the test setups that have to create the tables
+// before anything can read them
+export { applyMigrations, migrationsFolder } from './migrate.js'
+
 // Wired repository set — the usual way to build them
 export { createRepositories, type Repositories } from './create-repositories.js'
 

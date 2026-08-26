@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/mysql2'
-import { migrate } from 'drizzle-orm/mysql2/migrator'
 import mysql from 'mysql2/promise'
+import { applyMigrations } from './migrate.js'
 
 const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ||
@@ -21,14 +21,9 @@ export async function setup() {
 
     await pool.query('SET FOREIGN_KEY_CHECKS = 1')
 
-    // Run migrations
-    const db = drizzle({ client: pool })
-    const migrationsPath = process.cwd().endsWith('database')
-      ? './src/migrations'
-      : './libs/database/src/migrations'
-    await migrate(db, {
-      migrationsFolder: migrationsPath,
-    })
+    // Run migrations. The folder is resolved inside `applyMigrations`, from
+    // the package rather than from the working directory.
+    await applyMigrations(drizzle({ client: pool }))
   } catch (error) {
     // Vitest swallows the stack of a setup failure, so log it before rethrowing.
     // eslint-disable-next-line no-console
