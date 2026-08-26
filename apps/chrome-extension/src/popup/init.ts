@@ -2,7 +2,7 @@ import { ReauthorizationRequiredError } from '../auth.ts'
 import type { ConnectResponse, SyncResponse } from '../messages.ts'
 import * as storage from '../storage.ts'
 import type { TagWithCount } from '../types.ts'
-import { filterTags } from './filter.ts'
+import { filterSelected, filterTags } from './filter.ts'
 import {
   formatEmptyTagList,
   formatLastSync,
@@ -62,6 +62,7 @@ function elements(doc: Document) {
     connectButton: find<HTMLButtonElement>('#connect'),
     connectedTo: find('#connected-to'),
     tagFilter: find<HTMLInputElement>('#tag-filter'),
+    selectedOnly: find<HTMLInputElement>('#selected-only'),
     tagList: find('#tag-list'),
     tagSummary: find('#tag-summary'),
     lastSync: find('#last-sync'),
@@ -195,13 +196,34 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
     }
   }
 
+  /**
+   * The tags the list would draw right now: what the filter box matches,
+   * narrowed to the selection if the toggle is on.
+   *
+   * The toggle is read off the box rather than tracked, and it is deliberately
+   * not stored: it is a way of looking at the list for a moment, and a popup
+   * that opened showing four tags out of four hundred because of a box ticked
+   * last week would look broken.
+   */
+  function visibleTags(): TagWithCount[] {
+    const matching = filterTags(allTags, ui.tagFilter.value)
+    return ui.selectedOnly.checked
+      ? filterSelected(matching, selection)
+      : matching
+  }
+
+  /** How many rows the last render put on screen, for the count line. */
+  let shown = 0
+
   /** Draw the tags matching the filter box, ticked from the selection. */
   function drawTagList(): void {
+    const tags = visibleTags()
+    shown = tags.length
     renderTagList(
       ui.tagList,
-      filterTags(allTags, ui.tagFilter.value),
+      tags,
       [...selection],
-      formatEmptyTagList(ui.tagFilter.value)
+      formatEmptyTagList(ui.tagFilter.value, ui.selectedOnly.checked)
     )
     drawTagSummary()
   }
@@ -212,10 +234,15 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
    * A toggle calls this on its own: the box the user moved is already in the
    * state they left it, and re-rendering the list under their pointer would
    * only make the row they just clicked flicker.
+   *
+   * Which is why the first number is what the last render drew rather than
+   * what the filters would answer now. Under selected-only they disagree - a
+   * tag the user has just unticked is still on screen, waiting to be ticked
+   * again - and the line is about what is on screen.
    */
   function drawTagSummary(): void {
     ui.tagSummary.textContent = formatTagSummary(
-      filterTags(allTags, ui.tagFilter.value).length,
+      shown,
       allTags.length,
       selectedTagIds().length
     )
@@ -324,6 +351,9 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
     event => void onTagToggled(event.target)
   )
   ui.tagFilter.addEventListener('input', () => {
+    drawTagList()
+  })
+  ui.selectedOnly.addEventListener('change', () => {
     drawTagList()
   })
 

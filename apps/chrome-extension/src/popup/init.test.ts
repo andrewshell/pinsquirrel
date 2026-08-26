@@ -84,6 +84,14 @@ function filter(query: string): Promise<void> {
   return flush()
 }
 
+/** Tick or untick the "Selected only" box, and let the render happen. */
+function selectedOnly(on: boolean): Promise<void> {
+  const box = element<HTMLInputElement>('#selected-only')
+  box.checked = on
+  box.dispatchEvent(new Event('change', { bubbles: true }))
+  return flush()
+}
+
 const settingsShown = () => !element('#settings-view').hidden
 const mainShown = () => !element('#main-view').hidden
 const status = () => element('#status').textContent
@@ -289,6 +297,14 @@ describe('initPopup, with a connection stored', () => {
     expect(checkboxes().map(box => box.value)).toEqual(['t2'])
   })
 
+  it('draws only the selected tags once selected-only is ticked', async () => {
+    await initPopup(harness().deps)
+
+    await selectedOnly(true)
+
+    expect(checkboxes().map(box => box.value)).toEqual(['t2'])
+  })
+
   it('draws the whole list again when the box is cleared', async () => {
     await initPopup(harness().deps)
 
@@ -336,6 +352,87 @@ describe('initPopup, with a connection stored', () => {
     await flush()
 
     expect(element('#tag-summary').textContent).toBe('1 of 2 tags · 2 selected')
+  })
+
+  it('narrows by name and by selection at once', async () => {
+    Object.assign(chrome.local.items, { selectedTagIds: ['t1', 't2'] })
+    await initPopup(harness().deps)
+
+    await selectedOnly(true)
+    await filter('rust')
+
+    expect(checkboxes().map(box => box.value)).toEqual(['t2'])
+  })
+
+  it('draws the whole list again when selected-only is unticked', async () => {
+    await initPopup(harness().deps)
+
+    await selectedOnly(true)
+    await selectedOnly(false)
+
+    expect(checkboxes().map(box => box.value)).toEqual(['t1', 't2'])
+  })
+
+  it('says the selection is empty rather than that the account is', async () => {
+    Object.assign(chrome.local.items, { selectedTagIds: [] })
+    await initPopup(harness().deps)
+
+    await selectedOnly(true)
+
+    expect(checkboxes()).toHaveLength(0)
+    expect(element('#tag-list').textContent).toContain('No tags selected')
+  })
+
+  /**
+   * A mis-click is the whole reason: under selected-only, re-rendering on the
+   * change would take the row out from under the pointer that just unticked
+   * it, leaving nothing to tick again. The row goes on the next render.
+   */
+  it('leaves an unticked tag on screen under selected-only', async () => {
+    await initPopup(harness().deps)
+
+    await selectedOnly(true)
+    checkboxes()[0].click()
+    await flush()
+
+    expect(checkboxes().map(box => box.value)).toEqual(['t2'])
+    expect(checkboxes()[0].checked).toBe(false)
+    expect(element('#tag-summary').textContent).toBe('1 of 2 tags · 0 selected')
+  })
+
+  it('drops the unticked tag on the next render', async () => {
+    await initPopup(harness().deps)
+
+    await selectedOnly(true)
+    checkboxes()[0].click()
+    await flush()
+    await filter('')
+
+    expect(checkboxes()).toHaveLength(0)
+  })
+
+  /**
+   * A way of looking at the list for a moment, not a setting: a popup that
+   * opened showing four tags out of four hundred because of a box ticked last
+   * week would look broken.
+   */
+  it('opens with selected-only off, however it was left', async () => {
+    await initPopup(harness().deps)
+    await selectedOnly(true)
+
+    doc = loadPopupDocument()
+    await initPopup(harness().deps)
+
+    expect(element<HTMLInputElement>('#selected-only').checked).toBe(false)
+    expect(checkboxes().map(box => box.value)).toEqual(['t1', 't2'])
+  })
+
+  it('counts what selected-only left on screen against the whole account', async () => {
+    await initPopup(harness().deps)
+
+    await selectedOnly(true)
+
+    expect(element('#tag-summary').textContent).toBe('1 of 2 tags · 1 selected')
   })
 
   it('shows how long ago the last sync ran', async () => {

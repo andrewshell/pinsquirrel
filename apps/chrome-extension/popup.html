@@ -44,11 +44,26 @@
         cursor: progress;
         opacity: 0.6;
       }
-      #tag-filter {
-        width: 100%;
-        box-sizing: border-box;
+      .tag-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
         margin-bottom: 6px;
+      }
+      #tag-filter {
+        flex: 1;
+        /* Without this a flex item refuses to shrink below the width its
+           placeholder wants, which pushes the toggle off a 320px popup. */
+        min-width: 0;
+        box-sizing: border-box;
         padding: 6px;
+      }
+      label.toggle {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin: 0;
+        white-space: nowrap;
       }
       #tag-list {
         max-height: 300px;
@@ -123,14 +138,20 @@
       <!-- Shown once connected: tag selection, sync controls, status. -->
       <section id="main-view" hidden>
         <p id="connected-to" class="muted"></p>
-        <input
-          id="tag-filter"
-          type="search"
-          placeholder="Filter tags…"
-          aria-label="Filter tags"
-          autocomplete="off"
-          spellcheck="false"
-        />
+        <div class="tag-controls">
+          <input
+            id="tag-filter"
+            type="search"
+            placeholder="Filter tags…"
+            aria-label="Filter tags"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <label class="toggle" for="selected-only">
+            <input id="selected-only" type="checkbox" />
+            Selected only
+          </label>
+        </div>
         <div id="tag-list"></div>
         <p id="tag-summary" class="muted"></p>
         <p id="last-sync" class="muted"></p>
