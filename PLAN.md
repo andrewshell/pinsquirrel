@@ -202,7 +202,11 @@ the `https://pinsquirrel.com/api/v1` resource.
     (`src/popup/filter.ts`), the list scrolls inside a fixed height, and a line under it counts
     what is on screen against what the account has, plus how many are selected. The selection is
     held in the popup and written whole, because reading it back off the boxes would drop every
-    tag the filter was hiding
+    tag the filter was hiding. A "Selected only" box beside the filter answers the other question
+    that list is too long for — what have I picked? — and the two narrowings compose. It is not
+    stored: a popup opening with four tags of four hundred because of a box ticked last week
+    looks broken. Nor does a tick re-render, so a tag unticked under selected-only keeps its row
+    until the user types or flips the toggle and can undo the mis-click
   - Stores config in `chrome.storage.local` through `src/storage.ts`. 5b already writes
     `baseUrl`, `clientId`, `accessToken`, `refreshToken`, `expiresAt` and `registeredClients`;
     the popup writes `selectedTagIds` — the moment a box moves, because the popup closes as soon
