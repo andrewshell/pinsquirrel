@@ -521,3 +521,42 @@ export async function authorizedFetch(
   if (!retryToken) return response
   return send(retryToken)
 }
+
+/**
+ * End the connection: hand the refresh token back, then forget everything.
+ *
+ * The refresh token is the one worth revoking. Server-side it stands for the
+ * whole grant, so revoking it kills the access tokens minted from it too;
+ * revoking the access token alone would leave the refresh token able to mint
+ * more.
+ *
+ * The local clear happens whichever way the revocation goes. A user who
+ * clicked Disconnect while offline must not be left connected, and the server
+ * sweeps an abandoned grant on its own. That includes the cached registration,
+ * which costs one idempotent re-registration on the next connect and rules out
+ * reconnecting against a `client_id` the server has since forgotten.
+ */
+export async function disconnect(): Promise<void> {
+  const tokens = await storedTokens()
+
+  if (tokens) {
+    try {
+      const endpoints = await discoverEndpoints(tokens.baseUrl)
+      await fetch(endpoints.revocationEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          token: tokens.refreshToken,
+          token_type_hint: 'refresh_token',
+          client_id: tokens.clientId,
+        }).toString(),
+      })
+    } catch {
+      // RFC 7009 answers 200 for an unknown or already-dead token, so the only
+      // failures here are transport ones, and none of them is a reason to
+      // leave a disconnected extension holding credentials.
+    }
+  }
+
+  await storage.clear()
+}
