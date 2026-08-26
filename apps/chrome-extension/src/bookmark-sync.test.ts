@@ -2,10 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   findOrCreateFolder,
   removeOrphanFolders,
+  syncAll,
   syncTagFolder,
 } from './bookmark-sync.ts'
+import { ReauthorizationRequiredError } from './auth.ts'
 import { stubChrome } from './test/chrome-mock.ts'
-import type { Pin } from './types.ts'
+import type { Pin, Tag } from './types.ts'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -326,5 +328,133 @@ describe('removeOrphanFolders', () => {
     await removeOrphanFolders(root, ['reading'])
 
     expect(bookmarks.has(loose)).toBe(true)
+  })
+})
+
+/** A tag as `/api/v1/tags` serves it. */
+function tag(id: string, name: string): Tag {
+  return {
+    id,
+    userId: 'user-1',
+    name,
+    createdAt: '2026-08-01T00:00:00.000Z',
+    updatedAt: '2026-08-01T00:00:00.000Z',
+  }
+}
+
+/** The two API calls the sync makes, over fixed answers. */
+function apiStub(tags: Tag[], pinsByTag: Record<string, Pin[]> = {}) {
+  return {
+    getTags: () => Promise.resolve(tags),
+    getAllPinsForTag: (tagId: string) =>
+      Promise.resolve(pinsByTag[tagId] ?? []),
+  }
+}
+
+describe('syncAll', () => {
+  it('mirrors each selected tag into a folder under PinSquirrel in the bar', async () => {
+    const { bookmarks } = stubChrome()
+    const article = pin({
+      url: 'https://example.com/article',
+      title: 'An article',
+    })
+
+    await syncAll({
+      apiClient: apiStub([tag('tag-1', 'reading'), tag('tag-2', 'ignored')], {
+        'tag-1': [article],
+      }),
+      selectedTagIds: ['tag-1'],
+    })
+
+    const [root] = bookmarks.childrenOf(bookmarks.barId)
+    expect(root).toEqual({ id: expect.any(String), title: 'PinSquirrel' })
+    const [folder] = bookmarks.childrenOf(root.id)
+    expect(folder).toEqual({ id: expect.any(String), title: 'reading' })
+    expect(bookmarks.childrenOf(folder.id)).toEqual([
+      {
+        id: expect.any(String),
+        title: 'An article',
+        url: 'https://example.com/article',
+      },
+    ])
+  })
+})
+
+describe('syncAll, against tags that moved on', () => {
+  it('skips a selected id that is no longer a tag', async () => {
+    const { bookmarks } = stubChrome()
+
+    await syncAll({
+      apiClient: apiStub([tag('tag-1', 'reading')]),
+      selectedTagIds: ['tag-1', 'tag-deleted'],
+    })
+
+    const [root] = bookmarks.childrenOf(bookmarks.barId)
+    expect(bookmarks.childrenOf(root.id)).toEqual([
+      { id: expect.any(String), title: 'reading' },
+    ])
+  })
+
+  it('removes the folder of a tag that is no longer selected', async () => {
+    const { bookmarks } = stubChrome()
+    const rootId = bookmarks.addFolder(bookmarks.barId, 'PinSquirrel')
+    const stale = bookmarks.addFolder(rootId, 'deselected')
+
+    await syncAll({
+      apiClient: apiStub([tag('tag-1', 'reading')]),
+      selectedTagIds: ['tag-1'],
+    })
+
+    expect(bookmarks.has(stale)).toBe(false)
+  })
+})
+
+describe('syncAll, reporting to the popup through storage', () => {
+  it('records when the sync ran and clears the last failure', async () => {
+    const { local } = stubChrome({ lastSyncError: 'A previous failure' })
+    const before = Date.now()
+
+    await syncAll({ apiClient: apiStub([]), selectedTagIds: [] })
+
+    expect(local.items.lastSyncAt).toBeGreaterThanOrEqual(before)
+    expect('lastSyncError' in local.items).toBe(false)
+  })
+
+  it('records why a sync failed and lets the failure through', async () => {
+    const { local } = stubChrome()
+
+    await expect(
+      syncAll({
+        apiClient: {
+          getTags: () => Promise.reject(new Error('The server answered 500')),
+          getAllPinsForTag: () => Promise.resolve([]),
+        },
+        selectedTagIds: ['tag-1'],
+      })
+    ).rejects.toThrow('The server answered 500')
+
+    expect(local.items.lastSyncError).toBe('The server answered 500')
+    expect('lastSyncAt' in local.items).toBe(false)
+  })
+
+  it('says to reconnect when the grant is gone', async () => {
+    const { local } = stubChrome()
+
+    await expect(
+      syncAll({
+        apiClient: {
+          getTags: () =>
+            Promise.reject(
+              new ReauthorizationRequiredError('The refresh token was revoked')
+            ),
+          getAllPinsForTag: () => Promise.resolve([]),
+        },
+        selectedTagIds: ['tag-1'],
+      })
+    ).rejects.toBeInstanceOf(ReauthorizationRequiredError)
+
+    expect(local.items.lastSyncError).toBe(
+      'PinSquirrel needs to be reconnected: The refresh token was revoked'
+    )
   })
 })
