@@ -79,10 +79,10 @@ not a searched column at all.
       `EXISTS` over `pins_tags` joined to `tags`, not a join on the outer query, so a pin with
       three tags is one row. `countByUserId` builds from the same `buildConditions`, so the
       total follows. `escapeLikePattern` applies per term
-- [ ] `TagRepository.searchByName(userId, terms)`: tags whose name contains any term, or the
+- [x] `TagRepository.searchByName(userId, terms)`: tags whose name contains any term, or the
       terms concatenated — `jesse elder` finds `jesseelder`. Exposed as `TagService.searchTags`,
       gated on `AccessControl` like every other user-scoped operation
-- [ ] On `/pins?search=`, a "Matching tags" row above the pin list: one chip per tag, linking
+- [x] On `/pins?search=`, a "Matching tags" row above the pin list: one chip per tag, linking
       to `/pins?tag=<name>`, rendered only when there is at least one. Comes back with the HTMX
       partial as well as the full page, since the search box refreshes the list without a
       navigation
