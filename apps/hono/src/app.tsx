@@ -23,6 +23,9 @@ import { exportRoutes } from './routes/export'
 import { privateRoutes } from './routes/private'
 import { mcpRoutes } from './routes/mcp'
 import { createOAuthMetadataRoutes } from './routes/oauth-metadata'
+import { oauthRoutes } from './routes/oauth'
+import { oauthTokenRoutes } from './routes/oauth-token'
+import { oauthRegisterRoutes } from './routes/oauth-register'
 import { seoRoutes } from './routes/seo'
 import { oauthConfig } from './lib/config'
 import { markdownNegotiation } from './middleware/markdown-negotiation'
@@ -68,6 +71,13 @@ app.use('/terms', markdownNegotiation())
 // configuration.
 app.route('/', createOAuthMetadataRoutes(oauthConfig))
 
+// The machine-facing OAuth endpoints, mounted here for the same reason: an
+// OAuth client posts to them from its own process with no session and no
+// browser, so there is nothing for CSRF protection to protect. The consent
+// screen is the opposite case and mounts after both, below.
+app.route('/oauth', oauthTokenRoutes)
+app.route('/oauth', oauthRegisterRoutes)
+
 app.route('/mcp', mcpRoutes)
 
 app.use('*', sessionMiddleware())
@@ -81,6 +91,9 @@ app.route('/', styleRoutes)
 app.route('/pins', pinsRoutes)
 app.route('/tags', tagsRoutes)
 app.route('/profile', profileRoutes)
+// The consent screen: a browser form on a signed-in session, so it wants both
+// the session middleware and CSRF protection the endpoints above skip.
+app.route('/oauth', oauthRoutes)
 app.route('/import', importRoutes)
 app.route('/export', exportRoutes)
 app.route('/private', privateRoutes)

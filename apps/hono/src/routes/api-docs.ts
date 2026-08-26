@@ -6,17 +6,17 @@ const api = new OpenAPIHono()
 
 // --- Security scheme registration (shared across all API versions) ----------
 
+// One scheme, because there is one credential form. `X-API-Key` existed only
+// for the `ps_` API keys and left with them (Decision 12); advertising it here
+// would send a client after a credential nothing accepts.
 api.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
   type: 'http',
   scheme: 'bearer',
-  description: 'API key passed as Bearer token in Authorization header',
-})
-
-api.openAPIRegistry.registerComponent('securitySchemes', 'apiKeyHeader', {
-  type: 'apiKey',
-  in: 'header',
-  name: 'X-API-Key',
-  description: 'API key passed via X-API-Key header',
+  description:
+    'OAuth 2.1 access token passed as a Bearer token in the Authorization header. ' +
+    'Obtain one via the authorization code flow described at ' +
+    '/.well-known/oauth-authorization-server; the token must be bound to the ' +
+    'resource https://pinsquirrel.com/api/v1.',
 })
 
 // --- Mount versioned API sub-apps -------------------------------------------
@@ -32,10 +32,10 @@ api.doc31('/openapi.json', {
     title: 'PinSquirrel API',
     version: 'v1',
     description:
-      'API for managing bookmarks and tags in PinSquirrel. All endpoints require API key authentication.',
+      'API for managing bookmarks and tags in PinSquirrel. All endpoints require an OAuth 2.1 access token issued for the https://pinsquirrel.com/api/v1 resource.',
   },
   servers: [{ url: '/api', description: 'PinSquirrel API' }],
-  security: [{ bearerAuth: [] }, { apiKeyHeader: [] }],
+  security: [{ bearerAuth: [] }],
 })
 
 api.get(

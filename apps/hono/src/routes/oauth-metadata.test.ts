@@ -65,6 +65,7 @@ describe('GET /.well-known/oauth-authorization-server', () => {
       authorization_endpoint: 'https://oauth.test:8443/oauth/authorize',
       token_endpoint: 'https://oauth.test:8443/oauth/token',
       registration_endpoint: 'https://oauth.test:8443/oauth/register',
+      revocation_endpoint: 'https://oauth.test:8443/oauth/revoke',
       scopes_supported: ['pins:read', 'tags:read', 'offline_access'],
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code', 'refresh_token'],
