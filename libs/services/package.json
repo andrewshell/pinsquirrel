@@ -1,6 +1,6 @@
 {
   "name": "@pinsquirrel/services",
-  "version": "1.0.0",
+  "version": "3.5.3",
   "description": "Business logic services and validation for PinSquirrel",
   "type": "module",
   "main": "./src/index.ts",
