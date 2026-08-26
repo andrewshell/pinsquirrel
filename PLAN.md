@@ -67,6 +67,28 @@ is not repeated here. On top of it:
 
 ---
 
+## Search (before Phase 8)
+
+Searching for `jesse elder` returned one pin when five were relevant. The search in
+`DrizzlePinRepository.buildConditions` is one `LIKE '%<whole query>%'` over `url`, `title` and
+`description`: `jesseelder.com` does not contain the spaced phrase, and the `jesseelder` tag is
+not a searched column at all.
+
+- [ ] Split the query on whitespace into terms. Every term must match, each in any field: `AND`
+      over terms of `OR` over `url`, `title`, `description` and tag name. Tag name is an
+      `EXISTS` over `pins_tags` joined to `tags`, not a join on the outer query, so a pin with
+      three tags is one row. `countByUserId` builds from the same `buildConditions`, so the
+      total follows. `escapeLikePattern` applies per term
+- [ ] `TagRepository.searchByName(userId, terms)`: tags whose name contains any term, or the
+      terms concatenated — `jesse elder` finds `jesseelder`. Exposed as `TagService.searchTags`,
+      gated on `AccessControl` like every other user-scoped operation
+- [ ] On `/pins?search=`, a "Matching tags" row above the pin list: one chip per tag, linking
+      to `/pins?tag=<name>`, rendered only when there is at least one. Comes back with the HTMX
+      partial as well as the full page, since the search box refreshes the list without a
+      navigation
+
+---
+
 ## Phase 8: Write scopes, enforced
 
 Two scopes, `pins:write` and `tags:write`, at the same granularity as the reads. Tags on a pin
