@@ -17,6 +17,7 @@ interface PinsPageProps {
   sortBy?: 'created' | 'title'
   sortDirection?: 'asc' | 'desc'
   noTags?: boolean
+  matchingTags?: string[]
   flash?: { type: FlashType; message: string } | null
   baseUrl?: string
   privateMode?: boolean
@@ -34,6 +35,7 @@ export const PinsPage: FC<PinsPageProps> = ({
   sortBy = 'created',
   sortDirection = 'desc',
   noTags = false,
+  matchingTags = [],
   flash,
   baseUrl = '/pins',
   privateMode = false,
@@ -67,6 +69,7 @@ export const PinsPage: FC<PinsPageProps> = ({
           sortBy={sortBy}
           sortDirection={sortDirection}
           noTags={noTags}
+          matchingTags={matchingTags}
           baseUrl={baseUrl}
         />
       </div>

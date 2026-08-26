@@ -52,6 +52,7 @@ export interface ServiceMocks {
   getUserPinsWithPagination: Mock
   findByUrl: Mock
   getUserTags: Mock
+  searchTags: Mock
   login: Mock
 }
 
@@ -64,6 +65,7 @@ export function createServiceMocks(): ServiceMocks {
     getUserPinsWithPagination: vi.fn(),
     findByUrl: vi.fn(),
     getUserTags: vi.fn(),
+    searchTags: vi.fn(),
     login: vi.fn(),
   }
 }

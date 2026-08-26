@@ -1,6 +1,7 @@
 import type { FC } from 'hono/jsx'
 import type { Pin, Pagination } from '@pinsquirrel/domain'
 import { FilterHeader } from '../components/FilterHeader'
+import { MatchingTags } from '../components/MatchingTags'
 import { ViewSettings } from '../components/ViewSettings'
 import { PinListPartial } from './pin-list'
 
@@ -15,6 +16,8 @@ interface PinsContentPartialProps {
   sortBy?: 'created' | 'title'
   sortDirection?: 'asc' | 'desc'
   noTags?: boolean
+  /** Names of the tags matching the current search; empty renders no row. */
+  matchingTags?: string[]
   baseUrl?: string
 }
 
@@ -29,6 +32,7 @@ export const PinsContentPartial: FC<PinsContentPartialProps> = ({
   sortBy = 'created',
   sortDirection = 'desc',
   noTags = false,
+  matchingTags = [],
   baseUrl = '/pins',
 }) => {
   return (
@@ -41,6 +45,8 @@ export const PinsContentPartial: FC<PinsContentPartialProps> = ({
         noTags={noTags}
         baseUrl={baseUrl}
       />
+
+      <MatchingTags tags={matchingTags} baseUrl={baseUrl} />
 
       <ViewSettings
         sortBy={sortBy}
