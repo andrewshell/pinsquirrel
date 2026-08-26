@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatLastSync, parseBaseUrl } from './format.ts'
+import { formatLastSync, formatTagSummary, parseBaseUrl } from './format.ts'
 
 describe('parseBaseUrl', () => {
   it('keeps an https origin as it was typed', () => {
@@ -44,6 +44,34 @@ describe('parseBaseUrl', () => {
 
   it('rejects an empty box', () => {
     expect(parseBaseUrl('   ')).toBeNull()
+  })
+})
+
+describe('formatTagSummary', () => {
+  it('counts the whole list when nothing is filtered out', () => {
+    expect(formatTagSummary(445, 445, 3)).toBe('445 tags · 3 selected')
+  })
+
+  it('says how many of how many when a filter is narrowing the list', () => {
+    expect(formatTagSummary(12, 445, 3)).toBe('12 of 445 tags · 3 selected')
+  })
+
+  it('says so when the filter matches nothing', () => {
+    expect(formatTagSummary(0, 445, 3)).toBe('0 of 445 tags · 3 selected')
+  })
+
+  it('counts one tag as a tag', () => {
+    expect(formatTagSummary(1, 1, 1)).toBe('1 tag · 1 selected')
+  })
+
+  it('counts the tags a filter hides, not just the ones on screen', () => {
+    // The point of the line: 3 are selected even though 1 is on screen.
+    expect(formatTagSummary(1, 445, 3)).toBe('1 of 445 tags · 3 selected')
+  })
+
+  it('says nothing at all when the account has no tags', () => {
+    // The list itself says what to do about it; a row of zeroes only adds noise.
+    expect(formatTagSummary(0, 0, 0)).toBe('')
   })
 })
 

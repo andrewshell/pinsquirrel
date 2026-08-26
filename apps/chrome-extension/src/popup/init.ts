@@ -3,7 +3,7 @@ import type { ConnectResponse, SyncResponse } from '../messages.ts'
 import * as storage from '../storage.ts'
 import type { TagWithCount } from '../types.ts'
 import { filterTags } from './filter.ts'
-import { formatLastSync, parseBaseUrl } from './format.ts'
+import { formatLastSync, formatTagSummary, parseBaseUrl } from './format.ts'
 import { asCheckbox, renderTagList } from './render.ts'
 
 /**
@@ -58,6 +58,7 @@ function elements(doc: Document) {
     connectedTo: find('#connected-to'),
     tagFilter: find<HTMLInputElement>('#tag-filter'),
     tagList: find('#tag-list'),
+    tagSummary: find('#tag-summary'),
     lastSync: find('#last-sync'),
     syncError: find('#sync-error'),
     syncButton: find<HTMLButtonElement>('#sync-now'),
@@ -190,6 +191,22 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
     renderTagList(ui.tagList, filterTags(allTags, ui.tagFilter.value), [
       ...selection,
     ])
+    drawTagSummary()
+  }
+
+  /**
+   * The count line, redrawn without touching the list.
+   *
+   * A toggle calls this on its own: the box the user moved is already in the
+   * state they left it, and re-rendering the list under their pointer would
+   * only make the row they just clicked flicker.
+   */
+  function drawTagSummary(): void {
+    ui.tagSummary.textContent = formatTagSummary(
+      filterTags(allTags, ui.tagFilter.value).length,
+      allTags.length,
+      selectedTagIds().length
+    )
   }
 
   /**
@@ -251,6 +268,7 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
 
     if (box.checked) selection.add(box.value)
     else selection.delete(box.value)
+    drawTagSummary()
 
     try {
       await storage.set({ selectedTagIds: selectedTagIds() })

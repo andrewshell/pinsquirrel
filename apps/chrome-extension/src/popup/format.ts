@@ -36,6 +36,29 @@ export function parseBaseUrl(input: string): string | null {
   return url.origin
 }
 
+/**
+ * The line under the tag list: how much of it is on screen, and how much of it
+ * is picked.
+ *
+ * Both halves are needed once the list can be filtered. The first says whether
+ * what is on screen is the whole list or a slice of it, and the second is the
+ * only place a selection the filter is hiding is visible at all - without it,
+ * narrowing the list looks like it emptied the selection.
+ *
+ * Nothing is said for an account with no tags: the list already says what to
+ * do about that, and a row of zeroes under it is noise.
+ */
+export function formatTagSummary(
+  shown: number,
+  total: number,
+  selected: number
+): string {
+  if (total === 0) return ''
+  const tags =
+    shown === total ? count(total, 'tag') : `${shown} of ${count(total, 'tag')}`
+  return `${tags} · ${selected} selected`
+}
+
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
