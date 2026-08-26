@@ -21,6 +21,15 @@ export {
 export { TagService } from './services/tag.js'
 export { UserService } from './services/user.js'
 export { ApiKeyService } from './services/api-key.js'
+export {
+  OAuthService,
+  type AuthorizationOutcome,
+  type IssuedTokens,
+  type OAuthGrant,
+  type OAuthServiceConfig,
+  type ResolvedAuthorizationRequest,
+  type VerifiedAccessToken,
+} from './services/oauth.js'
 
 // Validation schemas (shared between REST, MCP, and other transports)
 export {
