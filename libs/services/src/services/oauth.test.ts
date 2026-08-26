@@ -899,8 +899,8 @@ describe('OAuthService.verifyAccessToken', () => {
     vi.mocked(ctx.userRepository.findById).mockResolvedValue(user)
   })
 
-  // The OAuth twin of `ApiKeyService.authenticate`: one call resolves the
-  // token and the account, which is why 6d's middleware needs no repository.
+  // One call resolves the token and the account, which is why the middleware
+  // over this needs no repository.
   it('resolves a live token to its principal', async () => {
     const result = await ctx.service.verifyAccessToken('pso_raw', MCP_RESOURCE)
 
@@ -970,8 +970,7 @@ describe('OAuthService.verifyAccessToken', () => {
     )
   })
 
-  // Same reason `ApiKeyService.authenticate` does this: a distinct answer
-  // would confirm the token itself was good.
+  // A distinct answer would confirm the token itself was good.
   it('reads a token whose user is gone as an invalid token', async () => {
     vi.mocked(ctx.userRepository.findById).mockResolvedValue(null)
 

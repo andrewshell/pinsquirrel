@@ -13,8 +13,8 @@ export const oauthTokens = mysqlTable(
   'oauth_tokens',
   {
     id: varchar('id', { length: 36 }).primaryKey(),
-    // SHA-256 hex, same as api_keys.key_hash. The raw `pso_` token is shown
-    // to the client once, in the token response, and never stored.
+    // SHA-256 hex, the way every stored secret here is. The raw `pso_` token
+    // is shown to the client once, in the token response, and never stored.
     tokenHash: varchar('token_hash', { length: 64 }).notNull().unique(),
     kind: mysqlEnum('kind', ['access', 'refresh']).notNull(),
     clientId: varchar('client_id', { length: 255 })

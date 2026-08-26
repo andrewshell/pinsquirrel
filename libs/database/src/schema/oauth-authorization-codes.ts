@@ -12,8 +12,8 @@ export const oauthAuthorizationCodes = mysqlTable(
   'oauth_authorization_codes',
   {
     id: varchar('id', { length: 36 }).primaryKey(),
-    // SHA-256 hex, same as api_keys.key_hash. The raw code lived only in the
-    // redirect that carried it.
+    // SHA-256 hex, the way every stored secret here is. The raw code lived
+    // only in the redirect that carried it.
     codeHash: varchar('code_hash', { length: 64 }).notNull().unique(),
     clientId: varchar('client_id', { length: 255 })
       .notNull()
