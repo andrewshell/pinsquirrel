@@ -46,7 +46,11 @@ export const PinsContentPartial: FC<PinsContentPartialProps> = ({
         baseUrl={baseUrl}
       />
 
-      <MatchingTags tags={matchingTags} baseUrl={baseUrl} />
+      <MatchingTags
+        tags={matchingTags}
+        searchParams={searchParams}
+        baseUrl={baseUrl}
+      />
 
       <ViewSettings
         sortBy={sortBy}

@@ -3,6 +3,8 @@ import type { FC } from 'hono/jsx'
 interface MatchingTagsProps {
   /** Tags whose name matched the current search. Empty renders nothing. */
   tags: string[]
+  /** The current query string, so a chip keeps the view and read filters. */
+  searchParams: string
   baseUrl: string
 }
 
@@ -12,10 +14,20 @@ interface MatchingTagsProps {
  * The search is deliberately dropped rather than combined: the row exists
  * because the user typed a word that turned out to be a tag, and the tag is the
  * broader, more useful answer. Keeping `?search=` as well would AND the two and
- * hand back a shorter list than the one already on screen.
+ * hand back a shorter list than the one already on screen. Everything else the
+ * user set — the view size, the read filter — travels with the click, as it
+ * does from a tag on a card; only the page resets, since the list changes.
  */
-function buildTagUrl(tagName: string, baseUrl: string): string {
-  return `${baseUrl}?tag=${encodeURIComponent(tagName)}`
+function buildTagUrl(
+  tagName: string,
+  currentParams: string,
+  baseUrl: string
+): string {
+  const params = new URLSearchParams(currentParams)
+  params.set('tag', tagName)
+  params.delete('search')
+  params.delete('page')
+  return `${baseUrl}?${params.toString()}`
 }
 
 /**
@@ -25,7 +37,11 @@ function buildTagUrl(tagName: string, baseUrl: string): string {
  * swaps `#pins-content` without a navigation — a row rendered only by the full
  * page would disappear on the first search.
  */
-export const MatchingTags: FC<MatchingTagsProps> = ({ tags, baseUrl }) => {
+export const MatchingTags: FC<MatchingTagsProps> = ({
+  tags,
+  searchParams,
+  baseUrl,
+}) => {
   if (tags.length === 0) {
     return null
   }
@@ -38,7 +54,7 @@ export const MatchingTags: FC<MatchingTagsProps> = ({ tags, baseUrl }) => {
       <div class="border-4 border-foreground bg-input p-3">
         <div class="flex items-center gap-2 flex-wrap">
           {tags.map(tagName => {
-            const url = buildTagUrl(tagName, baseUrl)
+            const url = buildTagUrl(tagName, searchParams, baseUrl)
             return (
               <a
                 key={tagName}
