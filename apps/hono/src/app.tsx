@@ -22,7 +22,9 @@ import { importRoutes } from './routes/import'
 import { exportRoutes } from './routes/export'
 import { privateRoutes } from './routes/private'
 import { mcpRoutes } from './routes/mcp'
+import { createOAuthMetadataRoutes } from './routes/oauth-metadata'
 import { seoRoutes } from './routes/seo'
+import { oauthConfig } from './lib/config'
 import { markdownNegotiation } from './middleware/markdown-negotiation'
 import { sessionMiddleware } from './middleware/session'
 import { securityHeaders } from './middleware/security-headers'
@@ -59,6 +61,12 @@ app.route('/', seoRoutes)
 app.use('/', markdownNegotiation())
 app.use('/privacy', markdownNegotiation())
 app.use('/terms', markdownNegotiation())
+
+// OAuth discovery documents — mounted here, before session and CSRF
+// middleware, because a client reads them while it is still anonymous. The
+// app is the composition root: it reads the base URL and hands the route its
+// configuration.
+app.route('/', createOAuthMetadataRoutes(oauthConfig))
 
 app.route('/mcp', mcpRoutes)
 
