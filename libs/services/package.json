@@ -30,6 +30,7 @@
     "node": ">=24.0.0"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@pinsquirrel/domain": "workspace:*",
     "zod": "^4.4.3"
   }

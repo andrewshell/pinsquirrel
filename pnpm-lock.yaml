@@ -335,6 +335,9 @@ importers:
 
   libs/services:
     dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.30.0
+        version: 1.30.0(supports-color@10.2.2)(zod@4.4.3)
       '@pinsquirrel/domain':
         specifier: workspace:*
         version: link:../domain

@@ -48,6 +48,22 @@ export {
   redirectUriMatches,
 } from './validation/oauth-uri.js'
 
+// OAuth wire-format schemas (authorize, token, registration, CIMD)
+export {
+  authorizationRequestSchema,
+  authorizationCodeGrantSchema,
+  clientIdMetadataDocumentSchema,
+  clientRegistrationSchema,
+  refreshTokenGrantSchema,
+  tokenRequestSchema,
+  type AuthorizationRequestParams,
+  type AuthorizationCodeGrantParams,
+  type ClientIdMetadataDocument,
+  type ClientRegistrationMetadata,
+  type RefreshTokenGrantParams,
+  type TokenRequestParams,
+} from './validation/oauth.js'
+
 // Response schemas (service output shapes)
 export {
   pinSchema,
