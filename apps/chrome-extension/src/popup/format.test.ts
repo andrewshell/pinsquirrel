@@ -72,6 +72,19 @@ describe('formatEmptyTagList', () => {
       'No tags yet. Add tags to your pins on PinSquirrel.'
     )
   })
+
+  it('blames the selected-only toggle rather than the account', () => {
+    // The account may well have tags; none of them is picked.
+    expect(formatEmptyTagList('', true)).toBe(
+      'No tags selected yet. Untick “Selected only” to see them all.'
+    )
+  })
+
+  it('blames both when a query is narrowing the selection as well', () => {
+    expect(formatEmptyTagList('zzz', true)).toBe(
+      'No selected tags match \u201Czzz\u201D.'
+    )
+  })
 })
 
 describe('formatTagSummary', () => {
