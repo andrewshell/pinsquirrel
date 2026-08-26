@@ -10,9 +10,12 @@ import type { MySql2Database } from 'drizzle-orm/mysql2'
  * from different packages (this package's own test setup, and the Hono app's,
  * which needs the schema in place before its end-to-end test opens the app).
  *
- * Additive only. It applies whatever migrations have not run yet and touches
- * nothing else, which is what makes it safe to call from a test setup that
- * must not destroy data another run is using.
+ * It applies whatever migrations have not run yet and touches nothing else,
+ * which is what makes it safe to call from a test setup that must not destroy
+ * data another run is using. It was additive-only until Phase 7 dropped
+ * `api_keys`, and a migration that drops a table a running instance still
+ * queries takes that instance down — so a destructive one deploys after the
+ * code that stopped using it, never with it.
  */
 export const migrationsFolder = fileURLToPath(
   new URL('./migrations', import.meta.url)
