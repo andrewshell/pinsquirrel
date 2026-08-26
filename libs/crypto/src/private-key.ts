@@ -6,6 +6,8 @@
  * `scrypt` later, which would need the signature these already have.
  */
 /* eslint-disable @typescript-eslint/require-await */
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
 import {
   randomBytes,
   scryptSync,
@@ -187,4 +189,14 @@ export async function loadPrivateKey(
   } catch {
     throw new Error('Incorrect passphrase or corrupted key file')
   }
+}
+
+/**
+ * Write a private key file, creating any missing parent directories. The file
+ * is owner read/write only: it is the one secret that must stay off the
+ * application server.
+ */
+export function writeKeyFile(path: string, contents: string): void {
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, contents, { mode: 0o600 })
 }

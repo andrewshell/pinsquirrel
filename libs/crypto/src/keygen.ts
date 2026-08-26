@@ -1,9 +1,13 @@
 /* eslint-disable no-console */
-import { writeFileSync, existsSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { stdin, stdout } from 'node:process'
 import { StringDecoder } from 'node:string_decoder'
 import { generateKeyPair } from './email-crypto.js'
-import { serializeRawPrivateKey, wrapPrivateKey } from './private-key.js'
+import {
+  serializeRawPrivateKey,
+  wrapPrivateKey,
+  writeKeyFile,
+} from './private-key.js'
 
 /**
  * Generate an email-sealing keypair.
@@ -93,7 +97,7 @@ async function main(): Promise<void> {
     console.warn('WARNING: writing an UNENCRYPTED private key. Protect it.')
   }
 
-  writeFileSync(outputPath, fileContents, { mode: 0o600 })
+  writeKeyFile(outputPath, fileContents)
 
   console.log('\nKeypair generated.')
   console.log(

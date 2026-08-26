@@ -1,10 +1,14 @@
 import { describe, it, expect } from 'vitest'
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { generateKeyPair } from './email-crypto.js'
 import {
   serializeRawPrivateKey,
   wrapPrivateKey,
   isEncryptedPrivateKey,
   loadPrivateKey,
+  writeKeyFile,
 } from './private-key.js'
 
 describe('private key file', () => {
@@ -131,5 +135,18 @@ describe('invalid key files', () => {
     await expect(loadPrivateKey(file, 'pw')).rejects.toThrow(
       'Invalid private key file'
     )
+  })
+})
+
+describe('writeKeyFile', () => {
+  it('creates missing parent directories and writes the file read-only to the owner', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'keygen-'))
+    const path = join(dir, 'nested', 'deeper', 'email-key.json')
+
+    writeKeyFile(path, '{"kind":"raw"}')
+
+    expect(readFileSync(path, 'utf8')).toBe('{"kind":"raw"}')
+    expect(statSync(path).mode & 0o777).toBe(0o600)
+    rmSync(dir, { recursive: true, force: true })
   })
 })
