@@ -1,6 +1,19 @@
+import { createHash } from 'node:crypto'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+// Deterministic secrets, so a test can assert what was stored against what
+// was handed back. The real generator and hash are covered by their own unit
+// tests; what matters here is that the raw value never reaches a repository.
+vi.mock('../utils/crypto.js', () => {
+  let issued = 0
+  return {
+    generateSecureToken: vi.fn(() => `secret-${String(++issued)}`),
+    hashToken: vi.fn((value: string) => `hashed_${value}`),
+  }
+})
 import type {
   HttpFetcher,
+  User,
   OAuthAuthorizationCodeRepository,
   OAuthClient,
   OAuthClientRepository,
@@ -8,8 +21,17 @@ import type {
   UserRepository,
 } from '@pinsquirrel/domain'
 import {
+  AccessControl,
+  OAuthAccessDeniedError,
   OAuthInvalidClientError,
   OAuthInvalidClientMetadataError,
+  OAuthInvalidRequestError,
+  OAuthInvalidScopeError,
+  OAuthInvalidTargetError,
+  OAuthUnauthorizedClientError,
+  Role,
+  UserStatus,
+  ValidationError,
 } from '@pinsquirrel/domain'
 import { createMockUserRepository } from '../test-utils.js'
 import { OAuthService } from './oauth.js'
@@ -28,6 +50,44 @@ const cimdDocument = {
   response_types: ['code'],
   token_endpoint_auth_method: 'none',
 }
+
+/** The PKCE challenge for `CODE_VERIFIER`, from RFC 7636 appendix B. */
+const CODE_VERIFIER = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'
+const CODE_CHALLENGE = createHash('sha256')
+  .update(CODE_VERIFIER)
+  .digest('base64url')
+
+function authorizeParams(
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> {
+  return {
+    response_type: 'code',
+    client_id: CIMD_URL,
+    redirect_uri: 'http://localhost:54321/callback',
+    code_challenge: CODE_CHALLENGE,
+    code_challenge_method: 'S256',
+    state: 'opaque-state',
+    resource: MCP_RESOURCE,
+    ...overrides,
+  }
+}
+
+function makeUser(id: string, username: string): User {
+  return {
+    id,
+    username,
+    passwordHash: 'hashed',
+    emailHash: null,
+    emailEncrypted: null,
+    roles: [Role.User],
+    status: UserStatus.Active,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }
+}
+
+const user = makeUser('user-1', 'squirrel')
+const otherUser = makeUser('user-2', 'intruder')
 
 function makeClient(overrides: Partial<OAuthClient> = {}): OAuthClient {
   return {
@@ -262,5 +322,194 @@ describe('OAuthService.resolveClient', () => {
     await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(
       OAuthInvalidClientError
     )
+  })
+})
+
+describe('OAuthService.resolveAuthorizationRequest', () => {
+  let ctx: ReturnType<typeof setup>
+
+  beforeEach(() => {
+    ctx = setup()
+  })
+
+  it('resolves a Claude Code request against its portless loopback registration', async () => {
+    const resolved =
+      await ctx.service.resolveAuthorizationRequest(authorizeParams())
+
+    expect(resolved.client.clientId).toBe(CIMD_URL)
+    expect(resolved.redirectUri).toBe('http://localhost:54321/callback')
+    expect(resolved.scopes).toEqual(['pins:read', 'tags:read'])
+    expect(resolved.resource).toBe(MCP_RESOURCE)
+    expect(resolved.state).toBe('opaque-state')
+  })
+
+  it('rejects a malformed request as a validation failure', async () => {
+    await expect(
+      ctx.service.resolveAuthorizationRequest(
+        authorizeParams({ code_challenge_method: 'plain' })
+      )
+    ).rejects.toBeInstanceOf(ValidationError)
+  })
+
+  // Nothing is redirected to a URI the client did not register, because the
+  // redirect is where the code would be delivered.
+  it('rejects a redirect URI the client never registered', async () => {
+    await expect(
+      ctx.service.resolveAuthorizationRequest(
+        authorizeParams({ redirect_uri: 'http://localhost:54321/evil' })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidRequestError)
+  })
+
+  it('rejects a resource this server issues no tokens for', async () => {
+    await expect(
+      ctx.service.resolveAuthorizationRequest(
+        authorizeParams({ resource: 'https://pinsquirrel.com' })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidTargetError)
+  })
+
+  it('accepts a resource written differently but meaning the same thing', async () => {
+    const resolved = await ctx.service.resolveAuthorizationRequest(
+      authorizeParams({ resource: 'HTTPS://PinSquirrel.com/mcp/' })
+    )
+
+    expect(resolved.resource).toBe(MCP_RESOURCE)
+  })
+
+  it('rejects a scope that is not granted here', async () => {
+    await expect(
+      ctx.service.resolveAuthorizationRequest(
+        authorizeParams({ scope: 'pins:read pins:write' })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidScopeError)
+  })
+
+  it('keeps offline_access, which is what buys a refresh token', async () => {
+    const resolved = await ctx.service.resolveAuthorizationRequest(
+      authorizeParams({ scope: 'pins:read offline_access' })
+    )
+
+    expect(resolved.scopes).toEqual(['pins:read', 'offline_access'])
+  })
+
+  it('rejects a client that is not registered for this grant', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({ clientId: 'dcr_ro', grantTypes: ['refresh_token'] })
+    )
+
+    await expect(
+      ctx.service.resolveAuthorizationRequest(
+        authorizeParams({ client_id: 'dcr_ro' })
+      )
+    ).rejects.toBeInstanceOf(OAuthUnauthorizedClientError)
+  })
+})
+
+describe('OAuthService.authorize', () => {
+  let ctx: ReturnType<typeof setup>
+  let ac: AccessControl
+
+  beforeEach(() => {
+    ctx = setup()
+    ac = new AccessControl(user)
+    vi.mocked(ctx.codeRepository.create).mockImplementation(data =>
+      Promise.resolve({
+        id: 'code-1',
+        consumedAt: null,
+        createdAt: new Date(),
+        ...data,
+      })
+    )
+  })
+
+  it('issues a code to the approved redirect URI and returns it once', async () => {
+    const outcome = await ctx.service.authorize(ac, {
+      params: authorizeParams(),
+      userId: user.id,
+      approved: true,
+    })
+
+    expect(outcome.status).toBe('approved')
+    if (outcome.status !== 'approved') return
+
+    expect(outcome.redirectUri).toBe('http://localhost:54321/callback')
+    expect(outcome.state).toBe('opaque-state')
+    expect(outcome.issuer).toBe('https://pinsquirrel.com')
+    expect(outcome.code).toBeTruthy()
+
+    // The raw code is never stored, only its hash.
+    expect(ctx.codeRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        codeHash: `hashed_${outcome.code}`,
+        clientId: CIMD_URL,
+        userId: user.id,
+        redirectUri: 'http://localhost:54321/callback',
+        codeChallenge: CODE_CHALLENGE,
+        scopes: ['pins:read', 'tags:read'],
+        resource: MCP_RESOURCE,
+      })
+    )
+    const created = vi.mocked(ctx.codeRepository.create).mock.calls[0][0]
+    expect(created.expiresAt.getTime()).toBeGreaterThan(Date.now())
+  })
+
+  // `completed_at` is what keeps a registration out of the incomplete-DCR
+  // sweep, and an authorization is what completes it.
+  it('marks the client as having completed an authorization', async () => {
+    await ctx.service.authorize(ac, {
+      params: authorizeParams(),
+      userId: user.id,
+      approved: true,
+    })
+
+    expect(ctx.clientRepository.markCompleted).toHaveBeenCalledWith(
+      'client-row-1',
+      expect.any(Date)
+    )
+  })
+
+  it('does not re-mark a client that already completed one', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({ completedAt: new Date('2026-01-01') })
+    )
+
+    await ctx.service.authorize(ac, {
+      params: authorizeParams(),
+      userId: user.id,
+      approved: true,
+    })
+
+    expect(ctx.clientRepository.markCompleted).not.toHaveBeenCalled()
+  })
+
+  // A denial is an outcome, not an exception: the client still has to be told,
+  // and telling it means redirecting to a URI that was validated first.
+  it('returns a denial carrying the validated redirect target', async () => {
+    const outcome = await ctx.service.authorize(ac, {
+      params: authorizeParams(),
+      userId: user.id,
+      approved: false,
+    })
+
+    expect(outcome).toMatchObject({
+      status: 'denied',
+      error: 'access_denied',
+      redirectUri: 'http://localhost:54321/callback',
+      state: 'opaque-state',
+      issuer: 'https://pinsquirrel.com',
+    })
+    expect(ctx.codeRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses to issue a code on behalf of another user', async () => {
+    await expect(
+      ctx.service.authorize(new AccessControl(otherUser), {
+        params: authorizeParams(),
+        userId: user.id,
+        approved: true,
+      })
+    ).rejects.toBeInstanceOf(OAuthAccessDeniedError)
+    expect(ctx.codeRepository.create).not.toHaveBeenCalled()
   })
 })
