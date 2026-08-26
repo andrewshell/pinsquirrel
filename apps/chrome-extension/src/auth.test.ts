@@ -3,6 +3,7 @@ import {
   authorizedFetch,
   buildAuthorizationUrl,
   connect,
+  disconnect,
   getAccessToken,
   OAuthProtocolError,
   ReauthorizationRequiredError,
@@ -334,5 +335,47 @@ describe('authorizedFetch', () => {
 
     expect(response.status).toBe(401)
     expect(server.tokenRequests).toHaveLength(1)
+  })
+})
+
+describe('disconnect', () => {
+  it('hands the refresh token back and clears everything it stored', async () => {
+    const server = stubOAuthServer({
+      ...connected(),
+      selectedTagIds: ['tag-1'],
+      registeredClients: { [SERVER_BASE_URL]: REGISTERED_CLIENT_ID },
+    })
+
+    await disconnect()
+
+    // A refresh token takes its whole grant family with it server-side, so
+    // this is what makes the access token stop working too.
+    expect(server.revocations).toEqual([
+      {
+        token: 'refresh-stored',
+        token_type_hint: 'refresh_token',
+        client_id: REGISTERED_CLIENT_ID,
+      },
+    ])
+    expect(server.chrome.local.items).toEqual({})
+  })
+
+  it('clears local storage even when the server cannot be reached', async () => {
+    const server = stubOAuthServer(connected())
+    server.fetched.route(`${SERVER_BASE_URL}/oauth/revoke`, () => {
+      throw new Error('offline')
+    })
+
+    await disconnect()
+
+    expect(server.chrome.local.items).toEqual({})
+  })
+
+  it('does nothing to revoke when there is no connection to end', async () => {
+    const server = stubOAuthServer()
+
+    await disconnect()
+
+    expect(server.revocations).toEqual([])
   })
 })
