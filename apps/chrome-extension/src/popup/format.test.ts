@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { formatLastSync, formatTagSummary, parseBaseUrl } from './format.ts'
+import {
+  formatEmptyTagList,
+  formatLastSync,
+  formatTagSummary,
+  parseBaseUrl,
+} from './format.ts'
 
 describe('parseBaseUrl', () => {
   it('keeps an https origin as it was typed', () => {
@@ -44,6 +49,28 @@ describe('parseBaseUrl', () => {
 
   it('rejects an empty box', () => {
     expect(parseBaseUrl('   ')).toBeNull()
+  })
+})
+
+describe('formatEmptyTagList', () => {
+  it('tells an account with no tags where tags come from', () => {
+    expect(formatEmptyTagList('')).toBe(
+      'No tags yet. Add tags to your pins on PinSquirrel.'
+    )
+  })
+
+  it('blames the query when there is one', () => {
+    expect(formatEmptyTagList('zzz')).toBe('No tags match “zzz”.')
+  })
+
+  it('quotes what was typed without the spaces around it', () => {
+    expect(formatEmptyTagList('  zzz  ')).toBe('No tags match “zzz”.')
+  })
+
+  it('treats a box of spaces as no query at all, as the filter does', () => {
+    expect(formatEmptyTagList('   ')).toBe(
+      'No tags yet. Add tags to your pins on PinSquirrel.'
+    )
   })
 })
 

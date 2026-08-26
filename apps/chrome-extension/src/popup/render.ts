@@ -14,11 +14,16 @@ import type { TagWithCount } from '../types.ts'
  * `tags` is what the list shows, not what the account has: with a filter in
  * the box it is the matches. `selectedTagIds` may name tags that are not in
  * `tags` at all - they are simply not drawn, and stay selected.
+ *
+ * `emptyMessage` is what stands in for a list with nothing in it. It is passed
+ * rather than written here because only the caller knows which kind of empty
+ * this is: an account with no tags, or a filter that matched none of them.
  */
 export function renderTagList(
   container: HTMLElement,
   tags: TagWithCount[],
-  selectedTagIds: string[]
+  selectedTagIds: string[],
+  emptyMessage: string
 ): void {
   const doc = container.ownerDocument
   container.replaceChildren()
@@ -26,7 +31,7 @@ export function renderTagList(
   if (tags.length === 0) {
     const empty = doc.createElement('p')
     empty.className = 'empty'
-    empty.textContent = 'No tags yet. Add tags to your pins on PinSquirrel.'
+    empty.textContent = emptyMessage
     container.append(empty)
     return
   }

@@ -298,6 +298,16 @@ describe('initPopup, with a connection stored', () => {
     expect(checkboxes().map(box => box.value)).toEqual(['t1', 't2'])
   })
 
+  it('says so rather than going blank when nothing matches', async () => {
+    await initPopup(harness().deps)
+
+    await filter('zzz')
+
+    expect(checkboxes()).toHaveLength(0)
+    expect(element('#tag-list').textContent).toContain('No tags match')
+    expect(element('#tag-list').textContent).toContain('zzz')
+  })
+
   it('counts the tags and the selection under the list', async () => {
     await initPopup(harness().deps)
 
