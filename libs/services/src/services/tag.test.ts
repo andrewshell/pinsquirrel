@@ -100,6 +100,47 @@ describe('TagService.getUserTags', () => {
   })
 })
 
+describe('TagService.searchTags', () => {
+  it('returns the caller’s own matching tags', async () => {
+    vi.mocked(mockRepo.searchByName).mockResolvedValue([tag])
+
+    await expect(
+      service.searchTags(new AccessControl(owner), 'owner-id', 'jesse elder')
+    ).resolves.toEqual([tag])
+    expect(mockRepo.searchByName).toHaveBeenCalledWith(
+      'owner-id',
+      'jesse elder'
+    )
+  })
+
+  it('hands back nothing when asked to search someone else’s tags', async () => {
+    vi.mocked(mockRepo.searchByName).mockResolvedValue([tag, foreignTag])
+
+    await expect(
+      service.searchTags(new AccessControl(otherUser), 'owner-id', 'jesse')
+    ).resolves.toEqual([])
+    expect(mockRepo.searchByName).not.toHaveBeenCalled()
+  })
+
+  it('returns nothing for an unauthenticated caller without querying', async () => {
+    vi.mocked(mockRepo.searchByName).mockResolvedValue([tag])
+
+    await expect(
+      service.searchTags(new AccessControl(null), 'owner-id', 'jesse')
+    ).resolves.toEqual([])
+    expect(mockRepo.searchByName).not.toHaveBeenCalled()
+  })
+
+  it('does not query for a search with no terms', async () => {
+    vi.mocked(mockRepo.searchByName).mockResolvedValue([tag])
+
+    await expect(
+      service.searchTags(new AccessControl(owner), 'owner-id', '   ')
+    ).resolves.toEqual([])
+    expect(mockRepo.searchByName).not.toHaveBeenCalled()
+  })
+})
+
 describe('TagService.getUserTagById', () => {
   it('returns the tag when owned by the caller', async () => {
     vi.mocked(mockRepo.findById).mockResolvedValue(tag)
