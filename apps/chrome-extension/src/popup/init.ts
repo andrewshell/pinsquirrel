@@ -2,8 +2,8 @@ import { ReauthorizationRequiredError } from '../auth.ts'
 import type { SyncResponse } from '../messages.ts'
 import * as storage from '../storage.ts'
 import type { TagWithCount } from '../types.ts'
-import { parseBaseUrl } from './format.ts'
-import { renderTagList } from './render.ts'
+import { formatLastSync, parseBaseUrl } from './format.ts'
+import { renderTagList, selectedTagIdsIn } from './render.ts'
 
 /**
  * The slice of `PinSquirrelApiClient` the popup uses.
@@ -45,8 +45,32 @@ function elements(doc: Document) {
     reconnectNotice: find('#reconnect-notice'),
     baseUrlInput: find<HTMLInputElement>('#base-url'),
     connectButton: find<HTMLButtonElement>('#connect'),
+    connectedTo: find('#connected-to'),
     tagList: find('#tag-list'),
+    lastSync: find('#last-sync'),
+    syncError: find('#sync-error'),
+    syncButton: find<HTMLButtonElement>('#sync-now'),
+    disconnectButton: find<HTMLButtonElement>('#disconnect'),
     status: find('#status'),
+  }
+}
+
+/**
+ * Run `work` with the button that started it disabled.
+ *
+ * Every one of these buttons starts something slow and none of them is safe to
+ * start twice: a second Connect opens a second consent tab, and a second sync
+ * has two runs writing the same bookmark folders.
+ */
+async function whileBusy(
+  button: HTMLButtonElement,
+  work: () => Promise<void>
+): Promise<void> {
+  button.disabled = true
+  try {
+    await work()
+  } finally {
+    button.disabled = false
   }
 }
 
@@ -77,7 +101,23 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
     ui.settingsView.hidden = true
     ui.mainView.hidden = false
     ui.reconnectNotice.hidden = true
+    ui.connectedTo.textContent = `Connected to ${baseUrl ?? ''}`
+    await refreshSyncStatus()
     await loadTags()
+  }
+
+  /**
+   * Re-read what the last sync left behind.
+   *
+   * The popup does not run the sync - the service worker does, and it can run
+   * one while the popup is closed - so these two keys are read from storage
+   * every time rather than tracked here.
+   */
+  async function refreshSyncStatus(): Promise<void> {
+    const stored = await storage.getMany(['lastSyncAt', 'lastSyncError'])
+    ui.lastSync.textContent = formatLastSync(stored.lastSyncAt, deps.now())
+    ui.syncError.textContent = stored.lastSyncError ?? ''
+    ui.syncError.hidden = stored.lastSyncError === undefined
   }
 
   /**
@@ -119,17 +159,63 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
     }
 
     setStatus('Waiting for you to approve the extension...')
+    await whileBusy(ui.connectButton, async () => {
+      try {
+        await deps.connect(origin)
+        baseUrl = origin
+        setStatus('')
+        await showMain()
+      } catch (error) {
+        report(error)
+      }
+    })
+  }
+
+  /**
+   * The selection, written the moment a box moves.
+   *
+   * No Save button: the popup closes the instant it loses focus, and a
+   * selection the user made but did not save would be gone.
+   */
+  async function onTagToggled(): Promise<void> {
     try {
-      await deps.connect(origin)
-      baseUrl = origin
-      setStatus('')
-      await showMain()
+      await storage.set({ selectedTagIds: selectedTagIdsIn(ui.tagList) })
     } catch (error) {
       report(error)
     }
   }
 
+  async function onSyncNow(): Promise<void> {
+    setStatus('Syncing...')
+    await whileBusy(ui.syncButton, async () => {
+      try {
+        const response = await deps.requestSync()
+        setStatus(response.ok ? '' : `Sync failed: ${response.error}`)
+        await refreshSyncStatus()
+      } catch (error) {
+        report(error)
+      }
+    })
+  }
+
+  async function onDisconnect(): Promise<void> {
+    await whileBusy(ui.disconnectButton, async () => {
+      try {
+        await deps.disconnect()
+        setStatus('')
+        showSettings()
+      } catch (error) {
+        report(error)
+      }
+    })
+  }
+
   ui.connectButton.addEventListener('click', () => void onConnect())
+  ui.syncButton.addEventListener('click', () => void onSyncNow())
+  ui.disconnectButton.addEventListener('click', () => void onDisconnect())
+  // One delegated listener, because the boxes themselves are replaced on
+  // every render and per-box listeners would have to be re-attached each time.
+  ui.tagList.addEventListener('change', () => void onTagToggled())
 
   const stored = await storage.getMany([
     'baseUrl',

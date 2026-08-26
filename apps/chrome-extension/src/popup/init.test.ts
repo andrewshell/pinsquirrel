@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ReauthorizationRequiredError } from '../auth.ts'
 import { stubChrome, type ChromeStub } from '../test/chrome-mock.ts'
 import { loadPopupDocument } from '../test/popup-dom.ts'
 import type { TagWithCount } from '../types.ts'
@@ -163,5 +164,140 @@ describe('initPopup, with a connection stored', () => {
     await initPopup(harness({ createApiClient }).deps)
 
     expect(createApiClient).toHaveBeenCalledWith('https://pinsquirrel.com')
+  })
+
+  it('names the server it is connected to', async () => {
+    await initPopup(harness().deps)
+
+    expect(element('#connected-to').textContent).toContain(
+      'https://pinsquirrel.com'
+    )
+  })
+
+  it('stores a tag the moment its box is ticked', async () => {
+    await initPopup(harness().deps)
+
+    checkboxes()[0].click()
+    await flush()
+
+    expect(chrome.local.items.selectedTagIds).toEqual(['t1', 't2'])
+  })
+
+  it('stores the shorter list the moment a box is unticked', async () => {
+    await initPopup(harness().deps)
+
+    checkboxes()[1].click()
+    await flush()
+
+    expect(chrome.local.items.selectedTagIds).toEqual([])
+  })
+
+  it('shows how long ago the last sync ran', async () => {
+    chrome.local.items.lastSyncAt = NOW - 5 * 60_000
+    await initPopup(harness().deps)
+
+    expect(element('#last-sync').textContent).toBe('Last synced 5 minutes ago')
+    expect(element('#sync-error').hidden).toBe(true)
+  })
+
+  it('shows why the last sync failed', async () => {
+    chrome.local.items.lastSyncError = 'Bookmarks permission denied'
+    await initPopup(harness().deps)
+
+    expect(element('#sync-error').hidden).toBe(false)
+    expect(element('#sync-error').textContent).toContain(
+      'Bookmarks permission denied'
+    )
+  })
+
+  it('asks the worker to sync and re-reads what the worker wrote', async () => {
+    const requestSync = vi.fn(() => {
+      // The worker records the sync; the popup has to notice.
+      chrome.local.items.lastSyncAt = NOW
+      return Promise.resolve({ ok: true as const })
+    })
+    chrome.local.items.lastSyncAt = NOW - 3 * 24 * 60 * 60_000
+    await initPopup(harness({ requestSync }).deps)
+
+    await click('#sync-now')
+
+    expect(requestSync).toHaveBeenCalled()
+    expect(element('#last-sync').textContent).toBe('Last synced just now')
+  })
+
+  it('reports a sync the worker refused', async () => {
+    const requestSync = vi.fn(() =>
+      Promise.resolve({ ok: false as const, error: 'No bookmarks permission' })
+    )
+    await initPopup(harness({ requestSync }).deps)
+
+    await click('#sync-now')
+
+    expect(status()).toContain('No bookmarks permission')
+  })
+
+  it('will not start a second sync while one is running', async () => {
+    let finish = (): void => {}
+    const requestSync = vi.fn(
+      () =>
+        new Promise<{ ok: true }>(resolve => {
+          finish = () => resolve({ ok: true })
+        })
+    )
+    await initPopup(harness({ requestSync }).deps)
+
+    element<HTMLButtonElement>('#sync-now').click()
+    await flush()
+    expect(element<HTMLButtonElement>('#sync-now').disabled).toBe(true)
+
+    finish()
+    await flush()
+    expect(element<HTMLButtonElement>('#sync-now').disabled).toBe(false)
+  })
+
+  it('goes back to the settings view on disconnect, server prefilled', async () => {
+    const { deps, disconnect } = harness()
+    await initPopup(deps)
+
+    await click('#disconnect')
+
+    expect(disconnect).toHaveBeenCalled()
+    expect(settingsShown()).toBe(true)
+    expect(mainShown()).toBe(false)
+    expect(element<HTMLInputElement>('#base-url').value).toBe(
+      'https://pinsquirrel.com'
+    )
+    expect(element('#reconnect-notice').hidden).toBe(true)
+  })
+})
+
+describe('initPopup, when the grant is gone', () => {
+  beforeEach(() => {
+    Object.assign(chrome.local.items, CONNECTED)
+  })
+
+  it('asks to reconnect when listing tags says the grant is gone', async () => {
+    const getTags = vi.fn(() =>
+      Promise.reject(new ReauthorizationRequiredError('invalid_grant'))
+    )
+    await initPopup(harness({ createApiClient: () => ({ getTags }) }).deps)
+
+    expect(settingsShown()).toBe(true)
+    expect(element('#reconnect-notice').hidden).toBe(false)
+    expect(element<HTMLInputElement>('#base-url').value).toBe(
+      'https://pinsquirrel.com'
+    )
+  })
+
+  it('asks to reconnect when a sync says the grant is gone', async () => {
+    const requestSync = vi.fn(() =>
+      Promise.reject(new ReauthorizationRequiredError('invalid_grant'))
+    )
+    await initPopup(harness({ requestSync }).deps)
+
+    await click('#sync-now')
+
+    expect(settingsShown()).toBe(true)
+    expect(element('#reconnect-notice').hidden).toBe(false)
   })
 })
