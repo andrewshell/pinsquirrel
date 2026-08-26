@@ -122,15 +122,20 @@ export class DrizzlePinRepository implements PinRepository {
       conditions.push(eq(pins.url, filter.url))
     }
 
-    if (filter?.search !== undefined && filter.search.trim() !== '') {
-      const searchTerm = `%${escapeLikePattern(filter.search)}%`
-      const searchCondition = or(
-        like(pins.url, searchTerm),
-        like(pins.title, searchTerm),
-        like(pins.description, searchTerm)
-      )
-      if (searchCondition) {
-        conditions.push(searchCondition)
+    if (filter?.search !== undefined) {
+      // Every term must match (AND), each in any field (OR). Searching
+      // `jesse elder` should find `jesseelder.com`, which the whole query as
+      // one LIKE never could.
+      for (const term of filter.search.split(/\s+/).filter(t => t !== '')) {
+        const pattern = `%${escapeLikePattern(term)}%`
+        const termCondition = or(
+          like(pins.url, pattern),
+          like(pins.title, pattern),
+          like(pins.description, pattern)
+        )
+        if (termCondition) {
+          conditions.push(termCondition)
+        }
       }
     }
 
