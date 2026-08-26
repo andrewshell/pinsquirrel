@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import type { MiddlewareHandler } from 'hono'
-import type { ApiKey, User } from '@pinsquirrel/domain'
+import type { User } from '@pinsquirrel/domain'
 import {
   AccessControl,
   InvalidCredentialsError,
@@ -27,24 +27,9 @@ const testUser = {
   updatedAt: new Date('2024-01-01'),
 } as unknown as User
 
-function makeApiKey(overrides: Partial<ApiKey> = {}): ApiKey {
-  return {
-    id: 'key-1',
-    userId: 'user-1',
-    name: 'Laptop Key',
-    lastUsedAt: null,
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-    ...overrides,
-  } as unknown as ApiKey
-}
-
 const svc = {
   updateEmail: vi.fn(),
   changePassword: vi.fn(),
-  listApiKeys: vi.fn(),
-  createApiKey: vi.fn(),
-  revokeApiKey: vi.fn(),
   listGrants: vi.fn(),
   revokeGrant: vi.fn(),
 }
@@ -68,11 +53,6 @@ vi.mock('../lib/services', () => ({
   },
   authService: {
     changePassword: (...a: unknown[]) => svc.changePassword(...a) as unknown,
-  },
-  apiKeyService: {
-    listApiKeys: (...a: unknown[]) => svc.listApiKeys(...a) as unknown,
-    createApiKey: (...a: unknown[]) => svc.createApiKey(...a) as unknown,
-    revokeApiKey: (...a: unknown[]) => svc.revokeApiKey(...a) as unknown,
   },
   oauthService: {
     listGrants: (...a: unknown[]) => svc.listGrants(...a) as unknown,
@@ -112,7 +92,6 @@ describe('profile routes', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     flash = null
-    svc.listApiKeys.mockResolvedValue([makeApiKey()])
     svc.listGrants.mockResolvedValue([makeGrant()])
     app = new Hono()
     app.route('/profile', profileRoutes)
@@ -128,7 +107,7 @@ describe('profile routes', () => {
   }
 
   describe('POST / — update-email', () => {
-    it('still lists the API keys once the email has been updated', async () => {
+    it('still lists the connected applications once the email has been updated', async () => {
       const res = await app.request(
         '/profile',
         formBody({ intent: 'update-email', email: 'new@example.com' })
@@ -139,8 +118,7 @@ describe('profile routes', () => {
         new AccessControl(testUser),
         { userId: testUser.id, email: 'new@example.com' }
       )
-      expect(html).toContain('Laptop Key')
-      expect(html).not.toContain('No API keys yet')
+      expect(html).toContain('Claude Code')
     })
 
     it('confirms the update to the user', async () => {
@@ -170,6 +148,24 @@ describe('profile routes', () => {
       expect(html).not.toMatch(/unexpected error/i)
     })
 
+    // The card list has to come back with the error, or a rejected form would
+    // blank the rest of the page.
+    it('reports a validation failure without losing the connected applications', async () => {
+      svc.updateEmail.mockRejectedValue(
+        new ValidationError({ email: ['Invalid email address'] })
+      )
+
+      const res = await app.request(
+        '/profile',
+        formBody({ intent: 'update-email', email: 'nope' })
+      )
+
+      expect(res.status).toBe(400)
+      const html = await res.text()
+      expect(html).toContain('Invalid email address')
+      expect(html).toContain('Claude Code')
+    })
+
     it('clears the address when the field is submitted empty', async () => {
       await app.request(
         '/profile',
@@ -184,7 +180,7 @@ describe('profile routes', () => {
   })
 
   describe('POST / — change-password', () => {
-    it('still lists the API keys once the password has been changed', async () => {
+    it('still lists the connected applications once the password has been changed', async () => {
       const res = await app.request(
         '/profile',
         formBody({
@@ -195,8 +191,7 @@ describe('profile routes', () => {
       )
 
       const html = await renderedProfile(res)
-      expect(html).toContain('Laptop Key')
-      expect(html).not.toContain('No API keys yet')
+      expect(html).toContain('Claude Code')
     })
 
     it('confirms the change to the user', async () => {
@@ -229,45 +224,18 @@ describe('profile routes', () => {
     })
   })
 
-  describe('POST / — revoke-api-key', () => {
-    it('confirms the revocation and re-renders the card', async () => {
+  // The API keys are gone (Phase 7), and so are the intents their forms
+  // posted. A stale page still holding those forms gets the same answer as any
+  // other action the route does not have.
+  describe.each(['create-api-key', 'revoke-api-key'])('POST / — %s', intent => {
+    it('is no longer an action the profile page knows about', async () => {
       const res = await app.request(
         '/profile',
-        formBody({ intent: 'revoke-api-key', keyId: 'key-1' })
-      )
-
-      expect(svc.revokeApiKey).toHaveBeenCalledWith(expect.anything(), 'key-1')
-      expect(await renderedProfile(res)).toMatch(/API key revoked/)
-    })
-  })
-
-  describe('POST / — create-api-key', () => {
-    it('shows the raw key exactly once, alongside the key list', async () => {
-      svc.createApiKey.mockResolvedValue({ rawKey: 'ps_secret_value' })
-
-      const res = await app.request(
-        '/profile',
-        formBody({ intent: 'create-api-key', name: 'Laptop Key' })
-      )
-
-      const html = await res.text()
-      expect(html).toContain('ps_secret_value')
-      expect(html).toContain('will not be shown again')
-    })
-
-    it('reports a validation failure without losing the key list', async () => {
-      svc.createApiKey.mockRejectedValue(
-        new ValidationError({ name: ['Name is required'] })
-      )
-
-      const res = await app.request(
-        '/profile',
-        formBody({ intent: 'create-api-key', name: '' })
+        formBody({ intent, name: 'Laptop Key', keyId: 'key-1' })
       )
 
       expect(res.status).toBe(400)
-      const html = await res.text()
-      expect(html).toContain('Laptop Key')
+      expect(await res.text()).toContain('Invalid action')
     })
   })
 

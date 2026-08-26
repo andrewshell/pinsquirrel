@@ -1,10 +1,9 @@
-import type { ApiKey, User } from '@pinsquirrel/domain'
+import type { User } from '@pinsquirrel/domain'
 import type { OAuthGrant } from '@pinsquirrel/services'
 import type { FlashMessage } from '../../middleware/session'
 import { FlashMessage as FlashMessageComponent } from '../components/FlashMessage'
 import { DefaultLayout } from '../layouts/default'
 import { AccountCard } from './profile/AccountCard'
-import { ApiKeysCard } from './profile/ApiKeysCard'
 import { BookmarkletCard } from './profile/BookmarkletCard'
 import { EmailForm } from './profile/EmailForm'
 import { OAuthGrantsCard } from './profile/OAuthGrantsCard'
@@ -14,8 +13,6 @@ interface ProfilePageProps {
   user: User
   flash?: FlashMessage | null
   errors?: Record<string, string[]>
-  apiKeys?: ApiKey[]
-  newApiKey?: string
   grants?: OAuthGrant[]
 }
 
@@ -23,14 +20,7 @@ interface ProfilePageProps {
  * The profile page is a stack of independent cards, one per file under
  * `profile/`. Adding or removing a card is a one-file change plus a line here.
  */
-export function ProfilePage({
-  user,
-  flash,
-  errors,
-  apiKeys,
-  newApiKey,
-  grants,
-}: ProfilePageProps) {
+export function ProfilePage({ user, flash, errors, grants }: ProfilePageProps) {
   return (
     <DefaultLayout
       title="Profile"
@@ -60,7 +50,6 @@ export function ProfilePage({
         <EmailForm errors={errors} />
         <PasswordForm user={user} errors={errors} />
         <OAuthGrantsCard grants={grants} />
-        <ApiKeysCard apiKeys={apiKeys} newApiKey={newApiKey} errors={errors} />
         <BookmarkletCard />
       </div>
     </DefaultLayout>
