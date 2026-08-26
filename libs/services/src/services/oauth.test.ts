@@ -1334,3 +1334,94 @@ describe('OAuthService.reconcileStaticClients', () => {
     ).rejects.toThrow(OAuthInvalidClientMetadataError)
   })
 })
+
+/**
+ * Claude gives discovery, registration and a token exchange 10 seconds, and a
+ * refresh 30. A CIMD fetch has its own 10 second timeout, so a token request
+ * that waited on one could spend the whole budget before it starts.
+ */
+describe('OAuthService token requests and the latency budget', () => {
+  let ctx: ReturnType<typeof setup>
+
+  /** Registered from a metadata document a full day ago: the cache is stale. */
+  const staleClient = () =>
+    makeClient({
+      metadataFetchedAt: new Date(Date.now() - 48 * 60 * 60 * 1000),
+    })
+
+  beforeEach(() => {
+    ctx = setup()
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      staleClient()
+    )
+    vi.mocked(ctx.codeRepository.consume).mockResolvedValue(makeCode())
+    vi.mocked(ctx.tokenRepository.create).mockImplementation(data =>
+      Promise.resolve(makeToken(data))
+    )
+  })
+
+  it('exchanges a code without waiting on the client metadata document', async () => {
+    const issued = await ctx.service.exchangeAuthorizationCode({
+      grant_type: 'authorization_code',
+      code: 'raw-code',
+      redirect_uri: 'http://localhost:54321/callback',
+      client_id: CIMD_URL,
+      code_verifier: CODE_VERIFIER,
+    })
+
+    expect(issued.accessToken.startsWith('pso_')).toBe(true)
+    expect(ctx.fetcher.fetch).not.toHaveBeenCalled()
+  })
+
+  it('refreshes without waiting on the client metadata document', async () => {
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
+      makeToken({
+        kind: 'refresh',
+        tokenHash: 'hashed_raw-refresh',
+        clientId: CIMD_URL,
+        userId: user.id,
+        scopes: ['pins:read', 'offline_access'],
+        resource: MCP_RESOURCE,
+        expiresAt: new Date(Date.now() + 60_000),
+      })
+    )
+    vi.mocked(ctx.tokenRepository.markRotated).mockResolvedValue(true)
+
+    await ctx.service.exchangeRefreshToken({
+      grant_type: 'refresh_token',
+      refresh_token: 'raw-refresh',
+      client_id: CIMD_URL,
+    })
+
+    expect(ctx.fetcher.fetch).not.toHaveBeenCalled()
+  })
+
+  // The authorization request is where the document is validated, so a client
+  // this server has never seen still has to be fetched there.
+  it('still fetches the document for a client it has no row for', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(null)
+
+    await expect(
+      ctx.service.exchangeAuthorizationCode({
+        grant_type: 'authorization_code',
+        code: 'raw-code',
+        redirect_uri: 'http://localhost:54321/callback',
+        client_id: CIMD_URL,
+        code_verifier: CODE_VERIFIER,
+      })
+    ).resolves.toBeDefined()
+
+    expect(ctx.fetcher.fetch).toHaveBeenCalled()
+  })
+
+  // The cache is what keeps the consent page off the network on every visit.
+  it('serves a fresh cached document to the authorization request without refetching', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({ metadataFetchedAt: new Date() })
+    )
+
+    await ctx.service.resolveAuthorizationRequest(authorizeParams())
+
+    expect(ctx.fetcher.fetch).not.toHaveBeenCalled()
+  })
+})

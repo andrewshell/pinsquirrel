@@ -1159,8 +1159,34 @@ Folded in from the standing follow-up. Phase 6 raises the priority, since `/oaut
   - The `peerDependencyRules` allowance (relocated into `pnpm-workspace.yaml` by #80) had gone
     inert. It permitted `0.4.2`, a version nothing requests. Removed in its own PR after
     confirming a forced full re-resolve produced a zero-line lockfile diff and no peer warnings.
-- [ ] Latency budget. Claude waits 10s for discovery/register/token and 30s for refresh, then
+- [x] Latency budget. Claude waits 10s for discovery/register/token and 30s for refresh, then
       treats the flow as failed. Don't buffer the response behind slow downstream work
+
+  Audited, and one real hole found and closed. What was checked:
+
+  - **The four discovery documents** are built from `oauthConfig` and serialized. No I/O at all,
+    not even a database read, so nothing can make them slow.
+  - **`POST /oauth/register`** parses JSON and runs `registerClient`, which is a schema parse, a
+    `findByClientId` and at most one insert. The identifier is derived in-process. No network.
+  - **`POST /oauth/token`** was the hole. Both grants resolved the client through `resolveClient`,
+    which for a CIMD `client_id` re-fetches the metadata document once the 24 hour cache goes
+    stale. `NodeHttpFetcher` allows 10 seconds for that, which is the entire exchange budget,
+    spent waiting on somebody else's web server. Fixed with `resolveClientForGrant`: a row this
+    server already holds is returned whatever its cached metadata says. The token endpoint only
+    compares the client's identifier against the code or refresh token, checks the redirect URI
+    against the code and the audience against the grant, so nothing it does reads a field a
+    re-fetch could change. A client with no row at all still resolves properly, so the answer
+    stays `invalid_client` rather than a confusing `invalid_grant`.
+  - **The CIMD fetch inside `authorize`** keeps the default 10 second timeout: `lib/services.ts`
+    constructs `new NodeHttpFetcher()` and passes no override, and nothing else in the app
+    constructs one with a longer one. The consent page is a browser page and is not on Claude's
+    budget in the first place.
+  - **A cached document is served without refetching**, which the 24 hour `metadataFetchedAt` TTL
+    already did. Now asserted rather than assumed, along with both no-fetch token paths, in
+    `oauth.test.ts` under "token requests and the latency budget".
+  - Nothing on any of these paths sends email, writes a session, or holds a response open behind
+    background work.
+
 - [ ] Profile page: list and revoke active OAuth grants. This lands next to the API key section
       for now and replaces it in Phase 7. Users need a working revocation UI before the key UI is
       removed, not after
