@@ -1,6 +1,7 @@
 import {
   normalizeOAuthUri,
   protectedResourceMetadataPath,
+  staticOAuthClientsSchema,
 } from '@pinsquirrel/services'
 
 /**
@@ -87,5 +88,55 @@ export function createOAuthConfig(baseUrl: string): OAuthConfig {
   }
 }
 
+/** One client an operator pre-registered, as the service reconciles it. */
+export interface StaticOAuthClient {
+  clientId: string
+  clientName: string | null
+  redirectUris: string[]
+}
+
+/**
+ * Clients an operator entered, so an organisation can paste its own
+ * `client_id` when adding PinSquirrel as a custom connector rather than
+ * relying on CIMD or dynamic registration.
+ *
+ * `OAUTH_STATIC_CLIENTS` is a JSON array of
+ * `{ client_id, client_name, redirect_uris }`. A malformed value throws here,
+ * at module load, which means the process refuses to boot: a connector that
+ * silently failed to register would look like a broken client to whoever
+ * pasted the identifier.
+ */
+export function resolveStaticOAuthClients(
+  env: NodeJS.ProcessEnv
+): StaticOAuthClient[] {
+  const raw = env.OAUTH_STATIC_CLIENTS?.trim()
+  if (!raw) return []
+
+  let document: unknown
+  try {
+    document = JSON.parse(raw)
+  } catch {
+    throw new Error(
+      'OAUTH_STATIC_CLIENTS must be a JSON array of ' +
+        '{ client_id, client_name, redirect_uris } objects'
+    )
+  }
+
+  const parsed = staticOAuthClientsSchema.safeParse(document)
+  if (!parsed.success) {
+    const detail = parsed.error.issues
+      .map(issue => `${issue.path.join('.') || 'value'}: ${issue.message}`)
+      .join('; ')
+    throw new Error(`OAUTH_STATIC_CLIENTS is invalid. ${detail}`)
+  }
+
+  return parsed.data.map(client => ({
+    clientId: client.client_id,
+    clientName: client.client_name ?? null,
+    redirectUris: client.redirect_uris,
+  }))
+}
+
 export const baseUrl = resolveBaseUrl(process.env)
 export const oauthConfig = createOAuthConfig(baseUrl)
+export const staticOAuthClients = resolveStaticOAuthClients(process.env)

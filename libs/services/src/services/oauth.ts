@@ -571,6 +571,66 @@ export class OAuthService {
   }
 
   /**
+   * Bring the clients an operator pre-registered into the table.
+   *
+   * Called once at boot from the composition root, so an organisation can
+   * paste its own `client_id` when adding PinSquirrel as a custom connector
+   * instead of relying on CIMD or dynamic registration. They are public
+   * clients with PKCE like every other client here; nothing issues or checks a
+   * secret, and the server metadata advertises no other auth method.
+   *
+   * Upsert only. An entry dropped from the config leaves its row alone rather
+   * than deleting it, because deleting a client cascades to the authorization
+   * codes and tokens that reference it - an operator editing a name should not
+   * be able to sign every user of that connector out by fat-fingering a
+   * different identifier.
+   */
+  async reconcileStaticClients(
+    clients: {
+      clientId: string
+      clientName: string | null
+      redirectUris: string[]
+    }[]
+  ): Promise<void> {
+    for (const client of clients) {
+      const redirectUris = client.redirectUris.map(uri =>
+        requireUsableRedirectUri(uri)
+      )
+
+      const existing = await this.clientRepository.findByClientId(
+        client.clientId
+      )
+
+      if (!existing) {
+        await this.clientRepository.create({
+          clientId: client.clientId,
+          clientName: client.clientName,
+          redirectUris,
+          grantTypes: DEFAULT_GRANT_TYPES,
+          tokenEndpointAuthMethod: 'none',
+          registrationType: 'static',
+          metadataUrl: null,
+          metadataFetchedAt: null,
+        })
+        continue
+      }
+
+      if (
+        existing.clientName === client.clientName &&
+        sameUriList(existing.redirectUris, redirectUris)
+      ) {
+        // Nothing to say. Every boot would otherwise write the same row back.
+        continue
+      }
+
+      await this.clientRepository.update(existing.id, {
+        clientName: client.clientName,
+        redirectUris,
+      })
+    }
+  }
+
+  /**
    * The applications a user has given access to.
    *
    * One entry per client and audience rather than per token: an authorization
@@ -1060,4 +1120,9 @@ function looksLikeUrl(clientId: string): boolean {
 function isFresh(fetchedAt: Date | null): boolean {
   if (!fetchedAt) return false
   return Date.now() - fetchedAt.getTime() < CIMD_CACHE_TTL_MS
+}
+
+/** Are these the same redirect URIs, in the same order? */
+function sameUriList(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((uri, index) => uri === b[index])
 }

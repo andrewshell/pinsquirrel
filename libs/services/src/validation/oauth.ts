@@ -1,5 +1,6 @@
 import { OAuthClientMetadataSchema } from '@modelcontextprotocol/sdk/shared/auth.js'
 import { z } from 'zod'
+import { isLoopbackRedirectHost } from './oauth-uri.js'
 
 /**
  * The OAuth wire formats, validated in the shape they arrive in.
@@ -121,3 +122,73 @@ export const clientIdMetadataDocumentSchema = OAuthClientMetadataSchema.extend({
 export type ClientIdMetadataDocument = z.infer<
   typeof clientIdMetadataDocumentSchema
 >
+
+/**
+ * A redirect URI this server is willing to send a browser to: https, or http
+ * on a loopback host. Same rule the registration path applies, stated here so
+ * an operator's typo fails at boot rather than at the first consent screen.
+ */
+function isUsableRedirectUri(uri: string): boolean {
+  let url: URL
+  try {
+    url = new URL(uri)
+  } catch {
+    return false
+  }
+  if (url.protocol === 'https:') return true
+  return url.protocol === 'http:' && isLoopbackRedirectHost(url.hostname)
+}
+
+/**
+ * Clients an operator pre-registered, so an organisation can paste its own
+ * `client_id` when adding PinSquirrel as a custom connector.
+ *
+ * They are public clients with PKCE like every other client here: the server
+ * metadata advertises `token_endpoint_auth_methods_supported: ["none"]` and
+ * nothing issues or checks a secret, so there is no `client_secret` field to
+ * fill in.
+ *
+ * `client_id` may not look like a URL. An http(s) identifier is resolved by
+ * fetching it as a CIMD document (Decision 15), so a row registered under one
+ * would never be looked up in the table.
+ */
+export const staticOAuthClientsSchema = z
+  .array(
+    z.object({
+      client_id: z
+        .string()
+        .min(1)
+        .refine(value => !/^https?:\/\//i.test(value), {
+          message:
+            'must not be an http(s) URL, which names a CIMD document rather than a stored client',
+        }),
+      client_name: z.string().min(1).optional(),
+      redirect_uris: z
+        .array(
+          z.string().min(1).refine(isUsableRedirectUri, {
+            message: 'must be https, or http on loopback',
+          })
+        )
+        .min(1, 'at least one redirect_uri is required'),
+    })
+  )
+  .superRefine((clients, ctx) => {
+    // `client_id` is unique in the table, so two entries sharing one is a
+    // configuration that cannot be reconciled - the second would overwrite the
+    // first on every boot.
+    const seen = new Set<string>()
+    clients.forEach((client, index) => {
+      if (seen.has(client.client_id)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `duplicate client_id: ${client.client_id}`,
+          path: [index, 'client_id'],
+        })
+      }
+      seen.add(client.client_id)
+    })
+  })
+
+export type StaticOAuthClientMetadata = z.infer<
+  typeof staticOAuthClientsSchema
+>[number]
