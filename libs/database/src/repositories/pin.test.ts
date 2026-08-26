@@ -872,6 +872,13 @@ describe('DrizzlePinRepository - Integration Tests', () => {
       expect(result).toHaveLength(4)
     })
 
+    it('should handle a whitespace-only search query gracefully', async () => {
+      const result = await pinRepository.findByUserId(testUser.id, {
+        search: '   \t ',
+      })
+      expect(result).toHaveLength(4)
+    })
+
     it('should handle null search query gracefully', async () => {
       const result = await pinRepository.findByUserId(testUser.id, {
         search: undefined,
