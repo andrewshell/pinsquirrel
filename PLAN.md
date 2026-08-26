@@ -109,11 +109,12 @@ password checks) and 3.4.1 (production Docker build repaired for pnpm 11); then 
 - [ ] Deferred read-write MCP tools. See Phase 3b-7. Gated on the `pins:write` scope
       from Phase 6, so do Phase 6 first.
 - [ ] Remove the API key infrastructure once OAuth is proven. New Phase 7.
-- [ ] `/mcp` holds one MCP session per process, so two clients cannot be connected to one
+- [x] ~~`/mcp` holds one MCP session per process, so two clients cannot be connected to one
       deployment at once, and the transport maps responses back to requests by JSON-RPC id
-      across every caller. Phase 3b code, found by 6g's end-to-end test, written up in full
-      under 6g with the fix. It blocks 6g's two real-client checks, so it comes first, in its
-      own change.
+      across every caller.~~ Fixed 2026-08-25. `/mcp` now builds an `McpServer` and a
+      `StreamableHTTPTransport` per request and closes both afterwards, the SDK's stateless
+      pattern. See 6g for what the run found and what the change does. 6g's two real-client
+      checks are no longer blocked.
 - [ ] `MailgunConfig.baseUrl` is honoured by the email service but never set by
       `apps/hono/src/lib/services.ts`. Unrelated to OAuth; only matters if Mailgun EU is ever
       used. Wire a `MAILGUN_BASE_URL` env through when it does.
@@ -329,7 +330,7 @@ Implemented with `@hono/mcp` (not `@modelcontextprotocol/hono`). Read-only only.
 ### 3b-3. MCP server
 
 - [x] Create `apps/hono/src/mcp/server.ts`
-  - `McpServer` instance with tools:
+  - `createMcpServer()` (a factory since 2026-08-25, see 6g) building an `McpServer` with tools:
 
   | Tool         | Description                                                 | Service Method                                        | Status       |
   | ------------ | ----------------------------------------------------------- | ----------------------------------------------------- | ------------ |
@@ -347,7 +348,8 @@ Implemented with `@hono/mcp` (not `@modelcontextprotocol/hono`). Read-only only.
 ### 3b-4. MCP route
 
 - [x] Create `apps/hono/src/routes/mcp.ts`
-  - Uses `@hono/mcp` `StreamableHTTPTransport` (Streamable HTTP)
+  - Uses `@hono/mcp` `StreamableHTTPTransport` (Streamable HTTP), one per request since
+    2026-08-25 (see 6g)
   - Applies Bearer token auth from 3b-2
   - Bypasses CSRF and session middleware (API key auth only)
 
@@ -497,10 +499,10 @@ The approach changed. Instead of a hand-written JSX docs page, the v1 routes wer
 > 6d, so `ps_` keys no longer open them. 6f added the rate limiters, the latency-budget fix and
 > the profile grants card; 6e added pre-registered static clients. 6g's automated half is done
 > too: the unit coverage is audited, and `apps/hono/src/oauth-e2e.test.ts` drives a whole
-> connection in process against the real app and a real database. What is left is the runs
-> against real clients, including the two CIMD items 6e leaves open because only a real client
-> exercises them, and the one-session-per-process limit in the MCP transport that 6g turned up
-> and that has to go before two clients can be connected at once. Goal: a user pastes
+> connection in process against the real app and a real database. The one-session-per-process
+> limit in the MCP transport that 6g turned up is fixed: `/mcp` builds a server and a transport
+> per request. What is left is the runs against real clients, including the two CIMD items 6e
+> leaves open because only a real client exercises them. Goal: a user pastes
 > `https://pinsquirrel.com/mcp` into
 > Claude (or any MCP client), clicks through a consent screen, and is connected. No hand-copied
 > API key.
@@ -1270,8 +1272,9 @@ before anything is removed. After Phase 7 there is no fallback credential to deb
 - [ ] End-to-end against Claude Code (`claude mcp add --transport http pinsquirrel <url>`), which
       exercises the CIMD + loopback path
 
-  Not run. It needs a browser and a person; the runbook is below. Read the transport note first,
-  because it decides whether this and the next item can both pass on one deployment.
+  Not run. It needs a browser and a person; the runbook is below. `/mcp` is stateless as of
+  2026-08-25 (see the transport note), so this and the next item can now both pass on one
+  deployment.
 
 - [ ] End-to-end against claude.ai as a custom connector, which exercises the fixed-callback path
 
@@ -1329,26 +1332,37 @@ narrowing it is a product decision about what "disconnect" means rather than a d
 mid-phase. Worth settling before Phase 7 removes the API key card and this becomes the only
 revocation UI.
 
-#### What the end-to-end run found: one MCP session per process
+#### What the end-to-end run found: one MCP session per process (fixed)
 
-`apps/hono/src/mcp/server.ts` connects a single `StreamableHTTPTransport` at module load and
-gives it a `sessionIdGenerator`, so the process holds exactly one MCP session. The second
-`initialize` anybody sends is answered `Invalid Request: Server already initialized`, and a
-request carrying any other `mcp-session-id` gets a 404. Two clients cannot be connected to one
+Fixed on 2026-08-25, before the two runs below. What it was and what replaced it, since the
+shape of `/mcp` is worth knowing before reading either runbook.
+
+`apps/hono/src/mcp/server.ts` connected a single `StreamableHTTPTransport` at module load and
+gave it a `sessionIdGenerator`, so the process held exactly one MCP session. The second
+`initialize` anybody sent was answered `Invalid Request: Server already initialized`, and a
+request carrying any other `mcp-session-id` got a 404. Two clients could not be connected to one
 deployment at the same time, which is exactly what the two real-client checkboxes above ask for.
 
-The transport also maps a response back to its HTTP request by JSON-RPC request id alone
+The transport also mapped a response back to its HTTP request by JSON-RPC request id alone
 (`#requestToStreamMapping`), across every caller. That is harmless while only one client can
 connect and is not once more than one can: two requests in flight with the same id would be
-answered with each other's responses. So the fix is not to pass `sessionIdGenerator: undefined`
-on the shared transport, which would lift the session limit and leave the shared mapping. It is
-the SDK's stateless pattern: build an `McpServer` and a `StreamableHTTPTransport` per request,
-with `sessionIdGenerator: undefined`, so each request carries its own mapping and no client
-needs a session header at all.
+answered with each other's responses. So the fix was not to pass `sessionIdGenerator: undefined`
+on the shared transport, which would have lifted the session limit and left the shared mapping.
+It was the SDK's stateless pattern.
 
-This is Phase 3b code that Phase 6 never touched, so it belongs in its own change rather than on
-the OAuth branch. Do it before running the two checks below, and note that
-`routes/mcp.test.ts` mocks `mcpTransport` by name and will need to follow the new shape.
+What landed: tool registration became `createMcpServer()`, and `routes/mcp.ts` builds an
+`McpServer` and a `StreamableHTTPTransport` per request with `sessionIdGenerator: undefined`,
+connects, handles, and closes both in a `finally` so a refused request leaves nothing behind
+either. Each request carries its own request-id mapping and no client needs a session header.
+`enableJsonResponse: true` stayed, and is what makes the cleanup safe: the response is one JSON
+body rather than an SSE stream, so `handleRequest` resolves only once the tool result has been
+written. GET and DELETE answer 405, which is all stateless leaves for them. The tools, the
+`mapDomainErrorToMcp` mapping and the `extra.authInfo.extra.user` handoff are untouched.
+
+`routes/mcp-per-request.test.ts` holds it in place at the HTTP seam: two clients initializing, a
+tool call with no session, two concurrent calls sharing a JSON-RPC id and answered out of order,
+and the per-request servers closed after both a served and a refused request. `routes/mcp.test.ts`
+mocked `mcpTransport` by name, so it now stands on the service the tool calls instead.
 
 #### Runbook: Claude Code
 
