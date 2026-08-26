@@ -122,8 +122,10 @@ export interface OAuthGrant {
   tokenId: string
   clientId: string
   clientName: string | null
+  /** Every scope any of the client's live tokens carries. */
   scopes: string[]
-  resource: string
+  /** Every audience the client holds a live token for. */
+  resources: string[]
   expiresAt: Date
   createdAt: Date
 }
@@ -633,10 +635,13 @@ export class OAuthService {
   /**
    * The applications a user has given access to.
    *
-   * One entry per client and audience rather than per token: an authorization
-   * mints an access token and a refresh token, and the profile page is showing
-   * the application, not the plumbing. Takes an `AccessControl` because this is
-   * a user-facing operation, as every user-scoped operation does.
+   * One entry per client rather than per token or per audience. An
+   * authorization mints an access token and a refresh token, and the profile
+   * page is showing the application, not the plumbing; and `revokeGrant` takes
+   * every token the client holds whatever the audience, so a row per audience
+   * would promise a granularity the Revoke button does not have. The row says
+   * everything the client can reach instead. Takes an `AccessControl` because
+   * this is a user-facing operation, as every user-scoped operation does.
    */
   async listGrants(ac: AccessControl, userId: string): Promise<OAuthGrant[]> {
     if (!ac.canCreateAs(userId)) {
@@ -649,10 +654,9 @@ export class OAuthService {
 
     const grouped = new Map<string, OAuthToken[]>()
     for (const token of tokens) {
-      const key = `${token.clientId}\n${token.resource}`
-      const group = grouped.get(key)
+      const group = grouped.get(token.clientId)
       if (group) group.push(token)
-      else grouped.set(key, [token])
+      else grouped.set(token.clientId, [token])
     }
 
     const names = new Map<string, string | null>()
@@ -674,8 +678,8 @@ export class OAuthService {
         tokenId: newest.id,
         clientId: newest.clientId,
         clientName: names.get(newest.clientId) ?? null,
-        scopes: newest.scopes,
-        resource: newest.resource,
+        scopes: [...new Set(group.flatMap(token => token.scopes))],
+        resources: [...new Set(group.map(token => token.resource))],
         expiresAt: newest.expiresAt,
         createdAt: newest.createdAt,
       })

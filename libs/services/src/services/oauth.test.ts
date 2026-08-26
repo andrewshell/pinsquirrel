@@ -1111,7 +1111,7 @@ describe('OAuthService grants', () => {
 
   // One authorization mints an access token and a refresh token. The profile
   // page shows the app, not the plumbing.
-  it('lists one grant per client and audience, not one per token', async () => {
+  it('lists one grant per client, not one per token', async () => {
     vi.mocked(ctx.tokenRepository.findActiveByUserId).mockResolvedValue([
       grantToken({ id: 'access-1' }),
       grantToken({ id: 'refresh-1', kind: 'refresh', tokenHash: 'hashed_y' }),
@@ -1123,15 +1123,37 @@ describe('OAuthService grants', () => {
     expect(grants[0]).toMatchObject({
       clientId: CIMD_URL,
       clientName: 'Claude Code',
-      resource: MCP_RESOURCE,
+      resources: [MCP_RESOURCE],
       scopes: ['pins:read', 'tags:read'],
     })
   })
 
-  it('keeps grants for different audiences apart', async () => {
+  // Revoking takes every token the client holds, whatever the audience, so a
+  // row per audience would promise a granularity the Revoke button does not
+  // have. One row per client, saying everything it can reach.
+  it('folds a client authorized for both audiences into one grant', async () => {
+    vi.mocked(ctx.tokenRepository.findActiveByUserId).mockResolvedValue([
+      grantToken({ id: 'access-1', scopes: ['pins:read'] }),
+      grantToken({
+        id: 'access-2',
+        resource: API_RESOURCE,
+        scopes: ['pins:read', 'tags:read'],
+      }),
+    ])
+
+    const grants = await ctx.service.listGrants(ac, user.id)
+
+    expect(grants).toHaveLength(1)
+    expect(grants[0]).toMatchObject({
+      resources: [MCP_RESOURCE, API_RESOURCE],
+      scopes: ['pins:read', 'tags:read'],
+    })
+  })
+
+  it('keeps grants for different clients apart', async () => {
     vi.mocked(ctx.tokenRepository.findActiveByUserId).mockResolvedValue([
       grantToken({ id: 'access-1' }),
-      grantToken({ id: 'access-2', resource: API_RESOURCE }),
+      grantToken({ id: 'access-2', clientId: 'dcr_other' }),
     ])
 
     expect(await ctx.service.listGrants(ac, user.id)).toHaveLength(2)

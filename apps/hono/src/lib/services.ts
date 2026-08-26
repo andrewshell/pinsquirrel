@@ -42,6 +42,8 @@ const emailService: EmailService =
         domain: process.env.MAILGUN_DOMAIN,
         fromEmail: process.env.MAILGUN_FROM_EMAIL || 'noreply@pinsquirrel.com',
         fromName: process.env.MAILGUN_FROM_NAME || 'PinSquirrel',
+        // Only the EU region needs this; the adapter defaults to the US API.
+        baseUrl: process.env.MAILGUN_BASE_URL || undefined,
       })
     : new NullEmailService()
 

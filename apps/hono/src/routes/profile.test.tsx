@@ -40,7 +40,7 @@ function makeGrant(overrides: Record<string, unknown> = {}) {
     clientId: 'https://claude.ai/oauth/claude-code-client-metadata',
     clientName: 'Claude Code',
     scopes: ['pins:read', 'tags:read'],
-    resource: 'http://localhost:8100/mcp',
+    resources: ['http://localhost:8100/mcp'],
     expiresAt: new Date('2024-02-01'),
     createdAt: new Date('2024-01-01'),
     ...overrides,
@@ -245,12 +245,27 @@ describe('profile routes', () => {
 
     it('names the REST resource as such', async () => {
       svc.listGrants.mockResolvedValue([
-        makeGrant({ resource: 'http://localhost:8100/api/v1' }),
+        makeGrant({ resources: ['http://localhost:8100/api/v1'] }),
       ])
 
       const html = await (await app.request('/profile')).text()
 
       expect(html).toContain('REST API')
+    })
+
+    it('lists every audience a client holds on its one row', async () => {
+      svc.listGrants.mockResolvedValue([
+        makeGrant({
+          resources: [
+            'http://localhost:8100/mcp',
+            'http://localhost:8100/api/v1',
+          ],
+        }),
+      ])
+
+      const html = await (await app.request('/profile')).text()
+
+      expect(html).toContain('MCP, REST API')
     })
 
     // A client that registered without a name is still something the user has

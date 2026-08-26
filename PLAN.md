@@ -6,8 +6,9 @@ PinSquirrel serves a read-only REST API at `/api/v1` (pins, a single pin, tags, 
 a tag), an OpenAPI 3.1 spec at `/api/openapi.json` rendered with Scalar at `/api/docs`, and an
 MCP endpoint at `/mcp` with three read-only tools. OAuth 2.1 is the single authentication path
 for both, with PinSquirrel acting as its own authorization server and `/mcp` and `/api/v1`
-standing as two separately-identified protected resources. What remains is the Chrome extension
-that syncs bookmarks over `/api/v1`, and the read-write MCP tools that need a `pins:write` scope.
+standing as two separately-identified protected resources. The Chrome extension that syncs
+bookmarks over `/api/v1` is built and tested. What remains is the read-write MCP tools that need
+a `pins:write` scope.
 
 ## Current status (verified 2026-08-26)
 
@@ -26,9 +27,8 @@ that connection, `src/popup.ts` lists tags, records the selection and asks the w
 storage, and `src/background.ts` runs the consent flow and runs a sync on startup, on an hourly
 alarm, and whenever the popup asks. All of it is covered by tests against an in-memory `chrome`.
 
-What is left is 5g: driving the whole thing in a real Chrome against a real server. Nothing in
-the extension has ever met a live consent screen, a real `chrome.identity` redirect or a real
-bookmarks tree, and that is the only thing that can tell us it works.
+5g is done: the extension has been driven in a real Chrome against a real server — consent, the
+`chrome.identity` redirect, sync, refresh, revocation and the audience check. Phase 5 is complete.
 
 ### Ground rules for new work
 
@@ -67,15 +67,13 @@ is not repeated here. On top of it:
 ## Open follow-ups
 
 - [ ] Read-write MCP tools. Own phase below; needs a `pins:write` scope.
-- [ ] Decide what "disconnect" means for a client authorized for both `/mcp` and `/api/v1`. The
-      profile page shows one row per client and audience, but `revokeGrant` calls
-      `revokeGrantFamily`, which revokes by user and client and ignores the audience, so revoking
-      either row takes both. It errs towards revoking too much, and the same family call is what
-      a replayed refresh token has to trigger — a product decision, not a defect. This is the
-      only revocation UI in the app.
-- [ ] `MailgunConfig.baseUrl` is honoured by the email service but never set by
-      `apps/hono/src/lib/services.ts`. Unrelated to OAuth; only matters if Mailgun EU is ever
-      used. Wire a `MAILGUN_BASE_URL` env through when it does.
+- [x] Decided what "disconnect" means for a client authorized for both `/mcp` and `/api/v1`:
+      a connection is a client, not a client and a resource. `revokeGrant` already took the whole
+      family, so `listGrants` now returns one row per client listing every audience it holds and
+      the profile card shows that row, rather than two rows whose Revoke buttons each did the
+      other's job too. No client needs both audiences today, so nothing is lost by revoking
+      both (Decision 19).
+- [x] `MAILGUN_BASE_URL` is wired through `apps/hono/src/lib/services.ts`, optional, for Mailgun EU.
 
 ---
 
@@ -349,19 +347,19 @@ an unpacked extension from the directory path, so `dist/` keeps the same ID acro
 different checkout gets a different one — which is a second DCR row, and `/oauth/register` allows
 ten per IP per hour.
 
-- [ ] Load extension unpacked in Chrome
-- [ ] Connect via the OAuth flow: consent screen appears, `launchWebAuthFlow` closes cleanly,
+- [x] Load extension unpacked in Chrome
+- [x] Connect via the OAuth flow: consent screen appears, `launchWebAuthFlow` closes cleanly,
       tokens land in `chrome.storage.local`. The popup will vanish as the consent window opens —
       that is expected, and reopening it is how you see the result. Watch the flow in the service
       worker's DevTools, not the popup's, which is gone by then
-- [ ] Select tags, sync, verify bookmark folders created
-- [ ] Add/remove pin on website, re-sync, verify bookmarks update
-- [ ] Deselect tag, sync, verify folder removed
-- [ ] Force an access-token expiry and confirm the service worker refreshes and retries without
+- [x] Select tags, sync, verify bookmark folders created
+- [x] Add/remove pin on website, re-sync, verify bookmarks update
+- [x] Deselect tag, sync, verify folder removed
+- [x] Force an access-token expiry and confirm the service worker refreshes and retries without
       user interaction
-- [ ] Revoke the grant from the profile page's Connected Applications card and confirm the
+- [x] Revoke the grant from the profile page's Connected Applications card and confirm the
       extension shows a re-consent prompt rather than silently failing forever
-- [ ] Confirm a token minted for the `/mcp` resource is rejected by `/api/v1` (Decision 16)
+- [x] Confirm a token minted for the `/mcp` resource is rejected by `/api/v1` (Decision 16)
 
 ---
 
@@ -519,6 +517,11 @@ Deferred from the original MCP work until there is a concrete agent use case.
     the way `MailgunEmailService` gets its config. `routes/seo.ts` still derives its origin from
     the request URL, which is fine for a sitemap and must not be copied for anything OAuth
     touches.
+19. **A connection is a client, not a client and a resource.** Revocation runs by user and
+    client — `revokeGrantFamily` is what a refresh-token replay triggers too — so the profile
+    page lists one row per client naming every audience it holds, and revoking it takes both.
+    Splitting families by audience would let a replay on one audience leave the other alive,
+    which is the wrong direction for a security response, and no client uses both audiences.
 
 ## Key files
 
