@@ -1,4 +1,14 @@
-import { eq, and, inArray, count, isNull, notExists, sql } from 'drizzle-orm'
+import {
+  eq,
+  and,
+  inArray,
+  count,
+  isNull,
+  like,
+  notExists,
+  or,
+  sql,
+} from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import type {
   Tag,
@@ -11,6 +21,7 @@ import { tags } from '../schema/tags.js'
 import { pinsTags } from '../schema/pins-tags.js'
 import { pins } from '../schema/pins.js'
 import type { Executor } from './executor.js'
+import { escapeLikePattern, splitSearchTerms } from './search-terms.js'
 
 export class DrizzleTagRepository implements TagRepository {
   constructor(private db: MySql2Database) {}
@@ -51,6 +62,36 @@ export class DrizzleTagRepository implements TagRepository {
     }
 
     return this.mapToTag(result[0])
+  }
+
+  /**
+   * Tags whose name contains any search term, or all of them run together.
+   *
+   * Terms are OR'd here, unlike the pin search which ANDs them: a tag name is
+   * one short string, so requiring every term to appear in it would answer
+   * `jesse elder` with nothing at all. The concatenated pattern is what finds
+   * the `jesseelder` a person writes as two words.
+   */
+  async searchByName(userId: string, search: string): Promise<Tag[]> {
+    const terms = splitSearchTerms(search)
+    if (terms.length === 0) {
+      return []
+    }
+
+    const patterns = new Set(terms.map(term => `%${escapeLikePattern(term)}%`))
+    if (terms.length > 1) {
+      patterns.add(`%${terms.map(escapeLikePattern).join('')}%`)
+    }
+
+    const matches = Array.from(patterns, pattern => like(tags.name, pattern))
+
+    const result = await this.db
+      .select()
+      .from(tags)
+      .where(and(eq(tags.userId, userId), or(...matches)))
+      .orderBy(tags.name)
+
+    return result.map(tag => this.mapToTag(tag))
   }
 
   async fetchOrCreateByNames(userId: string, names: string[]): Promise<Tag[]> {

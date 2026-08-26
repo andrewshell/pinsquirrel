@@ -802,6 +802,71 @@ describe('DrizzleTagRepository - Integration Tests', () => {
     })
   })
 
+  describe('searchByName', () => {
+    it('matches any single term, and the terms run together', async () => {
+      // `jesse elder` is one person written three ways: two tags carry one
+      // word each, and a third carries both with no separator. All three are
+      // relevant; a tag about neither is not.
+      for (const name of ['jesse', 'elder-stuff', 'jesseelder', 'unrelated']) {
+        await tagRepository.create({ userId: testUser.id, name })
+      }
+
+      const results = await tagRepository.searchByName(
+        testUser.id,
+        'jesse elder'
+      )
+
+      expect(results.map(t => t.name)).toEqual([
+        'elder-stuff',
+        'jesse',
+        'jesseelder',
+      ])
+    })
+
+    it('matches a term anywhere inside the name', async () => {
+      await tagRepository.create({ userId: testUser.id, name: 'wood-elder' })
+      await tagRepository.create({ userId: testUser.id, name: 'nothing' })
+
+      const results = await tagRepository.searchByName(testUser.id, 'elder')
+
+      expect(results.map(t => t.name)).toEqual(['wood-elder'])
+    })
+
+    it('returns nothing for a whitespace-only search', async () => {
+      await tagRepository.create({ userId: testUser.id, name: 'jesse' })
+
+      await expect(
+        tagRepository.searchByName(testUser.id, '   ')
+      ).resolves.toEqual([])
+      await expect(
+        tagRepository.searchByName(testUser.id, '')
+      ).resolves.toEqual([])
+    })
+
+    it('never returns another user’s tags', async () => {
+      const otherUser = await userRepository.create({
+        username: `other-${crypto.randomUUID().slice(0, 8)}`,
+        passwordHash: 'hashed_password',
+        emailHash: 'other_email_hash',
+      })
+      await tagRepository.create({ userId: otherUser.id, name: 'jesse' })
+      await tagRepository.create({ userId: testUser.id, name: 'jesseelder' })
+
+      const results = await tagRepository.searchByName(testUser.id, 'jesse')
+
+      expect(results.map(t => t.name)).toEqual(['jesseelder'])
+    })
+
+    it('treats LIKE wildcards as literal characters', async () => {
+      await tagRepository.create({ userId: testUser.id, name: 'a_c' })
+      await tagRepository.create({ userId: testUser.id, name: 'abc' })
+
+      const results = await tagRepository.searchByName(testUser.id, 'a_c')
+
+      expect(results.map(t => t.name)).toEqual(['a_c'])
+    })
+  })
+
   describe('deleteTagsWithNoPins', () => {
     it('should delete tags with no pin associations', async () => {
       const tagWithPins = await tagRepository.create({
