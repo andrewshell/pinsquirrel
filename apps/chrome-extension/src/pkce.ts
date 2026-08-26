@@ -49,3 +49,11 @@ export async function createPkcePair(): Promise<PkcePair> {
   )
   return { verifier, challenge: await pkceChallengeFor(verifier) }
 }
+
+/**
+ * A random URL-safe token, for the values that only have to be unguessable
+ * rather than PKCE-shaped - `state` on an authorization request.
+ */
+export function randomUrlSafeToken(bytes = VERIFIER_BYTES): string {
+  return base64url(crypto.getRandomValues(new Uint8Array(bytes)))
+}
