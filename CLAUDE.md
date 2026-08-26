@@ -1,219 +1,89 @@
 # CLAUDE.md
 
-Guidance for Claude Code working in this repository.
+Guidance for Claude Code working in this repository. Anything you can learn from `package.json`,
+`turbo.json` or a directory listing is deliberately not repeated here.
 
-## Repository Structure
+## Layering
 
-pnpm monorepo orchestrated with Turbo:
-
-- `apps/hono/` — Hono + HTMX application (main app, dev port 8100)
-- `apps/admin/` — Local operator console for contacting the waitlist (dev port 8200, `pnpm admin`). Not deployed; configured by `admin.config.json` (see `admin.config.example.json`)
-- `libs/services/` — Business logic and validation (Zod). Dependency-injected services (e.g. `AuthenticationService`, `PinService`)
-- `libs/database/` — Drizzle ORM (MySQL) schema and repositories. Implements interfaces from `@pinsquirrel/domain`
-- `libs/domain/` — Domain entities (User, Pin, Tag) and repository interfaces. **No external dependencies — pure domain logic**
-- `libs/adapters/` — External service adapters
-- `libs/crypto/` — Sealing signup emails to a public key, plus the `keygen` CLI (`pnpm --filter @pinsquirrel/crypto keygen`)
-- `libs/mailgun/` — Email service implementation
-
-Workspace packages depend on each other via the `workspace:*` protocol, e.g. `"@pinsquirrel/domain": "workspace:*"`.
-
-### Layering
+pnpm/Turbo monorepo: `apps/*` are composition roots and transports, `libs/services` is business
+logic, `libs/database` implements the repository interfaces from `libs/domain` (pure, no
+dependencies).
 
 **Apps assemble and call services. Services use repositories. Apps do not call repositories.**
 
-`libs/services` is the only layer that enforces `AccessControl` and validation, so a repository call from an app is an authorization check that did not happen. Every instance of this has produced a real bug: the REST API listed private pins because it re-decided the rule a transport at a time, the internal check-url endpoint looked pins up with no `AccessControl` at all, and the tag merge rules were enforced by the shape of a form rather than by the operation.
+`libs/services` is the only layer that enforces `AccessControl` and validation, so a repository
+call from an app is an authorization check that did not happen. Every instance of this has
+produced a real bug: the REST API listed private pins because it re-decided the rule a transport
+at a time, the internal check-url endpoint looked pins up with no `AccessControl` at all, and the
+tag merge rules were enforced by the shape of a form rather than by the operation.
 
-A route or middleware that wants data should call a service method. If none fits, add one — that is the cheaper half of the work.
+A route or middleware that wants data should call a service method. If none fits, add one — that
+is the cheaper half of the work.
 
 Two deliberate exceptions, both documented at the point of use:
 
-- `apps/hono/src/middleware/session.ts` — a session is how an `AccessControl` gets built, so there is nothing for a service to check, and only this app could ever call it.
-- `apps/hono/src/routes/health.ts` — asks whether the connection is alive, which no service models.
+- `apps/hono/src/middleware/session.ts` — a session is how an `AccessControl` gets built, so
+  there is nothing for a service to check, and only this app could ever call it.
+- `apps/hono/src/routes/health.ts` — asks whether the connection is alive, which no service
+  models.
 
-Composition roots (`apps/hono/src/lib/db.ts`, `apps/admin/src/runtime.ts`) construct repositories by definition; that is their job.
+Composition roots (`apps/hono/src/lib/db.ts`, `apps/admin/src/runtime.ts`) construct
+repositories by definition; that is their job.
 
-## Essential Commands
+## Running commands
 
-Root-level (Turbo orchestrates across packages):
+- pnpm only — never npm or yarn.
+- **Always run from the repo root with `pnpm --filter <workspace>`.** Do not `cd` into a
+  package.
+- `pnpm quality` is the full gate: typecheck + lint + test + format + audit.
+- `pnpm format` is a Turbo task and only formats inside packages. `pnpm format:check` is
+  `prettier --check .` at the root and covers root files too (`PLAN.md`, `DEPLOYMENT.md`, this
+  file). To fix those: `pnpm exec prettier --write <file>`.
+- For TDD, leave `pnpm --filter <workspace> test:watch` running.
 
-| Command                                        | Purpose                                              |
-| ---------------------------------------------- | ---------------------------------------------------- |
-| `pnpm dev`                                     | Start Hono dev server (port 8100)                    |
-| `pnpm build`                                   | Build all packages                                   |
-| `pnpm test`                                    | Run all tests                                        |
-| `pnpm typecheck` / `pnpm lint` / `pnpm format` | Type check / ESLint / Prettier (write mode)          |
-| `pnpm format:check`                            | `prettier --check .` at the repo root — the gate     |
-| `pnpm quality`                                 | All checks: typecheck + lint + test + format + audit |
-| `pnpm run audit`                               | `pnpm audit --prod --audit-level=high` (matches CI)  |
-| `pnpm db:up` / `pnpm db:down`                  | Start / stop dev MySQL container                     |
+## Pre-work baseline
 
-Database operations (workspace-scoped):
+**Before starting a task, run `pnpm run audit` on the base branch.** Advisories land against
+dependencies that were fine yesterday and have nothing to do with the work at hand. If it fails,
+fix it on its own branch first, then rebase. The same goes for any other quality check that is
+already red on the base branch.
 
-- `pnpm --filter @pinsquirrel/database db:generate` — generate Drizzle migration
-- `pnpm --filter @pinsquirrel/database db:migrate` — run migrations
-- `pnpm --filter @pinsquirrel/database db:studio` — open Drizzle Studio
+## TDD
 
-For TDD, run a workspace-scoped test watcher:
+**Add behaviour and fix bugs via Red → Green → Refactor.** The failing test is the spec; a bug
+fix without a test that failed first has no proof it addresses the bug.
 
-```bash
-pnpm --filter <workspace> test:watch
-```
+- **RED**: write the test, watch it fail for the _right_ reason — your assertion, not a typo
+  or missing import. If you cannot make it fail, the behaviour already exists or the test
+  asserts nothing.
+- **GREEN**: the smallest change that passes. Hardcoding is fine; the next RED forces
+  generalisation. Never edit the test to make it pass.
+- **REFACTOR**: with tests green, restructure freely. If a refactor goes red, revert the
+  refactor, not the test. Pure refactors of well-covered code need no new RED.
 
-## Monorepo Command Guidelines
+Commit after each cycle or small batch, not at the end of a session.
 
-**ALWAYS run commands from the project root using `pnpm --filter <workspace>`.** Do not `cd` into a subdirectory to run commands.
+## Done means green
 
-```bash
-# Good
-pnpm --filter @pinsquirrel/hono build
+**Never mark a task complete, commit, or open a PR until `pnpm quality` passes.** Fix in order:
+typecheck → lint → tests → format → audit (bump the package or add a `pnpm.overrides` entry).
 
-# Avoid
-cd apps/hono && pnpm build
-```
+## Hono app constraints
 
-## Pre-Work Baseline Check
+- **Server-rendered JSX, not React.** No client-side state or routing. HTMX drives
+  interactivity; vanilla JS only where HTMX cannot (`apps/hono/src/static/*.js`).
+- CSP is `script-src 'self'`: no inline `<script>`, no `onclick=`.
+- Sessions live in MySQL.
 
-**Before starting any new task, run `pnpm run audit` on the base branch.**
+## Adding a package
 
-Audit findings usually come from upstream advisories landing against dependencies that were fine yesterday — they are unrelated to whatever feature or bug you're about to work on. If you discover one mid-task, fixing it pollutes the PR with a dependency bump that has nothing to do with the change.
+Name it `@pinsquirrel/<name>`, give it the same script names Turbo expects (copy a sibling's
+`package.json`), reference siblings with `"workspace:*"`, extend root `tsconfig.base.json`, and
+build the ESLint config with `createConfig(import.meta.dirname)` from `eslint.config.base.js`.
 
-If the audit fails on the base branch:
+## Related documentation
 
-1. Stop — do not start the planned work yet.
-2. Fix it on its own branch and open a separate PR (typically bumping the offending dependency or adding a `pnpm.overrides` entry).
-3. Once that lands, rebase and start the planned work on a clean baseline.
-
-The same principle applies if any other quality check is already broken on the base branch: fix it separately first.
-
-## Test-Driven Development (TDD) Workflow
-
-**ALWAYS write code via the Red → Green → Refactor cycle when adding behavior or fixing bugs.**
-
-Why this matters in practice:
-
-- The failing test is the spec. Writing it first forces you to define "done" before you start typing implementation, which catches vague requirements early.
-- Bug fixes need a regression test that fails _before_ the fix. Otherwise you have no proof the fix actually addresses the reported behavior — and no guard against the bug returning.
-- Refactoring with green tests is safe; refactoring without them is gambling. The cycle gives you a safety net before you need it.
-- Small Red → Green → Refactor loops produce small, reviewable commits. Big-bang implementations produce big-bang PRs.
-
-Start the watcher in the relevant workspace and leave it running:
-
-```bash
-pnpm --filter <workspace> test:watch
-```
-
-#### 1. RED — Write a failing test first
-
-- Write the test that captures the behavior you want. Be precise about inputs, outputs, and edge cases.
-- Run the watcher and confirm the test fails. Read the failure message.
-- The failure must be for the _right reason_ — the assertion you wrote, not a typo, missing import, or unrelated crash. A test that fails for the wrong reason is not a real RED.
-- If you can't make the test fail at all, the behavior already exists or the test is asserting nothing useful.
-
-#### 2. GREEN — Make the test pass with the minimum change
-
-- Write the simplest code that turns the test green. Hardcoding a return value is fine if that's what the current test demands — the next RED step will force generalization.
-- Resist the urge to add features, error handling, or abstractions the current test doesn't require. They belong in a future RED step (with their own test) or not at all.
-- Do not modify the test to make it pass. If the test was wrong, go back to RED and rewrite it intentionally.
-
-#### 3. REFACTOR — Improve the design with the safety net on
-
-- This is where design happens. With tests green, restructure freely: extract functions, rename for clarity, collapse duplication, push logic to a better layer.
-- Run the watcher continuously. If a refactor turns a test red, **revert the refactor** — don't "fix" the test to match the broken refactor.
-- Refactor is optional per cycle. If the GREEN code is already clean, skip straight to the next RED.
-- Pure refactors of code that already has solid coverage don't need a new RED step — the existing tests _are_ the safety net.
-
-#### Commit cadence
-
-Commit after each completed cycle (or after a small batch of related cycles), not at the end of a multi-hour session. Small, sequential commits make review easier and bisecting trivial if something breaks later.
-
-## Quality Check Requirements
-
-**NEVER mark any task as complete until ALL quality checks pass!**
-
-Before considering any work "done", **ALL of the following must pass**:
-
-1. **Type Check**: `pnpm typecheck` - Must pass with zero errors
-2. **Lint**: `pnpm lint` - Must pass with zero errors (warnings should be addressed)
-3. **Tests**: `pnpm test` - All tests must pass (100% success rate)
-4. **Format**: `pnpm format:check` - Code must be properly formatted. This is the gate (`prettier --check .` from the repo root, covering every file, not just package `src/`); `pnpm format` is the write-mode fix for it.
-5. **Audit**: `pnpm run audit` - No high-severity advisories in production dependencies (matches CI)
-
-**Quick Quality Check Commands:**
-
-```bash
-# Single command to run all quality checks:
-pnpm quality
-
-# Or run individually:
-pnpm typecheck && pnpm lint && pnpm test && pnpm format:check && pnpm run audit
-```
-
-**If ANY check fails:**
-
-- Fix typecheck errors first
-- Then fix lint errors
-- Then fix test failures
-- Then run `pnpm format` to fix formatting
-- Finally resolve any audit findings (upgrade the offending package, or add a `pnpm.overrides` entry pinning a safe version)
-- Re-run all checks until 100% pass
-
-**Only when ALL checks pass should you:**
-
-- Mark tasks as complete
-- Commit changes
-- Create pull requests
-
-## Adding a New Package
-
-1. Create directory in `apps/` or `libs/`
-2. Add `package.json` named `@pinsquirrel/<name>` with `typecheck`, `lint`, `test`, `format` scripts (matches Turbo task config)
-3. Reference workspace siblings via `"workspace:*"` (e.g. `"@pinsquirrel/domain": "workspace:*"`)
-4. Run `pnpm install`
-
-Turbo (`turbo.json`) handles task ordering and caching across packages. Build outputs go to `build/**` or `dist/**`.
-
-## Hono App Architecture (apps/hono)
-
-| Component     | Technology   | Purpose                                 |
-| ------------- | ------------ | --------------------------------------- |
-| Backend       | Hono         | HTTP routing, middleware, JSX templates |
-| Interactivity | HTMX         | Partial page updates, form handling     |
-| Complex UI    | Vanilla JS   | Dropdowns, tag input autocomplete       |
-| Database      | Drizzle ORM  | MySQL via `@pinsquirrel/database`       |
-| Styling       | Tailwind CSS | Utility-first CSS                       |
-
-Key constraints:
-
-- **Server-rendered JSX templates, not React components.** No client-side state management or routing.
-- HTMX attributes drive interactivity. Vanilla JS only where HTMX is insufficient (`dropdown.js`, `tag-input-vanilla.js`).
-- Sessions are stored in MySQL.
-
-## Database
-
-- Connection via `DATABASE_URL`. Local default: `mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel` (started by `pnpm db:up`).
-- Schema in `libs/database/src/schema/`, repositories in `libs/database/src/repositories/`, client in `libs/database/src/client.ts`.
-- Repositories implement interfaces from `@pinsquirrel/domain`.
-
-## Tooling Notes
-
-- pnpm only — never npm or yarn. Node `>=24.0.0`.
-- TypeScript strict mode enabled across all packages; every `tsconfig.json` extends root `tsconfig.base.json` and overrides only what differs. Test files are typechecked too.
-- ESLint v10 flat config, type-aware (`recommendedTypeChecked`) in every package. The rules live once in root `eslint.config.base.js`; each package's `eslint.config.js` calls `createConfig(import.meta.dirname)` and adds its own `ignores`. `libs/adapters` passes `{ strict: true }` for `strictTypeChecked`.
-- Prettier: single quotes, no semicolons, 2-space indent, trailing commas.
-
-## Local Development with Docker
-
-```bash
-pnpm db:up    # start MySQL container
-pnpm dev      # run app against it
-pnpm db:down  # stop
-```
-
-For production Docker builds and deployment, see [DEPLOYMENT.md](./DEPLOYMENT.md).
-
-## Related Documentation
-
-- [PLAN.md](./PLAN.md) — Remaining roadmap for the API / MCP / OAuth / Chrome extension work, plus the OAuth client runbooks and the decision log
-- [DEPLOYMENT.md](./DEPLOYMENT.md) — Production deployment with Docker and migrations
+- [PLAN.md](./PLAN.md) — Roadmap, OAuth client runbooks, decision log
+- [DEPLOYMENT.md](./DEPLOYMENT.md) — Production Docker deployment, env vars, migrations
 - [STYLE.md](./STYLE.md) — Neo Brutalism UI design system
-- [README.md](./README.md) — Quick start and overview
+- [README.md](./README.md) — Quick start
