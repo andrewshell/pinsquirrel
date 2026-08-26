@@ -980,3 +980,268 @@ describe('OAuthService.verifyAccessToken', () => {
     )
   })
 })
+
+describe('OAuthService.registerClient', () => {
+  let ctx: ReturnType<typeof setup>
+
+  function registration(
+    overrides: Record<string, unknown> = {}
+  ): Record<string, unknown> {
+    return {
+      client_name: 'Some MCP Client',
+      redirect_uris: ['http://localhost:54321/callback'],
+      grant_types: ['authorization_code', 'refresh_token'],
+      token_endpoint_auth_method: 'none',
+      ...overrides,
+    }
+  }
+
+  beforeEach(() => {
+    ctx = setup()
+  })
+
+  it('registers a client under an identifier this server derived', async () => {
+    const client = await ctx.service.registerClient(registration())
+
+    expect(ctx.clientRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientName: 'Some MCP Client',
+        redirectUris: ['http://localhost:54321/callback'],
+        registrationType: 'dcr',
+        tokenEndpointAuthMethod: 'none',
+        metadataUrl: null,
+      })
+    )
+    expect(client.clientId.startsWith('dcr_')).toBe(true)
+  })
+
+  // Claude Code registers a fresh ephemeral port on every connection. Byte
+  // equality would store a row per connection, which is what dedup is for.
+  it('gives the same identifier to a re-registration on a new loopback port', async () => {
+    const first = await ctx.service.registerClient(registration())
+
+    const second = await ctx.service.registerClient(
+      registration({ redirect_uris: ['http://localhost:9999/callback'] })
+    )
+
+    expect(second.clientId).toBe(first.clientId)
+  })
+
+  it('returns the existing row rather than creating a second one', async () => {
+    const first = await ctx.service.registerClient(registration())
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(first)
+    vi.mocked(ctx.clientRepository.create).mockClear()
+
+    const second = await ctx.service.registerClient(registration())
+
+    expect(second).toBe(first)
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('keeps different clients apart, port aside', async () => {
+    const first = await ctx.service.registerClient(registration())
+
+    const other = await ctx.service.registerClient(
+      registration({ redirect_uris: ['http://localhost:54321/elsewhere'] })
+    )
+    const hosted = await ctx.service.registerClient(
+      registration({ redirect_uris: ['https://example.com/callback'] })
+    )
+
+    expect(other.clientId).not.toBe(first.clientId)
+    expect(hosted.clientId).not.toBe(first.clientId)
+  })
+
+  it('refuses a plaintext redirect URI that is not loopback', async () => {
+    await expect(
+      ctx.service.registerClient(
+        registration({ redirect_uris: ['http://example.com/callback'] })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidClientMetadataError)
+  })
+
+  it('refuses an authentication method this server does not advertise', async () => {
+    await expect(
+      ctx.service.registerClient(
+        registration({ token_endpoint_auth_method: 'client_secret_post' })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidClientMetadataError)
+  })
+
+  it('refuses a grant type this server does not implement', async () => {
+    await expect(
+      ctx.service.registerClient(
+        registration({ grant_types: ['client_credentials'] })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidClientMetadataError)
+  })
+
+  it('rejects a malformed registration as a validation failure', async () => {
+    await expect(
+      ctx.service.registerClient({ redirect_uris: [] })
+    ).rejects.toBeInstanceOf(ValidationError)
+  })
+})
+
+describe('OAuthService grants', () => {
+  let ctx: ReturnType<typeof setup>
+  let ac: AccessControl
+
+  function grantToken(overrides: Partial<OAuthToken> = {}): OAuthToken {
+    return makeToken(
+      {
+        tokenHash: 'hashed_x',
+        kind: 'access',
+        clientId: CIMD_URL,
+        userId: user.id,
+        scopes: ['pins:read', 'tags:read'],
+        resource: MCP_RESOURCE,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+      overrides
+    )
+  }
+
+  beforeEach(() => {
+    ctx = setup()
+    ac = new AccessControl(user)
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient()
+    )
+  })
+
+  // One authorization mints an access token and a refresh token. The profile
+  // page shows the app, not the plumbing.
+  it('lists one grant per client and audience, not one per token', async () => {
+    vi.mocked(ctx.tokenRepository.findActiveByUserId).mockResolvedValue([
+      grantToken({ id: 'access-1' }),
+      grantToken({ id: 'refresh-1', kind: 'refresh', tokenHash: 'hashed_y' }),
+    ])
+
+    const grants = await ctx.service.listGrants(ac, user.id)
+
+    expect(grants).toHaveLength(1)
+    expect(grants[0]).toMatchObject({
+      clientId: CIMD_URL,
+      clientName: 'Claude Code',
+      resource: MCP_RESOURCE,
+      scopes: ['pins:read', 'tags:read'],
+    })
+  })
+
+  it('keeps grants for different audiences apart', async () => {
+    vi.mocked(ctx.tokenRepository.findActiveByUserId).mockResolvedValue([
+      grantToken({ id: 'access-1' }),
+      grantToken({ id: 'access-2', resource: API_RESOURCE }),
+    ])
+
+    expect(await ctx.service.listGrants(ac, user.id)).toHaveLength(2)
+  })
+
+  it("refuses to list another user's grants", async () => {
+    await expect(
+      ctx.service.listGrants(new AccessControl(otherUser), user.id)
+    ).rejects.toBeInstanceOf(OAuthAccessDeniedError)
+    expect(ctx.tokenRepository.findActiveByUserId).not.toHaveBeenCalled()
+  })
+
+  // Revoking has to take the access token and the refresh token together, or
+  // the client keeps working until the access token expires.
+  it('revokes every token the grant covers', async () => {
+    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(
+      grantToken({ id: 'access-1' })
+    )
+    vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockResolvedValue(2)
+
+    await ctx.service.revokeGrant(ac, 'access-1')
+
+    expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
+      user.id,
+      CIMD_URL
+    )
+  })
+
+  it("refuses to revoke another user's grant", async () => {
+    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(
+      grantToken({ id: 'access-1', userId: otherUser.id })
+    )
+
+    await expect(
+      ctx.service.revokeGrant(ac, 'access-1')
+    ).rejects.toBeInstanceOf(OAuthAccessDeniedError)
+    expect(ctx.tokenRepository.revokeByUserAndClient).not.toHaveBeenCalled()
+  })
+
+  it('refuses to revoke a grant that does not exist', async () => {
+    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(null)
+
+    await expect(ctx.service.revokeGrant(ac, 'nope')).rejects.toBeInstanceOf(
+      OAuthInvalidGrantError
+    )
+  })
+})
+
+describe('OAuthService.revokeToken', () => {
+  let ctx: ReturnType<typeof setup>
+
+  function stored(overrides: Partial<OAuthToken> = {}): OAuthToken {
+    return makeToken(
+      {
+        tokenHash: 'hashed_raw',
+        kind: 'access',
+        clientId: CIMD_URL,
+        userId: user.id,
+        scopes: ['pins:read'],
+        resource: MCP_RESOURCE,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+      { id: 'access-1', ...overrides }
+    )
+  }
+
+  beforeEach(() => {
+    ctx = setup()
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(stored())
+    vi.mocked(ctx.tokenRepository.revoke).mockResolvedValue(true)
+    vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockResolvedValue(2)
+  })
+
+  it('revokes the access token a client hands back', async () => {
+    await ctx.service.revokeToken({ token: 'raw', client_id: CIMD_URL })
+
+    expect(ctx.tokenRepository.revoke).toHaveBeenCalledWith('access-1')
+  })
+
+  // RFC 7009: revoking a refresh token takes the access tokens with it, or
+  // the client keeps working for the rest of the hour.
+  it('takes the whole grant when the token handed back is a refresh token', async () => {
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
+      stored({ id: 'refresh-1', kind: 'refresh' })
+    )
+
+    await ctx.service.revokeToken({ token: 'raw', client_id: CIMD_URL })
+
+    expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
+      user.id,
+      CIMD_URL
+    )
+  })
+
+  // RFC 7009 4.1.1: an unknown token is a success, so revocation cannot be
+  // used to find out which tokens exist.
+  it('says nothing about a token it does not know', async () => {
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(null)
+
+    await expect(
+      ctx.service.revokeToken({ token: 'raw' })
+    ).resolves.toBeUndefined()
+    expect(ctx.tokenRepository.revoke).not.toHaveBeenCalled()
+  })
+
+  it('leaves a token that belongs to another client alone, and still says nothing', async () => {
+    await expect(
+      ctx.service.revokeToken({ token: 'raw', client_id: 'dcr_someone_else' })
+    ).resolves.toBeUndefined()
+    expect(ctx.tokenRepository.revoke).not.toHaveBeenCalled()
+  })
+})

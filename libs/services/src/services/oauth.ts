@@ -22,6 +22,8 @@ import {
 } from '@pinsquirrel/domain'
 import { generateSecureToken, hashToken } from '../utils/crypto.js'
 import {
+  canonicalizeRedirectUri,
+  isLoopbackRedirectHost,
   matchRedirectUri,
   normalizeOAuthUri,
   redirectUriMatches,
@@ -30,6 +32,7 @@ import {
   authorizationCodeGrantSchema,
   authorizationRequestSchema,
   clientIdMetadataDocumentSchema,
+  clientRegistrationSchema,
   refreshTokenGrantSchema,
   type ClientIdMetadataDocument,
 } from '../validation/oauth.js'
@@ -111,6 +114,18 @@ export interface IssuedTokens {
   scopes: string[]
   /** The audience both tokens are bound to. */
   resource: string
+}
+
+/** One application a user has given access to, as the profile page shows it. */
+export interface OAuthGrant {
+  /** The token to hand to `revokeGrant`. */
+  tokenId: string
+  clientId: string
+  clientName: string | null
+  scopes: string[]
+  resource: string
+  expiresAt: Date
+  createdAt: Date
 }
 
 /** Who a bearer token turns out to be, once it checks out. */
@@ -484,6 +499,188 @@ export class OAuthService {
     return { token, user, clientId: token.clientId, scopes: token.scopes }
   }
 
+  /**
+   * Register a client that posted its own metadata (RFC 7591).
+   *
+   * The fallback path, not the preferred one: DCR is deprecated in the current
+   * spec and lets an anonymous caller create rows (Decision 15). Two things
+   * bound the damage. The identifier is derived from the metadata rather than
+   * generated, so re-registering the same client returns the same row instead
+   * of a new one, and a row that never completes an authorization is swept.
+   *
+   * The derivation is what makes dedup work on a native client: the key drops
+   * the port for loopback redirect URIs only, so Claude Code's fresh ephemeral
+   * port each connection is the same client, while a different path or a
+   * different host is not.
+   */
+  async registerClient(metadata: unknown): Promise<OAuthClient> {
+    const parsed = clientRegistrationSchema.safeParse(metadata)
+    if (!parsed.success) {
+      throw validationErrorFromZod(parsed.error, {
+        fallbackField: 'client_metadata',
+      })
+    }
+    const request = parsed.data
+
+    const authMethod = request.token_endpoint_auth_method ?? 'none'
+    if (authMethod !== 'none') {
+      // The metadata document advertises `none` and nothing else. Advertise
+      // what is implemented; a secret this server never checks is worse than
+      // no secret at all.
+      throw new OAuthInvalidClientMetadataError(
+        'This server registers public clients only (token_endpoint_auth_method must be none)'
+      )
+    }
+
+    const grantTypes = request.grant_types ?? DEFAULT_GRANT_TYPES
+    const unsupported = grantTypes.filter(
+      grant => !DEFAULT_GRANT_TYPES.includes(grant)
+    )
+    if (unsupported.length > 0) {
+      throw new OAuthInvalidClientMetadataError(
+        `Unsupported grant type: ${unsupported.join(', ')}`
+      )
+    }
+
+    const redirectUris = request.redirect_uris.map(uri =>
+      requireUsableRedirectUri(uri)
+    )
+
+    const clientId = dcrClientId({
+      clientName: request.client_name ?? null,
+      redirectUris,
+      grantTypes,
+      authMethod,
+    })
+
+    const existing = await this.clientRepository.findByClientId(clientId)
+    if (existing) {
+      return existing
+    }
+
+    return this.clientRepository.create({
+      clientId,
+      clientName: request.client_name ?? null,
+      redirectUris,
+      grantTypes,
+      tokenEndpointAuthMethod: authMethod,
+      registrationType: 'dcr',
+      metadataUrl: null,
+      metadataFetchedAt: null,
+    })
+  }
+
+  /**
+   * The applications a user has given access to.
+   *
+   * One entry per client and audience rather than per token: an authorization
+   * mints an access token and a refresh token, and the profile page is showing
+   * the application, not the plumbing. Takes an `AccessControl` because this is
+   * a user-facing operation, exactly as `ApiKeyService.listApiKeys` does.
+   */
+  async listGrants(ac: AccessControl, userId: string): Promise<OAuthGrant[]> {
+    if (!ac.canCreateAs(userId)) {
+      throw new OAuthAccessDeniedError(
+        "Not authorized to list another user's grants"
+      )
+    }
+
+    const tokens = await this.tokenRepository.findActiveByUserId(userId)
+
+    const grouped = new Map<string, OAuthToken[]>()
+    for (const token of tokens) {
+      const key = `${token.clientId}\n${token.resource}`
+      const group = grouped.get(key)
+      if (group) group.push(token)
+      else grouped.set(key, [token])
+    }
+
+    const names = new Map<string, string | null>()
+    const grants: OAuthGrant[] = []
+
+    for (const group of grouped.values()) {
+      const newest = group.reduce((latest, token) =>
+        token.createdAt > latest.createdAt ? token : latest
+      )
+
+      if (!names.has(newest.clientId)) {
+        const client = await this.clientRepository.findByClientId(
+          newest.clientId
+        )
+        names.set(newest.clientId, client?.clientName ?? null)
+      }
+
+      grants.push({
+        tokenId: newest.id,
+        clientId: newest.clientId,
+        clientName: names.get(newest.clientId) ?? null,
+        scopes: newest.scopes,
+        resource: newest.resource,
+        expiresAt: newest.expiresAt,
+        createdAt: newest.createdAt,
+      })
+    }
+
+    return grants
+  }
+
+  /**
+   * Take an application's access away.
+   *
+   * Revoking one token would leave the rest of the grant alive, so the access
+   * token and the refresh token go together: a client whose refresh token
+   * survived would simply mint another access token, and one whose access
+   * token survived keeps working until it expires.
+   */
+  async revokeGrant(ac: AccessControl, tokenId: string): Promise<void> {
+    const token = await this.tokenRepository.findById(tokenId)
+    if (!token) {
+      throw new OAuthInvalidGrantError('No such grant')
+    }
+
+    if (!ac.canDelete(token)) {
+      throw new OAuthAccessDeniedError(
+        "Not authorized to revoke another user's grant"
+      )
+    }
+
+    await this.revokeGrantFamily(token.userId, token.clientId)
+  }
+
+  /**
+   * Hand a token back (RFC 7009).
+   *
+   * Always succeeds, whatever was presented. An unknown token, an already dead
+   * one and one belonging to a different client all answer the same way,
+   * because a revocation endpoint that reported which was which would be a way
+   * to find out whether a token exists.
+   */
+  async revokeToken(input: {
+    token: string
+    client_id?: string
+    token_type_hint?: string
+  }): Promise<void> {
+    const token = await this.tokenRepository.findByTokenHash(
+      hashToken(input.token)
+    )
+    if (!token) {
+      return
+    }
+
+    if (input.client_id && token.clientId !== input.client_id) {
+      return
+    }
+
+    if (token.kind === 'refresh') {
+      // A refresh token stands for the whole grant; leaving its access tokens
+      // alive would keep the client working for the rest of the hour.
+      await this.revokeGrantFamily(token.userId, token.clientId)
+      return
+    }
+
+    await this.tokenRepository.revoke(token.id)
+  }
+
   /** Kill every live token a user holds for one client. */
   private async revokeGrantFamily(
     userId: string,
@@ -795,6 +992,59 @@ function narrowedScopes(scope: string, granted: string[]): string[] {
  * an audience failure. Divergent normalization here looks like random
  * connection breakage from the outside.
  */
+/**
+ * A redirect URI a client may register.
+ *
+ * https anywhere, and plaintext only on loopback, where there is no network
+ * to intercept and RFC 8252 expects it. A plaintext URI on a real host would
+ * carry an authorization code across the internet in the clear.
+ */
+function requireUsableRedirectUri(uri: string): string {
+  let url: URL
+  try {
+    url = new URL(uri)
+  } catch {
+    throw new OAuthInvalidClientMetadataError(`Unusable redirect_uri: ${uri}`)
+  }
+
+  if (url.protocol === 'https:') return uri
+  if (url.protocol === 'http:' && isLoopbackRedirectHost(url.hostname)) {
+    return uri
+  }
+
+  throw new OAuthInvalidClientMetadataError(
+    `redirect_uri must be https, or http on loopback: ${uri}`
+  )
+}
+
+/**
+ * The identifier a dynamic registration gets, derived from what it registered.
+ *
+ * Derived rather than random so that re-registering the same client resolves
+ * to the same row. The redirect URIs go in canonicalized, which is what drops
+ * the port for loopback hosts only: Claude Code registering a fresh ephemeral
+ * port on every connection is one client, and a different path or host is a
+ * different one. There is no secret here to protect - a public client's
+ * identifier is public by definition.
+ */
+function dcrClientId(metadata: {
+  clientName: string | null
+  redirectUris: string[]
+  grantTypes: string[]
+  authMethod: string
+}): string {
+  const key = JSON.stringify({
+    clientName: metadata.clientName,
+    redirectUris: metadata.redirectUris
+      .map(uri => canonicalizeRedirectUri(uri))
+      .sort(),
+    grantTypes: [...metadata.grantTypes].sort(),
+    authMethod: metadata.authMethod,
+  })
+
+  return `dcr_${hashToken(key)}`
+}
+
 function sameResource(one: string, other: string): boolean {
   try {
     return normalizeOAuthUri(one) === normalizeOAuthUri(other)
