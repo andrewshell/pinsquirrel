@@ -7,7 +7,9 @@
  * edited title is overwritten.
  */
 
-import type { Pin } from './types.ts'
+import { ReauthorizationRequiredError } from './auth.ts'
+import * as storage from './storage.ts'
+import type { Pin, Tag } from './types.ts'
 
 /**
  * A folder's id, found by title under `parentId` or created there.
@@ -178,4 +180,103 @@ export async function removeOrphanFolders(
     }
     await chrome.bookmarks.removeTree(child.id)
   }
+}
+
+/** The folder the extension owns, at the top of the bookmarks bar. */
+const ROOT_FOLDER_NAME = 'PinSquirrel'
+
+/**
+ * The bookmarks bar's id.
+ *
+ * Found by walking the tree rather than assuming `'1'`: the id is stable in
+ * Chrome today, but the bar is identified in the API by its `folderType`, and
+ * that is what the sync asks for. The literal stays as the fallback for a
+ * build old enough not to report `folderType` (it arrived in Chrome 134).
+ */
+async function bookmarksBarId(): Promise<string> {
+  const [root] = await chrome.bookmarks.getTree()
+  const bar = root?.children?.find(node => node.folderType === 'bookmarks-bar')
+  return bar?.id ?? '1'
+}
+
+/**
+ * The part of `PinSquirrelApiClient` the sync uses.
+ *
+ * Named as its own type so a test can drive `syncAll` with two functions
+ * instead of a client with a `fetch` behind it. `runSync` is what builds the
+ * real one.
+ */
+export interface SyncApiClient {
+  getTags(): Promise<Tag[]>
+  getAllPinsForTag(tagId: string): Promise<Pin[]>
+}
+
+/** What the popup shows for a failed run. */
+function syncErrorMessage(error: unknown): string {
+  // The one failure the user has to act on: the grant is gone, and only a
+  // fresh consent brings it back. Saying so beats a message about a token the
+  // user never knew existed.
+  if (error instanceof ReauthorizationRequiredError) {
+    return `PinSquirrel needs to be reconnected: ${error.message}`
+  }
+  if (error instanceof Error) return error.message
+  return 'The sync failed for an unknown reason'
+}
+
+/**
+ * Mirror the selected tags into the bookmark tree, and report the run.
+ *
+ * The report is the point of the wrapper: the popup renders `lastSyncAt` and
+ * `lastSyncError` straight out of storage and is usually shut while a sync
+ * runs, so a failure that was not written down reads as a run that worked. The
+ * failure is rethrown as well, because the service worker (5f) has to answer
+ * the popup's `SyncRequest` with it when the popup *is* open.
+ *
+ * `lastSyncAt` is left alone by a failed run: it means "when the bookmarks
+ * were last correct", and a failure did not change that.
+ */
+export async function syncAll(input: {
+  apiClient: SyncApiClient
+  selectedTagIds: string[]
+}): Promise<void> {
+  try {
+    await mirrorTags(input)
+  } catch (error) {
+    await storage.set({ lastSyncError: syncErrorMessage(error) })
+    throw error
+  }
+
+  await storage.set({ lastSyncAt: Date.now() })
+  await storage.remove(['lastSyncError'])
+}
+
+/** The sync itself: tags to folders, pins to bookmarks. */
+async function mirrorTags(input: {
+  apiClient: SyncApiClient
+  selectedTagIds: string[]
+}): Promise<void> {
+  const tags = await input.apiClient.getTags()
+  const byId = new Map(tags.map(tag => [tag.id, tag]))
+  const selected = input.selectedTagIds.flatMap(id => {
+    const tag = byId.get(id)
+    return tag ? [tag] : []
+  })
+
+  const rootId = await findOrCreateFolder(
+    await bookmarksBarId(),
+    ROOT_FOLDER_NAME
+  )
+
+  for (const tag of selected) {
+    const folderId = await findOrCreateFolder(rootId, tag.name)
+    await syncTagFolder(
+      folderId,
+      await input.apiClient.getAllPinsForTag(tag.id)
+    )
+  }
+
+  await removeOrphanFolders(
+    rootId,
+    selected.map(tag => tag.name)
+  )
 }
