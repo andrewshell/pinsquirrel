@@ -1,0 +1,31 @@
+{
+  "name": "@pinsquirrel/chrome-extension",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Chrome extension that syncs PinSquirrel bookmarks over the v1 REST API",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src scripts",
+    "lint:fix": "eslint \"{src,scripts}/**/*.ts\" --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest --run",
+    "test:watch": "vitest --watch --coverage",
+    "test:coverage": "vitest --run --coverage"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.43",
+    "@types/node": "^26.2.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "esbuild": "^0.28.1",
+    "eslint": "^10.9.0",
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  // One project covers both `src` (extension code, bundled by esbuild) and
+  // `scripts` (the build script and its helpers, run by Node). `node` is in
+  // `types` for the latter's sake; nothing under `src` imports a Node builtin.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    // Node runs `scripts/build.ts` by stripping types, which requires the
+    // real `.ts` extension on relative imports. esbuild is fine either way.
+    "allowImportingTsExtensions": true,
+    "types": ["chrome", "node", "vitest/globals"]
+  },
+  "include": ["src/**/*", "scripts/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
