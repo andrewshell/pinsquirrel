@@ -2,6 +2,8 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import type {
   AccessControl,
   HttpFetcher,
+  OAuthToken,
+  User,
   OAuthAuthorizationCodeRepository,
   OAuthClient,
   OAuthClientRepository,
@@ -109,6 +111,14 @@ export interface IssuedTokens {
   scopes: string[]
   /** The audience both tokens are bound to. */
   resource: string
+}
+
+/** Who a bearer token turns out to be, once it checks out. */
+export interface VerifiedAccessToken {
+  token: OAuthToken
+  user: User
+  clientId: string
+  scopes: string[]
 }
 
 /** An authorization request that passed every check but consent. */
@@ -433,6 +443,47 @@ export class OAuthService {
     })
   }
 
+  /**
+   * Resolve a bearer token to the principal behind it, or to nothing.
+   *
+   * The OAuth twin of `ApiKeyService.authenticate`: the hash lookup, the
+   * expiry, revocation and audience checks and the account lookup are one
+   * call, which is why 6d's middleware needs no repository (Decision 20).
+   *
+   * Every failure is the same `null`. A token for the wrong audience, an
+   * expired one, a revoked one and one that never existed are indistinguishable
+   * from outside on purpose, and a token whose user is gone reads as invalid
+   * for the same enumeration reason `ApiKeyService` gives.
+   */
+  async verifyAccessToken(
+    rawToken: string,
+    expectedResource: string
+  ): Promise<VerifiedAccessToken | null> {
+    const token = await this.tokenRepository.findByTokenHash(
+      hashToken(rawToken)
+    )
+    if (!token || token.kind !== 'access') {
+      return null
+    }
+
+    if (token.revokedAt || token.expiresAt <= new Date()) {
+      return null
+    }
+
+    if (!sameResource(token.resource, expectedResource)) {
+      // RFC 8707 audience binding. The path component is significant, so an
+      // `/mcp` token cannot drive `/api/v1` (Decision 18).
+      return null
+    }
+
+    const user = await this.userRepository.findById(token.userId)
+    if (!user) {
+      return null
+    }
+
+    return { token, user, clientId: token.clientId, scopes: token.scopes }
+  }
+
   /** Kill every live token a user holds for one client. */
   private async revokeGrantFamily(
     userId: string,
@@ -735,6 +786,21 @@ function narrowedScopes(scope: string, granted: string[]): string[] {
     )
   }
   return requested.length > 0 ? [...new Set(requested)] : granted
+}
+
+/**
+ * Are these two the same resource identifier?
+ *
+ * Normalized on both sides, so a trailing slash or an upper-case host is not
+ * an audience failure. Divergent normalization here looks like random
+ * connection breakage from the outside.
+ */
+function sameResource(one: string, other: string): boolean {
+  try {
+    return normalizeOAuthUri(one) === normalizeOAuthUri(other)
+  } catch {
+    return false
+  }
 }
 
 function looksLikeUrl(clientId: string): boolean {

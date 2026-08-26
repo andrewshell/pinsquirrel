@@ -872,3 +872,111 @@ describe('OAuthService.exchangeRefreshToken', () => {
     ).rejects.toBeInstanceOf(ValidationError)
   })
 })
+
+describe('OAuthService.verifyAccessToken', () => {
+  let ctx: ReturnType<typeof setup>
+
+  function storedAccess(overrides: Partial<OAuthToken> = {}): OAuthToken {
+    return makeToken(
+      {
+        tokenHash: 'hashed_pso_raw',
+        kind: 'access',
+        clientId: CIMD_URL,
+        userId: user.id,
+        scopes: ['pins:read', 'tags:read'],
+        resource: MCP_RESOURCE,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+      { id: 'access-1', ...overrides }
+    )
+  }
+
+  beforeEach(() => {
+    ctx = setup()
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
+      storedAccess()
+    )
+    vi.mocked(ctx.userRepository.findById).mockResolvedValue(user)
+  })
+
+  // The OAuth twin of `ApiKeyService.authenticate`: one call resolves the
+  // token and the account, which is why 6d's middleware needs no repository.
+  it('resolves a live token to its principal', async () => {
+    const result = await ctx.service.verifyAccessToken('pso_raw', MCP_RESOURCE)
+
+    expect(ctx.tokenRepository.findByTokenHash).toHaveBeenCalledWith(
+      'hashed_pso_raw'
+    )
+    expect(result).toMatchObject({
+      user,
+      clientId: CIMD_URL,
+      scopes: ['pins:read', 'tags:read'],
+    })
+    expect(result?.token.id).toBe('access-1')
+  })
+
+  // The confused-deputy defense: `/mcp` and `/api/v1` are separate audiences
+  // and neither accepts the other's token.
+  it('refuses a token minted for the other resource', async () => {
+    expect(await ctx.service.verifyAccessToken('pso_raw', API_RESOURCE)).toBe(
+      null
+    )
+  })
+
+  it('compares the audience after normalizing both sides', async () => {
+    expect(
+      await ctx.service.verifyAccessToken(
+        'pso_raw',
+        'HTTPS://PinSquirrel.com/mcp/'
+      )
+    ).not.toBe(null)
+  })
+
+  it('refuses an expired token', async () => {
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
+      storedAccess({ expiresAt: new Date(Date.now() - 1000) })
+    )
+
+    expect(await ctx.service.verifyAccessToken('pso_raw', MCP_RESOURCE)).toBe(
+      null
+    )
+  })
+
+  it('refuses a revoked token', async () => {
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
+      storedAccess({ revokedAt: new Date() })
+    )
+
+    expect(await ctx.service.verifyAccessToken('pso_raw', MCP_RESOURCE)).toBe(
+      null
+    )
+  })
+
+  it('refuses a refresh token presented as a bearer credential', async () => {
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
+      storedAccess({ kind: 'refresh' })
+    )
+
+    expect(await ctx.service.verifyAccessToken('pso_raw', MCP_RESOURCE)).toBe(
+      null
+    )
+  })
+
+  it('refuses a token nothing is stored for', async () => {
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(null)
+
+    expect(await ctx.service.verifyAccessToken('pso_raw', MCP_RESOURCE)).toBe(
+      null
+    )
+  })
+
+  // Same reason `ApiKeyService.authenticate` does this: a distinct answer
+  // would confirm the token itself was good.
+  it('reads a token whose user is gone as an invalid token', async () => {
+    vi.mocked(ctx.userRepository.findById).mockResolvedValue(null)
+
+    expect(await ctx.service.verifyAccessToken('pso_raw', MCP_RESOURCE)).toBe(
+      null
+    )
+  })
+})
