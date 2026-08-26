@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>PinSquirrel</title>
+  </head>
+  <body>
+    <main id="popup">
+      <h1>PinSquirrel</h1>
+
+      <!-- Shown while the extension has no connection to a PinSquirrel
+           instance: base URL and the button that starts the OAuth flow. -->
+      <section id="settings-view" hidden></section>
+
+      <!-- Shown once connected: tag selection, sync controls, status. -->
+      <section id="main-view" hidden></section>
+
+      <p id="status" role="status"></p>
+    </main>
+
+    <!-- No inline scripts: the extension CSP forbids them. -->
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
