@@ -4,10 +4,10 @@ import { vi } from 'vitest'
  * A stand-in for the `chrome` global, for the extension code that talks to it.
  *
  * Only the surface this extension actually uses is here: `storage.local`,
- * `storage.sync` (present so a test can prove nothing writes to it), and the
- * two `identity` calls the OAuth flow makes. Anything else is left off on
- * purpose - a test that reaches for it should fail loudly rather than get an
- * empty object back.
+ * `storage.sync` (present so a test can prove nothing writes to it), the two
+ * `identity` calls the OAuth flow makes, and the `bookmarks` calls the sync
+ * makes. Anything else is left off on purpose - a test that reaches for it
+ * should fail loudly rather than get an empty object back.
  *
  * `vi.unstubAllGlobals()` in an `afterEach` is what undoes it.
  */
@@ -38,6 +38,8 @@ export interface ChromeStub {
   getRedirectURL: ReturnType<typeof vi.fn<() => string>>
   /** What the service worker answers the popup with. Set per test. */
   sendMessage: SendMessageMock
+  /** The bookmark tree the sync reads and writes. */
+  bookmarks: BookmarksStub
 }
 
 /** The callback-free half of `chrome.storage.StorageArea`, backed by an object. */
@@ -72,6 +74,220 @@ function storageArea(area: StubbedStorageArea) {
 }
 
 /**
+ * One node of the fake bookmark tree. A node with no `url` is a folder, which
+ * is the same rule the real API uses.
+ */
+interface StubBookmarkNode {
+  id: string
+  parentId?: string
+  title: string
+  url?: string
+  folderType?: `${chrome.bookmarks.FolderType}`
+  /** Child ids, in display order. Folders only. */
+  children?: string[]
+}
+
+/** The fake bookmark tree, and the handles a test drives it with. */
+export interface BookmarksStub {
+  /** The bookmarks bar, as Chrome numbers it. The sync has to find this. */
+  barId: string
+  /** Add a folder and answer its id. */
+  addFolder(parentId: string, title: string): string
+  /** Add a bookmark and answer its id. */
+  addBookmark(parentId: string, title: string, url: string): string
+  /** What a folder holds right now, in order. */
+  childrenOf(parentId: string): { id: string; title: string; url?: string }[]
+  /** Whether a node is still in the tree, for asserting a removal happened. */
+  has(id: string): boolean
+  /**
+   * Every `chrome.bookmarks` call made, in order, spelled `create(1)` or
+   * `getChildren(3)`. A test asserts on this to pin down how much of the
+   * bookmark API a sync touches, since the cost of this sync is round trips.
+   */
+  calls: string[]
+}
+
+/** The bookmarks bar's id in Chrome, seeded so the tree looks like a real one. */
+const BAR_ID = '1'
+
+/**
+ * An in-memory `chrome.bookmarks`.
+ *
+ * Only the calls the sync makes are implemented - `getTree`, `getChildren`,
+ * `create`, `update`, `move`, `remove`, `removeTree` - and each throws on an
+ * unknown id the way the real API rejects.
+ *
+ * `move` follows Chromium: the node is taken out of its parent and put back at
+ * the requested index, and a same-parent move to a *later* index is adjusted
+ * down by one because the index is read in the coordinate space before the
+ * removal. The sync only ever moves to an earlier index, where the two spaces
+ * agree, so it never depends on that adjustment.
+ */
+function bookmarksApi(stub: BookmarksStub) {
+  const nodes = new Map<string, StubBookmarkNode>([
+    ['0', { id: '0', title: '', children: [BAR_ID, '2'] }],
+    [
+      BAR_ID,
+      {
+        id: BAR_ID,
+        parentId: '0',
+        title: 'Bookmarks bar',
+        folderType: 'bookmarks-bar',
+        children: [],
+      },
+    ],
+    [
+      '2',
+      {
+        id: '2',
+        parentId: '0',
+        title: 'Other bookmarks',
+        folderType: 'other',
+        children: [],
+      },
+    ],
+  ])
+  let nextId = 3
+
+  const node = (id: string): StubBookmarkNode => {
+    const found = nodes.get(id)
+    if (!found) throw new Error(`Can't find bookmark for id: ${id}`)
+    return found
+  }
+
+  const childrenOf = (id: string): string[] => {
+    const folder = node(id)
+    if (!folder.children) throw new Error(`Bookmark ${id} is not a folder`)
+    return folder.children
+  }
+
+  const detach = (id: string): void => {
+    const parentId = node(id).parentId
+    if (parentId === undefined) return
+    const siblings = childrenOf(parentId)
+    siblings.splice(siblings.indexOf(id), 1)
+  }
+
+  const insert = (parentId: string, id: string, index?: number): void => {
+    const siblings = childrenOf(parentId)
+    siblings.splice(index ?? siblings.length, 0, id)
+    node(id).parentId = parentId
+  }
+
+  const add = (
+    parentId: string,
+    title: string,
+    url?: string,
+    index?: number
+  ): StubBookmarkNode => {
+    const id = String(nextId++)
+    nodes.set(id, { id, parentId, title, url, children: url ? undefined : [] })
+    insert(parentId, id, index)
+    return node(id)
+  }
+
+  /** The API's own view of a node: children nested, index filled in. */
+  const view = (
+    id: string,
+    deep: boolean
+  ): chrome.bookmarks.BookmarkTreeNode => {
+    const own = node(id)
+    const parentId = own.parentId
+    return {
+      id: own.id,
+      ...(parentId === undefined
+        ? {}
+        : { parentId, index: childrenOf(parentId).indexOf(id) }),
+      title: own.title,
+      ...(own.url === undefined ? {} : { url: own.url }),
+      ...(own.folderType === undefined ? {} : { folderType: own.folderType }),
+      syncing: false,
+      ...(own.children && deep
+        ? { children: own.children.map(child => view(child, true)) }
+        : {}),
+    }
+  }
+
+  const record = (call: string) => stub.calls.push(call)
+
+  stub.addFolder = (parentId, title) => add(parentId, title).id
+  stub.addBookmark = (parentId, title, url) => add(parentId, title, url).id
+  stub.childrenOf = parentId =>
+    childrenOf(parentId).map(id => {
+      const own = node(id)
+      return {
+        id: own.id,
+        title: own.title,
+        ...(own.url ? { url: own.url } : {}),
+      }
+    })
+  stub.has = id => nodes.has(id)
+
+  return {
+    getTree: () => {
+      record('getTree()')
+      return Promise.resolve([view('0', true)])
+    },
+    getChildren: (id: string) => {
+      record(`getChildren(${id})`)
+      return Promise.resolve(childrenOf(id).map(child => view(child, false)))
+    },
+    create: (details: chrome.bookmarks.CreateDetails) => {
+      record(`create(${details.parentId ?? '2'})`)
+      const created = add(
+        details.parentId ?? '2',
+        details.title ?? '',
+        details.url,
+        details.index
+      )
+      return Promise.resolve(view(created.id, false))
+    },
+    update: (id: string, changes: chrome.bookmarks.UpdateChanges) => {
+      record(`update(${id})`)
+      const own = node(id)
+      if (changes.title !== undefined) own.title = changes.title
+      if (changes.url !== undefined) own.url = changes.url
+      return Promise.resolve(view(id, false))
+    },
+    move: (id: string, destination: chrome.bookmarks.MoveDestination) => {
+      record(`move(${id})`)
+      const own = node(id)
+      const parentId = destination.parentId ?? own.parentId
+      if (parentId === undefined) throw new Error(`Can't move the root`)
+      const samePlace = parentId === own.parentId
+      const from = samePlace ? childrenOf(parentId).indexOf(id) : -1
+      const index =
+        destination.index !== undefined && samePlace && destination.index > from
+          ? destination.index - 1
+          : destination.index
+      detach(id)
+      insert(parentId, id, index)
+      return Promise.resolve(view(id, false))
+    },
+    remove: (id: string) => {
+      record(`remove(${id})`)
+      const own = node(id)
+      if (own.children?.length) {
+        throw new Error(`Can't remove non-empty folder ${id}`)
+      }
+      detach(id)
+      nodes.delete(id)
+      return Promise.resolve()
+    },
+    removeTree: (id: string) => {
+      record(`removeTree(${id})`)
+      const drop = (target: string) => {
+        for (const child of [...(node(target).children ?? [])]) drop(child)
+        nodes.delete(target)
+      }
+      detach(id)
+      drop(id)
+      return Promise.resolve()
+    },
+  }
+}
+
+/**
  * The extension's own callback URL, as Chrome mints it. Tests that assert a
  * `redirect_uri` compare against this.
  */
@@ -81,6 +297,10 @@ export const STUB_REDIRECT_URL = 'https://extensionid.chromiumapp.org/'
 export function stubChrome(
   initialLocal: Record<string, unknown> = {}
 ): ChromeStub {
+  const unimplemented = () => {
+    throw new Error('stubChrome has not been installed')
+  }
+
   const stub: ChromeStub = {
     local: { items: { ...initialLocal } },
     sync: { items: {} },
@@ -92,6 +312,15 @@ export function stubChrome(
       >(),
     getRedirectURL: vi.fn<() => string>(() => STUB_REDIRECT_URL),
     sendMessage: vi.fn<(message: unknown) => Promise<unknown>>(),
+    // `bookmarksApi` fills these in over the tree it closes over.
+    bookmarks: {
+      barId: BAR_ID,
+      addFolder: unimplemented,
+      addBookmark: unimplemented,
+      childrenOf: unimplemented,
+      has: unimplemented,
+      calls: [],
+    },
   }
 
   vi.stubGlobal('chrome', {
@@ -106,6 +335,7 @@ export function stubChrome(
     runtime: {
       sendMessage: stub.sendMessage,
     },
+    bookmarks: bookmarksApi(stub.bookmarks),
   })
 
   return stub
