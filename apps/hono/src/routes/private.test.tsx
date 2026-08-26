@@ -64,6 +64,7 @@ vi.mock('../lib/services', () => ({
   },
   tagService: {
     getUserTags: (...a: unknown[]) => svc.getUserTags(...a) as unknown,
+    searchTags: (...a: unknown[]) => svc.searchTags(...a) as unknown,
   },
 }))
 
@@ -90,6 +91,7 @@ describe('private routes', () => {
     session.isPrivateUnlocked.mockReturnValue(true)
     unlockLimiter.isLimited.mockReturnValue(false)
     svc.getUserTags.mockResolvedValue([makeTag()])
+    svc.searchTags.mockResolvedValue([])
     svc.getUserPinsWithPagination.mockResolvedValue({
       pins: [makePin({ isPrivate: true })],
       pagination: Pagination.fromTotalCount(1),
@@ -301,6 +303,31 @@ describe('private routes', () => {
         noTags: true,
       })
       expect(options).toMatchObject({ page: 3 })
+    })
+
+    it('offers the tags matching the search, linked into the private list', async () => {
+      svc.searchTags.mockResolvedValue([makeTag({ name: 'jesseelder' })])
+
+      const html = await (
+        await app.request('/private/pins?search=jesse')
+      ).text()
+
+      expect(svc.searchTags).toHaveBeenCalledWith(
+        expect.anything(),
+        testUser.id,
+        'jesse'
+      )
+      expect(html).toContain('Matching tags')
+      expect(html).toContain('/private/pins?tag=jesseelder')
+    })
+
+    it('says nothing about matching tags without a search', async () => {
+      svc.searchTags.mockResolvedValue([makeTag({ name: 'jesseelder' })])
+
+      const html = await (await app.request('/private/pins')).text()
+
+      expect(svc.searchTags).not.toHaveBeenCalled()
+      expect(html).not.toContain('Matching tags')
     })
 
     it('returns only the content partial for HTMX requests', async () => {

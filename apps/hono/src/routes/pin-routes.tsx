@@ -185,6 +185,13 @@ export function createPinRoutes({
 
     const result = await fetchUserPins(user, filter, page)
 
+    // A word the user typed may be one of their tags, which is a broader and
+    // usually better answer than the text match. Only asked when there is a
+    // search — an unsearched list has nothing to match against.
+    const matchingTags = search
+      ? await tagService.searchTags(new AccessControl(user), user.id, search)
+      : []
+
     const listProps = {
       pins: result.pins,
       pagination: result.pagination,
@@ -196,6 +203,7 @@ export function createPinRoutes({
       sortBy,
       sortDirection,
       noTags,
+      matchingTags: matchingTags.map(t => t.name),
       baseUrl,
     }
 

@@ -42,6 +42,7 @@ vi.mock('../lib/services', () => ({
   },
   tagService: {
     getUserTags: (...a: unknown[]) => svc.getUserTags(...a) as unknown,
+    searchTags: (...a: unknown[]) => svc.searchTags(...a) as unknown,
   },
 }))
 
@@ -66,6 +67,7 @@ describe('pins routes', () => {
     session.authUser.mockReturnValue(testUser)
     session.getFlash.mockReturnValue(null)
     svc.getUserTags.mockResolvedValue([makeTag()])
+    svc.searchTags.mockResolvedValue([])
     svc.getUserPinsWithPagination.mockResolvedValue({
       pins: [makePin()],
       pagination: Pagination.fromTotalCount(1),
@@ -184,6 +186,53 @@ describe('pins routes', () => {
 
       expect(html).toContain('view=compact')
       expect(html).not.toContain('size=compact')
+    })
+
+    it('offers the tags matching the search above the list', async () => {
+      svc.searchTags.mockResolvedValue([makeTag({ name: 'jesseelder' })])
+
+      const html = await (await app.request('/pins?search=jesse')).text()
+
+      expect(svc.searchTags).toHaveBeenCalledWith(
+        expect.anything(),
+        testUser.id,
+        'jesse'
+      )
+      expect(html).toContain('Matching tags')
+      expect(html).toContain('jesseelder')
+      expect(html).toContain('/pins?tag=jesseelder')
+    })
+
+    it('says nothing about matching tags without a search', async () => {
+      svc.searchTags.mockResolvedValue([makeTag({ name: 'jesseelder' })])
+
+      const html = await (await app.request('/pins')).text()
+
+      expect(svc.searchTags).not.toHaveBeenCalled()
+      expect(html).not.toContain('Matching tags')
+    })
+
+    it('says nothing about matching tags when the search matches none', async () => {
+      svc.searchTags.mockResolvedValue([])
+
+      const html = await (await app.request('/pins?search=jesse')).text()
+
+      expect(html).not.toContain('Matching tags')
+    })
+
+    it('returns the matching tags with the HTMX partial too', async () => {
+      // The search box swaps #pins-content without a navigation, so a row that
+      // only the full page rendered would vanish on the first search.
+      svc.searchTags.mockResolvedValue([makeTag({ name: 'jesseelder' })])
+
+      const html = await (
+        await app.request('/pins?search=jesse', {
+          headers: { 'HX-Request': 'true' },
+        })
+      ).text()
+
+      expect(html).toContain('Matching tags')
+      expect(html).toContain('/pins?tag=jesseelder')
     })
 
     it('returns only the content partial for HTMX requests', async () => {
