@@ -109,6 +109,11 @@ password checks) and 3.4.1 (production Docker build repaired for pnpm 11); then 
 - [ ] Deferred read-write MCP tools. See Phase 3b-7. Gated on the `pins:write` scope
       from Phase 6, so do Phase 6 first.
 - [ ] Remove the API key infrastructure once OAuth is proven. New Phase 7.
+- [ ] `/mcp` holds one MCP session per process, so two clients cannot be connected to one
+      deployment at once, and the transport maps responses back to requests by JSON-RPC id
+      across every caller. Phase 3b code, found by 6g's end-to-end test, written up in full
+      under 6g with the fix. It blocks 6g's two real-client checks, so it comes first, in its
+      own change.
 - [ ] `MailgunConfig.baseUrl` is honoured by the email service but never set by
       `apps/hono/src/lib/services.ts`. Unrelated to OAuth; only matters if Mailgun EU is ever
       used. Wire a `MAILGUN_BASE_URL` env through when it does.
@@ -483,16 +488,19 @@ The approach changed. Instead of a hand-written JSX docs page, the v1 routes wer
 
 ## Phase 6: OAuth 2.1 (the only auth path)
 
-> **Resume at 6g.** 6a through 6f shipped on `feat/oauth-phase-6`: both 401s carry a
+> **Resume at the real-client runs in 6g.** 6a through 6f shipped on `feat/oauth-phase-6`: both 401s carry a
 > `WWW-Authenticate` challenge, `BASE_URL` exists, the four discovery documents are served, the
 > OAuth entities, repository interfaces, error types, tables and Drizzle repositories exist with
 > the migration applied, `OAuthService` sits over them in `libs/services`, and the four endpoints
 > (`/oauth/authorize`, `/oauth/token`, `/oauth/revoke`, `/oauth/register`) plus
 > `middleware/oauth-auth.ts` are live. `/mcp` and `/api/v1` authenticate with OAuth only as of
 > 6d, so `ps_` keys no longer open them. 6f added the rate limiters, the latency-budget fix and
-> the profile grants card; 6e added pre-registered static clients. What is left is the end-to-end
-> runs against real clients (6g), including the two CIMD items 6e leaves open because only a real
-> client exercises them. Goal: a user pastes
+> the profile grants card; 6e added pre-registered static clients. 6g's automated half is done
+> too: the unit coverage is audited, and `apps/hono/src/oauth-e2e.test.ts` drives a whole
+> connection in process against the real app and a real database. What is left is the runs
+> against real clients, including the two CIMD items 6e leaves open because only a real client
+> exercises them, and the one-session-per-process limit in the MCP transport that 6g turned up
+> and that has to go before two clients can be connected at once. Goal: a user pastes
 > `https://pinsquirrel.com/mcp` into
 > Claude (or any MCP client), clicks through a consent screen, and is connected. No hand-copied
 > API key.
@@ -1229,16 +1237,146 @@ Folded in from the standing follow-up. Phase 6 raises the priority, since `/oaut
 This is the cutover gate. Phase 7 deletes the API key path, so everything below has to pass
 before anything is removed. After Phase 7 there is no fallback credential to debug with.
 
-- [ ] Unit tests: PKCE verification, redirect-URI matching (esp. loopback port-agnostic),
+- [x] Unit tests: PKCE verification, redirect-URI matching (esp. loopback port-agnostic),
       audience validation, refresh rotation, RFC 6749 error mapping
+
+  Audited 2026-08-25. All five were already covered by the time 6f landed, so nothing was
+  added; what follows is where each one is, so the next person does not go looking.
+
+  - **PKCE verification.** `libs/services/src/validation/oauth.test.ts` rejects the `plain`
+    method, a missing challenge, a challenge that is not a PKCE value, and a code exchange with
+    no verifier. `libs/services/src/services/oauth.test.ts` runs the positive path on an RFC 7636
+    appendix B verifier and challenge, and has "refuses a verifier that does not hash to the
+    stored challenge".
+  - **Redirect-URI matching.** `libs/services/src/validation/oauth-uri.test.ts`, in full: the
+    three loopback host forms, the whole `127.0.0.0/8` block, the port dropped for loopback hosts
+    only, a portless registration matching an ephemeral port, loopback hosts still told apart,
+    the path still significant, and a hosted callback matching only itself. The service adds
+    "resolves a Claude Code request against its portless loopback registration" and the DCR dedup
+    cases across ephemeral ports.
+  - **Audience validation.** `oauth.test.ts` on `verifyAccessToken` ("refuses a token minted for
+    the other resource", "compares the audience after normalizing both sides"), and on the
+    authorization request, the code exchange and the refresh. At the transport,
+    `apps/hono/src/middleware/oauth-auth.test.ts` ("verifies against the resource it was
+    constructed with"), `routes/mcp.test.ts` and `routes/api-v1.test.ts`.
+  - **Refresh rotation.** `oauth.test.ts`, "OAuthService.exchangeRefreshToken": the successor
+    pair, a replayed token killing the family, losing the rotation race, revoked and expired
+    tokens, and the scope-narrowing rules.
+  - **RFC 6749 error mapping.** `libs/domain/src/errors/oauth.test.ts` pins all nine wire codes.
+    The routes map onto them in `routes/oauth-token.test.ts` (`invalid_request`, `invalid_grant`,
+    `invalid_client` as the one 401, `unsupported_grant_type`), `routes/oauth-register.test.ts`
+    (`invalid_client_metadata`) and `routes/oauth.test.tsx` (`access_denied` on the redirect).
+
 - [ ] End-to-end against Claude Code (`claude mcp add --transport http pinsquirrel <url>`), which
       exercises the CIMD + loopback path
+
+  Not run. It needs a browser and a person; the runbook is below. Read the transport note first,
+  because it decides whether this and the next item can both pass on one deployment.
+
 - [ ] End-to-end against claude.ai as a custom connector, which exercises the fixed-callback path
-- [ ] Verify a token issued for a different `resource` is rejected at `/mcp`
-- [ ] Verify an `/mcp` token is rejected at `/api/v1`, and an `/api/v1` token at `/mcp`
-- [ ] Verify an expired token triggers refresh, and a revoked refresh token returns
+
+  Not run. Runbook below.
+
+- [x] Verify a token issued for a different `resource` is rejected at `/mcp`
+- [x] Verify an `/mcp` token is rejected at `/api/v1`, and an `/api/v1` token at `/mcp`
+- [x] Verify an expired token triggers refresh, and a revoked refresh token returns
       `invalid_grant` and prompts re-consent
-- [ ] Verify the profile page can revoke a live grant and the client notices
+- [x] Verify the profile page can revoke a live grant and the client notices
+
+  All four are `apps/hono/src/oauth-e2e.test.ts`, one ordered sequence run in process against
+  the real app and a real database, with nothing mocked: `app.request` goes through every
+  middleware the deployed app runs and `lib/services` is the real composition root. It reads
+  like a client. The only paths written out are `/mcp`, the URL a user pastes into Claude, and
+  `/profile`, a page a person visits; every other endpoint comes out of the discovery documents,
+  so a document advertising a path nothing serves fails the test instead of being ignored.
+
+  What it walks through, in order: the 401 challenge on an unauthenticated tool call, the
+  protected-resource document it names and the authorization-server document that points at;
+  dynamic registration on the portless loopback redirect a native client declares; the consent
+  screen naming the client and `127.0.0.1`; approval redirecting to the ephemeral port with
+  `code`, the same `state` and `iss`; the exchange returning a `pso_` token, a refresh token,
+  `expires_in` 3600 and `Cache-Control: no-store`; the same code refused a second time and a
+  mismatched PKCE verifier refused as `invalid_grant`; `list_pins` over `/mcp` succeeding while
+  that token is refused at `/api/v1` and an `/api/v1` token is refused at `/mcp`; `invalid_target`
+  both at authorize time for a resource this server does not serve and at token time for a
+  resource the code was not issued for; refresh rotation, the retired token replayed taking the
+  successor with it so the client has to re-consent; revocation from the profile page's own form
+  and through `/oauth/revoke`; and an expired token refused.
+
+  Three things about how it runs. It creates its own user through the real signup service and
+  deletes everything it made afterwards, so it leaves the database as it found it. It sends a
+  documentation address in `x-forwarded-for` (with `TRUST_PROXY` set for the file) so every rate
+  limiter buckets it away from the other route tests. And it seeds the session row rather than
+  posting to `/signin`: signup leaves an account with no password, which is set from an emailed
+  reset link, so there is no password to sign in with from a test. The row and the cookie are
+  what `sessionManager.create` writes, and every request after that resolves through the real
+  session middleware.
+
+  The suite needed somewhere to run, which is three small changes. `apps/hono/vitest.config.ts`
+  pins `DATABASE_URL` to the same test database `libs/database` uses, so a `DATABASE_URL`
+  exported in a shell can never be the one a test writes to. A `globalSetup`
+  (`src/test-support/database.ts`) applies the migrations additively through a new
+  `applyMigrations` export, rather than dropping every table the way `libs/database`'s own setup
+  does. And `turbo.json` orders `@pinsquirrel/hono#test` after `@pinsquirrel/database#test`, so
+  that drop cannot land in the middle of this run.
+
+#### What the end-to-end run found: one MCP session per process
+
+`apps/hono/src/mcp/server.ts` connects a single `StreamableHTTPTransport` at module load and
+gives it a `sessionIdGenerator`, so the process holds exactly one MCP session. The second
+`initialize` anybody sends is answered `Invalid Request: Server already initialized`, and a
+request carrying any other `mcp-session-id` gets a 404. Two clients cannot be connected to one
+deployment at the same time, which is exactly what the two real-client checkboxes above ask for.
+
+The transport also maps a response back to its HTTP request by JSON-RPC request id alone
+(`#requestToStreamMapping`), across every caller. That is harmless while only one client can
+connect and is not once more than one can: two requests in flight with the same id would be
+answered with each other's responses. So the fix is not to pass `sessionIdGenerator: undefined`
+on the shared transport, which would lift the session limit and leave the shared mapping. It is
+the SDK's stateless pattern: build an `McpServer` and a `StreamableHTTPTransport` per request,
+with `sessionIdGenerator: undefined`, so each request carries its own mapping and no client
+needs a session header at all.
+
+This is Phase 3b code that Phase 6 never touched, so it belongs in its own change rather than on
+the OAuth branch. Do it before running the two checks below, and note that
+`routes/mcp.test.ts` mocks `mcpTransport` by name and will need to follow the new shape.
+
+#### Runbook: Claude Code
+
+1. `pnpm db:up`, then `pnpm dev`. Leave `BASE_URL` at its default `http://localhost:8100`. It
+   has to be the origin the client actually reaches, because the issuer, both resource
+   identifiers and the audience check all come from it.
+2. `claude mcp add --transport http pinsquirrel http://localhost:8100/mcp`. The URL must match
+   the resource identifier exactly, path included: `http://localhost:8100/mcp`.
+3. Run `/mcp` in Claude Code, pick `pinsquirrel`, and choose to authenticate. A browser opens on
+   `http://localhost:8100/oauth/authorize?...`.
+4. Sign in if you are not already. The consent screen must name Claude Code, say it sends you
+   back to `127.0.0.1` or `localhost`, and list `pins:read`, `tags:read` and `offline_access`.
+   Approve it. The browser lands on a loopback port Claude Code is listening on.
+5. Back in Claude Code the server reads as connected. Ask it to list your bookmarks.
+6. Check the registration took the CIMD path rather than the DCR fallback:
+   `select client_id, registration_type from oauth_clients` should show
+   `https://claude.ai/oauth/claude-code-client-metadata` and `cimd`. A `dcr_` row instead means
+   the metadata document was not selected, and the authorization-server document is where to
+   look (`client_id_metadata_document_supported` and `"none"` both have to be advertised).
+7. Open `/profile`. The Connected Applications card should name Claude Code, say MCP, list the
+   three scopes, and carry today's date. Revoke it and confirm the client has to ask again.
+
+#### Runbook: claude.ai as a custom connector
+
+1. This one cannot run against localhost. Claude's servers fetch the metadata documents and post
+   to the token endpoint themselves, so the deployment needs a public HTTPS origin. A tunnel is
+   fine. Set `BASE_URL` to the tunnel's URL and restart: the issuer and both resource identifiers
+   are read once at boot, so a tunnel started afterwards will not be reflected.
+2. In claude.ai, add a custom connector pointing at `https://<your-host>/mcp`.
+3. The redirect URI is the fixed `https://claude.ai/api/mcp/auth_callback`, which is the
+   exact-match path rather than the loopback one. If you would rather hand it a `client_id` you
+   control, set `OAUTH_STATIC_CLIENTS` before boot:
+   `[{"client_id":"claude-web","client_name":"Claude","redirect_uris":["https://claude.ai/api/mcp/auth_callback"]}]`.
+   It must not be an http(s) URL, since that form is read as a CIMD document.
+4. The consent screen must name the connector and say it sends you back to `claude.ai`. Approve.
+5. Confirm the connector lists the tools and that a query returns your bookmarks.
+6. Check `/profile` shows the grant against MCP, and that revoking it disconnects the connector.
 
 ---
 
