@@ -207,18 +207,16 @@ function mcpRequest(
 }
 
 /**
- * The MCP session, opened once and reused.
+ * The opening handshake, done once.
  *
- * `mcp/server.ts` connects one `StreamableHTTPTransport` at module load and
- * gives it a `sessionIdGenerator`, so the process holds exactly one session:
- * a second `initialize` is answered "Server already initialized", whoever
- * sends it. That is a Phase 3b limitation this test ran into rather than
- * anything OAuth does, and it is written up under 6g in PLAN.md, because two
- * real clients cannot connect to one deployment until it is addressed. Here it
- * just means the handshake happens once, which is what one client does anyway.
+ * `/mcp` is stateless: it builds a server and a transport per request and
+ * hands out no `mcp-session-id`, so there is no session to carry and every
+ * later call stands on its own. The handshake still happens because a real
+ * client sends it, and because a server that stopped answering `initialize`
+ * would be a broken server.
  */
-async function mcpSession(token: string): Promise<string> {
-  if (mcpSessionId) return mcpSessionId
+async function mcpHandshake(token: string): Promise<void> {
+  if (mcpInitialized) return
 
   const initialized = await mcpRequest(token, {
     jsonrpc: '2.0',
@@ -230,29 +228,25 @@ async function mcpSession(token: string): Promise<string> {
       clientInfo: { name: 'pinsquirrel-e2e', version: '1.0.0' },
     },
   })
-  mcpSessionId = initialized.headers.get('mcp-session-id') ?? ''
+  expect(initialized.status).toBe(200)
 
-  await mcpRequest(
-    token,
-    { jsonrpc: '2.0', method: 'notifications/initialized' },
-    { 'mcp-session-id': mcpSessionId }
-  )
+  await mcpRequest(token, {
+    jsonrpc: '2.0',
+    method: 'notifications/initialized',
+  })
 
-  return mcpSessionId
+  mcpInitialized = true
 }
 
-/** Call a tool the way a client does, on an initialized session. */
+/** Call a tool the way a client does, once the handshake is out of the way. */
 async function callListPins(token: string): Promise<Response> {
-  return mcpRequest(
-    token,
-    {
-      jsonrpc: '2.0',
-      id: 2,
-      method: 'tools/call',
-      params: { name: 'list_pins', arguments: {} },
-    },
-    { 'mcp-session-id': await mcpSession(token) }
-  )
+  await mcpHandshake(token)
+  return mcpRequest(token, {
+    jsonrpc: '2.0',
+    id: 2,
+    method: 'tools/call',
+    params: { name: 'list_pins', arguments: {} },
+  })
 }
 
 // State the steps hand to each other, in the order they are established.
@@ -266,7 +260,7 @@ let authorizationServer: string
 let clientId: string
 let mcpTokens: TokenResponse
 let apiTokens: TokenResponse
-let mcpSessionId: string | undefined
+let mcpInitialized = false
 
 beforeAll(async () => {
   // The IP-keyed limiters read the forwarding header only when a proxy is

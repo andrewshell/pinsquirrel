@@ -3,19 +3,25 @@ import { Hono } from 'hono'
 import type { User } from '@pinsquirrel/domain'
 
 const mockVerifyAccessToken = vi.fn()
-const mockHandleRequest = vi.fn()
+const mockGetUserPinsWithPagination = vi.fn()
 
+// The MCP server and its transport are built per request by the route itself
+// (see `routes/mcp.ts`), so there is no transport to mock by name here. What
+// stands in for the world below is the service the `list_pins` tool calls:
+// whether it ran is how these cases tell "the request reached the MCP server"
+// from "the request was refused at the door".
 vi.mock('../lib/services', () => ({
   oauthService: {
     verifyAccessToken: (...args: unknown[]) =>
       mockVerifyAccessToken(...args) as unknown,
   },
-}))
-
-vi.mock('../mcp/server', () => ({
-  mcpTransport: {
-    handleRequest: (...args: unknown[]) =>
-      mockHandleRequest(...args) as unknown,
+  pinService: {
+    getUserPinsWithPagination: (...args: unknown[]) =>
+      mockGetUserPinsWithPagination(...args) as unknown,
+  },
+  tagService: {
+    getUserTags: vi.fn(),
+    getUserTagsWithCount: vi.fn(),
   },
 }))
 
@@ -55,13 +61,23 @@ function tokenFor(resource: string) {
 
 describe('mcp route auth', () => {
   let app: Hono
+  let seenAuth: unknown
 
   beforeEach(() => {
     vi.resetAllMocks()
     // A module-level limiter outlives a single test, so each case starts with
     // its own budget rather than inheriting whatever the last one spent.
     mcpLimiter.reset(TEST_CLIENT_IP)
+    seenAuth = undefined
     app = new Hono()
+    // `route()` merges the MCP handlers into this router, so they run on the
+    // same Context this sees on the way back out. That is how a test reads the
+    // `AuthInfo` the middleware wrote for the SDK. Registered before the route
+    // because Hono runs handlers in the order they were added.
+    app.use('/mcp', async (c, next) => {
+      await next()
+      seenAuth = c.get('auth')
+    })
     app.route('/mcp', mcpRoutes)
   })
 
@@ -83,7 +99,7 @@ describe('mcp route auth', () => {
     const res = await toolCall()
 
     expect(res.status).toBe(401)
-    expect(mockHandleRequest).not.toHaveBeenCalled()
+    expect(mockGetUserPinsWithPagination).not.toHaveBeenCalled()
   })
 
   it('carries a WWW-Authenticate challenge pointing at the MCP resource metadata', async () => {
@@ -109,16 +125,16 @@ describe('mcp route auth', () => {
     )
   })
 
-  it('hands an authenticated call to the transport', async () => {
+  it('hands an authenticated call to the MCP server', async () => {
     mockVerifyAccessToken.mockImplementation(
       tokenFor('http://localhost:8100/mcp')
     )
-    mockHandleRequest.mockResolvedValue(new Response('ok'))
+    mockGetUserPinsWithPagination.mockResolvedValue({ pins: [], total: 0 })
 
     const res = await toolCall({ Authorization: 'Bearer pso_ok' })
 
     expect(res.status).toBe(200)
-    expect(mockHandleRequest).toHaveBeenCalled()
+    expect(mockGetUserPinsWithPagination).toHaveBeenCalled()
   })
 
   // The AuthInfo the SDK sees is built from the OAuth principal: real scopes
@@ -128,17 +144,11 @@ describe('mcp route auth', () => {
     mockVerifyAccessToken.mockImplementation(
       tokenFor('http://localhost:8100/mcp')
     )
-    let seen: unknown
-    mockHandleRequest.mockImplementation(
-      (c: { get: (k: string) => unknown }) => {
-        seen = c.get('auth')
-        return new Response('ok')
-      }
-    )
+    mockGetUserPinsWithPagination.mockResolvedValue({ pins: [], total: 0 })
 
     await toolCall({ Authorization: 'Bearer pso_ok' })
 
-    expect(seen).toEqual({
+    expect(seenAuth).toEqual({
       token: 'pso_ok',
       clientId: 'client-1',
       scopes: ['pins:read', 'tags:read'],
@@ -156,7 +166,7 @@ describe('mcp route auth', () => {
     const res = await toolCall({ Authorization: 'Bearer pso_rest' })
 
     expect(res.status).toBe(401)
-    expect(mockHandleRequest).not.toHaveBeenCalled()
+    expect(mockGetUserPinsWithPagination).not.toHaveBeenCalled()
   })
 
   // X-API-Key went with the API keys. Authorization: Bearer is the only
@@ -181,6 +191,6 @@ describe('mcp route auth', () => {
 
     expect(res.status).toBe(429)
     expect(res.headers.get('Retry-After')).toBeTruthy()
-    expect(mockHandleRequest).not.toHaveBeenCalled()
+    expect(mockGetUserPinsWithPagination).not.toHaveBeenCalled()
   })
 })
