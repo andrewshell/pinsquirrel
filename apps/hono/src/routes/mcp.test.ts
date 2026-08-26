@@ -19,6 +19,8 @@ vi.mock('../mcp/server', () => ({
   },
 }))
 
+import { mcpLimiter } from '../middleware/rate-limit'
+import { TEST_CLIENT_IP, exhaust } from '../test-support/rate-limit'
 import { mcpRoutes } from './mcp'
 
 const TOOL_CALL = JSON.stringify({
@@ -56,6 +58,9 @@ describe('mcp route auth', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
+    // A module-level limiter outlives a single test, so each case starts with
+    // its own budget rather than inheriting whatever the last one spent.
+    mcpLimiter.reset(TEST_CLIENT_IP)
     app = new Hono()
     app.route('/mcp', mcpRoutes)
   })
@@ -165,5 +170,17 @@ describe('mcp route auth', () => {
 
     expect(res.status).toBe(401)
     expect(mockVerifyAccessToken).not.toHaveBeenCalled()
+  })
+
+  // Authenticated, so the point is abuse rather than brute force: a runaway
+  // agent must not be able to drive the process on its own.
+  it('answers 429 with Retry-After once the per-IP quota is spent', async () => {
+    exhaust(mcpLimiter, TEST_CLIENT_IP)
+
+    const res = await toolCall({ Authorization: 'Bearer pso_good' })
+
+    expect(res.status).toBe(429)
+    expect(res.headers.get('Retry-After')).toBeTruthy()
+    expect(mockHandleRequest).not.toHaveBeenCalled()
   })
 })

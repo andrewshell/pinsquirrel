@@ -1097,7 +1097,7 @@ API key' }`.
 Folded in from the standing follow-up. Phase 6 raises the priority, since `/oauth/token` and
 `/oauth/register` are unauthenticated endpoints.
 
-- [ ] Extend `rate-limit.ts` coverage to `/mcp`, `/api/v1/*`, `/oauth/token`, `/oauth/register`.
+- [x] Extend `rate-limit.ts` coverage to `/mcp`, `/api/v1/*`, `/oauth/token`, `/oauth/register`.
       Today it is wired into `routes/auth.tsx` and `routes/private.tsx` (verified 2026-08-25).
       As of 6d all four are mounted and unlimited, and `/oauth/register` is the pressing one: it
       is unauthenticated and it creates rows. The mount points to attach the limiters to are
@@ -1112,6 +1112,42 @@ Folded in from the standing follow-up. Phase 6 raises the priority, since `/oaut
     a deployment that forgets it
   - The limiter is in-process memory. Fine for one instance. Note it in `DEPLOYMENT.md` as the
     thing to replace if a second instance ever runs
+
+  Built. `rateLimitByClientId(limiter, message)` joined `rateLimitByIp` in `middleware/rate-limit.ts`,
+  and the limiters are applied inside each route file with `use('*', …)` rather than at the
+  `app.tsx` mount, so a route travels with its own quota. The five new limiters:
+
+  | Limiter                   | Key         | Budget       | Applied to                      |
+  | ------------------------- | ----------- | ------------ | ------------------------------- |
+  | `oauthRegisterLimiter`    | IP          | 10 / hour    | `/oauth/register`               |
+  | `oauthTokenIpLimiter`     | IP          | 60 / 15 min  | `/oauth/token`, `/oauth/revoke` |
+  | `oauthTokenClientLimiter` | `client_id` | 300 / 15 min | `/oauth/token`                  |
+  | `mcpLimiter`              | IP          | 300 / 5 min  | `/mcp`                          |
+  | `apiV1Limiter`            | IP          | 300 / 5 min  | `/api/v1/*`                     |
+
+  Four notes:
+
+  - **A refusal is a plain `429` with `Retry-After`, not an RFC 6749 error object.** Every code in
+    that registry describes something wrong with the request; a client told `invalid_request`
+    would fix its request rather than wait. The status and the header are the actionable part.
+  - **The `client_id` limiter is deliberately the loosest of the three OAuth ones.** A CIMD
+    `client_id` is one string shared by every user of that application, so every Claude Code
+    installation in the world lands in one bucket. A tight limit there is a self-inflicted outage,
+    not a defence. It also spends no budget on a request that names no client: there would be
+    nothing to key on but a shared empty string, and one malformed caller could lock every real
+    client out. The per-IP limiter has already counted it.
+  - **`rateLimitByClientId` reads the form body.** Safe because Hono caches the parsed body on the
+    request, so the handler's own `parseBody()` sees the same object rather than a consumed
+    stream, which is asserted in `rate-limit.test.ts`. A body it cannot parse passes through, so
+    the endpoint's `415` is what the caller gets.
+  - `/mcp` and `/api/v1/*` take their limiter **before** the auth middleware, so an unauthenticated
+    flood cannot spend a database round trip per request, and they have one limiter each so a
+    flood at one cannot exhaust the other's budget.
+
+  DEPLOYMENT.md gained a "Rate limiting" section saying the counters are in-process memory
+  (correct for one instance only; two instances each enforce half the limit and a restart forgets
+  everything) and repeating the `TRUST_PROXY` consequence.
+
 - [x] ~~Bump `hono-rate-limiter` to `^0.5.3`, handle its `unstorage` peer, remove the temporary
       `peerDependencyRules` allowance.~~ Done 2026-08-17. All three clauses turned out to be stale
       or already satisfied, and none of it was Phase 6 work:
@@ -1134,7 +1170,11 @@ Folded in from the standing follow-up. Phase 6 raises the priority, since `/oaut
     `oauthService.revokeGrant(ac, tokenId)`, flash + redirect like `revoke-api-key`
   - No inline script (CSP). A grants list needs none. If a confirm step is wanted, it is a
     `static/*.js` file with `onReady()`
-- [ ] Anthropic egresses from `160.79.104.0/21`. Note it in DEPLOYMENT.md if a WAF ever lands
+- [x] Anthropic egresses from `160.79.104.0/21`. Note it in DEPLOYMENT.md if a WAF ever lands
+
+  Recorded in the new DEPLOYMENT.md "Rate limiting" section, next to the other thing an operator
+  can get wrong at the edge. Nothing filters by address today; the note says what to allow if
+  something ever does.
 
 ### 6g. Testing
 

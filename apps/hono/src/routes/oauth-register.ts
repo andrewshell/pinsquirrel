@@ -4,6 +4,10 @@ import type { OAuthClient } from '@pinsquirrel/domain'
 import { OAuthError, ValidationError } from '@pinsquirrel/domain'
 import { oauthService } from '../lib/services.js'
 import { describeValidationError } from '../lib/oauth-error.js'
+import {
+  oauthRegisterLimiter,
+  rateLimitByIp,
+} from '../middleware/rate-limit.js'
 
 /**
  * RFC 7591 Dynamic Client Registration, the fallback path.
@@ -15,7 +19,10 @@ import { describeValidationError } from '../lib/oauth-error.js'
  * same client returns the same row, and `MaintenanceService.sweepExpired`
  * removes registrations that never complete an authorization.
  *
- * The per-IP registration quota is Phase 6f and attaches at this mount point.
+ * A per-IP quota bounds it further, and it is the tightest limit in the app:
+ * the endpoint is unauthenticated and it creates rows, while a real client
+ * registers once per fresh connection. A refusal is a plain `429` with
+ * `Retry-After`; RFC 7591 has no error code that means "later".
  *
  * `application/json` only. `/oauth/token` is the form-encoded one; the two do
  * not share a parser.
@@ -55,6 +62,14 @@ function clientInformation(client: OAuthClient) {
 }
 
 const oauthRegister = new Hono()
+
+oauthRegister.use(
+  '*',
+  rateLimitByIp(
+    oauthRegisterLimiter,
+    'Too many client registrations. Please try again later.'
+  )
+)
 
 oauthRegister.post('/register', async c => {
   if (!isJson(c)) {

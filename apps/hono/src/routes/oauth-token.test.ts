@@ -22,6 +22,12 @@ vi.mock('../lib/services', () => ({
   },
 }))
 
+import {
+  oauthTokenClientLimiter,
+  oauthTokenIpLimiter,
+} from '../middleware/rate-limit'
+import { TEST_CLIENT_IP, exhaust } from '../test-support/rate-limit'
+
 const { oauthTokenRoutes } = await import('./oauth-token')
 
 const ISSUED = {
@@ -54,6 +60,10 @@ describe('POST /oauth/token', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
+    // Module-level limiters outlive a single test, so every case starts with
+    // its own budget rather than inheriting whatever the last one spent.
+    oauthTokenIpLimiter.reset(TEST_CLIENT_IP)
+    oauthTokenClientLimiter.reset(CODE_GRANT.client_id)
     app = new Hono()
     app.route('/oauth', oauthTokenRoutes)
   })
@@ -245,6 +255,41 @@ describe('POST /oauth/token', () => {
 
     expect(res.headers.get('Cache-Control')).toBe('no-store')
   })
+
+  describe('rate limiting', () => {
+    it('answers 429 with Retry-After once the per-IP quota is spent', async () => {
+      exhaust(oauthTokenIpLimiter, TEST_CLIENT_IP)
+
+      const res = await app.request('/oauth/token', form(CODE_GRANT))
+
+      expect(res.status).toBe(429)
+      expect(res.headers.get('Retry-After')).toBeTruthy()
+      expect(mockExchangeAuthorizationCode).not.toHaveBeenCalled()
+    })
+
+    // A public client refreshes from whatever address its user is on, so the
+    // IP quota alone bounds nothing for it.
+    it('answers 429 once one client_id has spent its own quota', async () => {
+      exhaust(oauthTokenClientLimiter, CODE_GRANT.client_id)
+
+      const res = await app.request('/oauth/token', form(CODE_GRANT))
+
+      expect(res.status).toBe(429)
+      expect(mockExchangeAuthorizationCode).not.toHaveBeenCalled()
+    })
+
+    it('leaves another client_id alone', async () => {
+      exhaust(oauthTokenClientLimiter, CODE_GRANT.client_id)
+      mockExchangeAuthorizationCode.mockResolvedValue(ISSUED)
+
+      const res = await app.request(
+        '/oauth/token',
+        form({ ...CODE_GRANT, client_id: 'dcr_somebody_else' })
+      )
+
+      expect(res.status).toBe(200)
+    })
+  })
 })
 
 describe('POST /oauth/revoke', () => {
@@ -252,6 +297,10 @@ describe('POST /oauth/revoke', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
+    // Module-level limiters outlive a single test, so every case starts with
+    // its own budget rather than inheriting whatever the last one spent.
+    oauthTokenIpLimiter.reset(TEST_CLIENT_IP)
+    oauthTokenClientLimiter.reset(CODE_GRANT.client_id)
     app = new Hono()
     app.route('/oauth', oauthTokenRoutes)
   })
