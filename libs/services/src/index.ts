@@ -38,6 +38,12 @@ export {
   tagListQuerySchema,
 } from './validation/query-coerce.js'
 
+// OAuth URI rules (shared by the service layer and the app's metadata routes)
+export {
+  normalizeOAuthUri,
+  protectedResourceMetadataPath,
+} from './validation/oauth-uri.js'
+
 // Response schemas (service output shapes)
 export {
   pinSchema,
