@@ -57,6 +57,7 @@ beforeEach(() => {
     findById: vi.fn(),
     findByUserId: vi.fn(),
     findByUserIdAndName: vi.fn(),
+    searchByName: vi.fn(),
     fetchOrCreateByNames: vi.fn(),
     findByUserIdWithPinCount: vi.fn(),
     mergeTags: vi.fn(),
