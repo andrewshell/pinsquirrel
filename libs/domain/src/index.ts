@@ -21,7 +21,6 @@ export type {
   CreateSessionData,
   UpdateSessionData,
 } from './entities/session.js'
-export type { ApiKey, CreateApiKeyData } from './entities/api-key.js'
 export type {
   OAuthClient,
   OAuthClientRegistrationType,
@@ -53,7 +52,6 @@ export type { PinRepository, PinFilter } from './interfaces/pin-repository.js'
 export type { TagRepository } from './interfaces/tag-repository.js'
 export type { PasswordResetRepository } from './interfaces/password-reset-repository.js'
 export type { SessionRepository } from './interfaces/session-repository.js'
-export type { ApiKeyRepository } from './interfaces/api-key-repository.js'
 export type { OAuthClientRepository } from './interfaces/oauth-client-repository.js'
 export type { OAuthAuthorizationCodeRepository } from './interfaces/oauth-authorization-code-repository.js'
 export type { OAuthTokenRepository } from './interfaces/oauth-token-repository.js'
@@ -102,12 +100,6 @@ export {
   ParseError,
 } from './errors/metadata.js'
 export { ValidationError } from './errors/validation.js'
-export {
-  ApiKeyError,
-  ApiKeyNotFoundError,
-  ApiKeyLimitExceededError,
-  UnauthorizedApiKeyAccessError,
-} from './errors/api-key.js'
 export {
   OAuthError,
   OAuthInvalidRequestError,

@@ -13,7 +13,6 @@ export const {
   pinRepository,
   passwordResetRepository,
   sessionRepository,
-  apiKeyRepository,
   oauthClientRepository,
   oauthAuthorizationCodeRepository,
   oauthTokenRepository,

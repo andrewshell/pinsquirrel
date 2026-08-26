@@ -1,6 +1,5 @@
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import type {
-  ApiKeyRepository,
   OAuthAuthorizationCodeRepository,
   OAuthClientRepository,
   OAuthTokenRepository,
@@ -10,7 +9,6 @@ import type {
   TagRepository,
   UserRepository,
 } from '@pinsquirrel/domain'
-import { DrizzleApiKeyRepository } from './repositories/api-key.js'
 import { DrizzleOAuthAuthorizationCodeRepository } from './repositories/oauth-authorization-code.js'
 import { DrizzleOAuthClientRepository } from './repositories/oauth-client.js'
 import { DrizzleOAuthTokenRepository } from './repositories/oauth-token.js'
@@ -26,7 +24,6 @@ export interface Repositories {
   pinRepository: PinRepository
   passwordResetRepository: PasswordResetRepository
   sessionRepository: SessionRepository
-  apiKeyRepository: ApiKeyRepository
   oauthClientRepository: OAuthClientRepository
   oauthAuthorizationCodeRepository: OAuthAuthorizationCodeRepository
   oauthTokenRepository: OAuthTokenRepository
@@ -54,7 +51,6 @@ export function createRepositories(db: MySql2Database): Repositories {
     pinRepository: new DrizzlePinRepository(db, tagRepository),
     passwordResetRepository: new DrizzlePasswordResetRepository(db),
     sessionRepository: new DrizzleSessionRepository(db),
-    apiKeyRepository: new DrizzleApiKeyRepository(db),
     oauthClientRepository: new DrizzleOAuthClientRepository(db),
     oauthAuthorizationCodeRepository:
       new DrizzleOAuthAuthorizationCodeRepository(db),
