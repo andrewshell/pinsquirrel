@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.5.3](https://github.com/andrewshell/pinsquirrel/compare/v3.5.2...v3.5.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* commit the lockfile as the undici override rewrites it ([1f3e68e](https://github.com/andrewshell/pinsquirrel/commit/1f3e68e5a87b2d2645d912711a1723ddc2ee3764))
+
 ## [3.5.2](https://github.com/andrewshell/pinsquirrel/compare/v3.5.1...v3.5.2) (2026-08-26)
 
 
