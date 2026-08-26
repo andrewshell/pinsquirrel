@@ -482,8 +482,10 @@ The approach changed. Instead of a hand-written JSX docs page, the v1 routes wer
 
 ## Phase 6: OAuth 2.1 (the only auth path)
 
-> **Resume at 6b.** 6a shipped on `feat/oauth-phase-6`: both 401s now carry a `WWW-Authenticate`
-> challenge, `BASE_URL` exists, and the three discovery documents are served. Goal: a user pastes
+> **Resume at 6c.** 6a and 6b shipped on `feat/oauth-phase-6`: both 401s now carry a
+> `WWW-Authenticate` challenge, `BASE_URL` exists, the three discovery documents are served, and
+> the OAuth entities, repository interfaces, error types, tables and Drizzle repositories exist
+> with the migration applied. Nothing constructs a service over them yet. Goal: a user pastes
 > `https://pinsquirrel.com/mcp` into
 > Claude (or any MCP client), clicks through a consent screen, and is connected. No hand-copied
 > API key.
@@ -717,15 +719,29 @@ Anything that needs `node:net` or a URL parser belongs in `libs/services`.
   RFC 6749 token and authorization codes the endpoints need plus `access_denied` for the consent
   screen's deny button and `invalid_client_metadata` for registration.
 
-- [ ] `libs/database/src/schema/oauth-*.ts`: tables `oauth_clients`,
+- [x] `libs/database/src/schema/oauth-*.ts`: tables `oauth_clients`,
       `oauth_authorization_codes`, `oauth_tokens`. Hash codes and tokens at rest, same as
       `api_keys.key_hash` and `sessions`
-- [ ] `libs/database/src/repositories/oauth-*.ts`: Drizzle implementations
-- [ ] Add all three to `createRepositories()` and the `Repositories` interface in
+
+  Codes and tokens reference `oauth_clients.client_id`, not the row id, so the bearer path
+  resolves a client without a join. That column is unique, which is what lets it carry a foreign
+  key. `rotated_from` is deliberately not a foreign key back to `oauth_tokens`: the sweep deletes
+  dead rows, and a self-reference would either block that or null out the chain the column exists
+  to record.
+
+- [x] `libs/database/src/repositories/oauth-*.ts`: Drizzle implementations
+
+  `consume` on the code repository is one conditional UPDATE, not a read followed by a write, so
+  two concurrent exchanges of the same code resolve to one winner. Tests run against the real
+  database like `session.test.ts`; note that a fixture written through a raw pool query is stored
+  in the process timezone while Drizzle writes UTC, so backdating a row for a sweep test has to
+  go through Drizzle or it is off by the local offset.
+
+- [x] Add all three to `createRepositories()` and the `Repositories` interface in
       `libs/database/src/create-repositories.ts`, and extend the existing
       `create-repositories.test.ts`. `apps/hono/src/lib/db.ts` then just destructures them;
       `apps/admin` picks them up for free and ignores them. Do not `new Drizzle…` in the app
-- [ ] Generate + run migration (`drizzle.config` now points at `src/migrations`, `ad41976`)
+- [x] Generate + run migration (`drizzle.config` now points at `src/migrations`, `ad41976`)
 
 ### 6c. Service layer
 

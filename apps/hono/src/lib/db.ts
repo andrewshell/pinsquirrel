@@ -14,4 +14,7 @@ export const {
   passwordResetRepository,
   sessionRepository,
   apiKeyRepository,
+  oauthClientRepository,
+  oauthAuthorizationCodeRepository,
+  oauthTokenRepository,
 } = createRepositories(db)
