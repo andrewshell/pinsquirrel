@@ -14,8 +14,18 @@ The Chrome extension (`apps/chrome-extension/`, its README is the reference) syn
 into bookmark folders over `/api/v1` and is built and tested in a real Chrome. Distribution
 beyond "load unpacked" is deferred.
 
-The only open work is Phase 8. Everything else this plan once tracked has shipped; the reasoning
-that outlived the checklists is in the decision log below.
+Everything this plan once tracked as read-only has shipped; the reasoning that outlived the
+checklists is in the decision log below. What is open is the write side, driven by two use cases:
+
+1. **Pin the current page from the extension**, so the bookmarklet is no longer the only way to
+   create a pin from a browser. Phase 9, over a write endpoint Phase 8 makes possible.
+2. **Let an LLM help retag a library** — the account has many tags holding one or two pins and
+   many pins holding no tags, and that is a job for an agent that can read and write over MCP.
+   Phase 10.
+
+Both need a write scope that the server actually enforces, which today it does not: `oauthAuth`
+puts the granted scopes on the principal and `mcpAuth` forwards them, and nothing reads them.
+That is Phase 8, and it comes first.
 
 ## Ground rules
 
@@ -57,30 +67,129 @@ is not repeated here. On top of it:
 
 ---
 
-## Phase 8: Read-write MCP tools
+## Phase 8: Write scopes, enforced
 
-Deferred from the original MCP work until there is a concrete agent use case.
+Two scopes, `pins:write` and `tags:write`, at the same granularity as the reads. Tags on a pin
+are pin data and travel under `pins:write`; `tags:write` is for operations on the tag itself
+(merge, delete). The extension asks for `pins:write` only; an MCP client doing retagging asks
+for both.
 
-- [ ] Add `create_pin`, `update_pin` and `delete_pin` to `createMcpServer()` in
-      `apps/hono/src/mcp/server.ts`, over `PinService.createPin()`, `updatePin()` and
-      `deletePin()`. Errors go through `mapDomainErrorToMcp()` (`apps/hono/src/mcp/errors.ts`)
-      like the three read tools, rather than growing their own mapping
-- [ ] Add a `pins:write` scope. No such scope exists today: `SUPPORTED_SCOPES` in
-      `libs/services/src/services/oauth.ts` is `['pins:read', 'tags:read', 'offline_access']`,
-      `DEFAULT_SCOPES` is the first two, and `OAUTH_RESOURCE_SCOPES` in
-      `apps/hono/src/lib/config.ts` — which is what both protected-resource metadata documents
-      and both `WWW-Authenticate` challenges advertise — is `['pins:read', 'tags:read']`
-- [ ] Describe it on the consent screen. `SCOPE_DESCRIPTIONS` in
-      `apps/hono/src/views/pages/oauth-consent.tsx` has one line per scope, and an undescribed
-      scope is one a user is asked to approve without being told what it does
-- [ ] Gate the write tools on the granted scope, so a token issued before `pins:write` existed —
-      or one whose user approved only reads — cannot mutate data. The scopes are already on the
-      principal: `oauthAuth` puts them on the context and `mcpAuth` passes them into the SDK's
-      `AuthInfo`
-- [ ] Work out the step-up: an existing connection holds a read-only grant, and asking for
-      `pins:write` means sending the client back through `/oauth/authorize` for a new consent.
-      Decide whether that re-consent replaces the old grant or runs alongside it, and what the
-      MCP client sees in the meantime
+- [ ] Add both to `SUPPORTED_SCOPES` in `libs/services/src/services/oauth.ts` and to
+      `OAUTH_RESOURCE_SCOPES` in `apps/hono/src/lib/config.ts`, so both protected-resource
+      documents and both `WWW-Authenticate` challenges advertise them. `DEFAULT_SCOPES` stays
+      read-only: a client that names no scope gets no write, and a request for `pins:write` is a
+      request the user sees on the consent screen
+- [ ] Describe them in `SCOPE_DESCRIPTIONS` (`apps/hono/src/views/pages/oauth-consent.tsx`) in
+      the user's words — "Add, edit and delete your bookmarks", "Merge and delete your tags". An
+      undescribed scope is one a user approves without being told what it does
+- [ ] Enforce. A `requireScope(scope)` next to `oauthAuth` in
+      `apps/hono/src/middleware/oauth-auth.ts` that answers `403` with
+      `WWW-Authenticate: Bearer error="insufficient_scope", scope="pins:write"` (RFC 6750 §3.1).
+      `bearerChallenge()` (`middleware/www-authenticate.ts`) only knows the resource today; give
+      it an optional `error` and `scope` so both resources say it the same way. Applied
+      per route in `api-v1.ts`, never globally: the reads stay reachable on a read-only token.
+      For MCP, a `requireScope` guard inside the tool handler in `mcp/server.ts`, mapped by
+      `mapDomainErrorToMcp()` to a tool error the model can read; the scopes are already on
+      `AuthInfo`. A token minted before these scopes existed carries neither and is refused by
+      both, which is the point
+- [ ] Test the negative in `oauth-e2e.test.ts`: a token granted `pins:read tags:read` gets 403
+      with the challenge from a write route, and a token granted `pins:write` gets through.
+      That is the one test that proves the scope is load-bearing rather than decorative
+- [ ] Step-up is re-consent, nothing more. A client holding a read-only grant that wants to write
+      sends the user back through `/oauth/authorize` naming the wider scope; the server issues a
+      new token family and `listGrants` already shows the union per client (Decision 19). No
+      server-side "upgrade" path: the `insufficient_scope` challenge is the signal, and the
+      client's job is to re-authorize. The old family stays valid until it expires or is
+      revoked — revoking it on step-up would break a second device holding the same client
+
+---
+
+## Phase 9: Pin the current page from the extension
+
+The bookmarklet opens `/pins/new?url&title&description`, which looks the URL up with
+`findByUrl` and redirects to the existing pin's edit page if there is one. The extension
+replaces that with a form in the popup, and keeps the same two behaviours: prefill from the
+page, and never create a duplicate.
+
+### 9a. REST
+
+- [ ] `POST /api/v1/pins` in `routes/api-v1.ts`, behind `requireScope('pins:write')`, over
+      `PinService.createPin()`. Body is `createPinDataSchema` minus `userId`, `createdAt`,
+      `updatedAt` — the caller is the token's user and the server keeps the clock. `201` with
+      the pin and a `Location`. A `ValidationError` is `400` with the field errors, the same
+      shape the internal endpoints use; a URL the user already has is `409` with the existing
+      pin's id, because the client's next move is to open it rather than retry
+- [ ] Add `url` to `pinListInputSchema` (`libs/services/src/validation/pin-query.ts`) as an
+      exact-match filter — `PinFilter` already carries it, the schema just does not expose it —
+      so `GET /api/v1/pins?url=` is the lookup the extension runs before it shows the form. That
+      is the same question the bookmarklet's dedup asks, over the same service method
+- [ ] Both land in the OpenAPI document by construction (`@hono/zod-openapi`); check
+      `/api/docs` renders the `201`/`409` responses and the `pins:write` requirement, and add
+      the scope to the security scheme so the docs say which routes need it
+
+### 9b. Extension
+
+- [ ] Manifest: add `activeTab`. Clicking the action is the user gesture that grants it, and it
+      is enough to read the current tab's URL and title through `chrome.tabs.query`. Not `tabs`,
+      which is a standing permission over every tab. Add `scripting` only if the popup is to
+      pull the meta description and the selection the bookmarklet grabs today, through
+      `chrome.scripting.executeScript` on the active tab; start without it and see whether the
+      title alone is enough
+- [ ] `src/api-client.ts`: `findPinByUrl(url)` and `createPin(input)`. The `409` maps to a
+      distinguishable `PinExistsError` carrying the id, and a `403 insufficient_scope` maps to
+      `ReauthorizationRequiredError`, because that is the existing path to the Connect view and
+      it already keeps `selectedTagIds` across a reconnect
+- [ ] `src/auth.ts`: request `pins:write` alongside the reads. An installed extension holding a
+      read-only grant hits the `403` on its first save and lands on Connect with a notice
+      saying why — the step-up from Phase 8, with no new code
+- [ ] Popup: a "Pin this page" section above the tag list in `popup.html`, wired in
+      `src/popup/init.ts` through the same `deps` seam. Opens with the title prefilled and
+      editable, a tag input, private and read-later boxes, and Save. If `findPinByUrl` finds
+      one, the section says so and links to `${baseUrl}/pins/${id}/edit` in a new tab instead
+      of offering the form — an editor in a popup that closes on blur is a worse editor than the
+      site already has. After a save, ask the worker for a sync so a pin tagged with a selected
+      tag shows up in the bookmarks bar without waiting for the hour
+- [ ] Tags in the form: a plain text input, comma-separated, matched against the tag list the
+      popup already has for autocomplete. The site's `tag-input-vanilla.js` is not shared
+      (Decision 5)
+- [ ] Tests, the same way as before: the popup driven in happy-dom with a stub `fetch`, the
+      worker with `stubChrome`. `chrome-mock.ts` grows `tabs.query`
+
+---
+
+## Phase 10: MCP write tools for retagging
+
+The job: an agent reads the tag list with counts, finds the tags with one or two pins and the
+pins with none, proposes a consolidation, and applies it. `list_tags` with counts and
+`list_pins` with `noTags` already exist, so the read half is done; what is missing is a way to
+change a pin's tags and to fold tags together.
+
+- [ ] `update_pin` — id plus any of `updatePinDataSchema` — over `PinService.updatePin()`. This
+      is the retagging tool: `tagNames` replaces the pin's tags. Requires `pins:write`.
+      Annotations: `idempotentHint: true`, no `destructiveHint`
+- [ ] `create_pin` and `delete_pin` over `createPin()` / `deletePin()`, because a write scope
+      that can edit but not create or delete is a strange one to explain. `delete_pin` carries
+      `destructiveHint: true` so a client can confirm before calling. Requires `pins:write`
+- [ ] `merge_tags` over `TagService.mergeTags(sourceTagIds, targetTagId)`, which is the
+      consolidation primitive: every pin under the sources gets the target and the sources go.
+      Requires `tags:write`. `delete_tag` over `deleteTag()` alongside it, `destructiveHint`.
+      Note for the tool description: `updatePin` already collects tags left with no pins
+      (`collectOrphanedTags`), so retagging a pin away from a singleton tag deletes the tag —
+      the agent does not need a delete call for that case
+- [ ] Every write tool checks its scope through the Phase 8 guard before touching a service,
+      and every error goes through `mapDomainErrorToMcp()` — `ValidationError`, `PinNotFound`,
+      `TagNotFound` and the unauthorized errors all have mappings already
+- [ ] Tool descriptions written for the agent doing this job: say that `tagNames` replaces, not
+      appends; say that `merge_tags` takes ids, which `list_tags` returns; say what
+      `list_pins { noTags: true }` is for. The description is the only documentation the model
+      reads
+- [ ] Bulk is the agent looping. `update_pin` one pin at a time is correct for a few hundred
+      pins, and the `/mcp` rate limiter — `mcpLimiter`, 300 requests per five minutes per IP —
+      is what bounds an agent that loops badly. That is roughly one pin a second, which a retag
+      session over a few hundred pins will hit; either raise it or key it by client, and decide
+      before shipping rather than when the first session stalls
+- [ ] Drive it with Claude Code over the runbook: reconnect (the step-up), ask it to find tags
+      with one pin and propose merges, approve a few, and confirm `/tags` on the site agrees
 
 ---
 
@@ -152,12 +261,14 @@ manifest's `host_permissions`, and the session cookie is only `Secure` in produc
    built directly from it.
 3. **Existing API separation**: the session-authenticated, frontend-only endpoints live under
    `/api/internal/*`, separate from the public API.
-4. **One-way sync**: the extension never writes to PinSquirrel. Locally deleted bookmarks come
-   back on the next sync.
+4. **Bookmark sync is one-way**: the sync never writes to PinSquirrel, and a locally deleted
+   bookmark comes back on the next run. The extension writing a pin the user asked for (Phase 9)
+   is a different thing from the sync inferring one from a bookmark, and the second stays out.
 5. **Chrome extension is standalone**: no workspace dependency on other packages; it talks only
    over the HTTP API. Build uses esbuild on its own, outside the Turbo pipeline.
-6. **Read-only API for now**: only GET endpoints in v1. Write endpoints can come later when
-   there is a use case beyond the Chrome extension.
+6. **Read-only API until there was a use case**: v1 shipped with GET only. `POST /api/v1/pins`
+   arrives in Phase 9 for pinning from the extension, behind `pins:write`; nothing else is
+   added until something needs it.
 7. **MCP transport**: Streamable HTTP via `@hono/mcp` (`@modelcontextprotocol/hono` does not
    exist as a published package), mounted at `/mcp`, authenticated with OAuth `pso_` tokens
    bound to its own resource identifier (Decision 16). The route builds an `McpServer` and a
@@ -196,8 +307,8 @@ manifest's `host_permissions`, and the session cookie is only `Secure` in produc
     public server. A CIMD `client_id` is a self-hosted HTTPS URL that gets fetched and cached
     instead, and it is portable across authorization servers.
 14. **Scopes start minimal**: `pins:read` and `tags:read` on both resources, plus
-    `offline_access` advertised by the authorization server only. `pins:write` arrives with the
-    Phase 8 write tools, via the spec's step-up authorization flow. Adding a scope later is easy.
+    `offline_access` advertised by the authorization server only. `pins:write` and `tags:write`
+    arrive in Phase 8, requested explicitly and never by default. Adding a scope later is easy.
     Un-granting an over-broad one is not.
 15. **Token audience binding is mandatory**: the `resource` (RFC 8707) from the authorization
     request is stored on the access token, and each resource rejects any token not issued for
@@ -235,6 +346,20 @@ manifest's `host_permissions`, and the session cookie is only `Secure` in produc
     page lists one row per client naming every audience it holds, and revoking it takes both.
     Splitting families by audience would let a replay on one audience leave the other alive,
     which is the wrong direction for a security response, and no client uses both audiences.
+20. **Scopes are enforced at the operation, not at the resource.** `requireScope` sits on the
+    write routes and inside the write tools, so a read-only token still reads everything. A
+    resource-level check would either lock reads behind write or make the scope decorative,
+    which is what it is today. The challenge is RFC 6750's `insufficient_scope`, and step-up is
+    the client re-authorizing with the wider scope: no server-side upgrade, and the old family
+    is left alone because another device may hold it.
+21. **Two write scopes, matching the reads.** `pins:write` covers a pin including its tags;
+    `tags:write` covers merge and delete of the tag itself. The extension only ever needs the
+    first, and a consent screen that asks it to approve "merge and delete your tags" for a
+    Save button is asking for more than it uses.
+22. **The extension pins; it does not edit.** The popup creates a pin for the current page and,
+    when one exists, links to the site's edit page. A popup closes on blur, which is the wrong
+    place for an editor the site already has, and duplicate detection is a lookup by URL, the
+    same `findByUrl` the bookmarklet uses.
 
 ## Reference
 
