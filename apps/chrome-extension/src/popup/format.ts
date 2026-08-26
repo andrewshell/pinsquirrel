@@ -39,14 +39,25 @@ export function parseBaseUrl(input: string): string | null {
 /**
  * What the tag list says when it has nothing to draw.
  *
- * Two different emptys, and telling them apart is the whole point: with no
- * filter the account has no tags yet and the user has to go and make some,
- * while with one the tags are there and it is the query that found none.
+ * Telling the emptys apart is the whole point, and there are two things that
+ * can hide a tag. With neither, the account has no tags yet and the user has
+ * to go and make some. With a query, the tags are there and it is what was
+ * typed that found none. With the selected-only toggle, the tags are there and
+ * unpicked - and saying "no tags yet" to someone whose account is full of them
+ * sends them looking for a bug instead of at the toggle they just ticked.
  */
-export function formatEmptyTagList(query: string): string {
+export function formatEmptyTagList(
+  query: string,
+  selectedOnly = false
+): string {
   const asked = query.trim()
-  if (asked === '') return 'No tags yet. Add tags to your pins on PinSquirrel.'
-  return `No tags match “${asked}”.`
+  if (asked === '') {
+    return selectedOnly
+      ? 'No tags selected yet. Untick “Selected only” to see them all.'
+      : 'No tags yet. Add tags to your pins on PinSquirrel.'
+  }
+  const what = selectedOnly ? 'selected tags' : 'tags'
+  return `No ${what} match “${asked}”.`
 }
 
 /**
