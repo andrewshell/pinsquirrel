@@ -3,6 +3,95 @@
   <head>
     <meta charset="utf-8" />
     <title>PinSquirrel</title>
+    <!-- Inline rather than a popup.css: the MV3 CSP forbids inline *scripts*,
+         not inline styles, and a stylesheet is not something the manifest names,
+         so a separate file would mean teaching the build about an asset no
+         manifest field points at. -->
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        width: 320px;
+        margin: 0;
+        padding: 12px;
+        font:
+          13px/1.4 system-ui,
+          sans-serif;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 15px;
+      }
+      label {
+        display: block;
+        margin-bottom: 4px;
+      }
+      input[type='url'] {
+        width: 100%;
+        box-sizing: border-box;
+        margin-bottom: 8px;
+        padding: 6px;
+      }
+      button {
+        padding: 6px 10px;
+        cursor: pointer;
+      }
+      button.primary {
+        font-weight: 600;
+      }
+      button[disabled] {
+        cursor: progress;
+        opacity: 0.6;
+      }
+      #tag-list {
+        max-height: 220px;
+        overflow-y: auto;
+        margin-bottom: 8px;
+        border: 1px solid rgba(128, 128, 128, 0.4);
+        padding: 6px;
+      }
+      label.tag {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        padding: 2px 0;
+      }
+      .tag-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .tag-count {
+        opacity: 0.6;
+        font-variant-numeric: tabular-nums;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+      }
+      .muted {
+        margin: 4px 0;
+        opacity: 0.7;
+      }
+      .error {
+        margin: 4px 0;
+        color: #b3261e;
+      }
+      .notice {
+        margin: 0 0 8px;
+        padding: 6px;
+        border: 1px solid #b3261e;
+      }
+      #status:empty {
+        display: none;
+      }
+      #status {
+        margin: 8px 0 0;
+      }
+    </style>
   </head>
   <body>
     <main id="popup">
@@ -10,10 +99,32 @@
 
       <!-- Shown while the extension has no connection to a PinSquirrel
            instance: base URL and the button that starts the OAuth flow. -->
-      <section id="settings-view" hidden></section>
+      <section id="settings-view" hidden>
+        <p id="reconnect-notice" class="notice" hidden>
+          PinSquirrel needs your permission again. Connect to carry on.
+        </p>
+        <label for="base-url">PinSquirrel address</label>
+        <input
+          id="base-url"
+          type="url"
+          value="https://pinsquirrel.com"
+          spellcheck="false"
+          autocomplete="off"
+        />
+        <button id="connect" type="button" class="primary">Connect</button>
+      </section>
 
       <!-- Shown once connected: tag selection, sync controls, status. -->
-      <section id="main-view" hidden></section>
+      <section id="main-view" hidden>
+        <p id="connected-to" class="muted"></p>
+        <div id="tag-list"></div>
+        <p id="last-sync" class="muted"></p>
+        <p id="sync-error" class="error" hidden></p>
+        <div class="actions">
+          <button id="sync-now" type="button" class="primary">Sync Now</button>
+          <button id="disconnect" type="button">Disconnect</button>
+        </div>
+      </section>
 
       <p id="status" role="status"></p>
     </main>
