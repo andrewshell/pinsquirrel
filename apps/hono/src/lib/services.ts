@@ -9,12 +9,14 @@ import {
   NullEmailService,
   AuthenticationService,
   MetadataService,
+  OAuthService,
   PinboardService,
   PinService,
   TagService,
   UserService,
   type EmailSealer,
 } from '@pinsquirrel/services'
+import { oauthConfig } from './config'
 import {
   apiKeyRepository,
   userRepository,
@@ -22,6 +24,9 @@ import {
   pinRepository,
   passwordResetRepository,
   sessionRepository,
+  oauthClientRepository,
+  oauthAuthorizationCodeRepository,
+  oauthTokenRepository,
 } from './db'
 
 // Create utility instances for metadata service
@@ -76,7 +81,29 @@ export const apiKeyService = new ApiKeyService(apiKeyRepository, userRepository)
 export const metadataService = new MetadataService(httpFetcher, htmlParser)
 export const maintenanceService = new MaintenanceService(
   sessionRepository,
-  passwordResetRepository
+  passwordResetRepository,
+  oauthClientRepository,
+  oauthAuthorizationCodeRepository,
+  oauthTokenRepository
+)
+
+// The issuer and the resource identifiers are deployment facts, read once in
+// `lib/config.ts` and passed in. The service never reads `process.env`, and the
+// CIMD fetch arrives as the same SSRF-guarded fetcher the metadata service uses
+// (Decision 20).
+export const oauthService = new OAuthService(
+  oauthClientRepository,
+  oauthAuthorizationCodeRepository,
+  oauthTokenRepository,
+  userRepository,
+  httpFetcher,
+  {
+    issuer: oauthConfig.issuer,
+    resources: [
+      oauthConfig.resources.mcp.resource,
+      oauthConfig.resources.apiV1.resource,
+    ],
+  }
 )
 
 // Export static utilities for error handling
