@@ -22,6 +22,19 @@ export type {
   UpdateSessionData,
 } from './entities/session.js'
 export type { ApiKey, CreateApiKeyData } from './entities/api-key.js'
+export type {
+  OAuthClient,
+  OAuthClientRegistrationType,
+  CreateOAuthClientData,
+  UpdateOAuthClientData,
+} from './entities/oauth-client.js'
+export type {
+  AuthorizationCode,
+  CreateAuthorizationCodeData,
+  OAuthToken,
+  OAuthTokenKind,
+  CreateOAuthTokenData,
+} from './entities/oauth-grant.js'
 export {
   Pagination,
   type PaginationOptions,
@@ -41,6 +54,9 @@ export type { TagRepository } from './interfaces/tag-repository.js'
 export type { PasswordResetRepository } from './interfaces/password-reset-repository.js'
 export type { SessionRepository } from './interfaces/session-repository.js'
 export type { ApiKeyRepository } from './interfaces/api-key-repository.js'
+export type { OAuthClientRepository } from './interfaces/oauth-client-repository.js'
+export type { OAuthAuthorizationCodeRepository } from './interfaces/oauth-authorization-code-repository.js'
+export type { OAuthTokenRepository } from './interfaces/oauth-token-repository.js'
 export type { EmailService } from './interfaces/email-service.js'
 export type { HttpFetcher } from './interfaces/http-fetcher.js'
 export type { HtmlParser, MetadataResult } from './interfaces/html-parser.js'
@@ -89,6 +105,18 @@ export {
   ApiKeyLimitExceededError,
   UnauthorizedApiKeyAccessError,
 } from './errors/api-key.js'
+export {
+  OAuthError,
+  OAuthInvalidRequestError,
+  OAuthInvalidClientError,
+  OAuthInvalidGrantError,
+  OAuthUnauthorizedClientError,
+  OAuthUnsupportedGrantTypeError,
+  OAuthInvalidScopeError,
+  OAuthInvalidTargetError,
+  OAuthAccessDeniedError,
+  OAuthInvalidClientMetadataError,
+} from './errors/oauth.js'
 export {
   isBlockedIpv4,
   isBlockedIpv6,

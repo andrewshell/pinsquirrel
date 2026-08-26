@@ -684,18 +684,39 @@ find the metadata and then fail at a later, more informative step.
 `libs/domain` has no dependencies and must stay that way: entities, interfaces, and errors only.
 Anything that needs `node:net` or a URL parser belongs in `libs/services`.
 
-- [ ] `libs/domain/src/entities/oauth-client.ts`: `OAuthClient` with id, clientId, clientName,
+- [x] `libs/domain/src/entities/oauth-client.ts`: `OAuthClient` with id, clientId, clientName,
       redirectUris, grantTypes, tokenEndpointAuthMethod, registrationType (`cimd` | `dcr` |
       `static`), metadataUrl (CIMD only), metadataFetchedAt, createdAt
-- [ ] `libs/domain/src/entities/oauth-grant.ts`: `AuthorizationCode` (code hash, clientId,
+
+  Plus `completedAt`, which the list above did not name. The DCR TTL below needs to tell a
+  registration that never completed an authorization from one in daily use, and reading that off
+  a join against codes and tokens is both slower and easy to get wrong.
+
+- [x] `libs/domain/src/entities/oauth-grant.ts`: `AuthorizationCode` (code hash, clientId,
       userId, redirectUri, codeChallenge, scopes, resource, expiresAt, consumedAt) and
       `OAuthToken` (token hash, kind, clientId, userId, scopes, resource, expiresAt, revokedAt,
       rotatedFrom). `OAuthToken` implements `AccessGateable` (`userId` is the gate), so
       `AccessControl.canDelete(token)` decides revocation the way it does for `ApiKey` and `Pin`
-- [ ] `libs/domain/src/interfaces/`: repository interfaces for both. Each store with an expiry
+
+  Two adjustments. `OAuthToken` also carries `rotatedAt`, so a replayed rotated refresh token is
+  distinguishable from one a user revoked; without it both are just "revoked" and 6d cannot tell
+  a rotation replay from a normal dead token. And the code challenge method is not stored: `S256`
+  is the only method the metadata advertises and the only one 6d will accept, so a column that
+  can hold one value is noise.
+
+- [x] `libs/domain/src/interfaces/`: repository interfaces for both. Each store with an expiry
       exposes a `deleteExpired…(): Promise<number>` in the shape of
       `SessionRepository.deleteExpiredSessions`, so 6c can add it to the sweep
-- [ ] `libs/domain/src/errors/oauth.ts`: error types that map cleanly to RFC 6749 codes
+
+  Three interfaces, one per table. `deleteExpiredIncompleteClients` takes the cutoff date as an
+  argument rather than computing it, because the TTL is a policy the service owns.
+
+- [x] `libs/domain/src/errors/oauth.ts`: error types that map cleanly to RFC 6749 codes
+
+  `OAuthError` carries the wire `code`; each subclass fixes one value. Nine of them, the seven
+  RFC 6749 token and authorization codes the endpoints need plus `access_denied` for the consent
+  screen's deny button and `invalid_client_metadata` for registration.
+
 - [ ] `libs/database/src/schema/oauth-*.ts`: tables `oauth_clients`,
       `oauth_authorization_codes`, `oauth_tokens`. Hash codes and tokens at rest, same as
       `api_keys.key_hash` and `sessions`
