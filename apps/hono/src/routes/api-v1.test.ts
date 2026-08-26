@@ -180,12 +180,12 @@ describe('api-v1 routes', () => {
       expect(res.status).toBe(401)
     })
 
-    // X-API-Key belonged to the API keys, which are gone. It is not read at
-    // all now, not even as a fallback.
-    it('rejects an X-API-Key header', async () => {
+    // `Authorization: Bearer` is the only credential form. Nothing else is
+    // read, not even as a fallback.
+    it('ignores a non-bearer credential header', async () => {
       mockVerifyAccessToken.mockImplementation(tokenFor(REST_RESOURCE))
       const res = await app.request('/api/v1/pins', {
-        headers: { 'X-API-Key': 'ps_ok' },
+        headers: { 'X-Custom-Credential': 'anything' },
       })
 
       expect(res.status).toBe(401)

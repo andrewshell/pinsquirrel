@@ -137,9 +137,9 @@ describe('mcp route auth', () => {
     expect(mockGetUserPinsWithPagination).toHaveBeenCalled()
   })
 
-  // The AuthInfo the SDK sees is built from the OAuth principal: real scopes
-  // rather than the empty array the key path carried, and the OAuth client id
-  // rather than the user id.
+  // The AuthInfo the SDK sees is built from the OAuth principal: the scopes
+  // the token was actually granted, and the OAuth client id rather than the
+  // user id.
   it('builds AuthInfo from the OAuth principal', async () => {
     mockVerifyAccessToken.mockImplementation(
       tokenFor('http://localhost:8100/mcp')
@@ -169,14 +169,14 @@ describe('mcp route auth', () => {
     expect(mockGetUserPinsWithPagination).not.toHaveBeenCalled()
   })
 
-  // X-API-Key went with the API keys. Authorization: Bearer is the only
-  // credential form here.
-  it('rejects an X-API-Key header', async () => {
+  // `Authorization: Bearer` is the only credential form here. A credential
+  // offered in any other header is not one.
+  it('ignores a non-bearer credential header', async () => {
     mockVerifyAccessToken.mockImplementation(
       tokenFor('http://localhost:8100/mcp')
     )
 
-    const res = await toolCall({ 'X-API-Key': 'ps_ok' })
+    const res = await toolCall({ 'X-Custom-Credential': 'anything' })
 
     expect(res.status).toBe(401)
     expect(mockVerifyAccessToken).not.toHaveBeenCalled()
