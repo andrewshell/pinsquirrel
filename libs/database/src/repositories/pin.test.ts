@@ -1030,6 +1030,25 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         expect(total).toBe(result.length)
       })
 
+      it('combines with a tag filter, which joins the same tables outside', async () => {
+        await pinRepository.create({
+          userId: testUser.id,
+          url: 'https://example.org/a-talk',
+          title: 'A talk',
+          description: null,
+          readLater: false,
+          isPrivate: false,
+          tagNames: ['jesseelder', 'video'],
+        })
+
+        const result = await pinRepository.findByUserId(testUser.id, {
+          search: 'jesse elder',
+          tag: 'video',
+        })
+
+        expect(result.map(p => p.title)).toEqual(['A talk'])
+      })
+
       it('ignores runs of whitespace between terms', async () => {
         const result = await pinRepository.findByUserId(testUser.id, {
           search: '  jesse \t elder  ',
