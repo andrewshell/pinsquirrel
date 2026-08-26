@@ -691,3 +691,184 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     ).rejects.toBeInstanceOf(ValidationError)
   })
 })
+
+describe('OAuthService.exchangeRefreshToken', () => {
+  let ctx: ReturnType<typeof setup>
+
+  const refreshScopes = ['pins:read', 'tags:read', 'offline_access']
+
+  function refreshParams(
+    overrides: Record<string, unknown> = {}
+  ): Record<string, unknown> {
+    return {
+      grant_type: 'refresh_token',
+      refresh_token: 'raw-refresh',
+      client_id: CIMD_URL,
+      ...overrides,
+    }
+  }
+
+  function storedRefresh(overrides: Partial<OAuthToken> = {}): OAuthToken {
+    return makeToken(
+      {
+        tokenHash: 'hashed_raw-refresh',
+        kind: 'refresh',
+        clientId: CIMD_URL,
+        userId: user.id,
+        scopes: refreshScopes,
+        resource: MCP_RESOURCE,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+      { id: 'refresh-1', ...overrides }
+    )
+  }
+
+  beforeEach(() => {
+    ctx = setup()
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
+      storedRefresh()
+    )
+    vi.mocked(ctx.tokenRepository.markRotated).mockResolvedValue(true)
+    vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockResolvedValue(2)
+    vi.mocked(ctx.tokenRepository.create).mockImplementation(data =>
+      Promise.resolve(makeToken(data))
+    )
+  })
+
+  // OAuth 2.1 requires rotation for public clients, and both CIMD and DCR
+  // register Claude as one.
+  it('issues a new refresh token and retires the one presented', async () => {
+    const issued = await ctx.service.exchangeRefreshToken(refreshParams())
+
+    expect(issued.refreshToken).toBeTruthy()
+    expect(issued.refreshToken).not.toBe('raw-refresh')
+    expect(ctx.tokenRepository.markRotated).toHaveBeenCalledWith('refresh-1')
+    expect(ctx.tokenRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'refresh',
+        rotatedFrom: 'refresh-1',
+        resource: MCP_RESOURCE,
+        scopes: refreshScopes,
+      })
+    )
+  })
+
+  it('issues an access token for the same audience', async () => {
+    const issued = await ctx.service.exchangeRefreshToken(refreshParams())
+
+    expect(issued.accessToken.startsWith('pso_')).toBe(true)
+    expect(issued.resource).toBe(MCP_RESOURCE)
+  })
+
+  // A token presented after it was rotated means the chain leaked: either the
+  // client replayed it or somebody else has it, and there is no way to tell
+  // which. Killing the family is the only safe answer.
+  it('kills the whole grant when a rotated token is presented again', async () => {
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
+      storedRefresh({ rotatedAt: new Date() })
+    )
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+
+    expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
+      user.id,
+      CIMD_URL
+    )
+    expect(ctx.tokenRepository.create).not.toHaveBeenCalled()
+  })
+
+  // Two refreshes racing on the same token: the marking is conditional, so
+  // exactly one wins and the loser is a replay like any other.
+  it('treats losing the rotation race as a replay', async () => {
+    vi.mocked(ctx.tokenRepository.markRotated).mockResolvedValue(false)
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+    expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalled()
+  })
+
+  it('refuses a token the user revoked', async () => {
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
+      storedRefresh({ revokedAt: new Date() })
+    )
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+  })
+
+  it('refuses an expired token', async () => {
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
+      storedRefresh({ expiresAt: new Date(Date.now() - 1000) })
+    )
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+  })
+
+  it('refuses an access token presented as a refresh token', async () => {
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
+      storedRefresh({ kind: 'access' })
+    )
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+  })
+
+  it('refuses a token that belongs to another client', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({ clientId: 'dcr_other' })
+    )
+
+    await expect(
+      ctx.service.exchangeRefreshToken(
+        refreshParams({ client_id: 'dcr_other' })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+  })
+
+  it('refuses a token nothing is stored for', async () => {
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(null)
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+  })
+
+  it('lets a client ask for less than it already has', async () => {
+    const issued = await ctx.service.exchangeRefreshToken(
+      refreshParams({ scope: 'pins:read' })
+    )
+
+    expect(issued.scopes).toEqual(['pins:read'])
+  })
+
+  it('refuses a refresh that asks for more than was granted', async () => {
+    await expect(
+      ctx.service.exchangeRefreshToken(
+        refreshParams({
+          scope: 'pins:read tags:read offline_access pins:write',
+        })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidScopeError)
+  })
+
+  it('refuses a refresh aimed at a different audience', async () => {
+    await expect(
+      ctx.service.exchangeRefreshToken(
+        refreshParams({ resource: API_RESOURCE })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidTargetError)
+  })
+
+  it('rejects a malformed refresh request as a validation failure', async () => {
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams({ refresh_token: '' }))
+    ).rejects.toBeInstanceOf(ValidationError)
+  })
+})

@@ -28,6 +28,7 @@ import {
   authorizationCodeGrantSchema,
   authorizationRequestSchema,
   clientIdMetadataDocumentSchema,
+  refreshTokenGrantSchema,
   type ClientIdMetadataDocument,
 } from '../validation/oauth.js'
 import { validateUrlForFetching } from '../validation/url.js'
@@ -357,6 +358,90 @@ export class OAuthService {
   }
 
   /**
+   * Rotate a refresh token: retire the one presented, issue its successor.
+   *
+   * OAuth 2.1 requires rotation for public clients, and CIMD and DCR both
+   * register Claude as one. The retirement is `markRotated`, which only
+   * succeeds on a token that has not been rotated yet, so two refreshes racing
+   * on the same token resolve to one winner rather than two live chains.
+   *
+   * A token presented after it was rotated means the chain leaked. There is no
+   * way to tell a client replaying its own token from somebody else holding a
+   * copy, so the whole grant dies and the user re-consents.
+   */
+  async exchangeRefreshToken(params: unknown): Promise<IssuedTokens> {
+    const parsed = refreshTokenGrantSchema.safeParse(params)
+    if (!parsed.success) {
+      throw validationErrorFromZod(parsed.error, {
+        fallbackField: 'token_request',
+      })
+    }
+    const request = parsed.data
+
+    const client = await this.resolveClient(request.client_id)
+
+    const token = await this.tokenRepository.findByTokenHash(
+      hashToken(request.refresh_token)
+    )
+    if (
+      !token ||
+      token.kind !== 'refresh' ||
+      token.clientId !== client.clientId ||
+      token.revokedAt ||
+      token.expiresAt <= new Date()
+    ) {
+      throw new OAuthInvalidGrantError(
+        'The refresh token is invalid, expired, or revoked'
+      )
+    }
+
+    if (token.rotatedAt) {
+      await this.revokeGrantFamily(token.userId, token.clientId)
+      throw new OAuthInvalidGrantError(
+        'That refresh token was already exchanged; the grant has been revoked'
+      )
+    }
+
+    const scopes = request.scope
+      ? narrowedScopes(request.scope, token.scopes)
+      : token.scopes
+
+    if (request.resource) {
+      const requested = this.requireKnownResource(request.resource)
+      if (requested !== token.resource) {
+        throw new OAuthInvalidTargetError(
+          'resource does not match the audience this grant was made for'
+        )
+      }
+    }
+
+    if (!(await this.tokenRepository.markRotated(token.id))) {
+      // Lost the race with a concurrent refresh of the same token. The other
+      // one is already issuing a successor, so this one is a replay.
+      await this.revokeGrantFamily(token.userId, token.clientId)
+      throw new OAuthInvalidGrantError(
+        'That refresh token was already exchanged; the grant has been revoked'
+      )
+    }
+
+    return this.issueTokens({
+      client,
+      userId: token.userId,
+      scopes,
+      resource: token.resource,
+      rotatedFrom: token.id,
+    })
+  }
+
+  /** Kill every live token a user holds for one client. */
+  private async revokeGrantFamily(
+    userId: string,
+    clientId: string
+  ): Promise<number> {
+    return this.tokenRepository.revokeByUserAndClient(userId, clientId)
+  }
+
+  /**
    * Mint an access token, and a refresh token when one was granted.
    *
    * Both carry the audience the grant was made for, because the audience check
@@ -632,6 +717,24 @@ function grantedScopes(scope: string | undefined): string[] {
   }
 
   return [...new Set(requested)]
+}
+
+/**
+ * The scopes a refresh may ask for: any subset of what was already granted.
+ *
+ * Asking for more is refused rather than trimmed, because a client that
+ * believes it has a scope it does not will fail later, somewhere less
+ * informative than here.
+ */
+function narrowedScopes(scope: string, granted: string[]): string[] {
+  const requested = scope.split(/\s+/).filter(Boolean)
+  const widened = requested.filter(one => !granted.includes(one))
+  if (widened.length > 0) {
+    throw new OAuthInvalidScopeError(
+      `A refresh cannot widen a grant. Not granted: ${widened.join(', ')}`
+    )
+  }
+  return requested.length > 0 ? [...new Set(requested)] : granted
 }
 
 function looksLikeUrl(clientId: string): boolean {
