@@ -32,10 +32,14 @@
     "@scalar/hono-api-reference": "^0.11.16",
     "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
+    "drizzle-orm": "1.0.0-rc.5-169397b",
     "hono": "^4.13.3",
     "mailgun.js": "^14.0.0",
+    "mysql2": "^3.23.4",
     "pino": "^10.3.1",
-    "turndown": "^7.2.4"
+    "turndown": "^7.2.4",
+    "undici": "^8.10.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3",

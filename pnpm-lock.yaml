@@ -145,18 +145,30 @@ importers:
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
+      drizzle-orm:
+        specifier: 1.0.0-rc.5-169397b
+        version: 1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.23.4(@types/node@26.2.0))(pg@8.16.3)(zod@4.4.3)
       hono:
         specifier: ^4.13.3
         version: 4.13.3
       mailgun.js:
         specifier: ^14.0.0
         version: 14.0.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
+      mysql2:
+        specifier: ^3.23.4
+        version: 3.23.4(@types/node@26.2.0)
       pino:
         specifier: ^10.3.1
         version: 10.3.1
       turndown:
         specifier: ^7.2.4
         version: 7.2.4
+      undici:
+        specifier: ^8.10.0
+        version: 8.10.0
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@tailwindcss/cli':
         specifier: ^4.3.3
