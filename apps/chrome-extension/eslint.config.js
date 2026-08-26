@@ -8,4 +8,10 @@ export default [
     files: ['scripts/**/*.ts'],
     rules: { 'no-console': 'off' },
   },
+  {
+    // A service worker's only output is the DevTools console, so the entry
+    // point is where `console` is named - `initBackground` takes a logger.
+    files: ['src/background.ts'],
+    rules: { 'no-console': 'off' },
+  },
 ]
