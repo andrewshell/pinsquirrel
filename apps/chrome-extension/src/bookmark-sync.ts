@@ -7,7 +7,8 @@
  * edited title is overwritten.
  */
 
-import { ReauthorizationRequiredError } from './auth.ts'
+import { PinSquirrelApiClient } from './api-client.ts'
+import { authorizedFetch, ReauthorizationRequiredError } from './auth.ts'
 import * as storage from './storage.ts'
 import type { Pin, Tag } from './types.ts'
 
@@ -279,4 +280,33 @@ async function mirrorTags(input: {
     rootId,
     selected.map(tag => tag.name)
   )
+}
+
+/**
+ * A sync of what storage currently says, over the stored connection.
+ *
+ * The convenience form for the service worker (5f), which wakes with nothing
+ * in hand and has to rebuild both the client and the selection every time.
+ * `syncAll` stays the injectable one, so a test never has to stand up a token.
+ *
+ * No base URL means the extension was never connected or has been
+ * disconnected. That is not a sync failure to record - the popup is showing
+ * its Connect view either way - so it is raised as the same
+ * `ReauthorizationRequiredError` a dead grant raises and left to the caller.
+ */
+export async function runSync(): Promise<void> {
+  const stored = await storage.getMany(['baseUrl', 'selectedTagIds'])
+  if (!stored.baseUrl) {
+    throw new ReauthorizationRequiredError(
+      'The extension is not connected to a PinSquirrel server'
+    )
+  }
+
+  await syncAll({
+    apiClient: new PinSquirrelApiClient({
+      baseUrl: stored.baseUrl,
+      fetch: authorizedFetch,
+    }),
+    selectedTagIds: stored.selectedTagIds ?? [],
+  })
 }
