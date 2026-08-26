@@ -21,6 +21,7 @@ import {
 } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { applyPagination } from './pagination.js'
+import { escapeLikePattern, splitSearchTerms } from './search-terms.js'
 import { pins } from '../schema/pins.js'
 import { pinsTags } from '../schema/pins-tags.js'
 import { tags } from '../schema/tags.js'
@@ -29,17 +30,6 @@ import type { DrizzleTagRepository } from './tag.js'
 
 function md5(input: string): string {
   return createHash('md5').update(input).digest('hex')
-}
-
-/**
- * Escape the characters MySQL's LIKE treats as wildcards.
- *
- * A user searching for `a_c` means those three characters, not "a, anything,
- * c" — and `100%` should not match every pin containing "100". The backslash
- * goes first so the escapes we add are not themselves re-escaped.
- */
-function escapeLikePattern(term: string): string {
-  return term.replace(/[\\%_]/g, '\\$&')
 }
 
 /**
@@ -145,7 +135,7 @@ export class DrizzlePinRepository implements PinRepository {
       // Every term must match (AND), each in any field (OR). Searching
       // `jesse elder` should find `jesseelder.com`, which the whole query as
       // one LIKE never could.
-      for (const term of filter.search.split(/\s+/).filter(t => t !== '')) {
+      for (const term of splitSearchTerms(filter.search)) {
         const pattern = `%${escapeLikePattern(term)}%`
         const termCondition = or(
           like(pins.url, pattern),
