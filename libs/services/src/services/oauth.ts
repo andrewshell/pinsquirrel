@@ -336,7 +336,7 @@ export class OAuthService {
     }
     const request = parsed.data
 
-    const client = await this.resolveClient(request.client_id)
+    const client = await this.resolveClientForGrant(request.client_id)
 
     const code = await this.codeRepository.consume(hashToken(request.code))
     if (!code) {
@@ -403,7 +403,7 @@ export class OAuthService {
     }
     const request = parsed.data
 
-    const client = await this.resolveClient(request.client_id)
+    const client = await this.resolveClientForGrant(request.client_id)
 
     const token = await this.tokenRepository.findByTokenHash(
       hashToken(request.refresh_token)
@@ -851,6 +851,33 @@ export class OAuthService {
       throw new OAuthInvalidClientError('Unknown client_id')
     }
     return client
+  }
+
+  /**
+   * The client behind a `client_id` on a token request.
+   *
+   * A row this server already has is good enough here, however old its cached
+   * metadata is. What the token endpoint does with the client is compare its
+   * identifier against the one on the code or the refresh token; the redirect
+   * URI is checked against the code, and the audience against the grant.
+   * Nothing reads the redirect URIs or the grant types off the client, so a
+   * re-fetch could not change the answer.
+   *
+   * It could easily change the timing. Claude gives a token exchange 10
+   * seconds and a refresh 30, and a CIMD fetch has a 10 second timeout of its
+   * own, so a stale cache behind a slow or unreachable client host would spend
+   * the entire budget waiting for a document whose contents do not matter. The
+   * authorization request is where the document is validated and refreshed;
+   * that page is not on the budget.
+   */
+  private async resolveClientForGrant(clientId: string): Promise<OAuthClient> {
+    const known = await this.clientRepository.findByClientId(clientId)
+    if (known) return known
+
+    // No row at all. There is no grant to exchange either, but resolving
+    // properly is what turns that into `invalid_client` rather than a
+    // confusing `invalid_grant`.
+    return this.resolveClient(clientId)
   }
 
   /**
