@@ -4,7 +4,7 @@ import * as storage from '../storage.ts'
 import type { TagWithCount } from '../types.ts'
 import { filterTags } from './filter.ts'
 import { formatLastSync, parseBaseUrl } from './format.ts'
-import { renderTagList, selectedTagIdsIn } from './render.ts'
+import { asCheckbox, renderTagList } from './render.ts'
 
 /**
  * The slice of `PinSquirrelApiClient` the popup uses.
@@ -105,8 +105,14 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
    */
   let allTags: TagWithCount[] = []
 
-  /** The stored selection, as the last load or toggle left it. */
-  let selectedTagIds: string[] = []
+  /**
+   * The tags the user has picked, as the last load or toggle left them.
+   *
+   * Held here rather than read back off the boxes, because the boxes are only
+   * the tags matching the filter: a user narrowing the list to one tag would
+   * otherwise deselect every other tag the moment they ticked it.
+   */
+  const selection = new Set<string>()
 
   const setStatus = (text: string): void => {
     ui.status.textContent = text
@@ -171,7 +177,8 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
         storage.get('selectedTagIds'),
       ])
       allTags = tags
-      selectedTagIds = selected ?? []
+      selection.clear()
+      for (const id of selected ?? []) selection.add(id)
       drawTagList()
     } catch (error) {
       report(error)
@@ -180,11 +187,20 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
 
   /** Draw the tags matching the filter box, ticked from the selection. */
   function drawTagList(): void {
-    renderTagList(
-      ui.tagList,
-      filterTags(allTags, ui.tagFilter.value),
-      selectedTagIds
-    )
+    renderTagList(ui.tagList, filterTags(allTags, ui.tagFilter.value), [
+      ...selection,
+    ])
+  }
+
+  /**
+   * The selection as a list, in the order the server sends the tags.
+   *
+   * Ordering by `allTags` keeps the stored value stable no matter which tag
+   * was ticked last, and drops ids for tags the account no longer has -
+   * `getTags` answers with all of them, so an id missing from it is gone.
+   */
+  function selectedTagIds(): string[] {
+    return allTags.filter(tag => selection.has(tag.id)).map(tag => tag.id)
   }
 
   async function onConnect(): Promise<void> {
@@ -224,10 +240,20 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
    *
    * No Save button: the popup closes the instant it loses focus, and a
    * selection the user made but did not save would be gone.
+   *
+   * Only the box that moved is applied to the selection - the rest of the
+   * selection is whatever it already was, including the tags the filter is
+   * hiding, which have no box on screen to be read from.
    */
-  async function onTagToggled(): Promise<void> {
+  async function onTagToggled(target: EventTarget | null): Promise<void> {
+    const box = asCheckbox(target)
+    if (box === null) return
+
+    if (box.checked) selection.add(box.value)
+    else selection.delete(box.value)
+
     try {
-      await storage.set({ selectedTagIds: selectedTagIdsIn(ui.tagList) })
+      await storage.set({ selectedTagIds: selectedTagIds() })
     } catch (error) {
       report(error)
     }
@@ -263,7 +289,10 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
   ui.disconnectButton.addEventListener('click', () => void onDisconnect())
   // One delegated listener, because the boxes themselves are replaced on
   // every render and per-box listeners would have to be re-attached each time.
-  ui.tagList.addEventListener('change', () => void onTagToggled())
+  ui.tagList.addEventListener(
+    'change',
+    event => void onTagToggled(event.target)
+  )
   ui.tagFilter.addEventListener('input', () => {
     drawTagList()
   })

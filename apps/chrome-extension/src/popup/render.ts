@@ -8,8 +8,12 @@ import type { TagWithCount } from '../types.ts'
  * popup, which is the one page in the extension holding the tokens.
  *
  * Nothing here listens for anything. The wiring puts one `change` listener on
- * the container and reads the boxes back with `selectedTagIdsIn`, so a
+ * the container and picks the box out of the event with `asCheckbox`, so a
  * re-render cannot leave stale listeners behind on discarded nodes.
+ *
+ * `tags` is what the list shows, not what the account has: with a filter in
+ * the box it is the matches. `selectedTagIds` may name tags that are not in
+ * `tags` at all - they are simply not drawn, and stay selected.
  */
 export function renderTagList(
   container: HTMLElement,
@@ -52,16 +56,16 @@ export function renderTagList(
 }
 
 /**
- * The ids of the ticked boxes, in the order they are drawn.
+ * The tag box a change event came from, or null if it came from anything else.
  *
- * The DOM is the state: the alternative is a parallel array kept in step with
- * it by hand, and the two drift the first time a re-render happens between a
- * click and a read.
+ * The one listener sits on the container, so the target is whatever inside it
+ * was touched. The caller wants the box that moved rather than a read of every
+ * box on screen: the rows are only the tags matching the filter, and the tags
+ * it hides are still selected.
  */
-export function selectedTagIdsIn(container: HTMLElement): string[] {
-  return [
-    ...container.querySelectorAll<HTMLInputElement>('input[type=checkbox]'),
-  ]
-    .filter(checkbox => checkbox.checked)
-    .map(checkbox => checkbox.value)
+export function asCheckbox(
+  target: EventTarget | null
+): HTMLInputElement | null {
+  if (!(target instanceof HTMLInputElement)) return null
+  return target.type === 'checkbox' ? target : null
 }
