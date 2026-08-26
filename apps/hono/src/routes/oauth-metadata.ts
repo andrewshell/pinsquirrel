@@ -49,6 +49,9 @@ export function createOAuthMetadataRoutes(config: OAuthConfig): Hono {
       authorization_endpoint: `${config.issuer}/oauth/authorize`,
       token_endpoint: `${config.issuer}/oauth/token`,
       registration_endpoint: `${config.issuer}/oauth/register`,
+      // RFC 7009. Advertised now that the endpoint exists: a client with
+      // nowhere to hand a token back keeps it until it expires.
+      revocation_endpoint: `${config.issuer}/oauth/revoke`,
       scopes_supported: [...config.resources.mcp.scopes, ...AS_ONLY_SCOPES],
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code', 'refresh_token'],

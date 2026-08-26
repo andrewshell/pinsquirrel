@@ -19,17 +19,16 @@ import {
   pinFilterFromInput,
 } from '@pinsquirrel/services'
 import { pinService, tagService } from '../lib/services'
-import { apiKeyAuth, getApiUser } from '../middleware/api-auth'
+import { oauthAuth, getOAuthUser } from '../middleware/oauth-auth'
 import { oauthConfig } from '../lib/config'
 
 const apiV1 = new OpenAPIHono()
 
 // --- OpenAPI route specs (for spec generation only) -------------------------
 
-const security: Record<string, string[]>[] = [
-  { bearerAuth: [] },
-  { apiKeyHeader: [] },
-]
+// One credential form: an OAuth access token in `Authorization: Bearer`.
+// `X-API-Key` left with the API keys (Decision 12).
+const security: Record<string, string[]>[] = [{ bearerAuth: [] }]
 
 apiV1.openAPIRegistry.registerPath({
   method: 'get',
@@ -167,7 +166,11 @@ apiV1.openAPIRegistry.registerPath({
 // --- Auth middleware (applies to all routes) ---------------------------------
 
 // TODO: write endpoints (POST/PUT/DELETE) will need CSRF bypass when added.
-apiV1.use('*', apiKeyAuth(oauthConfig.resources.apiV1))
+//
+// The REST API is an OAuth protected resource with its own identifier, and
+// the middleware is handed exactly that one: a token minted for `/mcp` has to
+// be refused here (Decision 18).
+apiV1.use('*', oauthAuth(oauthConfig.resources.apiV1))
 
 // --- Helpers ----------------------------------------------------------------
 
@@ -182,7 +185,7 @@ function errorResponse(c: Context, err: unknown) {
   // 404, not 403, and with the id left out of the body: a pin or tag owned by
   // another user is indistinguishable from one that does not exist, which is
   // the rule the HTML routes already follow so ownership stays opaque. This
-  // 404 is unrelated to apiKeyAuth's 401 - that one answers "who are you?" and
+  // 404 is unrelated to oauthAuth's 401 - that one answers "who are you?" and
   // is settled before any handler runs (it is the one that carries
   // WWW-Authenticate).
   if (
@@ -204,7 +207,7 @@ function errorResponse(c: Context, err: unknown) {
 
 // GET /api/v1/pins - list pins (excludes private pins)
 apiV1.get('/pins', async c => {
-  const user = getApiUser(c)
+  const user = getOAuthUser(c)
   const ac = new AccessControl(user)
 
   const parsed = pinListQuerySchema.safeParse(c.req.query())
@@ -227,7 +230,7 @@ apiV1.get('/pins', async c => {
 
 // GET /api/v1/pins/:id - single pin
 apiV1.get('/pins/:id', async c => {
-  const user = getApiUser(c)
+  const user = getOAuthUser(c)
   const ac = new AccessControl(user)
   const id = c.req.param('id')
 
@@ -241,7 +244,7 @@ apiV1.get('/pins/:id', async c => {
 
 // GET /api/v1/tags - list user's tags
 apiV1.get('/tags', async c => {
-  const user = getApiUser(c)
+  const user = getOAuthUser(c)
   const ac = new AccessControl(user)
 
   const parsed = tagListQuerySchema.safeParse(c.req.query())
@@ -261,7 +264,7 @@ apiV1.get('/tags', async c => {
 
 // GET /api/v1/tags/:id/pins - pins for a tag (by tag id, excludes private)
 apiV1.get('/tags/:id/pins', async c => {
-  const user = getApiUser(c)
+  const user = getOAuthUser(c)
   const ac = new AccessControl(user)
   const tagId = c.req.param('id')
 

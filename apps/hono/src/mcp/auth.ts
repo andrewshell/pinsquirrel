@@ -1,7 +1,6 @@
 import type { MiddlewareHandler } from 'hono'
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js'
-import { authenticateBearer } from '../middleware/bearer-auth.js'
-import { bearerChallenge } from '../middleware/www-authenticate.js'
+import { oauthAuth, getOAuthPrincipal } from '../middleware/oauth-auth.js'
 import type { ProtectedResourceConfig } from '../lib/config.js'
 
 declare module 'hono' {
@@ -12,29 +11,31 @@ declare module 'hono' {
 
 /**
  * `resource` is the protected resource this endpoint is: its metadata document
- * is what the 401 advertises. Passing it in rather than reading config here
- * keeps the middleware transport-only and makes the challenge testable.
+ * is what the 401 advertises, and it is the audience a token has to be bound
+ * to. Passing it in rather than reading config here keeps the middleware
+ * transport-only and makes the challenge testable.
+ *
+ * The credential is an OAuth access token. `oauthAuth` does the parsing and
+ * the 401 - including the challenge, which clients need on every request
+ * including tool calls, because they authenticate lazily - and this wrapper
+ * translates the principal into the SDK's `AuthInfo`. The two types stay
+ * distinct on purpose (Decision 12): `AuthInfo` is the SDK's shape, built
+ * from ours.
  */
 export function mcpAuth(resource: ProtectedResourceConfig): MiddlewareHandler {
-  const challenge = bearerChallenge(resource)
+  const authenticate = oauthAuth(resource)
 
-  return async (c, next) => {
-    const result = await authenticateBearer(c, { allowApiKeyHeader: false })
-    if (!result.ok) {
-      // A real 401 with a real challenge, on every request including tool
-      // calls. Clients ignore WWW-Authenticate on a 200 and treat an MCP-level
-      // tool error as a tool failure, so either shape leaves them unable to
-      // discover where to authenticate.
-      return c.json({ error: result.failure.message }, 401, {
-        'WWW-Authenticate': challenge,
+  return async (c, next) =>
+    authenticate(c, async () => {
+      const principal = getOAuthPrincipal(c)
+      c.set('auth', {
+        token: principal.rawToken,
+        // The OAuth client, not the user it acts for, and the scopes the
+        // grant actually carries rather than an empty array.
+        clientId: principal.clientId,
+        scopes: principal.scopes,
+        extra: { user: principal.user },
       })
-    }
-    c.set('auth', {
-      token: result.auth.rawKey,
-      clientId: result.auth.user.id,
-      scopes: [],
-      extra: { user: result.auth.user },
+      await next()
     })
-    await next()
-  }
 }

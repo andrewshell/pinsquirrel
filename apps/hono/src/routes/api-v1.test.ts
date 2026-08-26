@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
-import type { ApiKey, Pin, Tag, TagWithCount, User } from '@pinsquirrel/domain'
+import type { Pin, Tag, TagWithCount, User } from '@pinsquirrel/domain'
 import {
   Pagination,
   PinNotFoundError,
@@ -9,7 +9,7 @@ import {
   UnauthorizedTagAccessError,
 } from '@pinsquirrel/domain'
 
-const mockAuthenticate = vi.fn()
+const mockVerifyAccessToken = vi.fn()
 const mockGetPin = vi.fn()
 const mockGetPublicPin = vi.fn()
 const mockGetUserPinsWithPagination = vi.fn()
@@ -18,8 +18,9 @@ const mockGetUserTagsWithCount = vi.fn()
 const mockGetUserTagById = vi.fn()
 
 vi.mock('../lib/services', () => ({
-  apiKeyService: {
-    authenticate: (...args: unknown[]) => mockAuthenticate(...args) as unknown,
+  oauthService: {
+    verifyAccessToken: (...args: unknown[]) =>
+      mockVerifyAccessToken(...args) as unknown,
   },
   pinService: {
     getPin: (...args: unknown[]) => mockGetPin(...args) as unknown,
@@ -49,17 +50,6 @@ const testUser: User = {
   updatedAt: new Date('2024-01-01'),
 } as unknown as User
 
-const testApiKey: ApiKey = {
-  id: 'key-1',
-  userId: 'user-1',
-  name: 'test',
-  keyHash: 'hash',
-  keyPrefix: 'ps_test',
-  lastUsedAt: new Date('2024-01-01'),
-  expiresAt: null,
-  createdAt: new Date('2024-01-01'),
-}
-
 function makePin(overrides: Partial<Pin> = {}): Pin {
   return {
     id: 'pin-1',
@@ -87,6 +77,26 @@ function makeTag(overrides: Partial<Tag> = {}): Tag {
   }
 }
 
+const REST_RESOURCE = 'http://localhost:8100/api/v1'
+
+/**
+ * A token that is only good for one resource, which is what the audience
+ * check in `verifyAccessToken` decides. Mocking it this way is what makes the
+ * cross-resource cases real: the route passes its own resource in, or the
+ * token opens both doors.
+ */
+function tokenFor(resource: string) {
+  return (_raw: unknown, expectedResource: unknown) =>
+    expectedResource === resource
+      ? {
+          token: { id: 'token-1' },
+          user: testUser,
+          clientId: 'client-1',
+          scopes: ['pins:read', 'tags:read'],
+        }
+      : null
+}
+
 describe('api-v1 routes', () => {
   let app: Hono
 
@@ -97,10 +107,13 @@ describe('api-v1 routes', () => {
   })
 
   describe('auth middleware', () => {
-    it('returns 401 without auth header', async () => {
+    it('returns 401 without an Authorization header', async () => {
       const res = await app.request('/api/v1/pins')
       expect(res.status).toBe(401)
-      expect(await res.json()).toEqual({ error: 'Missing API key' })
+      expect(await res.json()).toEqual({
+        error: 'invalid_token',
+        error_description: 'An OAuth bearer token is required',
+      })
     })
 
     // The REST API is an OAuth protected resource too, with its own identifier
@@ -115,61 +128,86 @@ describe('api-v1 routes', () => {
       )
     })
 
-    it('challenges an invalid key the same way', async () => {
-      mockAuthenticate.mockResolvedValue(null)
+    it('challenges an invalid token the same way', async () => {
+      mockVerifyAccessToken.mockResolvedValue(null)
       const res = await app.request('/api/v1/pins', {
-        headers: { Authorization: 'Bearer ps_bad' },
+        headers: { Authorization: 'Bearer pso_bad' },
       })
 
       expect(res.status).toBe(401)
       expect(res.headers.get('WWW-Authenticate')).toContain(
         'oauth-protected-resource/api/v1'
       )
+      expect(await res.json()).toEqual({
+        error: 'invalid_token',
+        error_description: 'The access token is invalid, expired, or revoked',
+      })
     })
 
-    it('returns 401 with invalid API key', async () => {
-      mockAuthenticate.mockResolvedValue(null)
+    // Expired, revoked, and belonging to a user who no longer exists are all
+    // the same answer: the service resolves the token or it does not, and the
+    // response never says which it was.
+    it.each(['expired', 'revoked', 'ownerless'])(
+      'rejects a %s token without saying which',
+      async () => {
+        mockVerifyAccessToken.mockResolvedValue(null)
+        const res = await app.request('/api/v1/pins', {
+          headers: { Authorization: 'Bearer pso_ok' },
+        })
+        expect(res.status).toBe(401)
+        expect(await res.json()).toEqual({
+          error: 'invalid_token',
+          error_description: 'The access token is invalid, expired, or revoked',
+        })
+      }
+    )
+
+    // Decision 18 again, from the other side: the path is what separates the
+    // two audiences, so an /mcp token must not drive the REST API.
+    it('rejects a token minted for the MCP resource', async () => {
+      mockVerifyAccessToken.mockImplementation(
+        tokenFor('http://localhost:8100/mcp')
+      )
       const res = await app.request('/api/v1/pins', {
-        headers: { Authorization: 'Bearer ps_bad' },
+        headers: { Authorization: 'Bearer pso_mcp' },
       })
+
       expect(res.status).toBe(401)
-      expect(await res.json()).toEqual({ error: 'Invalid API key' })
     })
 
-    // Keys cascade-delete with their user, so a key with no owner is only
-    // reachable in a race. It reports as invalid rather than confirming the
-    // key itself was good.
-    it('returns 401 when the key has no owner', async () => {
-      mockAuthenticate.mockResolvedValue(null)
+    // X-API-Key was the API-key-only header and the API keys are going. It is
+    // not read at all now, not even as a fallback.
+    it('rejects an X-API-Key header', async () => {
+      mockVerifyAccessToken.mockImplementation(tokenFor(REST_RESOURCE))
       const res = await app.request('/api/v1/pins', {
-        headers: { Authorization: 'Bearer ps_ok' },
+        headers: { 'X-API-Key': 'ps_ok' },
       })
+
       expect(res.status).toBe(401)
-      expect(await res.json()).toEqual({ error: 'Invalid API key' })
+      expect(mockVerifyAccessToken).not.toHaveBeenCalled()
     })
 
-    it('accepts X-API-Key header', async () => {
-      mockAuthenticate.mockResolvedValue({
-        apiKey: testApiKey,
-        user: testUser,
-      })
+    it('accepts a token minted for the REST resource', async () => {
+      mockVerifyAccessToken.mockImplementation(tokenFor(REST_RESOURCE))
       mockGetUserPinsWithPagination.mockResolvedValue({
         pins: [],
         pagination: Pagination.fromTotalCount(0),
       })
       const res = await app.request('/api/v1/pins', {
-        headers: { 'X-API-Key': 'ps_ok' },
+        headers: { Authorization: 'Bearer pso_ok' },
       })
+
       expect(res.status).toBe(200)
+      expect(mockVerifyAccessToken).toHaveBeenCalledWith(
+        'pso_ok',
+        REST_RESOURCE
+      )
     })
   })
 
   describe('GET /api/v1/pins', () => {
     beforeEach(() => {
-      mockAuthenticate.mockResolvedValue({
-        apiKey: testApiKey,
-        user: testUser,
-      })
+      mockVerifyAccessToken.mockImplementation(tokenFor(REST_RESOURCE))
     })
 
     it('returns pins and pagination shape', async () => {
@@ -178,7 +216,7 @@ describe('api-v1 routes', () => {
         pagination: Pagination.fromTotalCount(1, { page: 1, pageSize: 25 }),
       })
       const res = await app.request('/api/v1/pins', {
-        headers: { Authorization: 'Bearer ps_ok' },
+        headers: { Authorization: 'Bearer pso_ok' },
       })
       expect(res.status).toBe(200)
       const body = (await res.json()) as {
@@ -204,7 +242,7 @@ describe('api-v1 routes', () => {
       })
       await app.request(
         '/api/v1/pins?tag=js&search=react&readLater=true&page=2&pageSize=10&sortBy=title&sortDirection=asc',
-        { headers: { Authorization: 'Bearer ps_ok' } }
+        { headers: { Authorization: 'Bearer pso_ok' } }
       )
       const [, filter, pagination] = mockGetUserPinsWithPagination.mock.calls[0]
       expect(filter).toMatchObject({
@@ -219,7 +257,7 @@ describe('api-v1 routes', () => {
 
     it('returns 400 on invalid query', async () => {
       const res = await app.request('/api/v1/pins?page=abc', {
-        headers: { Authorization: 'Bearer ps_ok' },
+        headers: { Authorization: 'Bearer pso_ok' },
       })
       expect(res.status).toBe(400)
     })
@@ -227,16 +265,13 @@ describe('api-v1 routes', () => {
 
   describe('GET /api/v1/pins/:id', () => {
     beforeEach(() => {
-      mockAuthenticate.mockResolvedValue({
-        apiKey: testApiKey,
-        user: testUser,
-      })
+      mockVerifyAccessToken.mockImplementation(tokenFor(REST_RESOURCE))
     })
 
     it('returns pin', async () => {
       mockGetPublicPin.mockResolvedValue(makePin())
       const res = await app.request('/api/v1/pins/pin-1', {
-        headers: { Authorization: 'Bearer ps_ok' },
+        headers: { Authorization: 'Bearer pso_ok' },
       })
       expect(res.status).toBe(200)
       const body = (await res.json()) as { id: string }
@@ -248,7 +283,7 @@ describe('api-v1 routes', () => {
     it('reports a private pin as not found', async () => {
       mockGetPublicPin.mockRejectedValue(new PinNotFoundError('pin-1'))
       const res = await app.request('/api/v1/pins/pin-1', {
-        headers: { Authorization: 'Bearer ps_ok' },
+        headers: { Authorization: 'Bearer pso_ok' },
       })
       expect(res.status).toBe(404)
       // Same body as the foreign-pin case below: the id must not be echoed
@@ -265,7 +300,7 @@ describe('api-v1 routes', () => {
         new UnauthorizedPinAccessError('pin-1')
       )
       const res = await app.request('/api/v1/pins/pin-1', {
-        headers: { Authorization: 'Bearer ps_ok' },
+        headers: { Authorization: 'Bearer pso_ok' },
       })
       expect(res.status).toBe(404)
       expect(await res.json()).toEqual({ error: 'Pin not found' })
@@ -274,16 +309,13 @@ describe('api-v1 routes', () => {
 
   describe('GET /api/v1/tags', () => {
     beforeEach(() => {
-      mockAuthenticate.mockResolvedValue({
-        apiKey: testApiKey,
-        user: testUser,
-      })
+      mockVerifyAccessToken.mockImplementation(tokenFor(REST_RESOURCE))
     })
 
     it('returns tags', async () => {
       mockGetUserTags.mockResolvedValue([makeTag()])
       const res = await app.request('/api/v1/tags', {
-        headers: { Authorization: 'Bearer ps_ok' },
+        headers: { Authorization: 'Bearer pso_ok' },
       })
       expect(res.status).toBe(200)
       const body = (await res.json()) as Tag[]
@@ -295,7 +327,7 @@ describe('api-v1 routes', () => {
         { ...makeTag(), pinCount: 5 },
       ])
       const res = await app.request('/api/v1/tags?withCounts=true', {
-        headers: { Authorization: 'Bearer ps_ok' },
+        headers: { Authorization: 'Bearer pso_ok' },
       })
       expect(res.status).toBe(200)
       const body = (await res.json()) as TagWithCount[]
@@ -305,10 +337,7 @@ describe('api-v1 routes', () => {
 
   describe('GET /api/v1/tags/:id/pins', () => {
     beforeEach(() => {
-      mockAuthenticate.mockResolvedValue({
-        apiKey: testApiKey,
-        user: testUser,
-      })
+      mockVerifyAccessToken.mockImplementation(tokenFor(REST_RESOURCE))
     })
 
     it('returns pins filtered by tag name', async () => {
@@ -318,7 +347,7 @@ describe('api-v1 routes', () => {
         pagination: Pagination.fromTotalCount(1),
       })
       const res = await app.request('/api/v1/tags/tag-1/pins', {
-        headers: { Authorization: 'Bearer ps_ok' },
+        headers: { Authorization: 'Bearer pso_ok' },
       })
       expect(res.status).toBe(200)
       const filter = mockGetUserPinsWithPagination.mock.calls[0][1] as {
@@ -333,7 +362,7 @@ describe('api-v1 routes', () => {
     it('returns 404 when tag service throws TagNotFoundError', async () => {
       mockGetUserTagById.mockRejectedValue(new TagNotFoundError('tag-1'))
       const res = await app.request('/api/v1/tags/tag-1/pins', {
-        headers: { Authorization: 'Bearer ps_ok' },
+        headers: { Authorization: 'Bearer pso_ok' },
       })
       expect(res.status).toBe(404)
     })
@@ -343,7 +372,7 @@ describe('api-v1 routes', () => {
         new UnauthorizedTagAccessError('tag-1')
       )
       const res = await app.request('/api/v1/tags/tag-1/pins', {
-        headers: { Authorization: 'Bearer ps_ok' },
+        headers: { Authorization: 'Bearer pso_ok' },
       })
       expect(res.status).toBe(404)
       expect(await res.json()).toEqual({ error: 'Tag not found' })
