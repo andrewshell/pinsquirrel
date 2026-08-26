@@ -298,6 +298,12 @@ describe('initPopup, with a connection stored', () => {
     expect(checkboxes().map(box => box.value)).toEqual(['t1', 't2'])
   })
 
+  it('puts the cursor in the filter box, so the user can just type', async () => {
+    await initPopup(harness().deps)
+
+    expect(doc.activeElement).toBe(element('#tag-filter'))
+  })
+
   it('says so rather than going blank when nothing matches', async () => {
     await initPopup(harness().deps)
 
