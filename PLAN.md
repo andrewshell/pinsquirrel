@@ -482,11 +482,15 @@ The approach changed. Instead of a hand-written JSX docs page, the v1 routes wer
 
 ## Phase 6: OAuth 2.1 (the only auth path)
 
-> **Resume at 6d.** 6a, 6b and 6c shipped on `feat/oauth-phase-6`: both 401s now carry a
-> `WWW-Authenticate` challenge, `BASE_URL` exists, the three discovery documents are served, the
+> **Resume at 6f.** 6a, 6b, 6c and 6d shipped on `feat/oauth-phase-6`: both 401s carry a
+> `WWW-Authenticate` challenge, `BASE_URL` exists, the four discovery documents are served, the
 > OAuth entities, repository interfaces, error types, tables and Drizzle repositories exist with
-> the migration applied, and `OAuthService` sits over them in `libs/services`, constructed in
-> `apps/hono/src/lib/services.ts`. Nothing routes to it yet. Goal: a user pastes
+> the migration applied, `OAuthService` sits over them in `libs/services`, and the four endpoints
+> (`/oauth/authorize`, `/oauth/token`, `/oauth/revoke`, `/oauth/register`) plus
+> `middleware/oauth-auth.ts` are live. `/mcp` and `/api/v1` authenticate with OAuth only as of
+> 6d, so `ps_` keys no longer open them. What is left before a real client can be trusted with
+> this: the per-IP quota on `/oauth/register` (6f), the grants UI (6f), and the end-to-end runs
+> (6e, 6g). Goal: a user pastes
 > `https://pinsquirrel.com/mcp` into
 > Claude (or any MCP client), clicks through a consent screen, and is connected. No hand-copied
 > API key.
@@ -851,7 +855,11 @@ httpFetcher: HttpFetcher, config: { issuer, resources })`. The fetcher is the do
 
 ### 6d. Endpoints
 
-- [ ] `apps/hono/src/routes/oauth.tsx`: `GET`/`POST /oauth/authorize`
+> **Shipped.** The three route files exist, the OAuth middleware exists, and both protected
+> resources authenticate through it. `ps_` keys stop working on `/mcp` and `/api/v1` here; see the
+> cutover note below.
+
+- [x] `apps/hono/src/routes/oauth.tsx`: `GET`/`POST /oauth/authorize`
   - Browser-facing consent page. Mount after `sessionMiddleware()` and `csrf()`, the opposite of
     `/mcp`. Use `requireAuth()` from `middleware/session.ts`; unauthenticated visitors go through
     the existing login flow and return. The `/\evil.com` redirect fix in `89d8983` already
@@ -867,7 +875,23 @@ httpFetcher: HttpFetcher, config: { issuer, resources })`. The fetcher is the do
   - The consent screen shows `client_name` and the redirect URI hostname. The spec requires it,
     and it is the only defense against loopback impersonation by a local process
   - Emit `iss` on the redirect (RFC 9207), success and error alike
-- [ ] `apps/hono/src/routes/oauth-token.ts`: `POST /oauth/token`
+
+  Built. `views/pages/oauth-consent.tsx` and `views/pages/oauth-error.tsx` are the two pages.
+  Four things worth recording:
+
+  - No `static/oauth-consent.js` was needed. The decision is one form with two submit buttons
+    carrying `name="decision"`, which is why `Button` gained `name` and `value` props.
+  - The request travels through the form as hidden fields, one per named parameter, and the POST
+    re-runs every check rather than trusting what came back. The field list is explicit, so the
+    form cannot smuggle an extra parameter into the service's parser.
+  - PKCE and the `resource` parameter are enforced by the service's schema (6c), not by the
+    route. The route only decides what a failure looks like.
+  - `requireAuth()` needed nothing added: it already carries the full path and query into
+    `redirectTo`, and `safeRedirect` in `routes/auth.tsx` resolves it against our own origin. The
+    route test drives the real session middleware over fake repositories so that round trip is
+    exercised rather than mocked.
+
+- [x] `apps/hono/src/routes/oauth-token.ts`: `POST /oauth/token`
   - Must parse `application/x-www-form-urlencoded`. Claude sends both the initial exchange and
     refreshes that way; a JSON-only handler returns `415` and the whole flow dies. Note
     `/oauth/register` is `application/json`. Different parser, don't share one
@@ -877,7 +901,16 @@ httpFetcher: HttpFetcher, config: { issuer, resources })`. The fetcher is the do
     invalidates the old one
   - Return RFC 6749 codes. `invalid_grant`, never a custom code, on a dead refresh token; Claude's
     recovery keys on it
-- [ ] `apps/hono/src/routes/oauth-register.ts`: `POST /oauth/register` (RFC 7591, DCR fallback)
+
+  Built, and it answers `415` to anything that is not form-encoded rather than trying to guess.
+  `invalid_client` is the one `401`; every other code is a `400`. `Cache-Control: no-store` is on
+  every response the endpoint makes, errors included. The same file serves `POST /oauth/revoke`
+  (RFC 7009, form-encoded, always `200` whatever was presented), because the client handing a
+  token back and the user revoking a grant from the profile page are the same operation over
+  `OAuthService.revokeToken`. 6f's grants card calls `revokeGrant(ac, tokenId)` instead, which is
+  the `AccessControl` half of the same idea. `revocation_endpoint` joined the RFC 8414 document.
+
+- [x] `apps/hono/src/routes/oauth-register.ts`: `POST /oauth/register` (RFC 7591, DCR fallback)
   - Bound the growth. DCR lets an anonymous caller create rows, and Claude registers afresh on
     every new connection. Before shipping the endpoint: a per-IP registration quota (Phase 6f), a
     TTL on `oauth_clients` rows that never completed an authorization, and the cleanup covering
@@ -889,11 +922,25 @@ httpFetcher: HttpFetcher, config: { issuer, resources })`. The fetcher is the do
     the port for loopback hosts only (`localhost`, `127.0.0.0/8`, `::1`), preserving scheme,
     host, and path, and keeping exact-port matching for every non-loopback host. This is the same
     canonicalization the redirect-URI matcher in 6e needs. Write it once and share it.
-- [ ] Bypass CSRF for `/oauth/token` and `/oauth/register` (mount before `csrf()` like `/mcp`)
-- [ ] Give OAuth access tokens their own prefix, `pso_`. Not for dispatch (there is nothing to
+
+  Built. `application/json` only, `201` with the client information echo, and every failure is
+  `invalid_client_metadata` including the schema failures the token endpoint reports as
+  `invalid_request`. The dedup and the TTL are the service's and the sweep's, both from 6c. **The
+  per-IP quota is still outstanding and is 6f's**: this endpoint is unauthenticated and creates
+  rows, so it should not face the public internet until that lands.
+
+- [x] Bypass CSRF for `/oauth/token` and `/oauth/register` (mount before `csrf()` like `/mcp`)
+
+  `/oauth/revoke` mounts with them. `/oauth/authorize` mounts after session and CSRF, which is
+  where a browser form belongs.
+
+- [x] Give OAuth access tokens their own prefix, `pso_`. Not for dispatch (there is nothing to
       dispatch between), but so a leaked or logged token is identifiable on sight, and so Phase 7's
       removal can assert no `ps_` value ever reaches the OAuth path.
-- [ ] Create a new `apps/hono/src/middleware/oauth-auth.ts`. Do not extend `bearer-auth.ts`. It
+
+  Done in 6c; nothing in 6d needed to know about it, which is the point.
+
+- [x] Create a new `apps/hono/src/middleware/oauth-auth.ts`. Do not extend `bearer-auth.ts`. It
       does what `bearer-auth.ts` does and no more: parse `Authorization: Bearer`, call
       `oauthService.verifyAccessToken(raw, expectedResource)`, render the failure as a `401` +
       `WWW-Authenticate`, set the context variables. The hash lookup, expiry, revocation, and
@@ -913,7 +960,15 @@ httpFetcher: HttpFetcher, config: { issuer, resources })`. The fetcher is the do
     as a non-optional `ContextVariableMap` entry. Nothing reads it. `getApiKey()` has zero call
     sites and `c.get('apiKey')` is never consumed (re-traced 2026-08-25), so the declaration is
     the only thing holding the field alive, and it leaves with the rest of the key path.
-- [ ] Switch `/mcp` and `/api/v1/*` over to the new middleware, one route at a time. `ps_` keys
+
+  Built. It exports `oauthAuth(resource)`, `getOAuthPrincipal(c)` and `getOAuthUser(c)`, and puts
+  one `oauthPrincipal` entry on the context: `{ user, clientId, scopes, rawToken }`. The MCP
+  wrapper is a thin one over it, translating that principal into the SDK's `AuthInfo` rather than
+  duplicating the parse or the `401`. The failure body is RFC 6750 shaped
+  (`{ error: 'invalid_token', error_description }`) rather than the key path's `{ error: 'Missing
+API key' }`.
+
+- [x] Switch `/mcp` and `/api/v1/*` over to the new middleware, one route at a time. `ps_` keys
       keep working until Phase 7; there is no single cutover moment.
   - Each route validates the audience against its own resource URI. `/mcp` accepts only tokens
     minted for `https://pinsquirrel.com/mcp`; `/api/v1/*` accepts only
@@ -928,10 +983,30 @@ httpFetcher: HttpFetcher, config: { issuer, resources })`. The fetcher is the do
   - `X-API-Key` disappears entirely. It was the API-key-only header, and there are no API keys.
     `Authorization: Bearer` is the only accepted credential form. Drop `apiKeyHeader` from the
     OpenAPI security schemes in `routes/api-docs.ts` at the same time.
-- [ ] Tests: OAuth token succeeds on its own resource; an `/mcp` token is rejected by `/api/v1`
+
+  **The cutover happened here, not in Phase 7.** The line above about `ps_` keys continuing to
+  work is what changed. The plan's own intent was no dual dispatch, and keeping the key path
+  routed for one more phase would have meant exactly the dispatch branch the auth pivot deleted:
+  `/mcp` and `/api/v1` would each have had to decide which credential a bearer value was. So both
+  routes now go through `oauthAuth` alone, and `ps_` keys stop opening them as of this step.
+  `bearer-auth.ts`, `api-auth.ts` and `ApiKeyService` are untouched and still compile; Phase 7
+  removes them. The profile page's API key card is also untouched and stays until 6f adds the
+  grants card and 7c deletes it, so nobody loses their key management UI mid-flight.
+
+  `apiKeyHeader` is gone from both the registry and the per-path `security` arrays, and the
+  OpenAPI description now names the OAuth resource a token has to be bound to.
+
+- [x] Tests: OAuth token succeeds on its own resource; an `/mcp` token is rejected by `/api/v1`
       and vice versa; expired token rejected; revoked token rejected; `X-API-Key` rejected
       everywhere
-- [ ] Populate `scopes` in the `AuthInfo` object (currently hardcoded `[]` in `mcpAuth()`)
+
+  Route level with `app.request()` and a mocked `../lib/services`, plus middleware unit tests.
+  The cross-resource cases mock `verifyAccessToken` as a function of the resource it is handed,
+  so they fail if a route ever stops passing its own. Expired, revoked and ownerless are one case
+  at this level by construction: the service resolves the token or it does not, and the response
+  never says which it was.
+
+- [x] Populate `scopes` in the `AuthInfo` object (currently hardcoded `[]` in `mcpAuth()`)
 
 ### 6e. Client registration (CIMD-first)
 
@@ -984,9 +1059,14 @@ httpFetcher: HttpFetcher, config: { issuer, resources })`. The fetcher is the do
     regression in exactly this interaction. It's fixed upstream, cited here only as evidence
     that the portless-CIMD path is easy to get wrong on both sides. Test against the real client,
     not just a unit test
-- [ ] DCR as fallback for clients that don't do CIMD. Prefer CIMD: DCR is deprecated in the spec
+- [x] DCR as fallback for clients that don't do CIMD. Prefer CIMD: DCR is deprecated in the spec
       and makes Claude register a new client row on every fresh connection (Decision 15).
       `OAuthService.registerClient` exists as of 6c, dedup included; the endpoint is 6d's
+
+  Shipped with 6d. `POST /oauth/register` answers `201` with the client information, and a smoke
+  run against the dev database returned the derived `dcr_…` identifier. The per-IP quota that
+  bounds it is still 6f.
+
 - [ ] Support pre-registered static credentials, so an org can paste its own `client_id` when
       adding PinSquirrel as a custom connector
 
@@ -997,6 +1077,10 @@ Folded in from the standing follow-up. Phase 6 raises the priority, since `/oaut
 
 - [ ] Extend `rate-limit.ts` coverage to `/mcp`, `/api/v1/*`, `/oauth/token`, `/oauth/register`.
       Today it is wired into `routes/auth.tsx` and `routes/private.tsx` (verified 2026-08-25).
+      As of 6d all four are mounted and unlimited, and `/oauth/register` is the pressing one: it
+      is unauthenticated and it creates rows. The mount points to attach the limiters to are
+      `app.route('/oauth', oauthTokenRoutes)` and `app.route('/oauth', oauthRegisterRoutes)` in
+      `app.tsx`, or `use('*', …)` inside `routes/oauth-token.ts` and `routes/oauth-register.ts`.
   - Add limiters next to the existing ones (`signupLimiter`, `forgotPasswordLimiter`, …) and
     apply them with `rateLimitByIp(limiter, message)`, which answers `429` with `Retry-After`.
     `/oauth/token` additionally keys a limiter on `client_id`, since a public client's IP proves
