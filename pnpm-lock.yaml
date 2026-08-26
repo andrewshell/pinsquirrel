@@ -122,7 +122,7 @@ importers:
         specifier: ^10.9.0
         version: 10.9.0(jiti@2.7.0)(supports-color@10.2.2)
       happy-dom:
-        specifier: ^20.11.6
+        specifier: '>=20.8.9'
         version: 20.11.6
       prettier:
         specifier: ^3.9.6
