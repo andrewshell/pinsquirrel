@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from 'node:crypto'
 import type {
   AccessControl,
   HttpFetcher,
@@ -10,6 +11,7 @@ import type {
 import {
   OAuthAccessDeniedError,
   OAuthInvalidClientError,
+  OAuthInvalidGrantError,
   OAuthInvalidClientMetadataError,
   OAuthInvalidRequestError,
   OAuthInvalidScopeError,
@@ -17,8 +19,13 @@ import {
   OAuthUnauthorizedClientError,
 } from '@pinsquirrel/domain'
 import { generateSecureToken, hashToken } from '../utils/crypto.js'
-import { matchRedirectUri, normalizeOAuthUri } from '../validation/oauth-uri.js'
 import {
+  matchRedirectUri,
+  normalizeOAuthUri,
+  redirectUriMatches,
+} from '../validation/oauth-uri.js'
+import {
+  authorizationCodeGrantSchema,
   authorizationRequestSchema,
   clientIdMetadataDocumentSchema,
   type ClientIdMetadataDocument,
@@ -34,6 +41,32 @@ import { validationErrorFromZod } from '../validation/zod-error.js'
  * outlives its use is only a window for a replay.
  */
 const AUTHORIZATION_CODE_TTL_MS = 5 * 60 * 1000
+
+/**
+ * How long an access token lives.
+ *
+ * Short enough that a leaked one stops working the same day, long enough that
+ * a client is not refreshing on every other call. A client with
+ * `offline_access` refreshes silently; one without it re-consents.
+ */
+const ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000
+
+/**
+ * How long a refresh token lives if it is never used. Each rotation issues a
+ * fresh one, so an active connection keeps working indefinitely and an
+ * abandoned one falls out on its own.
+ */
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000
+
+/**
+ * The prefix on every access token this server issues. Not for dispatch,
+ * since there is nothing to dispatch between: it is so a leaked or logged
+ * token is identifiable on sight.
+ */
+const ACCESS_TOKEN_PREFIX = 'pso_'
+
+/** The scope that asks for a refresh token rather than for a permission. */
+const OFFLINE_ACCESS_SCOPE = 'offline_access'
 
 /**
  * Every scope this server grants (Decision 16). `offline_access` is not a
@@ -61,6 +94,20 @@ export interface OAuthServiceConfig {
   issuer: string
   /** Every resource identifier a token may be bound to (RFC 8707). */
   resources: string[]
+}
+
+/** What a token endpoint answers with, before it is put on the wire. */
+export interface IssuedTokens {
+  /** The raw access token, `pso_` prefixed. Returned once. */
+  accessToken: string
+  /** The raw refresh token, or null when `offline_access` was not granted. */
+  refreshToken: string | null
+  tokenType: 'Bearer'
+  /** Access token lifetime in seconds, for `expires_in`. */
+  expiresIn: number
+  scopes: string[]
+  /** The audience both tokens are bound to. */
+  resource: string
 }
 
 /** An authorization request that passed every check but consent. */
@@ -240,6 +287,130 @@ export class OAuthService {
       scopes: resolved.scopes,
       expiresAt,
       issuer: this.config.issuer,
+    }
+  }
+
+  /**
+   * Spend an authorization code and mint the tokens it stands for.
+   *
+   * The code is consumed before anything else is checked, because consuming it
+   * is the single-use guarantee and a failed check must not leave a code alive
+   * to try again with a different verifier.
+   *
+   * There is no `AccessControl` here: the caller is a client, not a user, and
+   * the code plus the PKCE verifier is the proof. That is the same reason
+   * `MaintenanceService` takes none.
+   */
+  async exchangeAuthorizationCode(params: unknown): Promise<IssuedTokens> {
+    const parsed = authorizationCodeGrantSchema.safeParse(params)
+    if (!parsed.success) {
+      throw validationErrorFromZod(parsed.error, {
+        fallbackField: 'token_request',
+      })
+    }
+    const request = parsed.data
+
+    const client = await this.resolveClient(request.client_id)
+
+    const code = await this.codeRepository.consume(hashToken(request.code))
+    if (!code) {
+      // Unknown, expired, or already spent. One answer for all three: telling
+      // them apart would say whether a code ever existed.
+      throw new OAuthInvalidGrantError(
+        'The authorization code is invalid, expired, or already used'
+      )
+    }
+
+    if (code.clientId !== client.clientId) {
+      throw new OAuthInvalidGrantError(
+        'The authorization code was issued to another client'
+      )
+    }
+
+    if (!redirectUriMatches(code.redirectUri, request.redirect_uri)) {
+      throw new OAuthInvalidGrantError(
+        'redirect_uri does not match the one the code was issued to'
+      )
+    }
+
+    if (!pkceVerifies(request.code_verifier, code.codeChallenge)) {
+      // A client that cannot prove it started the flow did not present a valid
+      // grant, whoever is holding the code.
+      throw new OAuthInvalidGrantError('The PKCE verifier does not match')
+    }
+
+    if (request.resource) {
+      const requested = this.requireKnownResource(request.resource)
+      if (requested !== code.resource) {
+        throw new OAuthInvalidTargetError(
+          'resource does not match the one the code was issued for'
+        )
+      }
+    }
+
+    return this.issueTokens({
+      client,
+      userId: code.userId,
+      scopes: code.scopes,
+      resource: code.resource,
+    })
+  }
+
+  /**
+   * Mint an access token, and a refresh token when one was granted.
+   *
+   * Both carry the audience the grant was made for, because the audience check
+   * at the resource server is the confused-deputy defense (Decision 17) and a
+   * refresh that could widen it would walk straight around it.
+   */
+  private async issueTokens(grant: {
+    client: OAuthClient
+    userId: string
+    scopes: string[]
+    resource: string
+    rotatedFrom?: string
+  }): Promise<IssuedTokens> {
+    const accessToken = ACCESS_TOKEN_PREFIX + generateSecureToken()
+    const expiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL_MS)
+
+    await this.tokenRepository.create({
+      tokenHash: hashToken(accessToken),
+      kind: 'access',
+      clientId: grant.client.clientId,
+      userId: grant.userId,
+      scopes: grant.scopes,
+      resource: grant.resource,
+      expiresAt,
+    })
+
+    // `offline_access` is what asks for unattended refresh, and a client not
+    // registered for the grant cannot use one.
+    const refreshable =
+      grant.scopes.includes(OFFLINE_ACCESS_SCOPE) &&
+      grant.client.grantTypes.includes('refresh_token')
+
+    let refreshToken: string | null = null
+    if (refreshable) {
+      refreshToken = generateSecureToken()
+      await this.tokenRepository.create({
+        tokenHash: hashToken(refreshToken),
+        kind: 'refresh',
+        clientId: grant.client.clientId,
+        userId: grant.userId,
+        scopes: grant.scopes,
+        resource: grant.resource,
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+        rotatedFrom: grant.rotatedFrom ?? null,
+      })
+    }
+
+    return {
+      accessToken,
+      refreshToken,
+      tokenType: 'Bearer',
+      expiresIn: Math.floor(ACCESS_TOKEN_TTL_MS / 1000),
+      scopes: grant.scopes,
+      resource: grant.resource,
     }
   }
 
@@ -430,6 +601,23 @@ const DEFAULT_GRANT_TYPES = ['authorization_code', 'refresh_token']
  * than dropped, so a client asking for something it will not get finds out
  * now instead of at the first call.
  */
+/**
+ * Does this verifier hash to the challenge the code was issued with?
+ *
+ * S256 only, which is all the server metadata advertises. Compared in
+ * constant time: the challenge is not a secret, but the comparison is on the
+ * path an attacker controls one side of, and there is no reason to leak how
+ * much of it matched.
+ */
+function pkceVerifies(verifier: string, challenge: string): boolean {
+  const computed = Buffer.from(
+    createHash('sha256').update(verifier).digest('base64url')
+  )
+  const expected = Buffer.from(challenge)
+  if (computed.length !== expected.length) return false
+  return timingSafeEqual(computed, expected)
+}
+
 function grantedScopes(scope: string | undefined): string[] {
   const requested = (scope ?? '').split(/\s+/).filter(Boolean)
   if (requested.length === 0) {
