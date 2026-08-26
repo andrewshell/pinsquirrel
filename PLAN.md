@@ -197,6 +197,12 @@ the `https://pinsquirrel.com/api/v1` resource.
   - Main view (configured): a checkbox per tag with its pin count, "Sync Now", how long ago the
     last sync ran, the last sync error if there is one, and "Disconnect". Disconnect revokes the
     token server-side through `POST /oauth/revoke`, then clears local storage
+  - The tag list is filtered by a box above it, focused as the view opens: an account with a few
+    hundred tags is a list nobody scrolls. The match is a case-insensitive substring on the name
+    (`src/popup/filter.ts`), the list scrolls inside a fixed height, and a line under it counts
+    what is on screen against what the account has, plus how many are selected. The selection is
+    held in the popup and written whole, because reading it back off the boxes would drop every
+    tag the filter was hiding
   - Stores config in `chrome.storage.local` through `src/storage.ts`. 5b already writes
     `baseUrl`, `clientId`, `accessToken`, `refreshToken`, `expiresAt` and `registeredClients`;
     the popup writes `selectedTagIds` — the moment a box moves, because the popup closes as soon
