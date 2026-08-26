@@ -34,6 +34,12 @@ paying for a DOM in every test in the package. They load the real `popup.html`
 through `src/test/popup-dom.ts`, so markup and code cannot drift apart
 unnoticed, and stub `chrome` with `src/test/chrome-mock.ts`.
 
+`chrome-mock.ts` carries an in-memory bookmark tree as well as the storage
+areas, with a bookmarks bar seeded where Chrome puts one. The sync's tests run
+against that rather than against a mock per call, so a reconciliation is judged
+by the tree it leaves behind — and by `bookmarks.calls`, which is how "a folder
+already in step costs one read and no writes" is asserted.
+
 ## Load unpacked
 
 1. Build, so `dist/` exists.
@@ -59,6 +65,7 @@ removed and re-added.
 | `src/messages.ts`            | The popup ↔ service worker message contract                           |
 | `src/auth.ts`                | OAuth client: connect, refresh, `authorizedFetch`, disconnect         |
 | `src/api-client.ts`          | `/api/v1` reads over `authorizedFetch`                                |
+| `src/bookmark-sync.ts`       | Tags to bookmark folders: `syncAll`, and `runSync` for the worker     |
 | `src/storage.ts`             | The only module that names `chrome.storage.local`                     |
 | `scripts/build.ts`           | esbuild bundle + asset copy                                           |
 | `scripts/manifest-assets.ts` | Derives the copy list from the manifest                               |
