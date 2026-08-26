@@ -43,9 +43,11 @@ authentication path for both, and a Chrome extension for bookmark syncing.
 > 8. **Rate limiting is a reusable pair.** `RateLimiter` (`middleware/rate-limiter.ts`) and
 >    `rateLimitByIp()` / `getClientIp()` (`middleware/rate-limit.ts`). `getClientIp` honours
 >    forwarding headers only when `TRUST_PROXY` is set (`abda250`). Production sets it.
-> 9. **There is no base-URL config yet.** `routes/seo.ts` derives its origin from the request
->    URL. That is fine for a sitemap and wrong for an OAuth issuer, because a spoofed `Host`
->    header must not change what the server claims to be. Phase 6a adds `BASE_URL` (Decision 20).
+> 9. **`BASE_URL` is the base-URL config, added by Phase 6a** (Decision 20). `routes/seo.ts` still
+>    derives its origin from the request URL, which is fine for a sitemap and wrong for an OAuth
+>    issuer, because a spoofed `Host` header must not change what the server claims to be.
+>    `apps/hono/src/lib/config.ts` reads `BASE_URL` once and exports `oauthConfig`. Nothing below
+>    the app reads it.
 > 10. **The profile page is one card per file** under `views/pages/profile/` (`e918e5f`).
 >     `ApiKeysCard.tsx` and `static/api-key-copy.js` are the whole key UI. 6f adds a sibling card,
 >     7c deletes those two files.
@@ -480,7 +482,9 @@ The approach changed. Instead of a hand-written JSX docs page, the v1 routes wer
 
 ## Phase 6: OAuth 2.1 (the only auth path)
 
-> **Resume here.** Nothing started. Goal: a user pastes `https://pinsquirrel.com/mcp` into
+> **Resume at 6b.** 6a shipped on `feat/oauth-phase-6`: both 401s now carry a `WWW-Authenticate`
+> challenge, `BASE_URL` exists, and the three discovery documents are served. Goal: a user pastes
+> `https://pinsquirrel.com/mcp` into
 > Claude (or any MCP client), clicks through a consent screen, and is connected. No hand-copied
 > API key.
 >
@@ -542,9 +546,13 @@ places; those are called out inline below.
 Ship this first and alone. It is a small diff that makes the failure mode legible. Claude will
 find the metadata and then fail at a later, more informative step.
 
-- [ ] Update `apps/hono/src/mcp/auth.ts` so that on auth failure it returns a real `401` with a
+- [x] Update `apps/hono/src/mcp/auth.ts` so that on auth failure it returns a real `401` with a
       `WWW-Authenticate` header. It currently returns a bare `c.json({ error }, 401)` with no
       header, which is why no client can discover anything.
+
+  Done. The header value is built by `bearerChallenge()` in
+  `apps/hono/src/middleware/www-authenticate.ts`, shared with the REST API, and `mcpAuth()` now
+  takes the protected resource it guards rather than reading config itself.
 
   ```http
   HTTP/1.1 401 Unauthorized
@@ -556,14 +564,18 @@ find the metadata and then fail at a later, more informative step.
   - Must be an HTTP status, not an MCP tool error. This applies to unauthenticated tool calls
     too, not just the initial connect ("lazy authentication")
 
-- [ ] Give `/api/v1/*` the same treatment, pointing at its own resource metadata document.
+- [x] Give `/api/v1/*` the same treatment, pointing at its own resource metadata document.
       `apiKeyAuth()` in `middleware/api-auth.ts` currently returns a bare `c.json({ error }, 401)`.
       Now that the REST API is an OAuth resource too (Decision 18), it needs a discoverable
       challenge, with `resource_metadata=".../oauth-protected-resource/api/v1"`, not the `/mcp`
       document. Get this wrong and the Chrome extension asks for the wrong audience, so every
       token it obtains is rejected.
 
-- [ ] Derive every issuer and resource URL from a new `BASE_URL` env, not a hardcoded constant and
+  Done. `apiKeyAuth()` takes its resource the same way `mcpAuth()` does. Both challenges carry
+  `scope="pins:read tags:read"` as well as `resource_metadata`, since both resources advertise the
+  same scopes.
+
+- [x] Derive every issuer and resource URL from a new `BASE_URL` env, not a hardcoded constant and
       not the request (Decision 20). Dev is `http://localhost:8100` (plain HTTP, no local TLS);
       production is `https://pinsquirrel.com`. The documents below show the production values.
   - There is no base-URL config today (verified 2026-08-25). `routes/seo.ts` builds its origin
@@ -574,7 +586,17 @@ find the metadata and then fail at a later, more informative step.
   - Read it once in the composition root (`lib/services.ts`) and pass the resulting issuer and
     resource URIs into `OAuthService` and the metadata route. The service never reads
     `process.env`, same as `MailgunEmailService` receiving its config
-- [ ] Create `apps/hono/src/routes/oauth-metadata.ts`
+  - It landed in a new `apps/hono/src/lib/config.ts` rather than in `lib/services.ts`, since
+    nothing about it needs a repository. It exports `resolveBaseUrl(env)`, `createOAuthConfig(baseUrl)`
+    and the module-level `baseUrl` / `oauthConfig` the app mounts with. `oauthConfig` is
+    `{ issuer, resources: { mcp, apiV1 } }`, and each resource is
+    `{ resource, metadataPath, metadataUrl, scopes }`. 6c hands the same `issuer` and resource
+    strings to `OAuthService`
+  - Vitest publishes Vite's `base` option as `process.env.BASE_URL`, defaulting to `/`, which
+    collides with this variable and made every test importing the config fail at boot.
+    `apps/hono/vitest.config.ts` pins `BASE_URL` to the dev default to close that off. Nothing
+    outside tests is affected, since the built app runs under Node without Vite
+- [x] Create `apps/hono/src/routes/oauth-metadata.ts`
   - `GET /.well-known/oauth-protected-resource/mcp` (RFC 9728), the MCP resource
     - `resource` must match the MCP URL exactly as the user types it into Claude, path included.
       Settle on `https://pinsquirrel.com/mcp` and document that string
@@ -623,12 +645,19 @@ find the metadata and then fail at a later, more informative step.
     Add `client_secret_post` only alongside the confidential pre-registered client support in
     6e, not before.
 
-- [ ] Mount both `.well-known` routes before session/CSRF middleware in `app.tsx` (next to the
+  The shared helper the two resource documents derive their paths from is
+  `protectedResourceMetadataPath` in `libs/services/src/validation/oauth-uri.ts`, alongside
+  `normalizeOAuthUri` (lowercase scheme and host, no default port, no trailing slash, no
+  fragment). Both are exported from the package index. 6c extends that file with redirect-URI
+  matching and the loopback rule. The route is a factory, `createOAuthMetadataRoutes(config)`, so
+  a test can build it against any base URL.
+
+- [x] Mount both `.well-known` routes before session/CSRF middleware in `app.tsx` (next to the
       `app.route('/mcp', mcpRoutes)` line). They must be reachable unauthenticated. Verified
       2026-08-25: nothing currently serves `/.well-known/*`, and the pre-session `seoRoutes` mount
       claims only `/robots.txt` and `/sitemap.xml`, so the path is free. `securityHeaders()` runs
       on `*` ahead of everything, which is fine. CSP does not affect a JSON document.
-- [ ] Manual test. A bare `GET` does not exercise the tool-call path, so POST a JSON-RPC body and
+- [x] Manual test. A bare `GET` does not exercise the tool-call path, so POST a JSON-RPC body and
       assert the `401` plus the header (note plain `http`, the dev server has no TLS):
 
   ```sh
@@ -638,8 +667,17 @@ find the metadata and then fail at a later, more informative step.
     -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_pins","arguments":{}}}'
   ```
 
-- [ ] Manual test: both metadata documents fetch and parse, and their URLs reflect the local
+  Run 2026-08-25 against `pnpm dev` on port 8100. Returns `401` with
+  `www-authenticate: Bearer resource_metadata="http://localhost:8100/.well-known/oauth-protected-resource/mcp", scope="pins:read tags:read"`.
+  `GET /api/v1/pins` returns the same shape with the `api/v1` document.
+
+- [x] Manual test: both metadata documents fetch and parse, and their URLs reflect the local
       base-URL config rather than production
+
+  Run 2026-08-25. All three documents parse as JSON and carry `http://localhost:8100` throughout
+  with no `BASE_URL` set. Re-run with `BASE_URL=https://pinsquirrel.com` and every URL follows,
+  the `WWW-Authenticate` header included. Booting with `NODE_ENV=production` and no `BASE_URL`
+  exits with "BASE_URL must be set in production".
 
 ### 6b. Domain + database layer
 
