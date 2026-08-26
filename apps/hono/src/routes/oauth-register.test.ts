@@ -14,6 +14,9 @@ vi.mock('../lib/services', () => ({
   },
 }))
 
+import { oauthRegisterLimiter } from '../middleware/rate-limit'
+import { TEST_CLIENT_IP, exhaust } from '../test-support/rate-limit'
+
 const { oauthRegisterRoutes } = await import('./oauth-register')
 
 const METADATA = {
@@ -48,6 +51,9 @@ describe('POST /oauth/register', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
+    // The limiter is a module-level singleton, so each case starts with its
+    // own budget rather than inheriting whatever the last one spent.
+    oauthRegisterLimiter.reset(TEST_CLIENT_IP)
     app = new Hono()
     app.route('/oauth', oauthRegisterRoutes)
   })
@@ -140,5 +146,19 @@ describe('POST /oauth/register', () => {
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('invalid_client_metadata')
     expect(mockRegisterClient).not.toHaveBeenCalled()
+  })
+
+  // The endpoint is unauthenticated and it creates rows, which is why this is
+  // the tightest limit in the app.
+  describe('rate limiting', () => {
+    it('answers 429 with Retry-After once the per-IP quota is spent', async () => {
+      exhaust(oauthRegisterLimiter, TEST_CLIENT_IP)
+
+      const res = await app.request('/oauth/register', json(METADATA))
+
+      expect(res.status).toBe(429)
+      expect(res.headers.get('Retry-After')).toBeTruthy()
+      expect(mockRegisterClient).not.toHaveBeenCalled()
+    })
   })
 })

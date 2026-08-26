@@ -37,6 +37,8 @@ vi.mock('../lib/services', () => ({
   },
 }))
 
+import { apiV1Limiter } from '../middleware/rate-limit'
+import { TEST_CLIENT_IP, exhaust } from '../test-support/rate-limit'
 import { apiV1Routes } from './api-v1'
 
 const testUser: User = {
@@ -102,6 +104,9 @@ describe('api-v1 routes', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
+    // A module-level limiter outlives a single test, so each case starts with
+    // its own budget rather than inheriting whatever the last one spent.
+    apiV1Limiter.reset(TEST_CLIENT_IP)
     app = new Hono()
     app.route('/api/v1', apiV1Routes)
   })
@@ -376,6 +381,23 @@ describe('api-v1 routes', () => {
       })
       expect(res.status).toBe(404)
       expect(await res.json()).toEqual({ error: 'Tag not found' })
+    })
+  })
+
+  // Authenticated, so the point is abuse rather than brute force. Its own
+  // limiter, so a flood at /mcp cannot spend this budget.
+  describe('rate limiting', () => {
+    it('answers 429 with Retry-After once the per-IP quota is spent', async () => {
+      exhaust(apiV1Limiter, TEST_CLIENT_IP)
+      mockVerifyAccessToken.mockImplementation(tokenFor(REST_RESOURCE))
+
+      const res = await app.request('/api/v1/pins', {
+        headers: { Authorization: 'Bearer pso_good' },
+      })
+
+      expect(res.status).toBe(429)
+      expect(res.headers.get('Retry-After')).toBeTruthy()
+      expect(mockGetUserPinsWithPagination).not.toHaveBeenCalled()
     })
   })
 })

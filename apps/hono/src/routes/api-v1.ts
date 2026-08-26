@@ -21,6 +21,7 @@ import {
 import { pinService, tagService } from '../lib/services'
 import { oauthAuth, getOAuthUser } from '../middleware/oauth-auth'
 import { oauthConfig } from '../lib/config'
+import { apiV1Limiter, rateLimitByIp } from '../middleware/rate-limit'
 
 const apiV1 = new OpenAPIHono()
 
@@ -170,6 +171,13 @@ apiV1.openAPIRegistry.registerPath({
 // The REST API is an OAuth protected resource with its own identifier, and
 // the middleware is handed exactly that one: a token minted for `/mcp` has to
 // be refused here (Decision 18).
+// Ahead of the auth check, and on its own limiter so a flood at /mcp cannot
+// spend this budget. Both resources are authenticated, so what this bounds is
+// abuse rather than credential guessing.
+apiV1.use(
+  '*',
+  rateLimitByIp(apiV1Limiter, 'Too many requests. Please try again later.')
+)
 apiV1.use('*', oauthAuth(oauthConfig.resources.apiV1))
 
 // --- Helpers ----------------------------------------------------------------

@@ -183,6 +183,26 @@ docker logs <container-id>
    - `drizzle-kit` must be in production dependencies
    - All workspace packages must be available in container
 
+## Rate limiting
+
+Sign-in, sign-up, password reset, `/oauth/token`, `/oauth/revoke`,
+`/oauth/register`, `/mcp` and `/api/v1/*` are all rate limited. Two things an
+operator has to know:
+
+- **The limiter keys on the client address, and only trusts a forwarding header
+  when `TRUST_PROXY` is set.** Behind the reverse proxy without it, every
+  request buckets under the proxy's own address and one caller exhausts the
+  budget for everyone.
+- **The counters live in the process's own memory.** They are correct for a
+  single instance and nothing else: two instances each enforce half the limit,
+  and a restart forgets everything. Running more than one instance means moving
+  the counters to a shared store (Redis or the database) first.
+
+Anthropic egresses from `160.79.104.0/21`. Nothing here filters by address
+today, but that is the range to allow if a WAF or a firewall rule ever sits in
+front of `/mcp`, `/oauth/*` and the discovery documents. Blocking it blocks
+every hosted Claude connector.
+
 ## Monitoring
 
 ### Health Checks
