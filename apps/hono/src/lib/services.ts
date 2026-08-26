@@ -87,7 +87,7 @@ export const maintenanceService = new MaintenanceService(
 // The issuer and the resource identifiers are deployment facts, read once in
 // `lib/config.ts` and passed in. The service never reads `process.env`, and the
 // CIMD fetch arrives as the same SSRF-guarded fetcher the metadata service uses
-// (Decision 20).
+// (Decision 18).
 export const oauthService = new OAuthService(
   oauthClientRepository,
   oauthAuthorizationCodeRepository,

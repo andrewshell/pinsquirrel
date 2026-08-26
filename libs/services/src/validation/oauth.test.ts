@@ -72,7 +72,7 @@ describe('authorizationRequestSchema', () => {
     ).toBe(false)
   })
 
-  // Audience binding is mandatory (Decision 17), so the request has to name
+  // Audience binding is mandatory (Decision 15), so the request has to name
   // the resource it wants a token for. There is no safe default with two
   // protected resources.
   it('rejects a request with no resource', () => {

@@ -11,7 +11,7 @@ import {
  * configuration the way `MailgunEmailService` does. `routes/seo.ts` derives its
  * origin from the request, which is fine for a sitemap and wrong for OAuth -
  * the issuer, the resource identifiers and the audience check all have to agree
- * on one string that a spoofed `Host` header cannot influence (Decision 20).
+ * on one string that a spoofed `Host` header cannot influence (Decision 18).
  */
 
 const DEV_BASE_URL = 'http://localhost:8100'
@@ -81,7 +81,7 @@ export function createOAuthConfig(baseUrl: string): OAuthConfig {
     resources: {
       // Two resources, one authorization server. The identifiers stay distinct
       // so a token minted for `/mcp` is rejected by `/api/v1` and vice versa
-      // (Decision 17, Decision 18).
+      // (Decision 15, Decision 16).
       mcp: protectedResource(issuer, '/mcp'),
       apiV1: protectedResource(issuer, '/api/v1'),
     },

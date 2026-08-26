@@ -16,7 +16,7 @@ import {
  * Both are machine-facing and both are mounted before `csrf()`, next to
  * `/mcp`: the caller is an OAuth client posting from its own process, not a
  * browser form, and there is no session to protect. Neither reads a
- * repository; every check lives in `OAuthService` (Decision 20).
+ * repository; every check lives in `OAuthService` (Decision 18).
  *
  * `application/x-www-form-urlencoded` is the only body form here. Claude sends
  * the initial exchange and every refresh that way, and RFC 6749 4.1.3

@@ -6,7 +6,7 @@ const api = new OpenAPIHono()
 
 // --- Security scheme registration (shared across all API versions) ----------
 
-// One scheme, because there is one credential form (Decision 12). Advertising
+// One scheme, because there is one credential form (Decision 10). Advertising
 // a second would send a client after a credential nothing accepts.
 api.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
   type: 'http',

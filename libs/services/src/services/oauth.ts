@@ -75,7 +75,7 @@ const ACCESS_TOKEN_PREFIX = 'pso_'
 const OFFLINE_ACCESS_SCOPE = 'offline_access'
 
 /**
- * Every scope this server grants (Decision 16). `offline_access` is not a
+ * Every scope this server grants (Decision 14). `offline_access` is not a
  * permission on anything; it is what asks for a refresh token, which is why
  * the protected resources do not advertise it and the authorization server
  * does.
@@ -176,9 +176,9 @@ export type AuthorizationOutcome =
  *
  * Shaped after the MCP SDK's `OAuthServerProvider` so the mental model
  * matches the ecosystem, but deliberately not implementing it: that interface
- * takes an Express `Response` (Decision 14). Everything here is testable
+ * takes an Express `Response` (Decision 12). Everything here is testable
  * without HTTP and without a database, which is the test for whether a piece
- * is in the right layer (Decision 20).
+ * is in the right layer (Decision 18).
  *
  * There is no `AccessControl` on the token endpoint's operations. A client
  * exchanging a code or a refresh token has no logged-in user to authorize
@@ -463,7 +463,7 @@ export class OAuthService {
    *
    * One call: the hash lookup, the expiry, revocation and audience checks,
    * and the account lookup. That is why the middleware over this needs no
-   * repository (Decision 20).
+   * repository (Decision 18).
    *
    * Every failure is the same `null`. A token for the wrong audience, an
    * expired one, a revoked one and one that never existed are indistinguishable
@@ -487,7 +487,7 @@ export class OAuthService {
 
     if (!sameResource(token.resource, expectedResource)) {
       // RFC 8707 audience binding. The path component is significant, so an
-      // `/mcp` token cannot drive `/api/v1` (Decision 18).
+      // `/mcp` token cannot drive `/api/v1` (Decision 16).
       return null
     }
 
@@ -503,7 +503,7 @@ export class OAuthService {
    * Register a client that posted its own metadata (RFC 7591).
    *
    * The fallback path, not the preferred one: DCR is deprecated in the current
-   * spec and lets an anonymous caller create rows (Decision 15). Two things
+   * spec and lets an anonymous caller create rows (Decision 13). Two things
    * bound the damage. The identifier is derived from the metadata rather than
    * generated, so re-registering the same client returns the same row instead
    * of a new one, and a row that never completes an authorization is swept.
@@ -753,7 +753,7 @@ export class OAuthService {
    * Mint an access token, and a refresh token when one was granted.
    *
    * Both carry the audience the grant was made for, because the audience check
-   * at the resource server is the confused-deputy defense (Decision 17) and a
+   * at the resource server is the confused-deputy defense (Decision 15) and a
    * refresh that could widen it would walk straight around it.
    */
   private async issueTokens(grant: {
@@ -813,7 +813,7 @@ export class OAuthService {
    * Compared after normalization so a trailing slash or an upper-case host is
    * the same resource, and refused outright when it is not one of ours: with
    * two protected resources whose separation is the confused-deputy defense
-   * (Decision 17), there is no default to fall back to.
+   * (Decision 15), there is no default to fall back to.
    */
   private requireKnownResource(resource: string): string {
     let normalized: string
@@ -837,7 +837,7 @@ export class OAuthService {
   /**
    * The client behind a `client_id`, whichever way it registered.
    *
-   * An HTTPS URL is a Client ID Metadata Document (Decision 15): it names a
+   * An HTTPS URL is a Client ID Metadata Document (Decision 13): it names a
    * document this server fetches, validates and caches. Anything else is a
    * `dcr` or `static` registration and is a row lookup.
    */
