@@ -73,3 +73,35 @@ export interface Tag {
 export interface TagWithCount extends Tag {
   pinCount: number
 }
+
+/** A pin, as `/api/v1` serves it. Private pins never appear here. */
+export interface Pin {
+  id: string
+  userId: string
+  url: string
+  title: string
+  description: string | null
+  readLater: boolean
+  isPrivate: boolean
+  /** The tags on the pin, by name - the API sends names, not ids. */
+  tagNames: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+/** Where in a result set a page sits, as the API reports it. */
+export interface Pagination {
+  totalCount: number
+  page: number
+  pageSize: number
+  offset: number
+  totalPages: number
+  hasNext: boolean
+  hasPrevious: boolean
+}
+
+/** One page of pins, the shape every list endpoint answers with. */
+export interface PaginatedPins {
+  pins: Pin[]
+  pagination: Pagination
+}
