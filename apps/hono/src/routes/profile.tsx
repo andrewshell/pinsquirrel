@@ -3,10 +3,16 @@ import {
   AccessControl,
   ApiKeyLimitExceededError,
   InvalidCredentialsError,
+  OAuthError,
   UserAlreadyExistsError,
   ValidationError,
 } from '@pinsquirrel/domain'
-import { accountService, apiKeyService, authService } from '../lib/services'
+import {
+  accountService,
+  apiKeyService,
+  authService,
+  oauthService,
+} from '../lib/services'
 import { getString } from '../lib/form'
 import {
   getAuthUser,
@@ -28,11 +34,17 @@ profile.get('/', async c => {
   // Get flash message if any
   const flash = sessionManager.getFlash()
 
-  // Fetch user's API keys
+  // The cards the page is built from, fetched together: each is independent,
+  // so there is nothing to sequence.
   const ac = new AccessControl(user)
-  const apiKeys = await apiKeyService.listApiKeys(ac, user.id)
+  const [apiKeys, grants] = await Promise.all([
+    apiKeyService.listApiKeys(ac, user.id),
+    oauthService.listGrants(ac, user.id),
+  ])
 
-  return c.html(<ProfilePage user={user} flash={flash} apiKeys={apiKeys} />)
+  return c.html(
+    <ProfilePage user={user} flash={flash} apiKeys={apiKeys} grants={grants} />
+  )
 })
 
 // POST /profile - Handle form submissions
@@ -70,10 +82,18 @@ profile.post('/', async c => {
         name,
       })
 
-      const apiKeys = await apiKeyService.listApiKeys(ac, user.id)
+      const [apiKeys, grants] = await Promise.all([
+        apiKeyService.listApiKeys(ac, user.id),
+        oauthService.listGrants(ac, user.id),
+      ])
 
       return c.html(
-        <ProfilePage user={user} apiKeys={apiKeys} newApiKey={rawKey} />
+        <ProfilePage
+          user={user}
+          apiKeys={apiKeys}
+          grants={grants}
+          newApiKey={rawKey}
+        />
       )
     }
 
@@ -84,6 +104,17 @@ profile.post('/', async c => {
       await apiKeyService.revokeApiKey(ac, keyId)
 
       sessionManager.setFlash('success', 'API key revoked successfully!')
+      return c.redirect('/profile')
+    }
+
+    // Revoking takes the whole grant family, access token and refresh token
+    // together: leaving either alive would let the client carry on.
+    if (intent === 'revoke-oauth-grant') {
+      const tokenId = getString(formData['tokenId'])
+
+      await oauthService.revokeGrant(new AccessControl(user), tokenId)
+
+      sessionManager.setFlash('success', 'Application access revoked!')
       return c.redirect('/profile')
     }
 
@@ -107,13 +138,37 @@ profile.post('/', async c => {
       400
     )
   } catch (error) {
-    // Fetch API keys for error rendering (needed if the error came from an API key action)
+    // Every error path re-renders the whole page, so both card lists have to
+    // come back with it or an unrelated failure would blank them.
     const ac = new AccessControl(user)
-    const apiKeys = await apiKeyService.listApiKeys(ac, user.id)
+    const [apiKeys, grants] = await Promise.all([
+      apiKeyService.listApiKeys(ac, user.id),
+      oauthService.listGrants(ac, user.id),
+    ])
 
     if (error instanceof ValidationError) {
       return c.html(
-        <ProfilePage user={user} apiKeys={apiKeys} errors={error.fields} />,
+        <ProfilePage
+          user={user}
+          apiKeys={apiKeys}
+          grants={grants}
+          errors={error.fields}
+        />,
+        400
+      )
+    }
+
+    // A grant that is gone, or one that was never this user's. Either way the
+    // form is stale rather than the server broken, and saying which it was
+    // would tell somebody whether a token id exists.
+    if (error instanceof OAuthError) {
+      return c.html(
+        <ProfilePage
+          user={user}
+          apiKeys={apiKeys}
+          grants={grants}
+          errors={{ _form: ['That application access is no longer active.'] }}
+        />,
         400
       )
     }
@@ -123,6 +178,7 @@ profile.post('/', async c => {
         <ProfilePage
           user={user}
           apiKeys={apiKeys}
+          grants={grants}
           errors={{ _form: [error.message] }}
         />,
         400
@@ -137,6 +193,7 @@ profile.post('/', async c => {
         <ProfilePage
           user={user}
           apiKeys={apiKeys}
+          grants={grants}
           errors={{ email: ['That email address is already in use'] }}
         />,
         400
@@ -148,6 +205,7 @@ profile.post('/', async c => {
         <ProfilePage
           user={user}
           apiKeys={apiKeys}
+          grants={grants}
           errors={{ currentPassword: ['Current password is incorrect'] }}
         />,
         400
@@ -159,6 +217,7 @@ profile.post('/', async c => {
       <ProfilePage
         user={user}
         apiKeys={apiKeys}
+        grants={grants}
         errors={{ _form: ['An unexpected error occurred. Please try again.'] }}
       />,
       500

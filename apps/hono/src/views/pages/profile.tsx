@@ -1,4 +1,5 @@
 import type { ApiKey, User } from '@pinsquirrel/domain'
+import type { OAuthGrant } from '@pinsquirrel/services'
 import type { FlashMessage } from '../../middleware/session'
 import { FlashMessage as FlashMessageComponent } from '../components/FlashMessage'
 import { DefaultLayout } from '../layouts/default'
@@ -6,6 +7,7 @@ import { AccountCard } from './profile/AccountCard'
 import { ApiKeysCard } from './profile/ApiKeysCard'
 import { BookmarkletCard } from './profile/BookmarkletCard'
 import { EmailForm } from './profile/EmailForm'
+import { OAuthGrantsCard } from './profile/OAuthGrantsCard'
 import { PasswordForm } from './profile/PasswordForm'
 
 interface ProfilePageProps {
@@ -14,6 +16,7 @@ interface ProfilePageProps {
   errors?: Record<string, string[]>
   apiKeys?: ApiKey[]
   newApiKey?: string
+  grants?: OAuthGrant[]
 }
 
 /**
@@ -26,6 +29,7 @@ export function ProfilePage({
   errors,
   apiKeys,
   newApiKey,
+  grants,
 }: ProfilePageProps) {
   return (
     <DefaultLayout
@@ -55,6 +59,7 @@ export function ProfilePage({
         <AccountCard user={user} />
         <EmailForm errors={errors} />
         <PasswordForm user={user} errors={errors} />
+        <OAuthGrantsCard grants={grants} />
         <ApiKeysCard apiKeys={apiKeys} newApiKey={newApiKey} errors={errors} />
         <BookmarkletCard />
       </div>

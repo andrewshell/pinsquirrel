@@ -103,8 +103,9 @@ password checks) and 3.4.1 (production Docker build repaired for pnpm 11); then 
 
 ### Open follow-ups on the public API
 
-- [ ] Extend rate limiting across the public endpoints. Phase 6 raises the priority, since
-      `/oauth/token` and `/oauth/register` are unauthenticated. Folded into Phase 6f.
+- [x] Extend rate limiting across the public endpoints. Phase 6 raises the priority, since
+      `/oauth/token` and `/oauth/register` are unauthenticated. Folded into Phase 6f, and done
+      there: five limiters, applied inside each route file.
 - [ ] Deferred read-write MCP tools. See Phase 3b-7. Gated on the `pins:write` scope
       from Phase 6, so do Phase 6 first.
 - [ ] Remove the API key infrastructure once OAuth is proven. New Phase 7.
@@ -482,15 +483,16 @@ The approach changed. Instead of a hand-written JSX docs page, the v1 routes wer
 
 ## Phase 6: OAuth 2.1 (the only auth path)
 
-> **Resume at 6f.** 6a, 6b, 6c and 6d shipped on `feat/oauth-phase-6`: both 401s carry a
+> **Resume at 6g.** 6a through 6f shipped on `feat/oauth-phase-6`: both 401s carry a
 > `WWW-Authenticate` challenge, `BASE_URL` exists, the four discovery documents are served, the
 > OAuth entities, repository interfaces, error types, tables and Drizzle repositories exist with
 > the migration applied, `OAuthService` sits over them in `libs/services`, and the four endpoints
 > (`/oauth/authorize`, `/oauth/token`, `/oauth/revoke`, `/oauth/register`) plus
 > `middleware/oauth-auth.ts` are live. `/mcp` and `/api/v1` authenticate with OAuth only as of
-> 6d, so `ps_` keys no longer open them. What is left before a real client can be trusted with
-> this: the per-IP quota on `/oauth/register` (6f), the grants UI (6f), and the end-to-end runs
-> (6e, 6g). Goal: a user pastes
+> 6d, so `ps_` keys no longer open them. 6f added the rate limiters, the latency-budget fix and
+> the profile grants card; 6e added pre-registered static clients. What is left is the end-to-end
+> runs against real clients (6g), including the two CIMD items 6e leaves open because only a real
+> client exercises them. Goal: a user pastes
 > `https://pinsquirrel.com/mcp` into
 > Claude (or any MCP client), clicks through a consent screen, and is connected. No hand-copied
 > API key.
@@ -1187,7 +1189,7 @@ Folded in from the standing follow-up. Phase 6 raises the priority, since `/oaut
   - Nothing on any of these paths sends email, writes a session, or holds a response open behind
     background work.
 
-- [ ] Profile page: list and revoke active OAuth grants. This lands next to the API key section
+- [x] Profile page: list and revoke active OAuth grants. This lands next to the API key section
       for now and replaces it in Phase 7. Users need a working revocation UI before the key UI is
       removed, not after
   - New file `views/pages/profile/OAuthGrantsCard.tsx` plus one line in `views/pages/profile.tsx`.
@@ -1196,6 +1198,26 @@ Folded in from the standing follow-up. Phase 6 raises the priority, since `/oaut
     `oauthService.revokeGrant(ac, tokenId)`, flash + redirect like `revoke-api-key`
   - No inline script (CSP). A grants list needs none. If a confirm step is wanted, it is a
     `static/*.js` file with `onReady()`
+
+  Built as `views/pages/profile/OAuthGrantsCard.tsx`, titled "Connected Applications", one line
+  above `ApiKeysCard` in `views/pages/profile.tsx`. No inline script was needed: it is a list and
+  a form. Each entry names the client (its identifier when it registered without a name), the
+  resource, the scopes, and the authorized and expiry dates, with a Revoke form posting
+  `intent=revoke-oauth-grant` and the token id. Three things worth recording:
+
+  - **The resource is labelled, not printed.** `https://…/mcp` and `https://…/api/v1` are the
+    right strings for the protocol and the wrong ones for somebody deciding whether to revoke, so
+    `resourceLabel` in `lib/config.ts` renders them as "MCP" and "REST API". It lives in the
+    config because the config is what decides which identifiers exist, and an unrecognised one
+    falls back to itself rather than being hidden.
+  - **The GET fetches keys and grants with one `Promise.all`**, and so does every error path.
+    The cards are independent, and an unrelated failure that blanked one of the lists would look
+    like data loss.
+  - **A stale form is a `400`, not a `500`.** Revoking a grant that a second tab already revoked
+    throws `OAuthInvalidGrantError`, and revoking somebody else's throws `OAuthAccessDeniedError`;
+    both render as "That application access is no longer active", which is also what stops the
+    page reporting whether a token id exists.
+
 - [x] Anthropic egresses from `160.79.104.0/21`. Note it in DEPLOYMENT.md if a WAF ever lands
 
   Recorded in the new DEPLOYMENT.md "Rate limiting" section, next to the other thing an operator
