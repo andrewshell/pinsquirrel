@@ -1,5 +1,5 @@
 import { ReauthorizationRequiredError } from '../auth.ts'
-import type { SyncResponse } from '../messages.ts'
+import type { ConnectResponse, SyncResponse } from '../messages.ts'
 import * as storage from '../storage.ts'
 import type { TagWithCount } from '../types.ts'
 import { formatLastSync, parseBaseUrl } from './format.ts'
@@ -19,13 +19,22 @@ export interface PopupApiClient {
  * Everything the popup does that is not the DOM.
  *
  * Injected rather than imported so the wiring tests can drive it without
- * mocking modules: `connect` opens a browser tab, `requestSync` wakes a service
- * worker, and `now` is a clock. What is *not* here is storage - it is already
- * behind `chrome.storage.local`, which the tests stub at the `chrome` global.
+ * mocking modules: the two `request*` calls wake a service worker, and `now`
+ * is a clock. What is *not* here is storage - it is already behind
+ * `chrome.storage.local`, which the tests stub at the `chrome` global.
  */
 export interface PopupDeps {
   document: Document
-  connect(baseUrl: string): Promise<void>
+  /**
+   * Ask the service worker to run the OAuth flow; it does not run here.
+   *
+   * `chrome.identity.launchWebAuthFlow` opens a window, and Chrome destroys
+   * this popup the moment that window takes focus - so a flow started here
+   * died half-finished, after the server had issued the tokens and before
+   * anything could store them. What the user saw was a grant on their profile
+   * and a popup that still asked them to connect.
+   */
+  requestConnect(baseUrl: string): Promise<ConnectResponse>
   disconnect(): Promise<void>
   createApiClient(baseUrl: string): PopupApiClient
   requestSync(): Promise<SyncResponse>
@@ -129,11 +138,16 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
    */
   function report(error: unknown): void {
     if (error instanceof ReauthorizationRequiredError) {
-      setStatus('')
-      showSettings({ reconnect: true })
+      askToReconnect()
       return
     }
     setStatus(error instanceof Error ? error.message : String(error))
+  }
+
+  /** Back to Connect, because only the user can bring the grant back. */
+  function askToReconnect(): void {
+    setStatus('')
+    showSettings({ reconnect: true })
   }
 
   async function loadTags(): Promise<void> {
@@ -161,7 +175,17 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
     setStatus('Waiting for you to approve the extension...')
     await whileBusy(ui.connectButton, async () => {
       try {
-        await deps.connect(origin)
+        // Usually this never returns: the consent window takes focus and
+        // Chrome destroys the popup mid-await. The flow carries on in the
+        // worker, and what the user sees is the popup they open next - which
+        // finds the tokens in storage and opens on the main view. Everything
+        // below is the case where the popup happened to survive.
+        const response = await deps.requestConnect(origin)
+        if (!response.ok) {
+          if (response.reauthorizationRequired) askToReconnect()
+          else setStatus(response.error)
+          return
+        }
         baseUrl = origin
         setStatus('')
         await showMain()
