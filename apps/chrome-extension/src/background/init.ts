@@ -1,4 +1,10 @@
-import { isSyncRequest, type SyncResponse } from '../messages.ts'
+import { ReauthorizationRequiredError } from '../auth.ts'
+import {
+  isConnectRequest,
+  isSyncRequest,
+  type ConnectResponse,
+  type SyncResponse,
+} from '../messages.ts'
 import * as storage from '../storage.ts'
 
 /**
@@ -28,7 +34,42 @@ const SYNC_PERIOD_MINUTES = 60
 export interface BackgroundDeps {
   /** A full sync of stored selection over the stored connection. */
   runSync(): Promise<void>
+  /**
+   * The whole OAuth flow against `baseUrl`, ending with tokens in storage.
+   *
+   * This runs here rather than in the popup that asked for it because
+   * `chrome.identity.launchWebAuthFlow` opens a window, and Chrome destroys
+   * the action popup the moment that window takes focus. The flow died
+   * mid-exchange: the server had issued the tokens and nothing was left alive
+   * to store them, so the user got a grant on their profile and a popup that
+   * still asked them to connect. The worker outlives the popup, so it does not
+   * matter here that the popup is gone before this returns.
+   */
+  connect(baseUrl: string): Promise<void>
   logger: BackgroundLogger
+}
+
+/**
+ * Wrap `work` so that only one run of it exists at a time.
+ *
+ * Two syncs at once means two runs reconciling the same bookmark folders
+ * against two reads of the same tags; two connects means two consent windows
+ * for one server. Everything that asks for one while it is running joins the
+ * run already in flight instead, including a connect naming a different server
+ * - the popup only ever offers one at a time, and its button is disabled for
+ * the duration. Every caller has to attach its own handler: the shared promise
+ * rejects once and is handed to each of them.
+ */
+function singleFlight<Args extends unknown[]>(
+  work: (...args: Args) => Promise<void>
+): (...args: Args) => Promise<void> {
+  let inFlight: Promise<void> | null = null
+  return (...args) => {
+    inFlight ??= work(...args).finally(() => {
+      inFlight = null
+    })
+    return inFlight
+  }
 }
 
 function messageOf(error: unknown): string {
@@ -57,22 +98,8 @@ async function isConnected(): Promise<boolean> {
  * to happen at the top level and cannot wait on anything asynchronous.
  */
 export function initBackground(deps: BackgroundDeps): void {
-  /**
-   * The sync in progress, if there is one.
-   *
-   * Two syncs at once means two runs reconciling the same bookmark folders
-   * against two reads of the same tags, so everything that wants a sync joins
-   * this one instead. Every caller has to attach its own handler: the shared
-   * promise rejects once and is handed to each of them.
-   */
-  let inFlight: Promise<void> | null = null
-
-  function sync(): Promise<void> {
-    inFlight ??= deps.runSync().finally(() => {
-      inFlight = null
-    })
-    return inFlight
-  }
+  const sync = singleFlight(() => deps.runSync())
+  const connect = singleFlight((baseUrl: string) => deps.connect(baseUrl))
 
   /**
    * A sync nobody is watching: on browser startup, or on the alarm.
@@ -100,6 +127,26 @@ export function initBackground(deps: BackgroundDeps): void {
       return { ok: true }
     } catch (error) {
       return { ok: false, error: messageOf(error) }
+    }
+  }
+
+  /**
+   * A connect the popup asked for, with its outcome as a value.
+   *
+   * Usually nobody is left to hear it: the consent window takes focus, Chrome
+   * tears the popup down, and `sendResponse` lands nowhere. That is fine -
+   * `connect` has written the tokens to storage by then, and the popup reads
+   * them on its next open. The answer only matters when the popup survived.
+   */
+  async function connectForPopup(baseUrl: string): Promise<ConnectResponse> {
+    try {
+      await connect(baseUrl)
+      return { ok: true }
+    } catch (error) {
+      const failure = { ok: false as const, error: messageOf(error) }
+      return error instanceof ReauthorizationRequiredError
+        ? { ...failure, reauthorizationRequired: true }
+        : failure
     }
   }
 
@@ -134,11 +181,17 @@ export function initBackground(deps: BackgroundDeps): void {
   })
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (!isSyncRequest(message)) return false
+    // Both answers come later, so Chrome has to keep the channel open.
+    if (isSyncRequest(message)) {
+      void syncForPopup().then(sendResponse)
+      return true
+    }
 
-    void syncForPopup().then(sendResponse)
+    if (isConnectRequest(message)) {
+      void connectForPopup(message.baseUrl).then(sendResponse)
+      return true
+    }
 
-    // The answer comes later, so Chrome has to keep the channel open.
-    return true
+    return false
   })
 }
