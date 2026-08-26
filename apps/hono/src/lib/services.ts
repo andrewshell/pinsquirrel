@@ -4,7 +4,6 @@ import type { EmailService } from '@pinsquirrel/domain'
 import { MailgunEmailService } from '@pinsquirrel/mailgun'
 import {
   AccountService,
-  ApiKeyService,
   MaintenanceService,
   NullEmailService,
   AuthenticationService,
@@ -18,7 +17,6 @@ import {
 } from '@pinsquirrel/services'
 import { oauthConfig } from './config'
 import {
-  apiKeyRepository,
   userRepository,
   tagRepository,
   pinRepository,
@@ -77,7 +75,6 @@ export const pinService = new PinService(pinRepository, tagRepository)
 export const pinboardService = new PinboardService(pinService)
 export const tagService = new TagService(tagRepository)
 export const userService = new UserService(userRepository)
-export const apiKeyService = new ApiKeyService(apiKeyRepository, userRepository)
 export const metadataService = new MetadataService(httpFetcher, htmlParser)
 export const maintenanceService = new MaintenanceService(
   sessionRepository,

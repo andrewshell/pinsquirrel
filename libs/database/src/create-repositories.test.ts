@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { createRepositories } from './create-repositories.js'
-import { DrizzleApiKeyRepository } from './repositories/api-key.js'
 import { DrizzleOAuthAuthorizationCodeRepository } from './repositories/oauth-authorization-code.js'
 import { DrizzleOAuthClientRepository } from './repositories/oauth-client.js'
 import { DrizzleOAuthTokenRepository } from './repositories/oauth-token.js'
@@ -26,7 +25,6 @@ describe('createRepositories', () => {
       DrizzlePasswordResetRepository
     )
     expect(repos.sessionRepository).toBeInstanceOf(DrizzleSessionRepository)
-    expect(repos.apiKeyRepository).toBeInstanceOf(DrizzleApiKeyRepository)
     expect(repos.oauthClientRepository).toBeInstanceOf(
       DrizzleOAuthClientRepository
     )
