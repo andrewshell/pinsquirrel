@@ -10,6 +10,10 @@ interface ButtonProps {
   type?: 'button' | 'submit' | 'reset'
   class?: string
   disabled?: boolean
+  // A submit button can carry the decision it stands for, which is how a form
+  // offers two choices without any script.
+  name?: string
+  value?: string
   'aria-label'?: string
   // No `onclick`: the app ships a `script-src 'self'` CSP, so an inline
   // handler would not run. Use a data attribute and a listener in
