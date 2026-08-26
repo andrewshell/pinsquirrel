@@ -5,9 +5,10 @@ import { vi } from 'vitest'
  *
  * Only the surface this extension actually uses is here: `storage.local`,
  * `storage.sync` (present so a test can prove nothing writes to it), the two
- * `identity` calls the OAuth flow makes, and the `bookmarks` calls the sync
- * makes. Anything else is left off on purpose - a test that reaches for it
- * should fail loudly rather than get an empty object back.
+ * `identity` calls the OAuth flow makes, the `bookmarks` calls the sync makes,
+ * and the `runtime` and `alarms` events the service worker listens on.
+ * Anything else is left off on purpose - a test that reaches for it should
+ * fail loudly rather than get an empty object back.
  *
  * `vi.unstubAllGlobals()` in an `afterEach` is what undoes it.
  */
@@ -30,6 +31,46 @@ export type SendMessageMock = ReturnType<
   typeof vi.fn<(message: unknown) => Promise<unknown>>
 >
 
+/**
+ * A `chrome.events.Event`, as a test drives it.
+ *
+ * The real thing hands a listener to the browser and waits for the browser to
+ * call it, which is exactly what a test cannot wait for. This keeps the
+ * listeners the code registered and lets the test be the browser.
+ */
+export interface EventStub<Args extends unknown[], R = void> {
+  /** Every listener registered through `addListener`, in order. */
+  listeners: ((...args: Args) => R)[]
+  /** Call each listener with these arguments; answers what each returned. */
+  fire(...args: Args): R[]
+}
+
+/** The `chrome.runtime` events the service worker wakes on. */
+export interface RuntimeEventsStub {
+  onStartup: EventStub<[]>
+  onInstalled: EventStub<[chrome.runtime.InstalledDetails]>
+  /**
+   * A listener answers `true` to say it will call `sendResponse` later, which
+   * is what `fire` hands back - the whole point of the return value.
+   */
+  onMessage: EventStub<
+    [unknown, chrome.runtime.MessageSender, (response?: unknown) => void],
+    boolean | undefined
+  >
+}
+
+/** An in-memory `chrome.alarms`: what exists, and what asked for it. */
+export interface AlarmsStub {
+  /** Every `chrome.alarms.create` call, in order. */
+  created: { name: string; info: chrome.alarms.AlarmCreateInfo }[]
+  /**
+   * The alarms that exist right now, by name. `create` adds one, and a test
+   * seeds one to stand for an alarm that survived the worker being unloaded.
+   */
+  existing: Map<string, chrome.alarms.Alarm>
+  onAlarm: EventStub<[chrome.alarms.Alarm]>
+}
+
 export interface ChromeStub {
   local: StubbedStorageArea
   sync: StubbedStorageArea
@@ -40,6 +81,24 @@ export interface ChromeStub {
   sendMessage: SendMessageMock
   /** The bookmark tree the sync reads and writes. */
   bookmarks: BookmarksStub
+  /** The events the service worker registers on, for a test to fire. */
+  runtime: RuntimeEventsStub
+  /** The periodic sync alarm, for a test to inspect and fire. */
+  alarms: AlarmsStub
+}
+
+/** One event stub, plus the `addListener` the extension code calls. */
+function eventStub<Args extends unknown[], R = void>(): EventStub<Args, R> & {
+  addListener(listener: (...args: Args) => R): void
+} {
+  const listeners: ((...args: Args) => R)[] = []
+  return {
+    listeners,
+    addListener(listener) {
+      listeners.push(listener)
+    },
+    fire: (...args) => listeners.map(listener => listener(...args)),
+  }
 }
 
 /** The callback-free half of `chrome.storage.StorageArea`, backed by an object. */
@@ -301,6 +360,18 @@ export function stubChrome(
     throw new Error('stubChrome has not been installed')
   }
 
+  const runtimeEvents = {
+    onStartup: eventStub<[]>(),
+    onInstalled: eventStub<[chrome.runtime.InstalledDetails]>(),
+    onMessage: eventStub<
+      [unknown, chrome.runtime.MessageSender, (response?: unknown) => void],
+      boolean | undefined
+    >(),
+  }
+
+  const onAlarm = eventStub<[chrome.alarms.Alarm]>()
+  const alarms: AlarmsStub = { created: [], existing: new Map(), onAlarm }
+
   const stub: ChromeStub = {
     local: { items: { ...initialLocal } },
     sync: { items: {} },
@@ -321,6 +392,8 @@ export function stubChrome(
       has: unimplemented,
       calls: [],
     },
+    runtime: runtimeEvents,
+    alarms,
   }
 
   vi.stubGlobal('chrome', {
@@ -334,6 +407,24 @@ export function stubChrome(
     },
     runtime: {
       sendMessage: stub.sendMessage,
+      onStartup: runtimeEvents.onStartup,
+      onInstalled: runtimeEvents.onInstalled,
+      onMessage: runtimeEvents.onMessage,
+    },
+    alarms: {
+      create: (name: string, info: chrome.alarms.AlarmCreateInfo) => {
+        alarms.created.push({ name, info })
+        alarms.existing.set(name, {
+          name,
+          scheduledTime: Date.now(),
+          ...(info.periodInMinutes === undefined
+            ? {}
+            : { periodInMinutes: info.periodInMinutes }),
+        })
+        return Promise.resolve()
+      },
+      get: (name: string) => Promise.resolve(alarms.existing.get(name)),
+      onAlarm,
     },
     bookmarks: bookmarksApi(stub.bookmarks),
   })
