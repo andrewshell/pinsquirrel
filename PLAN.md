@@ -74,7 +74,7 @@ Searching for `jesse elder` returned one pin when five were relevant. The search
 `description`: `jesseelder.com` does not contain the spaced phrase, and the `jesseelder` tag is
 not a searched column at all.
 
-- [ ] Split the query on whitespace into terms. Every term must match, each in any field: `AND`
+- [x] Split the query on whitespace into terms. Every term must match, each in any field: `AND`
       over terms of `OR` over `url`, `title`, `description` and tag name. Tag name is an
       `EXISTS` over `pins_tags` joined to `tags`, not a join on the outer query, so a pin with
       three tags is one row. `countByUserId` builds from the same `buildConditions`, so the
