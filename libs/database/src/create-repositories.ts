@@ -1,6 +1,9 @@
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import type {
   ApiKeyRepository,
+  OAuthAuthorizationCodeRepository,
+  OAuthClientRepository,
+  OAuthTokenRepository,
   PasswordResetRepository,
   PinRepository,
   SessionRepository,
@@ -8,6 +11,9 @@ import type {
   UserRepository,
 } from '@pinsquirrel/domain'
 import { DrizzleApiKeyRepository } from './repositories/api-key.js'
+import { DrizzleOAuthAuthorizationCodeRepository } from './repositories/oauth-authorization-code.js'
+import { DrizzleOAuthClientRepository } from './repositories/oauth-client.js'
+import { DrizzleOAuthTokenRepository } from './repositories/oauth-token.js'
 import { DrizzlePasswordResetRepository } from './repositories/password-reset.js'
 import { DrizzlePinRepository } from './repositories/pin.js'
 import { DrizzleSessionRepository } from './repositories/session.js'
@@ -21,6 +27,9 @@ export interface Repositories {
   passwordResetRepository: PasswordResetRepository
   sessionRepository: SessionRepository
   apiKeyRepository: ApiKeyRepository
+  oauthClientRepository: OAuthClientRepository
+  oauthAuthorizationCodeRepository: OAuthAuthorizationCodeRepository
+  oauthTokenRepository: OAuthTokenRepository
 }
 
 /**
@@ -46,5 +55,9 @@ export function createRepositories(db: MySql2Database): Repositories {
     passwordResetRepository: new DrizzlePasswordResetRepository(db),
     sessionRepository: new DrizzleSessionRepository(db),
     apiKeyRepository: new DrizzleApiKeyRepository(db),
+    oauthClientRepository: new DrizzleOAuthClientRepository(db),
+    oauthAuthorizationCodeRepository:
+      new DrizzleOAuthAuthorizationCodeRepository(db),
+    oauthTokenRepository: new DrizzleOAuthTokenRepository(db),
   }
 }
