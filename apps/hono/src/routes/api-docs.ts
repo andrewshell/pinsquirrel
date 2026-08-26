@@ -6,9 +6,8 @@ const api = new OpenAPIHono()
 
 // --- Security scheme registration (shared across all API versions) ----------
 
-// One scheme, because there is one credential form. `X-API-Key` existed only
-// for the `ps_` API keys and left with them (Decision 12); advertising it here
-// would send a client after a credential nothing accepts.
+// One scheme, because there is one credential form (Decision 12). Advertising
+// a second would send a client after a credential nothing accepts.
 api.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
   type: 'http',
   scheme: 'bearer',

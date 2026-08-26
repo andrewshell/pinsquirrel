@@ -8,9 +8,8 @@ export interface OAuthTokenRepository {
 
   /**
    * The bearer-token lookup. The raw token is hashed by the service and only
-   * the hash reaches here, the same way `ApiKeyRepository.findByKeyHash`
-   * works. Returns the row whatever its state; expiry, revocation, rotation
-   * and audience are the service's checks to make.
+   * the hash reaches here. Returns the row whatever its state; expiry,
+   * revocation, rotation and audience are the service's checks to make.
    */
   findByTokenHash(tokenHash: string): Promise<OAuthToken | null>
 

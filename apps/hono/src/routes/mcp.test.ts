@@ -170,7 +170,7 @@ describe('mcp route auth', () => {
   })
 
   // X-API-Key went with the API keys. Authorization: Bearer is the only
-  // credential form here now.
+  // credential form here.
   it('rejects an X-API-Key header', async () => {
     mockVerifyAccessToken.mockImplementation(
       tokenFor('http://localhost:8100/mcp')

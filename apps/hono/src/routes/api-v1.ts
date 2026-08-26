@@ -27,8 +27,8 @@ const apiV1 = new OpenAPIHono()
 
 // --- OpenAPI route specs (for spec generation only) -------------------------
 
-// One credential form: an OAuth access token in `Authorization: Bearer`.
-// `X-API-Key` left with the API keys (Decision 12).
+// One credential form: an OAuth access token in `Authorization: Bearer`
+// (Decision 12).
 const security: Record<string, string[]>[] = [{ bearerAuth: [] }]
 
 apiV1.openAPIRegistry.registerPath({

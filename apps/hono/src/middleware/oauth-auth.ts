@@ -7,16 +7,15 @@ import type { ProtectedResourceConfig } from '../lib/config.js'
 /**
  * Bearer authentication for the OAuth protected resources.
  *
- * A copy of the split `bearer-auth.ts` documents rather than an extension of
- * it: header parsing stays here because it is transport, and resolving the
- * token to a principal is `OAuthService.verifyAccessToken`'s job - the hash
- * lookup, the expiry and revocation checks, the audience check and the user
- * lookup all happen there. There is deliberately no dispatch between
- * credential types. One credential type means one code path, and the `ps_` key
- * path leaves wholesale in Phase 7.
+ * Header parsing stays here because it is transport, and resolving the token
+ * to a principal is `OAuthService.verifyAccessToken`'s job - the hash lookup,
+ * the expiry and revocation checks, the audience check and the user lookup all
+ * happen there.
  *
- * `Authorization: Bearer` is the only accepted form. `X-API-Key` existed only
- * for API keys and is not read here at all.
+ * There is deliberately no dispatch between credential types: an OAuth access
+ * token in `Authorization: Bearer` is the only credential this server has
+ * (Decision 12). `X-API-Key` belonged to the API keys Phase 7 removed and is
+ * not read here at all.
  */
 
 /** Who a verified OAuth access token turns out to be. */

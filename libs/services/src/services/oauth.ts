@@ -184,7 +184,7 @@ export type AuthorizationOutcome =
  * exchanging a code or a refresh token has no logged-in user to authorize
  * against; the code or the token is itself the proof, which is why those
  * methods verify possession rather than identity. The user-facing grant
- * operations do take one, exactly as `ApiKeyService.listApiKeys` does.
+ * operations do take one, as every user-scoped operation does.
  */
 export class OAuthService {
   constructor(
@@ -461,14 +461,14 @@ export class OAuthService {
   /**
    * Resolve a bearer token to the principal behind it, or to nothing.
    *
-   * The OAuth twin of `ApiKeyService.authenticate`: the hash lookup, the
-   * expiry, revocation and audience checks and the account lookup are one
-   * call, which is why 6d's middleware needs no repository (Decision 20).
+   * One call: the hash lookup, the expiry, revocation and audience checks,
+   * and the account lookup. That is why the middleware over this needs no
+   * repository (Decision 20).
    *
    * Every failure is the same `null`. A token for the wrong audience, an
    * expired one, a revoked one and one that never existed are indistinguishable
    * from outside on purpose, and a token whose user is gone reads as invalid
-   * for the same enumeration reason `ApiKeyService` gives.
+   * too: a distinct answer would confirm the token itself was good.
    */
   async verifyAccessToken(
     rawToken: string,
@@ -636,7 +636,7 @@ export class OAuthService {
    * One entry per client and audience rather than per token: an authorization
    * mints an access token and a refresh token, and the profile page is showing
    * the application, not the plumbing. Takes an `AccessControl` because this is
-   * a user-facing operation, exactly as `ApiKeyService.listApiKeys` does.
+   * a user-facing operation, as every user-scoped operation does.
    */
   async listGrants(ac: AccessControl, userId: string): Promise<OAuthGrant[]> {
     if (!ac.canCreateAs(userId)) {

@@ -180,8 +180,8 @@ describe('api-v1 routes', () => {
       expect(res.status).toBe(401)
     })
 
-    // X-API-Key was the API-key-only header and the API keys are going. It is
-    // not read at all now, not even as a fallback.
+    // X-API-Key belonged to the API keys, which are gone. It is not read at
+    // all now, not even as a fallback.
     it('rejects an X-API-Key header', async () => {
       mockVerifyAccessToken.mockImplementation(tokenFor(REST_RESOURCE))
       const res = await app.request('/api/v1/pins', {
@@ -298,8 +298,8 @@ describe('api-v1 routes', () => {
 
     // Ownership stays opaque, exactly as the HTML routes have it: another
     // user's pin is reported as missing, never as "exists but not yours".
-    // This is a different 401 from the one apiKeyAuth returns - that one
-    // answers "who are you?" and is settled before any handler runs.
+    // This is a different 401 from the one the auth middleware returns - that
+    // one answers "who are you?" and is settled before any handler runs.
     it('reports another user’s pin as not found, not 401 or 403', async () => {
       mockGetPublicPin.mockRejectedValue(
         new UnauthorizedPinAccessError('pin-1')

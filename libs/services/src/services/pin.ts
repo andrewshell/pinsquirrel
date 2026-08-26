@@ -229,8 +229,8 @@ export class PinService {
   /**
    * Get a pin that the caller is allowed to see over a public-only surface.
    *
-   * The REST API and the MCP server both authenticate with an API key and
-   * expose public pins only. Anything the caller may not see - missing,
+   * The REST API and the MCP server both authenticate an OAuth access token
+   * and expose public pins only. Anything the caller may not see - missing,
    * private, or owned by someone else - is reported as missing, so the error
    * can never confirm that an id exists. This deliberately does not delegate
    * to `getPin`, whose `UnauthorizedPinAccessError` would do exactly that.
