@@ -1011,6 +1011,25 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         ])
       })
 
+      it('returns a pin with several matching tags once, and counts it once', async () => {
+        await pinRepository.create({
+          userId: testUser.id,
+          url: 'https://example.org/a-talk',
+          title: 'A talk',
+          description: null,
+          readLater: false,
+          isPrivate: false,
+          tagNames: ['jesseelder', 'jesse', 'elder'],
+        })
+
+        const filter = { search: 'jesse elder' }
+        const result = await pinRepository.findByUserId(testUser.id, filter)
+        const total = await pinRepository.countByUserId(testUser.id, filter)
+
+        expect(result.filter(p => p.title === 'A talk')).toHaveLength(1)
+        expect(total).toBe(result.length)
+      })
+
       it('ignores runs of whitespace between terms', async () => {
         const result = await pinRepository.findByUserId(testUser.id, {
           search: '  jesse \t elder  ',
