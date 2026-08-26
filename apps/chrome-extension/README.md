@@ -112,22 +112,22 @@ removed and re-added.
 
 ## Layout
 
-| Path                         | What it is                                                               |
-| ---------------------------- | ------------------------------------------------------------------------ |
-| `manifest.json`              | Manifest V3: permissions, service worker, popup                          |
-| `popup.html`                 | Popup markup and styles; no inline scripts (extension CSP)               |
-| `src/background.ts`          | Service worker entry point: hands `initBackground` its real dependencies |
-| `src/background/init.ts`     | The worker itself: startup, the alarm, and the popup's two requests      |
-| `src/popup.ts`               | Popup entry point: hands `initPopup` its real dependencies               |
-| `src/popup/`                 | The popup itself — `init.ts` wiring, `render.ts` and `format.ts` pure    |
-| `src/messages.ts`            | The popup ↔ service worker message contract                              |
-| `src/auth.ts`                | OAuth client: connect, refresh, `authorizedFetch`, disconnect            |
-| `src/api-client.ts`          | `/api/v1` reads over `authorizedFetch`                                   |
-| `src/bookmark-sync.ts`       | Tags to bookmark folders: `syncAll`, and `runSync` for the worker        |
-| `src/storage.ts`             | The only module that names `chrome.storage.local`                        |
-| `scripts/build.ts`           | esbuild bundle + asset copy                                              |
-| `scripts/manifest-assets.ts` | Derives the copy list from the manifest                                  |
-| `icons/`                     | The app favicon at 16/48/128 (from `apps/hono/src/static/`)              |
+| Path                         | What it is                                                                |
+| ---------------------------- | ------------------------------------------------------------------------- |
+| `manifest.json`              | Manifest V3: permissions, service worker, popup                           |
+| `popup.html`                 | Popup markup and styles; no inline scripts (extension CSP)                |
+| `src/background.ts`          | Service worker entry point: hands `initBackground` its real dependencies  |
+| `src/background/init.ts`     | The worker itself: startup, the alarm, and the popup's two requests       |
+| `src/popup.ts`               | Popup entry point: hands `initPopup` its real dependencies                |
+| `src/popup/`                 | The popup itself — `init.ts` wiring, `render.ts` and `format.ts` pure     |
+| `src/messages.ts`            | The popup ↔ service worker message contract                               |
+| `src/auth.ts`                | OAuth client: connect, refresh, `authorizedFetch`, disconnect             |
+| `src/api-client.ts`          | `/api/v1` reads over `authorizedFetch`                                    |
+| `src/bookmark-sync.ts`       | Tags to bookmark folders: `syncAll`, and `runSync` for the worker         |
+| `src/storage.ts`             | The only module that names `chrome.storage.local`                         |
+| `scripts/build.ts`           | esbuild bundle + asset copy                                               |
+| `scripts/manifest-assets.ts` | Derives the copy list from the manifest                                   |
+| `icons/`                     | The acorn favicon at 16/48/128; 48 and 128 are upscaled from the 32px PNG |
 
 `tsconfig.json` covers `src` and `scripts` as one project. `types` carries
 `chrome` (the extension APIs), `node` (for the build script) and
