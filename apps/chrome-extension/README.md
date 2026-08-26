@@ -22,6 +22,18 @@ is derived from the manifest (`scripts/manifest-assets.ts`), so an icon added to
 
 Set `NODE_ENV=production` to minify and drop the source maps.
 
+## Tests
+
+```bash
+pnpm --filter @pinsquirrel/chrome-extension test
+```
+
+Vitest runs on the `node` environment. The popup's tests opt into a DOM one
+file at a time with `// @vitest-environment happy-dom` at the top, rather than
+paying for a DOM in every test in the package. They load the real `popup.html`
+through `src/test/popup-dom.ts`, so markup and code cannot drift apart
+unnoticed, and stub `chrome` with `src/test/chrome-mock.ts`.
+
 ## Load unpacked
 
 1. Build, so `dist/` exists.
@@ -37,15 +49,20 @@ removed and re-added.
 
 ## Layout
 
-| Path                         | What it is                                            |
-| ---------------------------- | ----------------------------------------------------- |
-| `manifest.json`              | Manifest V3: permissions, service worker, popup       |
-| `popup.html`                 | Static popup shell; no inline scripts (extension CSP) |
-| `src/background.ts`          | Service worker entry point                            |
-| `src/popup.ts`               | Popup entry point                                     |
-| `scripts/build.ts`           | esbuild bundle + asset copy                           |
-| `scripts/manifest-assets.ts` | Derives the copy list from the manifest               |
-| `icons/`                     | Placeholder artwork at 16/48/128, pending real icons  |
+| Path                         | What it is                                                            |
+| ---------------------------- | --------------------------------------------------------------------- |
+| `manifest.json`              | Manifest V3: permissions, service worker, popup                       |
+| `popup.html`                 | Popup markup and styles; no inline scripts (extension CSP)            |
+| `src/background.ts`          | Service worker entry point                                            |
+| `src/popup.ts`               | Popup entry point: hands `initPopup` its real dependencies            |
+| `src/popup/`                 | The popup itself — `init.ts` wiring, `render.ts` and `format.ts` pure |
+| `src/messages.ts`            | The popup ↔ service worker message contract                           |
+| `src/auth.ts`                | OAuth client: connect, refresh, `authorizedFetch`, disconnect         |
+| `src/api-client.ts`          | `/api/v1` reads over `authorizedFetch`                                |
+| `src/storage.ts`             | The only module that names `chrome.storage.local`                     |
+| `scripts/build.ts`           | esbuild bundle + asset copy                                           |
+| `scripts/manifest-assets.ts` | Derives the copy list from the manifest                               |
+| `icons/`                     | Placeholder artwork at 16/48/128, pending real icons                  |
 
 `tsconfig.json` covers `src` and `scripts` as one project. `types` carries
 `chrome` (the extension APIs), `node` (for the build script) and
