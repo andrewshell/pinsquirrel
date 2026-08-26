@@ -12,10 +12,10 @@ import type { MySql2Database } from 'drizzle-orm/mysql2'
  *
  * It applies whatever migrations have not run yet and touches nothing else,
  * which is what makes it safe to call from a test setup that must not destroy
- * data another run is using. It was additive-only until Phase 7 dropped
- * `api_keys`, and a migration that drops a table a running instance still
- * queries takes that instance down — so a destructive one deploys after the
- * code that stopped using it, never with it.
+ * data another run is using. Not every migration is additive, though: one that
+ * drops a table a running instance still queries takes that instance down, so
+ * a destructive migration deploys after the code that stopped using it, never
+ * with it.
  */
 export const migrationsFolder = fileURLToPath(
   new URL('./migrations', import.meta.url)

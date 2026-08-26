@@ -224,21 +224,6 @@ describe('profile routes', () => {
     })
   })
 
-  // The API keys are gone (Phase 7), and so are the intents their forms
-  // posted. A stale page still holding those forms gets the same answer as any
-  // other action the route does not have.
-  describe.each(['create-api-key', 'revoke-api-key'])('POST / — %s', intent => {
-    it('is no longer an action the profile page knows about', async () => {
-      const res = await app.request(
-        '/profile',
-        formBody({ intent, name: 'Laptop Key', keyId: 'key-1' })
-      )
-
-      expect(res.status).toBe(400)
-      expect(await res.text()).toContain('Invalid action')
-    })
-  })
-
   it('rejects an unknown intent', async () => {
     const res = await app.request('/profile', formBody({ intent: 'nonsense' }))
 

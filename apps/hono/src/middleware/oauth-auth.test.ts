@@ -73,11 +73,11 @@ describe('oauthAuth', () => {
     expect(mockVerifyAccessToken).not.toHaveBeenCalled()
   })
 
-  // X-API-Key belonged to the API keys, which are gone. Authorization: Bearer
-  // is the only credential form.
-  it('ignores an X-API-Key header entirely', async () => {
+  // `Authorization: Bearer` is the only credential form. A credential offered
+  // in any other header is not a credential.
+  it('ignores a non-bearer credential header entirely', async () => {
     const res = await app.request('/thing', {
-      headers: { 'X-API-Key': 'ps_something' },
+      headers: { 'X-Custom-Credential': 'something' },
     })
 
     expect(res.status).toBe(401)

@@ -13,9 +13,8 @@ import type { ProtectedResourceConfig } from '../lib/config.js'
  * happen there.
  *
  * There is deliberately no dispatch between credential types: an OAuth access
- * token in `Authorization: Bearer` is the only credential this server has
- * (Decision 10). `X-API-Key` belonged to the API keys Phase 7 removed and is
- * not read here at all.
+ * token in `Authorization: Bearer` is the only credential this server accepts
+ * (Decision 10). No other header carries one.
  */
 
 /** Who a verified OAuth access token turns out to be. */
