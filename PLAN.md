@@ -1407,9 +1407,14 @@ mocked `mcpTransport` by name, so it now stands on the service the tool calls in
 
 ## Phase 7: Remove the API key path
 
-> **Gated on 6g passing.** Nothing here starts until OAuth works end-to-end against both a real
-> MCP client and the Chrome extension. Until then `ps_` keys stay as the working fallback. That
-> is the whole reason Phase 6 builds alongside the key path instead of replacing it in place.
+> **Gated on 6g passing, which it did on 2026-08-26.** OAuth is proven end-to-end against real
+> MCP clients (Claude Code over CIMD + loopback; claude.ai and ChatGPT as connectors over the
+> fixed callback) and against `/api/v1` in `oauth-e2e.test.ts`. The gate used to name the Chrome
+> extension as well, which was a mistake: Phase 5 has not started and is itself blocked on OAuth,
+> so read literally the gate could never open. The extension is built on the OAuth path Phase 7
+> leaves behind, not tested before it. Until this phase lands, `ps_` keys stay in the tree as an
+> already-disconnected fallback. That is the whole reason Phase 6 built alongside the key path
+> instead of replacing it in place.
 
 Decision 12 (rewritten) makes OAuth the only auth path. This phase collects the removal into one
 reviewable diff instead of letting it leak through Phase 6.
@@ -1450,7 +1455,8 @@ reviewable diff instead of letting it leak through Phase 6.
 
 - [ ] `pnpm quality` green
 - [ ] A previously-issued `ps_` key is rejected everywhere
-- [ ] MCP and the Chrome extension both still work on OAuth alone
+- [ ] `/mcp` and `/api/v1` both still work on OAuth alone (`oauth-e2e.test.ts` and a real-client
+      check against Claude Code)
 
 ---
 
