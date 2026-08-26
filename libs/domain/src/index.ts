@@ -58,7 +58,10 @@ export type { OAuthClientRepository } from './interfaces/oauth-client-repository
 export type { OAuthAuthorizationCodeRepository } from './interfaces/oauth-authorization-code-repository.js'
 export type { OAuthTokenRepository } from './interfaces/oauth-token-repository.js'
 export type { EmailService } from './interfaces/email-service.js'
-export type { HttpFetcher } from './interfaces/http-fetcher.js'
+export type {
+  HttpFetcher,
+  HttpFetchOptions,
+} from './interfaces/http-fetcher.js'
 export type { HtmlParser, MetadataResult } from './interfaces/html-parser.js'
 
 // Errors

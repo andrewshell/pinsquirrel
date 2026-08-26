@@ -1,5 +1,5 @@
 import { lookup as dnsLookup } from 'node:dns'
-import type { HttpFetcher } from '@pinsquirrel/domain'
+import type { HttpFetcher, HttpFetchOptions } from '@pinsquirrel/domain'
 import {
   FetchTimeoutError,
   HttpError,
@@ -24,6 +24,7 @@ type FetchLike = (
     headers: Record<string, string>
     signal: AbortSignal
     dispatcher?: Agent
+    redirect?: 'follow' | 'error'
   }
 ) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>
 
@@ -120,7 +121,7 @@ export class NodeHttpFetcher implements HttpFetcher {
     })
   }
 
-  async fetch(url: string): Promise<string> {
+  async fetch(url: string, options: HttpFetchOptions = {}): Promise<string> {
     let response: Awaited<ReturnType<FetchLike>>
     try {
       response = await this.fetchFn(url, {
@@ -129,6 +130,9 @@ export class NodeHttpFetcher implements HttpFetcher {
         },
         signal: AbortSignal.timeout(this.timeout),
         dispatcher: this.dispatcher,
+        // Only when asked: undici's own default is to follow, and every
+        // existing caller wants that.
+        ...(options.redirect ? { redirect: options.redirect } : {}),
       })
     } catch (error) {
       // A hostname that resolves into a private range is the same refusal as
