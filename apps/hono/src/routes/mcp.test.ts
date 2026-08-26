@@ -156,7 +156,7 @@ describe('mcp route auth', () => {
     })
   })
 
-  // Decision 18: the two resources are separate audiences, and the path is
+  // Decision 16: the two resources are separate audiences, and the path is
   // what separates them.
   it('rejects a token minted for the REST resource', async () => {
     mockVerifyAccessToken.mockImplementation(

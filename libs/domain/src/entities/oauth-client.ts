@@ -2,7 +2,7 @@
  * How the client came to be registered.
  *
  * - `cimd`: the `client_id` is an HTTPS URL naming a metadata document this
- *   server fetched and validated. The preferred path (Decision 15).
+ *   server fetched and validated. The preferred path (Decision 13).
  * - `dcr`: the client posted its metadata to `/oauth/register` (RFC 7591).
  *   Anyone can do this, so these rows are the ones the sweep bounds.
  * - `static`: entered by an operator. Never swept.

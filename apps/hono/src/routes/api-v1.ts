@@ -28,7 +28,7 @@ const apiV1 = new OpenAPIHono()
 // --- OpenAPI route specs (for spec generation only) -------------------------
 
 // One credential form: an OAuth access token in `Authorization: Bearer`
-// (Decision 12).
+// (Decision 10).
 const security: Record<string, string[]>[] = [{ bearerAuth: [] }]
 
 apiV1.openAPIRegistry.registerPath({
@@ -170,7 +170,7 @@ apiV1.openAPIRegistry.registerPath({
 //
 // The REST API is an OAuth protected resource with its own identifier, and
 // the middleware is handed exactly that one: a token minted for `/mcp` has to
-// be refused here (Decision 18).
+// be refused here (Decision 16).
 // Ahead of the auth check, and on its own limiter so a flood at /mcp cannot
 // spend this budget. Both resources are authenticated, so what this bounds is
 // abuse rather than credential guessing.

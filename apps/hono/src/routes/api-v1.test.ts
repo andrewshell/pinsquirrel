@@ -122,7 +122,7 @@ describe('api-v1 routes', () => {
     })
 
     // The REST API is an OAuth protected resource too, with its own identifier
-    // (Decision 18). Point it at the /mcp document and the Chrome extension
+    // (Decision 16). Point it at the /mcp document and the Chrome extension
     // asks for the wrong audience, so every token it obtains is rejected.
     it('challenges with the REST resource metadata, not the MCP one', async () => {
       const res = await app.request('/api/v1/pins')
@@ -167,7 +167,7 @@ describe('api-v1 routes', () => {
       }
     )
 
-    // Decision 18 again, from the other side: the path is what separates the
+    // Decision 16 again, from the other side: the path is what separates the
     // two audiences, so an /mcp token must not drive the REST API.
     it('rejects a token minted for the MCP resource', async () => {
       mockVerifyAccessToken.mockImplementation(

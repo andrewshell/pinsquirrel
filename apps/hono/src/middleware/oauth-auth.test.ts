@@ -100,7 +100,7 @@ describe('oauthAuth', () => {
   })
 
   // Audience binding lives in the service; the middleware's job is to hand it
-  // the resource this route is (Decision 18), so neither route can inherit the
+  // the resource this route is (Decision 16), so neither route can inherit the
   // other's.
   it('verifies against the resource it was constructed with', async () => {
     mockVerifyAccessToken.mockResolvedValue(null)

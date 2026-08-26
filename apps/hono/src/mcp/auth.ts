@@ -19,7 +19,7 @@ declare module 'hono' {
  * the 401 - including the challenge, which clients need on every request
  * including tool calls, because they authenticate lazily - and this wrapper
  * translates the principal into the SDK's `AuthInfo`. The two types stay
- * distinct on purpose (Decision 12): `AuthInfo` is the SDK's shape, built
+ * distinct on purpose (Decision 10): `AuthInfo` is the SDK's shape, built
  * from ours.
  */
 export function mcpAuth(resource: ProtectedResourceConfig): MiddlewareHandler {

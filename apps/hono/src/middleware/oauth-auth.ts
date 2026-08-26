@@ -14,7 +14,7 @@ import type { ProtectedResourceConfig } from '../lib/config.js'
  *
  * There is deliberately no dispatch between credential types: an OAuth access
  * token in `Authorization: Bearer` is the only credential this server has
- * (Decision 12). `X-API-Key` belonged to the API keys Phase 7 removed and is
+ * (Decision 10). `X-API-Key` belonged to the API keys Phase 7 removed and is
  * not read here at all.
  */
 
@@ -70,7 +70,7 @@ function extractBearerToken(c: Context): string | Failure {
 /**
  * `resource` is the protected-resource identifier this route is. It is a
  * parameter rather than a module-level constant so neither `/mcp` nor
- * `/api/v1` can inherit the other's audience (Decision 18): the service checks
+ * `/api/v1` can inherit the other's audience (Decision 16): the service checks
  * the token against exactly this string, and the 401 advertises exactly this
  * resource's metadata document.
  */

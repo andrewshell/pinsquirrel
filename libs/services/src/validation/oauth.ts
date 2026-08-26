@@ -11,7 +11,7 @@ import { isLoopbackRedirectHost } from './oauth-uri.js'
  * agree on a second, camelCase spelling of the same request.
  *
  * The RFC 7591 client metadata comes from `@modelcontextprotocol/sdk`, which
- * publishes it framework-agnostically (Decision 14). Only the parts this
+ * publishes it framework-agnostically (Decision 12). Only the parts this
  * server needs to be stricter about are re-stated here.
  */
 
@@ -34,7 +34,7 @@ const pkceValue = z
  *
  * `resource` is required, which RFC 8707 leaves optional. This server has two
  * protected resources whose whole point is that a token for one is refused by
- * the other (Decision 17), so a request that names neither has no safe default
+ * the other (Decision 15), so a request that names neither has no safe default
  * to fall back on.
  */
 export const authorizationRequestSchema = z.object({
@@ -105,7 +105,7 @@ export type ClientRegistrationMetadata = z.infer<
 >
 
 /**
- * A Client ID Metadata Document (Decision 15): the same metadata, published by
+ * A Client ID Metadata Document (Decision 13): the same metadata, published by
  * the client at an HTTPS URL, plus the `client_id` that URL names.
  *
  * The `client_id` is required because comparing it against the URL the
@@ -149,7 +149,7 @@ function isUsableRedirectUri(uri: string): boolean {
  * fill in.
  *
  * `client_id` may not look like a URL. An http(s) identifier is resolved by
- * fetching it as a CIMD document (Decision 15), so a row registered under one
+ * fetching it as a CIMD document (Decision 13), so a row registered under one
  * would never be looked up in the table.
  */
 export const staticOAuthClientsSchema = z

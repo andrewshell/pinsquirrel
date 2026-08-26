@@ -7,7 +7,7 @@ import type { OAuthConfig, ProtectedResourceConfig } from '../lib/config.js'
  *
  * Every URL is derived from the configured base URL and never from the
  * request, so a spoofed `Host` header cannot change the identity the server
- * publishes (Decision 20). The routes are mounted before session and CSRF
+ * publishes (Decision 18). The routes are mounted before session and CSRF
  * middleware because a client has to read them while it is still anonymous.
  */
 
