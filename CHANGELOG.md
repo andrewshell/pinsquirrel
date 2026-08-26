@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.5.2](https://github.com/andrewshell/pinsquirrel/compare/v3.5.1...v3.5.2) (2026-08-26)
+
+
+### Bug Fixes
+
+* externalize every third-party dependency of the bundled workspace libs ([24a82ec](https://github.com/andrewshell/pinsquirrel/commit/24a82ecfaff39bebe309762c085218bc8041c32c))
+
 ## [3.5.1](https://github.com/andrewshell/pinsquirrel/compare/v3.5.0...v3.5.1) (2026-08-26)
 
 
