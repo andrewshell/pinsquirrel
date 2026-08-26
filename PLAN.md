@@ -17,7 +17,10 @@ is the only way to reach either one. OAuth has been driven end to end by real cl
 Code over CIMD and a loopback redirect, claude.ai as a custom connector over the fixed callback —
 and in process against the real app and a real database in `apps/hono/src/oauth-e2e.test.ts`.
 
-Nothing of the Chrome extension exists: there is no `apps/chrome-extension/`.
+The Chrome extension is scaffolded and no further. `apps/chrome-extension/` builds a loadable
+Manifest V3 extension — esbuild bundles the two entry points into `dist/` alongside the manifest,
+popup shell and placeholder icons — but `src/background.ts` and `src/popup.ts` are empty. There is
+no auth, no API client and no sync yet.
 
 ### Ground rules for new work
 
@@ -77,16 +80,20 @@ the `https://pinsquirrel.com/api/v1` resource.
 
 ### 5a. Scaffold
 
-- [ ] Create `apps/chrome-extension/package.json` (`@pinsquirrel/chrome-extension`)
-- [ ] Create `apps/chrome-extension/tsconfig.json`
-- [ ] Create `apps/chrome-extension/manifest.json` (Manifest V3)
+- [x] Create `apps/chrome-extension/package.json` (`@pinsquirrel/chrome-extension`)
+- [x] Create `apps/chrome-extension/tsconfig.json`
+- [x] Create `apps/chrome-extension/manifest.json` (Manifest V3)
   - Permissions: `bookmarks`, `storage`, `alarms`, `identity` (required for
     `launchWebAuthFlow`)
   - Service worker: `background.js`
   - Popup: `popup.html`
-- [ ] Create `apps/chrome-extension/popup.html`
-- [ ] Create build script (esbuild: bundle background.ts + popup.ts)
-- [ ] Add icon placeholders
+  - Host permissions: `https://pinsquirrel.com/*` and `http://localhost:8100/*`
+- [x] Create `apps/chrome-extension/popup.html`
+- [x] Create build script (esbuild: bundle background.ts + popup.ts)
+  - `scripts/build.ts`, run by Node's type stripping. The list of files copied verbatim into
+    `dist/` is derived from the manifest by `scripts/manifest-assets.ts`, so an icon named in
+    `manifest.json` ships without the build script being edited
+- [x] Add icon placeholders
 
 ### 5b. OAuth client
 
