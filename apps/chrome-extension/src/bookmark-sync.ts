@@ -148,3 +148,34 @@ export async function syncTagFolder(
     }
   }
 }
+
+/**
+ * Drop the tag folders under the PinSquirrel root that no longer belong.
+ *
+ * That is a folder named after a tag the user has deselected or deleted, and
+ * a second folder carrying a name that is still active - `findOrCreateFolder`
+ * only ever uses the first, so any others are stale copies that would never be
+ * updated again.
+ *
+ * Only folders. The root is a place in the user's own bookmark bar, so a
+ * bookmark they filed beside the tag folders is left where it is; inside a tag
+ * folder the rule is the opposite, because that folder's whole contents are
+ * the extension's to keep in step.
+ */
+export async function removeOrphanFolders(
+  parentFolderId: string,
+  activeTagNames: string[]
+): Promise<void> {
+  const wanted = new Set(activeTagNames)
+  const children = await chrome.bookmarks.getChildren(parentFolderId)
+
+  const seen = new Set<string>()
+  for (const child of children) {
+    if (child.url !== undefined) continue
+    if (wanted.has(child.title) && !seen.has(child.title)) {
+      seen.add(child.title)
+      continue
+    }
+    await chrome.bookmarks.removeTree(child.id)
+  }
+}
