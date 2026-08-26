@@ -1033,7 +1033,7 @@ API key' }`.
 > the freshness question is worth. The cached row is the same row the client is looked up in, so
 > the TTL costs one fetch a day per client.
 
-- [ ] CIMD resolution: when `client_id` is an HTTPS URL, fetch it, validate the document's
+- [x] CIMD resolution: when `client_id` is an HTTPS URL, fetch it, validate the document's
       `client_id` matches the URL exactly, validate `redirect_uris`, cache respecting HTTP cache
       headers
   - SSRF guard required. This is a server-side fetch of a caller-supplied URL, and most of the
@@ -1059,7 +1059,7 @@ API key' }`.
     rebinding and redirect tests in `node-http-fetcher.test.ts`; do not duplicate them. Cover
     `http` scheme rejected, missing path rejected, oversized response, `client_id` mismatch
     between URL and document, invalid `redirect_uris`
-- [ ] Redirect URI matching, the bug-prone part. Two shapes (the matcher and its unit tests
+- [x] Redirect URI matching, the bug-prone part. Two shapes (the matcher and its unit tests
       landed in 6c; what is left here is the end-to-end run against the real clients):
   - Hosted Claude (web, Desktop, mobile, Cowork): exact match on
     `https://claude.ai/api/mcp/auth_callback`
@@ -1269,16 +1269,18 @@ before anything is removed. After Phase 7 there is no fallback credential to deb
     `invalid_client` as the one 401, `unsupported_grant_type`), `routes/oauth-register.test.ts`
     (`invalid_client_metadata`) and `routes/oauth.test.tsx` (`access_denied` on the redirect).
 
-- [ ] End-to-end against Claude Code (`claude mcp add --transport http pinsquirrel <url>`), which
+- [x] End-to-end against Claude Code (`claude mcp add --transport http pinsquirrel <url>`), which
       exercises the CIMD + loopback path
 
-  Not run. It needs a browser and a person; the runbook is below. `/mcp` is stateless as of
-  2026-08-25 (see the transport note), so this and the next item can now both pass on one
-  deployment.
+  Passed 2026-08-26 against the local dev server: Claude connected through the consent screen
+  and listed pins. The runbook is below for the next time.
 
-- [ ] End-to-end against claude.ai as a custom connector, which exercises the fixed-callback path
+- [x] End-to-end against claude.ai as a custom connector, which exercises the fixed-callback path
 
-  Not run. Runbook below.
+  Passed 2026-08-26. Both Claude and ChatGPT were connected to the same local server at once
+  (the per-request transport fix made that possible). Revoking Claude's grant from the profile
+  page left ChatGPT working and made Claude ask to re-authenticate, which is exactly the
+  per-client revocation 6f was for. Runbook below.
 
 - [x] Verify a token issued for a different `resource` is rejected at `/mcp`
 - [x] Verify an `/mcp` token is rejected at `/api/v1`, and an `/api/v1` token at `/mcp`
