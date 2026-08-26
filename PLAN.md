@@ -17,13 +17,14 @@ is the only way to reach either one. OAuth has been driven end to end by real cl
 Code over CIMD and a loopback redirect, claude.ai as a custom connector over the fixed callback —
 and in process against the real app and a real database in `apps/hono/src/oauth-e2e.test.ts`.
 
-The Chrome extension has a scaffold, an OAuth client and an API client. `apps/chrome-extension/`
-builds a loadable Manifest V3 extension — esbuild bundles the two entry points into `dist/`
-alongside the manifest, popup shell and placeholder icons — `src/auth.ts` can connect, refresh and
-disconnect against a real server, over `src/storage.ts` and `src/oauth-metadata.ts`, and
-`src/api-client.ts` reads tags and a tag's pins over that connection. What is left is the two
-things that use them: `src/popup.ts` and `src/background.ts` are still empty, and there is no
-bookmark sync.
+The Chrome extension has a scaffold, an OAuth client, an API client and a popup.
+`apps/chrome-extension/` builds a loadable Manifest V3 extension — esbuild bundles the two entry
+points into `dist/` alongside the manifest, popup and placeholder icons — `src/auth.ts` can
+connect, refresh and disconnect against a real server, over `src/storage.ts` and
+`src/oauth-metadata.ts`, `src/api-client.ts` reads tags and a tag's pins over that connection, and
+`src/popup.ts` connects, lists tags, records the selection and asks for a sync. What is left is
+what actually moves bookmarks: `src/background.ts` is still empty, so "Sync Now" reports that
+nothing answered, and there is no bookmark sync behind it.
 
 ### Ground rules for new work
 
@@ -170,16 +171,47 @@ the `https://pinsquirrel.com/api/v1` resource.
 
 ### 5d. Popup UI
 
-- [ ] Create `apps/chrome-extension/src/popup.ts`
-  - Settings view (unconfigured): URL input and a "Connect" button that launches the OAuth flow
-  - Main view (configured): tag checkboxes, "Sync Now" button, last sync time, status,
-    "Disconnect". Disconnect revokes the token server-side through `POST /oauth/revoke`, then
-    clears local storage
+- [x] Create `apps/chrome-extension/src/popup.ts`
+  - It is the entry point and nothing else. The wiring is `initPopup(deps)` in
+    `src/popup/init.ts`, which takes the four things a test cannot run — `connect`, `disconnect`,
+    a `PinSquirrelApiClient` factory, and `requestSync` — as arguments, so the popup is driven in
+    happy-dom with none of them and no module mocking. Storage is not among them: it is already
+    behind `chrome.storage.local`, which the tests stub at the `chrome` global. The pure pieces
+    sit beside it — `src/popup/format.ts` (the base URL, the last-sync wording) and
+    `src/popup/render.ts` (the tag checkboxes)
+  - Settings view (unconfigured): URL input defaulted to `https://pinsquirrel.com`, and a
+    "Connect" button that launches the OAuth flow. Only an origin is accepted — both well-known
+    documents are read from the root of the base URL, so `https://host/app` would send discovery
+    where the server does not publish, and saying so in the input beats a 404 halfway through
+    consent
+  - Main view (configured): a checkbox per tag with its pin count, "Sync Now", how long ago the
+    last sync ran, the last sync error if there is one, and "Disconnect". Disconnect revokes the
+    token server-side through `POST /oauth/revoke`, then clears local storage
   - Stores config in `chrome.storage.local` through `src/storage.ts`. 5b already writes
     `baseUrl`, `clientId`, `accessToken`, `refreshToken`, `expiresAt` and `registeredClients`;
-    what is left for the popup is `selectedTagIds`, `lastSyncAt` and `lastSyncError`
+    the popup writes `selectedTagIds` — the moment a box moves, because the popup closes as soon
+    as it loses focus and there is nowhere to put a Save button — and reads `lastSyncAt` and
+    `lastSyncError`, which 5e and 5f write. It re-reads those two after every sync rather than
+    tracking them, since the worker also syncs while the popup is shut
   - Connect calls `connect(baseUrl)`, Disconnect calls `disconnect()`, and a
-    `ReauthorizationRequiredError` out of any call is what puts the popup back on Connect
+    `ReauthorizationRequiredError` out of any call is what puts the popup back on Connect — with
+    the server prefilled and a notice saying why
+- [x] Define the message contract, which 5d's list did not name: "Sync Now" cannot do the sync
+      itself, because the popup is closed for most of one. `src/messages.ts` holds
+      `SyncRequest`, `SyncResponse` and the guards, imported by both halves, and `requestSync()`
+      wraps `chrome.runtime.sendMessage`. A failure travels as `{ ok: false, error }` rather than
+      a rejection: an exception thrown inside a message handler does not cross the channel. A
+      worker that is not installed yet rejects the send and one that returns without answering
+      resolves it with `undefined` — both come back as that same failure, because the popup has
+      the same job either way
+- [x] Views as markup, not strings
+  - `popup.html` carries both sections and every id the popup looks up, and the wiring tests
+    parse that file rather than a fixture — the code finds its elements by id, and a fixture
+    would let the two drift with no test noticing. Tag names are written with `textContent`, node
+    by node, because a tag is user data and this is the page holding the tokens
+  - Styling is an inline `<style>` in `popup.html`. The MV3 CSP forbids inline _scripts_, not
+    inline styles, and no manifest field names a stylesheet, so a `popup.css` would mean teaching
+    the build about an asset nothing points at
 
 ### 5e. Bookmark sync
 
@@ -191,14 +223,18 @@ the `https://pinsquirrel.com/api/v1` resource.
     1. Find/create "PinSquirrel" root folder in bookmark bar
     2. For each selected tag: find/create subfolder, fetch all pins, sync bookmarks
     3. Remove orphan subfolders
-    4. Store lastSyncAt
+    4. Store `lastSyncAt`, and clear or set `lastSyncError` — the popup renders both straight
+       from storage, so a run that fails silently reads as a run that succeeded
 
 ### 5f. Background service worker
 
 - [ ] Create `apps/chrome-extension/src/background.ts`
   - `chrome.runtime.onStartup` → trigger sync
   - `chrome.runtime.onInstalled` → set up alarm for periodic sync (optional)
-  - Listen for messages from popup (manual sync trigger)
+  - `chrome.runtime.onMessage` → answer the popup's manual sync. The contract is 5d's
+    `src/messages.ts`: `isSyncRequest()` to recognise it, a `SyncResponse` to answer with, and
+    the listener must return `true` so the channel stays open for the async answer. A sync
+    already running should be joined rather than started twice
   - Sync logic calls into `bookmark-sync.ts`
 
 ### 5g. Testing
