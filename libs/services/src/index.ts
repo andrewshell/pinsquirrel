@@ -64,12 +64,14 @@ export {
   clientIdMetadataDocumentSchema,
   clientRegistrationSchema,
   refreshTokenGrantSchema,
+  staticOAuthClientsSchema,
   tokenRequestSchema,
   type AuthorizationRequestParams,
   type AuthorizationCodeGrantParams,
   type ClientIdMetadataDocument,
   type ClientRegistrationMetadata,
   type RefreshTokenGrantParams,
+  type StaticOAuthClientMetadata,
   type TokenRequestParams,
 } from './validation/oauth.js'
 

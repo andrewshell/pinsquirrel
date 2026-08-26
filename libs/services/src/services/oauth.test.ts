@@ -1245,3 +1245,92 @@ describe('OAuthService.revokeToken', () => {
     expect(ctx.tokenRepository.revoke).not.toHaveBeenCalled()
   })
 })
+
+describe('OAuthService.reconcileStaticClients', () => {
+  let ctx: ReturnType<typeof setup>
+
+  const acme = {
+    clientId: 'acme-connector',
+    clientName: 'Acme Connector',
+    redirectUris: ['https://acme.example.com/callback'],
+  }
+
+  beforeEach(() => {
+    ctx = setup()
+  })
+
+  it('registers a pre-registered client the table has never seen', async () => {
+    await ctx.service.reconcileStaticClients([acme])
+
+    expect(ctx.clientRepository.create).toHaveBeenCalledWith({
+      clientId: 'acme-connector',
+      clientName: 'Acme Connector',
+      redirectUris: ['https://acme.example.com/callback'],
+      grantTypes: ['authorization_code', 'refresh_token'],
+      tokenEndpointAuthMethod: 'none',
+      registrationType: 'static',
+      metadataUrl: null,
+      metadataFetchedAt: null,
+    })
+  })
+
+  it('follows the operator when the name or the redirect URIs change', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({
+        id: 'client-row-static',
+        clientId: 'acme-connector',
+        clientName: 'Acme',
+        redirectUris: ['https://acme.example.com/old'],
+        registrationType: 'static',
+        metadataUrl: null,
+        metadataFetchedAt: null,
+      })
+    )
+
+    await ctx.service.reconcileStaticClients([acme])
+
+    expect(ctx.clientRepository.update).toHaveBeenCalledWith(
+      'client-row-static',
+      {
+        clientName: 'Acme Connector',
+        redirectUris: ['https://acme.example.com/callback'],
+      }
+    )
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('writes nothing when the row already says what the config says', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({
+        id: 'client-row-static',
+        clientId: 'acme-connector',
+        clientName: 'Acme Connector',
+        redirectUris: ['https://acme.example.com/callback'],
+        registrationType: 'static',
+        metadataUrl: null,
+        metadataFetchedAt: null,
+      })
+    )
+
+    await ctx.service.reconcileStaticClients([acme])
+
+    expect(ctx.clientRepository.update).not.toHaveBeenCalled()
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  // Removing an entry from the config must not take the grants with it: a row
+  // deleted here would revoke every token issued to that client by cascade.
+  it('never deletes a client that has dropped out of the config', async () => {
+    await ctx.service.reconcileStaticClients([])
+
+    expect(ctx.clientRepository.delete).not.toHaveBeenCalled()
+  })
+
+  it('refuses a redirect URI this server would never redirect to', async () => {
+    await expect(
+      ctx.service.reconcileStaticClients([
+        { ...acme, redirectUris: ['http://acme.example.com/callback'] },
+      ])
+    ).rejects.toThrow(OAuthInvalidClientMetadataError)
+  })
+})

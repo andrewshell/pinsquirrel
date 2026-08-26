@@ -1067,8 +1067,30 @@ API key' }`.
   run against the dev database returned the derived `dcr_…` identifier. The per-IP quota that
   bounds it is still 6f.
 
-- [ ] Support pre-registered static credentials, so an org can paste its own `client_id` when
+- [x] Support pre-registered static credentials, so an org can paste its own `client_id` when
       adding PinSquirrel as a custom connector
+
+  Built as an `OAUTH_STATIC_CLIENTS` env holding a JSON array of
+  `{ client_id, client_name, redirect_uris }`, parsed by `resolveStaticOAuthClients` in
+  `apps/hono/src/lib/config.ts` against `staticOAuthClientsSchema` (`libs/services`), and
+  reconciled into `oauth_clients` with `registrationType: 'static'` by a new
+  `OAuthService.reconcileStaticClients`. Four things worth recording:
+
+  - A malformed value throws at module load, so the process refuses to boot. A connector that
+    silently failed to register looks like a broken client to whoever pasted the identifier.
+  - `client_id` may not be an http(s) URL. `resolveClient` reads that form as a CIMD document and
+    fetches it, so a row stored under such an identifier would never be looked up.
+  - Reconciliation is an upsert and never a delete. Deleting a client cascades to its codes and
+    tokens, so an operator fat-fingering an identifier would sign every user of that connector
+    out. A row whose name and redirect URIs already match is not written back either.
+  - It is called from `apps/hono/src/index.ts` next to `startExpirySweep`, not from
+    `lib/services.ts` module load, so a test importing a service does not reach the database. A
+    failure there is logged, not fatal: the config was already validated, so what is left is an
+    unreachable database, which is no reason to refuse to serve everything else.
+
+  `token_endpoint_auth_methods_supported` stays `["none"]`. Static clients are public clients
+  with PKCE; nothing issues or checks a secret. Documented in `apps/hono/.env.example` and the
+  DEPLOYMENT.md env table.
 
 ### 6f. Rate limiting and hardening
 

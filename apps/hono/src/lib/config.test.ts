@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { createOAuthConfig, resolveBaseUrl } from './config'
+import {
+  createOAuthConfig,
+  resolveBaseUrl,
+  resolveStaticOAuthClients,
+} from './config'
 
 describe('resolveBaseUrl', () => {
   it('uses BASE_URL when it is set', () => {
@@ -82,5 +86,102 @@ describe('createOAuthConfig', () => {
 
     expect(config.resources.mcp.scopes).toEqual(['pins:read', 'tags:read'])
     expect(config.resources.apiV1.scopes).toEqual(['pins:read', 'tags:read'])
+  })
+})
+
+describe('resolveStaticOAuthClients', () => {
+  it('is empty when the variable is unset or blank', () => {
+    expect(resolveStaticOAuthClients({})).toEqual([])
+    expect(resolveStaticOAuthClients({ OAUTH_STATIC_CLIENTS: '   ' })).toEqual(
+      []
+    )
+  })
+
+  it('reads the clients an operator pre-registered', () => {
+    const clients = resolveStaticOAuthClients({
+      OAUTH_STATIC_CLIENTS: JSON.stringify([
+        {
+          client_id: 'acme-connector',
+          client_name: 'Acme Connector',
+          redirect_uris: ['https://acme.example.com/callback'],
+        },
+      ]),
+    })
+
+    expect(clients).toEqual([
+      {
+        clientId: 'acme-connector',
+        clientName: 'Acme Connector',
+        redirectUris: ['https://acme.example.com/callback'],
+      },
+    ])
+  })
+
+  it('fails at boot on a value that is not JSON', () => {
+    expect(() =>
+      resolveStaticOAuthClients({ OAUTH_STATIC_CLIENTS: 'acme-connector' })
+    ).toThrow(/OAUTH_STATIC_CLIENTS/)
+  })
+
+  it('fails at boot on a JSON value that is not an array of clients', () => {
+    expect(() =>
+      resolveStaticOAuthClients({
+        OAUTH_STATIC_CLIENTS: JSON.stringify({ client_id: 'acme' }),
+      })
+    ).toThrow(/OAUTH_STATIC_CLIENTS/)
+  })
+
+  it('fails at boot on a client with no redirect URIs', () => {
+    expect(() =>
+      resolveStaticOAuthClients({
+        OAUTH_STATIC_CLIENTS: JSON.stringify([
+          { client_id: 'acme', client_name: 'Acme', redirect_uris: [] },
+        ]),
+      })
+    ).toThrow(/OAUTH_STATIC_CLIENTS/)
+  })
+
+  it('fails at boot on a redirect URI this server would never redirect to', () => {
+    // Same rule the registration path applies: https, or http on loopback.
+    expect(() =>
+      resolveStaticOAuthClients({
+        OAUTH_STATIC_CLIENTS: JSON.stringify([
+          {
+            client_id: 'acme',
+            client_name: 'Acme',
+            redirect_uris: ['http://acme.example.com/callback'],
+          },
+        ]),
+      })
+    ).toThrow(/OAUTH_STATIC_CLIENTS/)
+  })
+
+  it('fails at boot on a client_id that looks like a CIMD document URL', () => {
+    // An http(s) client_id is resolved by fetching it, so a static row under
+    // that identifier would never be looked up in the table.
+    expect(() =>
+      resolveStaticOAuthClients({
+        OAUTH_STATIC_CLIENTS: JSON.stringify([
+          {
+            client_id: 'https://acme.example.com/client',
+            client_name: 'Acme',
+            redirect_uris: ['https://acme.example.com/callback'],
+          },
+        ]),
+      })
+    ).toThrow(/OAUTH_STATIC_CLIENTS/)
+  })
+
+  it('fails at boot when two clients share a client_id', () => {
+    const entry = {
+      client_id: 'acme',
+      client_name: 'Acme',
+      redirect_uris: ['https://acme.example.com/callback'],
+    }
+    expect(() =>
+      resolveStaticOAuthClients({
+        OAUTH_STATIC_CLIENTS: JSON.stringify([entry, entry]),
+      })
+    ).toThrow(/OAUTH_STATIC_CLIENTS/)
   })
 })
