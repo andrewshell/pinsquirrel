@@ -59,6 +59,20 @@ export class OAuthProtocolError extends Error {
   }
 }
 
+/**
+ * The grant is gone and only the user can bring it back.
+ *
+ * Distinguishable from every other failure on purpose: a caller that catches
+ * this puts the popup back on its Connect button, where a network error or a
+ * 500 should leave the connection alone and be retried.
+ */
+export class ReauthorizationRequiredError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ReauthorizationRequiredError'
+  }
+}
+
 /** The authorization request, as a URL for `launchWebAuthFlow` to open. */
 export function buildAuthorizationUrl(input: {
   endpoints: OAuthEndpoints
@@ -352,4 +366,111 @@ export async function connect(baseUrl: string): Promise<void> {
   }
 
   await storage.set(tokens)
+}
+
+/**
+ * The keys that make up a connection, read together so a half-written state
+ * cannot look like a whole one.
+ */
+const TOKEN_KEYS = [
+  'baseUrl',
+  'clientId',
+  'accessToken',
+  'refreshToken',
+  'expiresAt',
+] as const
+
+/** The stored connection, or nothing if the extension is not connected. */
+async function storedTokens(): Promise<StoredTokens | null> {
+  const stored = await storage.getMany([...TOKEN_KEYS])
+  for (const key of TOKEN_KEYS) {
+    if (stored[key] === undefined) return null
+  }
+  return stored as StoredTokens
+}
+
+/**
+ * How close to expiry an access token is treated as already spent.
+ *
+ * A token that dies while a request is in flight comes back as a 401 the
+ * caller has to unwind, so it is cheaper to refresh a minute early than to
+ * discover the expiry mid-call.
+ */
+const EXPIRY_SKEW_MS = 60 * 1000
+
+function isSpent(tokens: StoredTokens): boolean {
+  return tokens.expiresAt - Date.now() <= EXPIRY_SKEW_MS
+}
+
+/**
+ * The one refresh allowed to be in flight.
+ *
+ * Rotation is mandatory server-side and a rotated token is a replay: two
+ * concurrent refreshes of the same token means one of them loses the race and
+ * the *whole grant* is revoked. The popup and the service worker can both want
+ * a token at once, so they share this promise rather than each posting.
+ */
+let refreshInFlight: Promise<StoredTokens> | null = null
+
+/**
+ * Spend the refresh token for a new pair, and store what comes back.
+ *
+ * The endpoints are rediscovered rather than cached across calls: a service
+ * worker is torn down between wakes, so a cache would rarely survive to be
+ * used, and a stale one would send a refresh to an endpoint the server has
+ * moved.
+ */
+async function refreshTokens(current: StoredTokens): Promise<StoredTokens> {
+  refreshInFlight ??= (async () => {
+    try {
+      const endpoints = await discoverEndpoints(current.baseUrl)
+      const body = await postTokenRequest(endpoints.tokenEndpoint, {
+        grant_type: 'refresh_token',
+        refresh_token: current.refreshToken,
+        client_id: current.clientId,
+        resource: endpoints.resource,
+      })
+
+      const next = tokensFrom(body, {
+        baseUrl: current.baseUrl,
+        clientId: current.clientId,
+        previousRefreshToken: current.refreshToken,
+      })
+      await storage.set(next)
+      return next
+    } catch (error) {
+      if (
+        error instanceof OAuthProtocolError &&
+        error.code === 'invalid_grant'
+      ) {
+        // Expired, revoked from the profile page, or replayed - the server
+        // took the whole family either way. Nothing here can recover it.
+        await storage.remove([...TOKEN_KEYS])
+        throw new ReauthorizationRequiredError(error.message)
+      }
+      throw error
+    } finally {
+      refreshInFlight = null
+    }
+  })()
+
+  return refreshInFlight
+}
+
+/**
+ * A bearer token good for the next call.
+ *
+ * Refreshes when the stored one is spent or nearly so; the caller never has to
+ * ask whether it is still valid.
+ */
+export async function getAccessToken(): Promise<string> {
+  const tokens = await storedTokens()
+  if (!tokens) {
+    throw new ReauthorizationRequiredError(
+      'The extension is not connected to a PinSquirrel server'
+    )
+  }
+  if (!isSpent(tokens)) return tokens.accessToken
+
+  return (await refreshTokens(tokens)).accessToken
 }

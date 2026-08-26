@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   buildAuthorizationUrl,
   connect,
+  getAccessToken,
   OAuthProtocolError,
+  ReauthorizationRequiredError,
   readAuthorizationRedirect,
 } from './auth.ts'
 import type { OAuthEndpoints } from './oauth-metadata.ts'
@@ -191,5 +193,93 @@ describe('connect', () => {
       clientId: REGISTERED_CLIENT_ID,
       registeredClients: { [SERVER_BASE_URL]: REGISTERED_CLIENT_ID },
     })
+  })
+})
+
+/** A connection already in storage, with the access token still good. */
+function connected(overrides: Record<string, unknown> = {}) {
+  return {
+    baseUrl: SERVER_BASE_URL,
+    clientId: REGISTERED_CLIENT_ID,
+    accessToken: 'pso_stored',
+    refreshToken: 'refresh-stored',
+    expiresAt: Date.now() + 60 * 60 * 1000,
+    ...overrides,
+  }
+}
+
+describe('getAccessToken', () => {
+  it('hands back the stored token without asking the server', async () => {
+    const server = stubOAuthServer(connected())
+
+    expect(await getAccessToken()).toBe('pso_stored')
+    expect(server.tokenRequests).toEqual([])
+  })
+
+  it('refreshes a token that is about to expire and stores the rotated pair', async () => {
+    // Inside the skew, so it is treated as spent even though it has not
+    // strictly expired: a call made with it could land after it dies.
+    const server = stubOAuthServer(
+      connected({ expiresAt: Date.now() + 10 * 1000 })
+    )
+    server.answerTokenWith(() =>
+      tokenResponse({ access_token: 'pso_fresh', refresh_token: 'refresh-2' })
+    )
+
+    expect(await getAccessToken()).toBe('pso_fresh')
+
+    expect(server.tokenRequests).toEqual([
+      {
+        grant_type: 'refresh_token',
+        refresh_token: 'refresh-stored',
+        client_id: REGISTERED_CLIENT_ID,
+        resource: RESOURCE,
+      },
+    ])
+    // Rotation is mandatory server-side: the response that returned this one
+    // killed the old one, so failing to store it breaks the next refresh.
+    expect(server.chrome.local.items).toMatchObject({
+      accessToken: 'pso_fresh',
+      refreshToken: 'refresh-2',
+    })
+    expect(server.chrome.local.items.expiresAt).toBeGreaterThan(Date.now())
+  })
+
+  it('asks for consent again when nothing is stored', async () => {
+    stubOAuthServer()
+
+    await expect(getAccessToken()).rejects.toBeInstanceOf(
+      ReauthorizationRequiredError
+    )
+  })
+
+  it('drops the dead grant and asks for consent again on invalid_grant', async () => {
+    const server = stubOAuthServer({
+      ...connected({ expiresAt: Date.now() - 1000 }),
+      selectedTagIds: ['tag-1'],
+    })
+    server.answerTokenWith(() => oauthErrorResponse('invalid_grant'))
+
+    await expect(getAccessToken()).rejects.toBeInstanceOf(
+      ReauthorizationRequiredError
+    )
+
+    expect(server.chrome.local.items.accessToken).toBeUndefined()
+    expect(server.chrome.local.items.refreshToken).toBeUndefined()
+    // The user's tag picks are not a credential, and they survive so a
+    // reconnect does not start from an empty list.
+    expect(server.chrome.local.items.selectedTagIds).toEqual(['tag-1'])
+  })
+
+  // Two refreshes of the same token means one loses the rotation race, and the
+  // server revokes the whole grant family for a replay.
+  it('posts one refresh when two callers want a token at once', async () => {
+    const server = stubOAuthServer(connected({ expiresAt: Date.now() - 1000 }))
+
+    const [one, other] = await Promise.all([getAccessToken(), getAccessToken()])
+
+    expect(server.tokenRequests).toHaveLength(1)
+    expect(one).toBe('pso_access')
+    expect(other).toBe('pso_access')
   })
 })
