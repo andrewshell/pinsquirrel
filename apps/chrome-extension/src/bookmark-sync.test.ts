@@ -2,11 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   findOrCreateFolder,
   removeOrphanFolders,
+  runSync,
   syncAll,
   syncTagFolder,
 } from './bookmark-sync.ts'
 import { ReauthorizationRequiredError } from './auth.ts'
 import { stubChrome } from './test/chrome-mock.ts'
+import { jsonResponse, stubFetch } from './test/fetch-mock.ts'
 import type { Pin, Tag } from './types.ts'
 
 afterEach(() => {
@@ -456,5 +458,78 @@ describe('syncAll, reporting to the popup through storage', () => {
     expect(local.items.lastSyncError).toBe(
       'PinSquirrel needs to be reconnected: The refresh token was revoked'
     )
+  })
+})
+
+describe('runSync', () => {
+  const BASE_URL = 'https://pinsquirrel.com'
+
+  /** A connection the service worker could pick up and use right now. */
+  const connected = {
+    baseUrl: BASE_URL,
+    clientId: 'client-1',
+    accessToken: 'pso_access',
+    refreshToken: 'pso_refresh',
+    expiresAt: Date.now() + 3_600_000,
+  }
+
+  it('syncs the tags storage names, over the connection storage holds', async () => {
+    const { bookmarks, local } = stubChrome({
+      ...connected,
+      selectedTagIds: ['tag-1'],
+    })
+    const article = pin({
+      url: 'https://example.com/article',
+      title: 'An article',
+    })
+    const server = stubFetch({
+      [`${BASE_URL}/api/v1/tags`]: jsonResponse([tag('tag-1', 'reading')]),
+      [`${BASE_URL}/api/v1/tags/tag-1/pins?page=1&pageSize=100`]: jsonResponse({
+        pins: [article],
+        pagination: {
+          totalCount: 1,
+          page: 1,
+          pageSize: 100,
+          offset: 0,
+          totalPages: 1,
+          hasNext: false,
+          hasPrevious: false,
+        },
+      }),
+    })
+
+    await runSync()
+
+    expect(server.mock.mock.calls[0]?.[1]).toMatchObject({
+      headers: expect.any(Headers),
+    })
+    const [root] = bookmarks.childrenOf(bookmarks.barId)
+    const [folder] = bookmarks.childrenOf(root.id)
+    expect(bookmarks.childrenOf(folder.id)).toEqual([
+      {
+        id: expect.any(String),
+        title: 'An article',
+        url: 'https://example.com/article',
+      },
+    ])
+    expect(local.items.lastSyncAt).toEqual(expect.any(Number))
+  })
+
+  it('syncs nothing when no tag is selected, rather than failing', async () => {
+    const { bookmarks, local } = stubChrome(connected)
+    stubFetch({ [`${BASE_URL}/api/v1/tags`]: jsonResponse([]) })
+
+    await runSync()
+
+    expect(bookmarks.childrenOf(bookmarks.barId)).toEqual([
+      { id: expect.any(String), title: 'PinSquirrel' },
+    ])
+    expect(local.items.lastSyncAt).toEqual(expect.any(Number))
+  })
+
+  it('asks for a connection rather than syncing when there is none', async () => {
+    stubChrome({ selectedTagIds: ['tag-1'] })
+
+    await expect(runSync()).rejects.toBeInstanceOf(ReauthorizationRequiredError)
   })
 })
