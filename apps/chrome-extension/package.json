@@ -1,7 +1,7 @@
 {
   "name": "@pinsquirrel/chrome-extension",
   "private": true,
-  "version": "1.0.0",
+  "version": "3.5.3",
   "description": "Chrome extension that syncs PinSquirrel bookmarks over the v1 REST API",
   "type": "module",
   "scripts": {
