@@ -1553,16 +1553,16 @@ _All paths below re-verified 2026-08-25, present and accurate on `main`._
 - `libs/services/src/validation/zod-error.ts`: `validationErrorFromZod`, the one Zod to `ValidationError` conversion
 - `libs/services/src/validation/url.ts`: `validateUrlForFetching`, the CIMD pre-check
 - `libs/adapters/src/node-http-fetcher.ts`: the SSRF-guarded fetcher behind the `HttpFetcher` interface `OAuthService` receives. `libs/services/src/services/metadata.ts` shows the injection
-- `apps/hono/src/middleware/bearer-auth.ts`: `authenticateBearer()`, the transport-only split to copy into `oauth-auth.ts`, not extend. Deleted in Phase 7
+- ~~`apps/hono/src/middleware/bearer-auth.ts`: `authenticateBearer()`, the transport-only split to copy into `oauth-auth.ts`, not extend~~ Deleted by Phase 7 on 2026-08-26; `oauth-auth.ts` is the split that is left
 - `apps/hono/src/mcp/auth.ts`: where the `401` gains its `WWW-Authenticate` header and where `AuthInfo.scopes` gets populated
 - `apps/hono/src/mcp/errors.ts`: `mapDomainErrorToMcp()`, for the 3b-7 write tools
 - `apps/hono/src/middleware/session.ts`: `requireAuth()`. `/oauth/authorize` is a browser page and reuses this
 - `apps/hono/src/middleware/rate-limit.ts` / `rate-limiter.ts`: `RateLimiter`, `rateLimitByIp()`, `getClientIp()`. Phase 6f adds limiters here
 - `apps/hono/src/middleware/security-headers.ts`: the CSP the consent page and grants card must satisfy. `static/on-ready.js` is how page behaviour is attached
-- `apps/hono/src/views/pages/profile/ApiKeysCard.tsx`: the card pattern `OAuthGrantsCard.tsx` copies
+- ~~`apps/hono/src/views/pages/profile/ApiKeysCard.tsx`: the card pattern `OAuthGrantsCard.tsx` copies~~ Deleted by Phase 7c on 2026-08-26; `OAuthGrantsCard.tsx` carries the pattern now
 - `apps/hono/src/app.tsx`: the `app.route('/mcp', mcpRoutes)` line marks the pre-session/pre-CSRF mount point that `.well-known`, `/oauth/token`, and `/oauth/register` need
 - `apps/hono/src/routes/seo.ts`: `getOrigin(c.req.url)`, the request-derived origin that is fine for a sitemap and must not be used for the issuer
-- `libs/database/src/schema/api-keys.ts`: closest existing pattern for the hashed-secret OAuth tables
+- ~~`libs/database/src/schema/api-keys.ts`: closest existing pattern for the hashed-secret OAuth tables~~ Deleted by Phase 7 on 2026-08-26, along with the table; `schema/oauth-tokens.ts` is the pattern now
 
 ## Reference
 
