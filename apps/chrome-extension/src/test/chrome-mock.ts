@@ -12,6 +12,13 @@ import { vi } from 'vitest'
  * `vi.unstubAllGlobals()` in an `afterEach` is what undoes it.
  */
 
+/** `chrome.identity.launchWebAuthFlow`, in its promise form. */
+export type LaunchWebAuthFlowMock = ReturnType<
+  typeof vi.fn<
+    (details: chrome.identity.WebAuthFlowDetails) => Promise<string | undefined>
+  >
+>
+
 /** An in-memory `chrome.storage` area, and the record a test can read. */
 export interface StubbedStorageArea {
   /** What the area holds right now, readable and writable from a test. */
@@ -22,8 +29,8 @@ export interface ChromeStub {
   local: StubbedStorageArea
   sync: StubbedStorageArea
   /** Resolves to the redirect URL Chrome would land on. Set per flow. */
-  launchWebAuthFlow: ReturnType<typeof vi.fn>
-  getRedirectURL: ReturnType<typeof vi.fn>
+  launchWebAuthFlow: LaunchWebAuthFlowMock
+  getRedirectURL: ReturnType<typeof vi.fn<() => string>>
 }
 
 /** The callback-free half of `chrome.storage.StorageArea`, backed by an object. */
@@ -70,8 +77,13 @@ export function stubChrome(
   const stub: ChromeStub = {
     local: { items: { ...initialLocal } },
     sync: { items: {} },
-    launchWebAuthFlow: vi.fn(),
-    getRedirectURL: vi.fn(() => STUB_REDIRECT_URL),
+    launchWebAuthFlow:
+      vi.fn<
+        (
+          details: chrome.identity.WebAuthFlowDetails
+        ) => Promise<string | undefined>
+      >(),
+    getRedirectURL: vi.fn<() => string>(() => STUB_REDIRECT_URL),
   }
 
   vi.stubGlobal('chrome', {

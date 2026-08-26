@@ -1,10 +1,25 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   buildAuthorizationUrl,
+  connect,
   OAuthProtocolError,
   readAuthorizationRedirect,
 } from './auth.ts'
 import type { OAuthEndpoints } from './oauth-metadata.ts'
+import { pkceChallengeFor } from './pkce.ts'
+import { STUB_REDIRECT_URL } from './test/chrome-mock.ts'
+import {
+  BASE_URL as SERVER_BASE_URL,
+  oauthErrorResponse,
+  REGISTERED_CLIENT_ID,
+  RESOURCE,
+  stubOAuthServer,
+  tokenResponse,
+} from './test/oauth-server.ts'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 const BASE_URL = 'https://pinsquirrel.com'
 
@@ -91,5 +106,90 @@ describe('readAuthorizationRedirect', () => {
         { state: 'state-123', issuer: BASE_URL }
       )
     ).toThrow(/issuer/i)
+  })
+})
+
+describe('connect', () => {
+  it('registers, gets consent, and stores the tokens the exchange returned', async () => {
+    const server = stubOAuthServer()
+
+    await connect(SERVER_BASE_URL)
+
+    // Registered as a public client at the callback Chrome minted for it.
+    expect(server.registrations).toEqual([
+      {
+        client_name: 'PinSquirrel Chrome Extension',
+        redirect_uris: [STUB_REDIRECT_URL],
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none',
+      },
+    ])
+
+    expect(server.chrome.launchWebAuthFlow).toHaveBeenCalledWith(
+      expect.objectContaining({ interactive: true })
+    )
+
+    expect(server.tokenRequests).toEqual([
+      {
+        grant_type: 'authorization_code',
+        code: 'code-1',
+        redirect_uri: STUB_REDIRECT_URL,
+        client_id: REGISTERED_CLIENT_ID,
+        code_verifier: expect.any(String) as string,
+        resource: RESOURCE,
+      },
+    ])
+
+    expect(server.chrome.local.items).toMatchObject({
+      baseUrl: SERVER_BASE_URL,
+      clientId: REGISTERED_CLIENT_ID,
+      accessToken: 'pso_access',
+      refreshToken: 'refresh-1',
+      expiresAt: expect.any(Number) as number,
+    })
+  })
+
+  it('proves it started the flow: the verifier it sends hashes to the challenge it sent', async () => {
+    const server = stubOAuthServer()
+
+    await connect(SERVER_BASE_URL)
+
+    const challenge =
+      server.authorizations[0].searchParams.get('code_challenge')
+    const verifier = server.tokenRequests[0].code_verifier
+
+    expect(challenge).toBe(await pkceChallengeFor(verifier))
+  })
+
+  it('reuses a cached registration rather than registering again', async () => {
+    const server = stubOAuthServer({
+      registeredClients: { [SERVER_BASE_URL]: 'dcr_cached' },
+    })
+
+    await connect(SERVER_BASE_URL)
+
+    expect(server.registrations).toEqual([])
+    expect(server.tokenRequests[0].client_id).toBe('dcr_cached')
+  })
+
+  it('re-registers and starts over when the server has forgotten the cached client', async () => {
+    const server = stubOAuthServer({
+      registeredClients: { [SERVER_BASE_URL]: 'dcr_stale' },
+    })
+    server.answerTokenWith(form =>
+      form.client_id === 'dcr_stale'
+        ? oauthErrorResponse('invalid_client', 401)
+        : tokenResponse()
+    )
+
+    await connect(SERVER_BASE_URL)
+
+    expect(server.registrations).toHaveLength(1)
+    expect(server.authorizations).toHaveLength(2)
+    expect(server.chrome.local.items).toMatchObject({
+      clientId: REGISTERED_CLIENT_ID,
+      registeredClients: { [SERVER_BASE_URL]: REGISTERED_CLIENT_ID },
+    })
   })
 })

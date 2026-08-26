@@ -1,4 +1,7 @@
-import type { OAuthEndpoints } from './oauth-metadata.ts'
+import { discoverEndpoints, type OAuthEndpoints } from './oauth-metadata.ts'
+import { createPkcePair, randomUrlSafeToken } from './pkce.ts'
+import * as storage from './storage.ts'
+import type { StoredTokens } from './types.ts'
 
 /**
  * The extension's OAuth 2.1 client.
@@ -6,7 +9,25 @@ import type { OAuthEndpoints } from './oauth-metadata.ts'
  * Authorization code with PKCE against a fixed HTTPS callback Chrome mints for
  * the extension (Decision 17), so there is no secret here and no loopback port
  * to match.
+ *
+ * ## Why dynamic registration rather than CIMD
+ *
+ * CIMD is this server's preferred path (Decision 13) and it is not available
+ * to an extension. A CIMD `client_id` is an HTTPS URL the *client* publishes a
+ * metadata document at, which the server fetches; an extension is a bundle of
+ * files inside a browser profile with no origin it can serve from, and
+ * `chrome-extension://` is not fetchable from a server. Hosting the document
+ * on pinsquirrel.com instead would make the authorization server vouch for its
+ * own client, which is the check CIMD exists to perform.
+ *
+ * So the extension registers dynamically (RFC 7591). The cost CIMD avoids - a
+ * row per connection - does not apply here, because `registerClient` derives
+ * the identifier from the metadata: this extension's name and callback are
+ * fixed, so every install of it deduplicates to the same row.
  */
+
+/** The name the consent screen shows the user. */
+const CLIENT_NAME = 'PinSquirrel Chrome Extension' as const
 
 /**
  * What the extension asks for.
@@ -102,4 +123,233 @@ export function readAuthorizationRedirect(
     throw new Error('The authorization redirect carried no code')
   }
   return code
+}
+
+/** `https://host/` and `https://host` name the same server; keep one spelling. */
+function normalizeBaseUrl(baseUrl: string): string {
+  const trimmed = baseUrl.trim()
+  return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed
+}
+
+/** What the token endpoint answers with (RFC 6749 5.1). */
+interface TokenResponseBody {
+  access_token: string
+  token_type: string
+  expires_in: number
+  refresh_token?: string
+  scope: string
+}
+
+/** The RFC 6749 5.2 error body, which both machine endpoints answer with. */
+function protocolErrorFrom(body: unknown, status: number): OAuthProtocolError {
+  const fields = (body ?? {}) as Record<string, unknown>
+  const code = typeof fields.error === 'string' ? fields.error : 'server_error'
+  const description =
+    typeof fields.error_description === 'string'
+      ? fields.error_description
+      : `The server answered ${status}`
+  return new OAuthProtocolError(code, description)
+}
+
+async function readJson(response: Response): Promise<unknown> {
+  try {
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Post to the token endpoint.
+ *
+ * `application/x-www-form-urlencoded` is the only body form it accepts; the
+ * registration endpoint is the JSON one.
+ */
+async function postTokenRequest(
+  endpoint: string,
+  params: Record<string, string>
+): Promise<TokenResponseBody> {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(params).toString(),
+  })
+
+  const body = await readJson(response)
+  if (!response.ok) throw protocolErrorFrom(body, response.status)
+  return body as TokenResponseBody
+}
+
+/** The token response as the extension stores it, with expiry made absolute. */
+function tokensFrom(
+  body: TokenResponseBody,
+  context: { baseUrl: string; clientId: string; previousRefreshToken?: string }
+): StoredTokens {
+  const refreshToken = body.refresh_token ?? context.previousRefreshToken
+  if (!refreshToken) {
+    // Without one the service worker cannot refresh unattended, which is the
+    // whole reason `offline_access` is requested. Failing here beats
+    // discovering it an hour later with no way to recover but a consent screen.
+    throw new Error('The token response carried no refresh token')
+  }
+
+  return {
+    baseUrl: context.baseUrl,
+    clientId: context.clientId,
+    accessToken: body.access_token,
+    refreshToken,
+    expiresAt: Date.now() + body.expires_in * 1000,
+  }
+}
+
+/**
+ * Register this extension as a public client (RFC 7591).
+ *
+ * The identifier the server returns is derived from this metadata rather than
+ * generated, so posting the same body twice returns the same client instead of
+ * creating a second one.
+ */
+async function registerClient(
+  endpoints: OAuthEndpoints,
+  redirectUri: string
+): Promise<string> {
+  const response = await fetch(endpoints.registrationEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_name: CLIENT_NAME,
+      redirect_uris: [redirectUri],
+      grant_types: ['authorization_code', 'refresh_token'],
+      response_types: ['code'],
+      // This server registers public clients only and advertises no other
+      // method. An extension has nowhere to keep a secret anyway.
+      token_endpoint_auth_method: 'none',
+    }),
+  })
+
+  const body = await readJson(response)
+  if (!response.ok) throw protocolErrorFrom(body, response.status)
+
+  const clientId = (body as { client_id?: unknown }).client_id
+  if (typeof clientId !== 'string' || clientId.length === 0) {
+    throw new Error('The registration response carried no client_id')
+  }
+  return clientId
+}
+
+/**
+ * The `client_id` for this server, registering one if there is none cached.
+ *
+ * The cache is keyed by base URL so a user who connects to a self-hosted
+ * PinSquirrel and to pinsquirrel.com does not overwrite one registration with
+ * the other.
+ */
+async function resolveClientId(
+  baseUrl: string,
+  endpoints: OAuthEndpoints,
+  redirectUri: string
+): Promise<string> {
+  const cached = (await storage.get('registeredClients')) ?? {}
+  if (cached[baseUrl]) return cached[baseUrl]
+
+  const clientId = await registerClient(endpoints, redirectUri)
+  await storage.set({ registeredClients: { ...cached, [baseUrl]: clientId } })
+  return clientId
+}
+
+/** Forget a cached registration the server no longer recognises. */
+async function forgetClientId(baseUrl: string): Promise<void> {
+  const cached = { ...((await storage.get('registeredClients')) ?? {}) }
+  delete cached[baseUrl]
+  await storage.set({ registeredClients: cached })
+}
+
+/**
+ * One consent round trip: open the flow, come back with a code, spend it.
+ *
+ * Every value that binds the two halves together - the verifier, the state,
+ * the redirect URI - is created here and never leaves the call, so two
+ * concurrent connects cannot pick up each other's.
+ */
+async function authorizeAndExchange(input: {
+  baseUrl: string
+  endpoints: OAuthEndpoints
+  clientId: string
+  redirectUri: string
+}): Promise<StoredTokens> {
+  const { verifier, challenge } = await createPkcePair()
+  const state = randomUrlSafeToken()
+
+  const redirect = await chrome.identity.launchWebAuthFlow({
+    url: buildAuthorizationUrl({
+      endpoints: input.endpoints,
+      clientId: input.clientId,
+      redirectUri: input.redirectUri,
+      challenge,
+      state,
+    }),
+    // The user has to see the consent screen and sign in if they are not
+    // already, so there is no non-interactive form of this.
+    interactive: true,
+  })
+
+  if (!redirect) {
+    throw new Error('The authorization window closed without a redirect')
+  }
+
+  const code = readAuthorizationRedirect(redirect, {
+    state,
+    issuer: input.endpoints.issuer,
+  })
+
+  const body = await postTokenRequest(input.endpoints.tokenEndpoint, {
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: input.redirectUri,
+    client_id: input.clientId,
+    code_verifier: verifier,
+    resource: input.endpoints.resource,
+  })
+
+  return tokensFrom(body, {
+    baseUrl: input.baseUrl,
+    clientId: input.clientId,
+  })
+}
+
+/**
+ * Connect the extension to a PinSquirrel server: discover, register, get the
+ * user's consent, and store what comes back.
+ *
+ * A cached registration the server has since forgotten answers the exchange
+ * with `invalid_client`. That is recoverable, but only by starting over - the
+ * code was spent on the way in - so the cache is dropped and the whole flow
+ * runs once more against a fresh registration.
+ */
+export async function connect(baseUrl: string): Promise<void> {
+  const origin = normalizeBaseUrl(baseUrl)
+  const endpoints = await discoverEndpoints(origin)
+  const redirectUri = chrome.identity.getRedirectURL()
+
+  const attempt = async (clientId: string) =>
+    authorizeAndExchange({ baseUrl: origin, endpoints, clientId, redirectUri })
+
+  let tokens: StoredTokens
+  try {
+    tokens = await attempt(
+      await resolveClientId(origin, endpoints, redirectUri)
+    )
+  } catch (error) {
+    if (!(
+      error instanceof OAuthProtocolError && error.code === 'invalid_client'
+    )) {
+      throw error
+    }
+    await forgetClientId(origin)
+    tokens = await attempt(
+      await resolveClientId(origin, endpoints, redirectUri)
+    )
+  }
+
+  await storage.set(tokens)
 }
