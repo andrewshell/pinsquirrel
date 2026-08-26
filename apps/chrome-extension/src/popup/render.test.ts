@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { TagWithCount } from '../types.ts'
-import { renderTagList, selectedTagIdsIn } from './render.ts'
+import { asCheckbox, renderTagList } from './render.ts'
 
 function tag(id: string, name: string, pinCount: number): TagWithCount {
   return {
@@ -73,21 +73,20 @@ describe('renderTagList', () => {
   })
 })
 
-describe('selectedTagIdsIn', () => {
-  it('reads back the ids whose boxes are ticked, in the rendered order', () => {
-    renderTagList(
-      container,
-      [tag('t1', 'reading', 12), tag('t2', 'rust', 3), tag('t3', 'ai', 7)],
-      ['t1', 't3']
-    )
+describe('asCheckbox', () => {
+  it('answers with the box a change event came from', () => {
+    renderTagList(container, [tag('t1', 'reading', 12)], [])
+    const box = checkboxes()[0]
 
-    expect(selectedTagIdsIn(container)).toEqual(['t1', 't3'])
+    expect(asCheckbox(box)).toBe(box)
+    expect(asCheckbox(box)?.value).toBe('t1')
   })
 
-  it('follows a box the user just unticked', () => {
-    renderTagList(container, [tag('t1', 'reading', 12)], ['t1'])
-    checkboxes()[0].checked = false
+  it('answers null for anything in the list that is not a box', () => {
+    renderTagList(container, [tag('t1', 'reading', 12)], [])
 
-    expect(selectedTagIdsIn(container)).toEqual([])
+    expect(asCheckbox(container.querySelector('.tag-name'))).toBeNull()
+    expect(asCheckbox(container)).toBeNull()
+    expect(asCheckbox(null)).toBeNull()
   })
 })

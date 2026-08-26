@@ -243,6 +243,44 @@ describe('initPopup, with a connection stored', () => {
     expect(chrome.local.items.selectedTagIds).toEqual([])
   })
 
+  /**
+   * The selection lives in storage, not in the rows on screen. Reading it back
+   * off the boxes would drop every tag the filter had hidden - which, with a
+   * filter narrow enough to be useful, is nearly all of them.
+   */
+  it('keeps a selected tag the filter is hiding', async () => {
+    await initPopup(harness().deps)
+
+    // 't2' is selected and now hidden; the user ticks the one tag on screen.
+    await filter('reading')
+    checkboxes()[0].click()
+    await flush()
+
+    expect(chrome.local.items.selectedTagIds).toEqual(['t1', 't2'])
+  })
+
+  it('unticks only the tag whose box moved', async () => {
+    Object.assign(chrome.local.items, { selectedTagIds: ['t1', 't2'] })
+    await initPopup(harness().deps)
+
+    await filter('rust')
+    checkboxes()[0].click()
+    await flush()
+
+    expect(chrome.local.items.selectedTagIds).toEqual(['t1'])
+  })
+
+  it('still shows a tag as ticked after the filter has hidden and shown it', async () => {
+    await initPopup(harness().deps)
+
+    checkboxes()[0].click()
+    await flush()
+    await filter('rust')
+    await filter('')
+
+    expect(checkboxes().map(box => box.checked)).toEqual([true, true])
+  })
+
   it('draws only the tags whose name matches what was typed', async () => {
     await initPopup(harness().deps)
 
