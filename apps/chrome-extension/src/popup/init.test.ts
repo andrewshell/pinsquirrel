@@ -298,6 +298,30 @@ describe('initPopup, with a connection stored', () => {
     expect(checkboxes().map(box => box.value)).toEqual(['t1', 't2'])
   })
 
+  it('counts the tags and the selection under the list', async () => {
+    await initPopup(harness().deps)
+
+    expect(element('#tag-summary').textContent).toBe('2 tags · 1 selected')
+  })
+
+  it('re-counts as the filter narrows the list', async () => {
+    await initPopup(harness().deps)
+
+    await filter('rust')
+
+    expect(element('#tag-summary').textContent).toBe('1 of 2 tags · 1 selected')
+  })
+
+  it('re-counts the moment a box moves, hidden tags included', async () => {
+    await initPopup(harness().deps)
+
+    await filter('reading')
+    checkboxes()[0].click()
+    await flush()
+
+    expect(element('#tag-summary').textContent).toBe('1 of 2 tags · 2 selected')
+  })
+
   it('shows how long ago the last sync ran', async () => {
     chrome.local.items.lastSyncAt = NOW - 5 * 60_000
     await initPopup(harness().deps)
