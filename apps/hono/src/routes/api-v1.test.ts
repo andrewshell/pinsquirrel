@@ -103,6 +103,30 @@ describe('api-v1 routes', () => {
       expect(await res.json()).toEqual({ error: 'Missing API key' })
     })
 
+    // The REST API is an OAuth protected resource too, with its own identifier
+    // (Decision 18). Point it at the /mcp document and the Chrome extension
+    // asks for the wrong audience, so every token it obtains is rejected.
+    it('challenges with the REST resource metadata, not the MCP one', async () => {
+      const res = await app.request('/api/v1/pins')
+
+      expect(res.status).toBe(401)
+      expect(res.headers.get('WWW-Authenticate')).toBe(
+        'Bearer resource_metadata="http://localhost:8100/.well-known/oauth-protected-resource/api/v1", scope="pins:read tags:read"'
+      )
+    })
+
+    it('challenges an invalid key the same way', async () => {
+      mockAuthenticate.mockResolvedValue(null)
+      const res = await app.request('/api/v1/pins', {
+        headers: { Authorization: 'Bearer ps_bad' },
+      })
+
+      expect(res.status).toBe(401)
+      expect(res.headers.get('WWW-Authenticate')).toContain(
+        'oauth-protected-resource/api/v1'
+      )
+    })
+
     it('returns 401 with invalid API key', async () => {
       mockAuthenticate.mockResolvedValue(null)
       const res = await app.request('/api/v1/pins', {

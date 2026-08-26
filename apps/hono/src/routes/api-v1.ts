@@ -20,6 +20,7 @@ import {
 } from '@pinsquirrel/services'
 import { pinService, tagService } from '../lib/services'
 import { apiKeyAuth, getApiUser } from '../middleware/api-auth'
+import { oauthConfig } from '../lib/config'
 
 const apiV1 = new OpenAPIHono()
 
@@ -166,7 +167,7 @@ apiV1.openAPIRegistry.registerPath({
 // --- Auth middleware (applies to all routes) ---------------------------------
 
 // TODO: write endpoints (POST/PUT/DELETE) will need CSRF bypass when added.
-apiV1.use('*', apiKeyAuth())
+apiV1.use('*', apiKeyAuth(oauthConfig.resources.apiV1))
 
 // --- Helpers ----------------------------------------------------------------
 
