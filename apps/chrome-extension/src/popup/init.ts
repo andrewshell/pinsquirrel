@@ -136,6 +136,10 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
     ui.mainView.hidden = false
     ui.reconnectNotice.hidden = true
     ui.connectedTo.textContent = `Connected to ${baseUrl ?? ''}`
+    // Before the tags are in: the popup opens under the cursor, and the user
+    // who came to find one tag among hundreds can start typing straight away.
+    // `autofocus` in the markup would not do it - the view starts hidden.
+    ui.tagFilter.focus()
     await refreshSyncStatus()
     await loadTags()
   }
