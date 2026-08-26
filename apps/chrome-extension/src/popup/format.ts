@@ -37,6 +37,19 @@ export function parseBaseUrl(input: string): string | null {
 }
 
 /**
+ * What the tag list says when it has nothing to draw.
+ *
+ * Two different emptys, and telling them apart is the whole point: with no
+ * filter the account has no tags yet and the user has to go and make some,
+ * while with one the tags are there and it is the query that found none.
+ */
+export function formatEmptyTagList(query: string): string {
+  const asked = query.trim()
+  if (asked === '') return 'No tags yet. Add tags to your pins on PinSquirrel.'
+  return `No tags match “${asked}”.`
+}
+
+/**
  * The line under the tag list: how much of it is on screen, and how much of it
  * is picked.
  *

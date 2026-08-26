@@ -3,7 +3,12 @@ import type { ConnectResponse, SyncResponse } from '../messages.ts'
 import * as storage from '../storage.ts'
 import type { TagWithCount } from '../types.ts'
 import { filterTags } from './filter.ts'
-import { formatLastSync, formatTagSummary, parseBaseUrl } from './format.ts'
+import {
+  formatEmptyTagList,
+  formatLastSync,
+  formatTagSummary,
+  parseBaseUrl,
+} from './format.ts'
 import { asCheckbox, renderTagList } from './render.ts'
 
 /**
@@ -188,9 +193,12 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
 
   /** Draw the tags matching the filter box, ticked from the selection. */
   function drawTagList(): void {
-    renderTagList(ui.tagList, filterTags(allTags, ui.tagFilter.value), [
-      ...selection,
-    ])
+    renderTagList(
+      ui.tagList,
+      filterTags(allTags, ui.tagFilter.value),
+      [...selection],
+      formatEmptyTagList(ui.tagFilter.value)
+    )
     drawTagSummary()
   }
 
