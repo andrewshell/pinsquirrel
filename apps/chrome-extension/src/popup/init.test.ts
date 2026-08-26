@@ -35,21 +35,21 @@ let doc: Document
 
 interface Harness {
   deps: PopupDeps
-  connect: ReturnType<typeof vi.fn>
+  requestConnect: ReturnType<typeof vi.fn>
   disconnect: ReturnType<typeof vi.fn>
   getTags: ReturnType<typeof vi.fn>
   requestSync: ReturnType<typeof vi.fn>
 }
 
 function harness(overrides: Partial<PopupDeps> = {}): Harness {
-  const connect = vi.fn(() => Promise.resolve())
+  const requestConnect = vi.fn(() => Promise.resolve({ ok: true as const }))
   const disconnect = vi.fn(() => Promise.resolve())
   const getTags = vi.fn(() => Promise.resolve(TAGS))
   const requestSync = vi.fn(() => Promise.resolve({ ok: true as const }))
 
   const deps: PopupDeps = {
     document: doc,
-    connect,
+    requestConnect,
     disconnect,
     createApiClient: () => ({ getTags }),
     requestSync,
@@ -57,7 +57,7 @@ function harness(overrides: Partial<PopupDeps> = {}): Harness {
     ...overrides,
   }
 
-  return { deps, connect, disconnect, getTags, requestSync }
+  return { deps, requestConnect, disconnect, getTags, requestSync }
 }
 
 /** Let the click handlers' promises settle. */
@@ -104,41 +104,84 @@ describe('initPopup, with no connection stored', () => {
   })
 
   it('refuses to start a flow against an address that is not an origin', async () => {
-    const { deps, connect } = harness()
+    const { deps, requestConnect } = harness()
     await initPopup(deps)
 
     element<HTMLInputElement>('#base-url').value = 'pinsquirrel.com'
     await click('#connect')
 
-    expect(connect).not.toHaveBeenCalled()
+    expect(requestConnect).not.toHaveBeenCalled()
     expect(status()).toMatch(/address/i)
     expect(settingsShown()).toBe(true)
   })
 
-  it('connects to the normalized origin and shows the tag list', async () => {
-    const { deps, connect } = harness()
+  it('asks the worker to connect, and shows the tag list if it survives', async () => {
+    const { deps, requestConnect } = harness()
     await initPopup(deps)
 
     element<HTMLInputElement>('#base-url').value = 'https://pinsquirrel.com/'
     await click('#connect')
 
-    expect(connect).toHaveBeenCalledWith('https://pinsquirrel.com')
+    expect(requestConnect).toHaveBeenCalledWith('https://pinsquirrel.com')
     expect(mainShown()).toBe(true)
     expect(settingsShown()).toBe(false)
     expect(checkboxes().map(box => box.value)).toEqual(['t1', 't2'])
   })
 
-  it('stays on the settings view when the flow fails', async () => {
+  it('stays on the settings view when the worker reports a failed flow', async () => {
     const { deps } = harness({
-      connect: vi.fn(() =>
-        Promise.reject(new Error('The user closed the tab'))
+      requestConnect: vi.fn(() =>
+        Promise.resolve({
+          ok: false as const,
+          error: 'The user closed the window',
+        })
       ),
     })
     await initPopup(deps)
     await click('#connect')
 
     expect(settingsShown()).toBe(true)
-    expect(status()).toContain('The user closed the tab')
+    expect(status()).toContain('The user closed the window')
+  })
+
+  it('asks to reconnect when the worker says the grant is gone', async () => {
+    const { deps } = harness({
+      requestConnect: vi.fn(() =>
+        Promise.resolve({
+          ok: false as const,
+          error: 'invalid_grant',
+          reauthorizationRequired: true,
+        })
+      ),
+    })
+    await initPopup(deps)
+    await click('#connect')
+
+    expect(settingsShown()).toBe(true)
+    expect(element('#reconnect-notice').hidden).toBe(false)
+  })
+
+  /**
+   * The bug this arrangement exists for: Chrome destroys the popup when the
+   * consent window takes focus, so the flow finishes with nobody listening.
+   * What the user sees is the popup they open next.
+   */
+  it('opens on the main view when the worker connected after it closed', async () => {
+    const torndown = harness({
+      requestConnect: vi.fn(() => {
+        Object.assign(chrome.local.items, CONNECTED)
+        // Never answers - the popup that asked is gone.
+        return new Promise<never>(() => {})
+      }),
+    })
+    await initPopup(torndown.deps)
+    await click('#connect')
+
+    doc = loadPopupDocument()
+    await initPopup(harness().deps)
+
+    expect(mainShown()).toBe(true)
+    expect(settingsShown()).toBe(false)
   })
 })
 
