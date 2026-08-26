@@ -482,10 +482,11 @@ The approach changed. Instead of a hand-written JSX docs page, the v1 routes wer
 
 ## Phase 6: OAuth 2.1 (the only auth path)
 
-> **Resume at 6c.** 6a and 6b shipped on `feat/oauth-phase-6`: both 401s now carry a
-> `WWW-Authenticate` challenge, `BASE_URL` exists, the three discovery documents are served, and
-> the OAuth entities, repository interfaces, error types, tables and Drizzle repositories exist
-> with the migration applied. Nothing constructs a service over them yet. Goal: a user pastes
+> **Resume at 6d.** 6a, 6b and 6c shipped on `feat/oauth-phase-6`: both 401s now carry a
+> `WWW-Authenticate` challenge, `BASE_URL` exists, the three discovery documents are served, the
+> OAuth entities, repository interfaces, error types, tables and Drizzle repositories exist with
+> the migration applied, and `OAuthService` sits over them in `libs/services`, constructed in
+> `apps/hono/src/lib/services.ts`. Nothing routes to it yet. Goal: a user pastes
 > `https://pinsquirrel.com/mcp` into
 > Claude (or any MCP client), clicks through a consent screen, and is connected. No hand-copied
 > API key.
@@ -745,7 +746,7 @@ Anything that needs `node:net` or a URL parser belongs in `libs/services`.
 
 ### 6c. Service layer
 
-- [ ] `libs/services/src/services/oauth.ts`: `OAuthService`
+- [x] `libs/services/src/services/oauth.ts`: `OAuthService`
   - Constructor: `(clientRepository, codeRepository, tokenRepository, userRepository,
 httpFetcher: HttpFetcher, config: { issuer, resources })`. The fetcher is the domain
     interface, injected exactly as `MetadataService(httpFetcher, htmlParser)` does. The CIMD
@@ -767,21 +768,86 @@ httpFetcher: HttpFetcher, config: { issuer, resources })`. The fetcher is the do
     refresh) have no `ac`. The client is the caller, and the code or refresh token is the proof.
     Mirror the `MaintenanceService` comment explaining why when writing it
   - Reuse `libs/services/src/utils/crypto.ts` for token generation and hashing
-- [ ] `libs/services/src/validation/oauth.ts`: Zod schemas. Reuse the schemas from
+
+  Built, with the method set the endpoints need:
+  `resolveClient(clientId)`, `resolveAuthorizationRequest(params)`,
+  `authorize(ac, { params, userId, approved })`, `exchangeAuthorizationCode(params)`,
+  `exchangeRefreshToken(params)`, `verifyAccessToken(raw, expectedResource)`,
+  `registerClient(metadata)`, `listGrants(ac, userId)`, `revokeGrant(ac, tokenId)`,
+  `revokeToken({ token, client_id })`. Four things differ from the sketch above:
+
+  - `challengeForAuthorizationCode` has no separate method. It exists in the SDK because the
+    Express router verifies PKCE in one handler and exchanges the code in another;
+    `exchangeAuthorizationCode` does both here, which keeps the consume and the verify in one
+    place and is what makes the failed-verifier case burn the code.
+  - `authorize` takes the consent decision rather than only the request, and returns an outcome
+    rather than throwing on denial. A denial still has to reach the client, and that means
+    redirecting to a URI that has already been validated. An exception would leave the route
+    holding an error with nowhere to send it. `OAuthAccessDeniedError` is still thrown, but for
+    a session trying to authorize as somebody else.
+  - `resolveAuthorizationRequest` is split out so the consent page (a `GET`) can be rendered
+    from the same checks the `POST` runs.
+  - The token TTLs are the service's: authorization code 5 minutes, access token 1 hour,
+    refresh token 30 days with rotation on every use, CIMD cache 24 hours.
+
+- [x] `libs/services/src/validation/oauth.ts`: Zod schemas. Reuse the schemas from
       `@modelcontextprotocol/sdk/shared/auth.js` where they fit; those are framework-agnostic.
       Convert failures with `validationErrorFromZod` (`validation/zod-error.ts`) like every other
       service; the route maps `ValidationError` to `invalid_request` / `invalid_client_metadata`
-- [ ] `libs/services/src/validation/oauth-uri.ts`: the one URI normalization rule (scheme/host
+
+  `authorizationRequestSchema`, `authorizationCodeGrantSchema`, `refreshTokenGrantSchema`,
+  `tokenRequestSchema` (the discriminated union of the two grants), `clientRegistrationSchema`
+  and `clientIdMetadataDocumentSchema`, all snake_case, so a route hands its raw query or form
+  straight to the service. The RFC 7591 metadata is the SDK's `OAuthClientMetadataSchema`, which
+  meant adding `@modelcontextprotocol/sdk` to `@pinsquirrel/services`; it was already in the
+  install as a dependency of `apps/hono`, so nothing new is pulled in.
+
+  Two places are deliberately stricter than the specs. `code_challenge_method` is required and
+  must be `S256`, because RFC 7636 reads an absent method as `plain` and OAuth 2.1 forbids that.
+  `resource` is required on an authorization request, which RFC 8707 leaves optional: with two
+  protected resources whose separation is the confused-deputy defense there is no safe default
+  audience to fall back on.
+
+- [x] `libs/services/src/validation/oauth-uri.ts`: the one URI normalization rule (scheme/host
       case, default port, trailing slash) and the one loopback canonicalization (drop the port for
       `localhost`, `127.0.0.0/8`, `::1` only). Used by redirect-URI matching (6e), DCR dedup (6d),
       audience comparison (6d), and the app's metadata documents (6a). Pure functions, exported
       from the package index like `pinFilterFromInput`. This is the fiddly part. Give it its own
       tests
-- [ ] Extend `MaintenanceService.sweepExpired()` with expired authorization codes, expired and
+
+  `isLoopbackRedirectHost`, `canonicalizeRedirectUri`, `redirectUriMatches` and
+  `matchRedirectUri` joined `normalizeOAuthUri` and `protectedResourceMetadataPath`. The DCR
+  dedup key is `canonicalizeRedirectUri` applied to each redirect URI and hashed with the rest
+  of the metadata, in `oauth.ts`, rather than a second canonicalization here. Tested against the
+  real client shapes: `http://localhost/callback` and `http://127.0.0.1/callback` both match
+  `http://localhost:54321/callback` on the host that registered them, and
+  `https://claude.ai/api/mcp/auth_callback` matches only itself.
+
+- [x] Extend `MaintenanceService.sweepExpired()` with expired authorization codes, expired and
       revoked tokens, and `oauth_clients` rows that never completed an authorization within their
       TTL. Add the three counts to `SweepResult`; the existing `Promise.all` shape already sweeps
       stores independently. Nothing changes in `apps/hono`; `startExpirySweep` runs it
-- [ ] Tests for `OAuthService`
+
+  `SweepResult` gained `oauthAuthorizationCodes`, `oauthTokens` and `oauthClients`. The
+  constructor gained the three repositories, so `lib/services.ts` changed; `lib/expiry-sweep.ts`
+  did not, and picks the new counts up on its own. The incomplete-registration TTL is 24 hours
+  and is passed to the repository, since the deadline is a policy this layer owns.
+
+- [x] Tests for `OAuthService`
+
+  Repositories are mocked and the fetcher is a fake, so every case runs without HTTP or a
+  database: the CIMD rules (http scheme, missing path, private address, oversized body, non-JSON,
+  `client_id` mismatch, unusable `redirect_uris`, unreachable document), PKCE verification,
+  audience validation in both directions, refresh rotation and replay, DCR dedup across ephemeral
+  ports, and the `AccessControl` checks on the grant operations.
+
+- [x] `HttpFetcher.fetch` gained an optional `{ redirect }` option (`libs/domain`,
+      `libs/adapters`), which 6b did not anticipate. Refusing a redirect is not something the
+      service can do on its own: the interface returned a string and nothing else, so a CIMD
+      document that redirected was followed like any page. The option is absent unless asked for,
+      so the metadata fetch is unchanged.
+- [x] Wire `OAuthService` in `apps/hono/src/lib/services.ts` and export it, the schemas and the
+      URI helpers from the services index
 
 ### 6d. Endpoints
 
@@ -869,6 +935,17 @@ httpFetcher: HttpFetcher, config: { issuer, resources })`. The fetcher is the do
 
 ### 6e. Client registration (CIMD-first)
 
+> **Service-complete after 6c.** The first two items below are built and unit-tested inside
+> `OAuthService`; what is left for this phase is the endpoint work in 6d that calls them, plus
+> the two items that are not service logic at all (a DCR endpoint, and static credentials an
+> operator enters). The checkboxes stay open until an endpoint exercises them end to end.
+>
+> One thing changed from the description below: the CIMD cache is keyed on `metadataFetchedAt`
+> with a 24 hour TTL rather than on the document's HTTP cache headers. `HttpFetcher.fetch`
+> returns a body and no headers, and a fetcher that surfaced them would be a wider change than
+> the freshness question is worth. The cached row is the same row the client is looked up in, so
+> the TTL costs one fetch a day per client.
+
 - [ ] CIMD resolution: when `client_id` is an HTTPS URL, fetch it, validate the document's
       `client_id` matches the URL exactly, validate `redirect_uris`, cache respecting HTTP cache
       headers
@@ -895,7 +972,8 @@ httpFetcher: HttpFetcher, config: { issuer, resources })`. The fetcher is the do
     rebinding and redirect tests in `node-http-fetcher.test.ts`; do not duplicate them. Cover
     `http` scheme rejected, missing path rejected, oversized response, `client_id` mismatch
     between URL and document, invalid `redirect_uris`
-- [ ] Redirect URI matching, the bug-prone part. Two shapes:
+- [ ] Redirect URI matching, the bug-prone part. Two shapes (the matcher and its unit tests
+      landed in 6c; what is left here is the end-to-end run against the real clients):
   - Hosted Claude (web, Desktop, mobile, Cowork): exact match on
     `https://claude.ai/api/mcp/auth_callback`
   - Claude Code: native client, RFC 8252 loopback on an ephemeral port. It declares portless
@@ -907,7 +985,8 @@ httpFetcher: HttpFetcher, config: { issuer, resources })`. The fetcher is the do
     that the portless-CIMD path is easy to get wrong on both sides. Test against the real client,
     not just a unit test
 - [ ] DCR as fallback for clients that don't do CIMD. Prefer CIMD: DCR is deprecated in the spec
-      and makes Claude register a new client row on every fresh connection (Decision 15)
+      and makes Claude register a new client row on every fresh connection (Decision 15).
+      `OAuthService.registerClient` exists as of 6c, dedup included; the endpoint is 6d's
 - [ ] Support pre-registered static credentials, so an org can paste its own `client_id` when
       adding PinSquirrel as a custom connector
 
