@@ -17,12 +17,13 @@ is the only way to reach either one. OAuth has been driven end to end by real cl
 Code over CIMD and a loopback redirect, claude.ai as a custom connector over the fixed callback —
 and in process against the real app and a real database in `apps/hono/src/oauth-e2e.test.ts`.
 
-The Chrome extension has a scaffold and an OAuth client. `apps/chrome-extension/` builds a
-loadable Manifest V3 extension — esbuild bundles the two entry points into `dist/` alongside the
-manifest, popup shell and placeholder icons — and `src/auth.ts` can now connect, refresh and
-disconnect against a real server, over `src/storage.ts` and `src/oauth-metadata.ts`. What is left
-is everything that uses it: `src/background.ts` and `src/popup.ts` are still empty, and there is
-no API client and no sync.
+The Chrome extension has a scaffold, an OAuth client and an API client. `apps/chrome-extension/`
+builds a loadable Manifest V3 extension — esbuild bundles the two entry points into `dist/`
+alongside the manifest, popup shell and placeholder icons — `src/auth.ts` can connect, refresh and
+disconnect against a real server, over `src/storage.ts` and `src/oauth-metadata.ts`, and
+`src/api-client.ts` reads tags and a tag's pins over that connection. What is left is the two
+things that use them: `src/popup.ts` and `src/background.ts` are still empty, and there is no
+bookmark sync.
 
 ### Ground rules for new work
 
@@ -137,16 +138,35 @@ the `https://pinsquirrel.com/api/v1` resource.
 
 ### 5c. API client
 
-- [ ] Add Tag, Pin and Pagination to `apps/chrome-extension/src/types.ts`, which 5b created with
+- [x] Add Tag, Pin and Pagination to `apps/chrome-extension/src/types.ts`, which 5b created with
       `ExtensionStorage` and `StoredTokens` in it. `ExtensionStorage` carries two keys 5d's list
       did not name: `clientId`, and `registeredClients` (base URL → dynamically registered
       `client_id`)
-- [ ] Create `apps/chrome-extension/src/api-client.ts`
+  - Four types, not three: `TagWithCount` joins them, because `withCounts` decides whether
+    `pinCount` is in the answer. Timestamps stay ISO 8601 strings — that is what came over the
+    wire, and nothing in the extension does date arithmetic with them
+- [x] Create `apps/chrome-extension/src/api-client.ts`
   - `PinSquirrelApiClient` class (baseUrl + `authorizedFetch` from 5b, which owns the token, the
-    expiry and the `401` retry)
-  - `getTags(withCounts?)` → fetch `/api/v1/tags`
-  - `getPinsForTag(tagId, page?, pageSize?)` → fetch `/api/v1/tags/:id/pins`
-  - `getAllPinsForTag(tagId)` → paginate through all pages
+    expiry and the `401` retry). The `fetch` is a constructor parameter rather than an import, so
+    a test hands it a stub and nothing below the seam knows a token exists
+  - `getTags(withCounts?)` → fetch `/api/v1/tags`. Overloaded on the argument: asking for counts
+    returns `TagWithCount[]`, so no caller checks for a field it already knows is there
+  - `getPinsForTag(tagId, page?, pageSize?)` → fetch `/api/v1/tags/:id/pins`. The id is
+    percent-encoded into the path; `page` and `pageSize` are only sent when given, so the
+    server's defaults stay the only defaults
+  - `getAllPinsForTag(tagId)` → paginate through all pages at `pageSize=100`, the cap
+    `pinListQuerySchema` enforces. The page count is taken from the first answer and not
+    re-read, so a server reporting a growing `totalPages` cannot spin the loop forever, and an
+    empty page inside the range ends it early
+  - Failures: a non-2xx becomes an `ApiError` carrying `status`, the message, and a `code` when
+    the server spelled the failure in RFC 6749 terms. The two error bodies are told apart by
+    `error_description` — a v1 route sends prose in `error`, the OAuth middleware sends a machine
+    code there — and the rate limiter's plain-text 429 falls back to the status rather than
+    surfacing a JSON parse error in place of the real one. A `ReauthorizationRequiredError` out
+    of the injected fetch passes through untouched: the popup branches on it
+  - A 200 is checked against the shape it claims to be before it is cast. Hand-written guards
+    over the fields the extension actually reads, not Zod — this package has no dependencies
+    (Decision 5)
 
 ### 5d. Popup UI
 
