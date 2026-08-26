@@ -17,14 +17,15 @@ is the only way to reach either one. OAuth has been driven end to end by real cl
 Code over CIMD and a loopback redirect, claude.ai as a custom connector over the fixed callback —
 and in process against the real app and a real database in `apps/hono/src/oauth-e2e.test.ts`.
 
-The Chrome extension has a scaffold, an OAuth client, an API client and a popup.
-`apps/chrome-extension/` builds a loadable Manifest V3 extension — esbuild bundles the two entry
-points into `dist/` alongside the manifest, popup and placeholder icons — `src/auth.ts` can
+The Chrome extension has a scaffold, an OAuth client, an API client, a popup and the bookmark
+sync. `apps/chrome-extension/` builds a loadable Manifest V3 extension — esbuild bundles the two
+entry points into `dist/` alongside the manifest, popup and placeholder icons — `src/auth.ts` can
 connect, refresh and disconnect against a real server, over `src/storage.ts` and
-`src/oauth-metadata.ts`, `src/api-client.ts` reads tags and a tag's pins over that connection, and
-`src/popup.ts` connects, lists tags, records the selection and asks for a sync. What is left is
-what actually moves bookmarks: `src/background.ts` is still empty, so "Sync Now" reports that
-nothing answered, and there is no bookmark sync behind it.
+`src/oauth-metadata.ts`, `src/api-client.ts` reads tags and a tag's pins over that connection,
+`src/popup.ts` connects, lists tags, records the selection and asks for a sync, and
+`src/bookmark-sync.ts` turns the selected tags into bookmark folders and records what happened
+in storage. What is left is the thing that calls it: `src/background.ts` is still empty, so
+"Sync Now" reports that nothing answered, and nothing runs a sync on startup or on a schedule.
 
 ### Ground rules for new work
 
@@ -215,16 +216,51 @@ the `https://pinsquirrel.com/api/v1` resource.
 
 ### 5e. Bookmark sync
 
-- [ ] Create `apps/chrome-extension/src/bookmark-sync.ts`
-  - `findOrCreateFolder(parentId, name)`: find or create a bookmark folder
-  - `syncTagFolder(folderId, pins[])`: add missing bookmarks, remove extras, update changed titles
-  - `removeOrphanFolders(parentFolderId, activeTagNames[])`: remove folders for deselected tags
-  - `syncAll(apiClient, selectedTagIds)`: orchestrates the full sync:
-    1. Find/create "PinSquirrel" root folder in bookmark bar
-    2. For each selected tag: find/create subfolder, fetch all pins, sync bookmarks
+- [x] Create `apps/chrome-extension/src/bookmark-sync.ts`
+  - `findOrCreateFolder(parentId, name)`: find or create a bookmark folder. A node with no `url`
+    is a folder, the same test the API uses; a _bookmark_ carrying the name is not a candidate,
+    since nothing can be filed under it
+  - `syncTagFolder(folderId, pins[])`: add missing bookmarks, remove extras, update changed
+    titles. Matching is by URL, compared as the exact string that came over the wire — Chrome
+    stores what it is given, so normalizing here would only stop a bookmark matching the pin it
+    was made from. The folder is left holding exactly one bookmark per pinned URL and nothing
+    else: a second bookmark for a URL pinned twice, and a subfolder someone filed inside a tag
+    folder, are both surplus and go. Order is newest pin first (`createdAt` descending, URL
+    breaking a tie), because Chrome keeps a folder in insertion order and the alternative is an
+    arrangement that depends on the history of syncs. An already-correct folder costs one
+    `getChildren` and no writes; a bookmark is only updated when its title moved and only moved
+    when its position did, always backwards, which is the direction where Chrome's same-parent
+    move index is unambiguous
+  - `removeOrphanFolders(parentFolderId, activeTagNames[])`: remove folders for deselected tags,
+    and a second folder carrying a name that is still active — `findOrCreateFolder` only ever
+    uses the first, so the rest are stale copies. Folders only: a bookmark the user filed beside
+    the tag folders is theirs, where a tag folder's whole contents are the extension's
+  - `syncAll({ apiClient, selectedTagIds })`: orchestrates the full sync:
+    1. Find/create "PinSquirrel" root folder in bookmark bar. The bar is found by walking
+       `getTree()` for the node whose `folderType` is `bookmarks-bar`, with `'1'` as the fallback
+       for a Chrome older than 134, rather than hardcoding the id
+    2. For each selected tag: find/create subfolder, fetch all pins, sync bookmarks. Tag _names_
+       come from `getTags()`, so a selected id the server no longer knows is skipped rather than
+       failing the run
     3. Remove orphan subfolders
     4. Store `lastSyncAt`, and clear or set `lastSyncError` — the popup renders both straight
-       from storage, so a run that fails silently reads as a run that succeeded
+       from storage, so a run that fails silently reads as a run that succeeded. `lastSyncAt`
+       stays epoch milliseconds, which is what `ExtensionStorage` declares and what
+       `formatLastSync` subtracts from. A failed run leaves it alone: it means "when the
+       bookmarks were last correct". The failure is recorded _and_ rethrown, since 5f has to
+       answer the popup with it, and a `ReauthorizationRequiredError` is recorded as
+       "PinSquirrel needs to be reconnected: …" rather than as whatever the token layer called it
+  - `runSync()`, which 5e's list did not name: the argument-free form 5f calls. It reads
+    `baseUrl` and `selectedTagIds` back out of storage and builds the real
+    `PinSquirrelApiClient` over `authorizedFetch`, because a service worker wakes holding
+    nothing. `syncAll` stays injectable, so no test has to stand up a token to drive one. No
+    stored base URL raises the same `ReauthorizationRequiredError` a dead grant does, and does
+    not record a sync failure — the popup is on its Connect view either way
+  - `stubChrome` grew an in-memory `chrome.bookmarks` (`src/test/chrome-mock.ts`): a real tree
+    with a seeded bookmarks bar, `getTree`/`getChildren`/`create`/`update`/`move`/`remove`/
+    `removeTree`, and a log of every call made. The reconciliation is judged by the tree it
+    leaves behind rather than by a mock per call, and the call log is what pins down how many
+    round trips a sync costs
 
 ### 5f. Background service worker
 
@@ -235,7 +271,9 @@ the `https://pinsquirrel.com/api/v1` resource.
     `src/messages.ts`: `isSyncRequest()` to recognise it, a `SyncResponse` to answer with, and
     the listener must return `true` so the channel stays open for the async answer. A sync
     already running should be joined rather than started twice
-  - Sync logic calls into `bookmark-sync.ts`
+  - Sync logic calls into `bookmark-sync.ts` — `runSync()` is the whole of it, and it already
+    writes `lastSyncAt` / `lastSyncError`, so the worker's job is to run one at a time and turn
+    a rejection into a `SyncResponse`
 
 ### 5g. Testing
 
