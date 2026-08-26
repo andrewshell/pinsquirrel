@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.5.1](https://github.com/andrewshell/pinsquirrel/compare/v3.5.0...v3.5.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* keep mailgun.js a direct hono dependency ([18e09e3](https://github.com/andrewshell/pinsquirrel/commit/18e09e3e6cdb9705abdaa7001156cc6d4f1eec29))
+
+
 ## [3.5.0](https://github.com/andrewshell/pinsquirrel/compare/v3.4.1...v3.5.0) (2026-08-26)
 
 
