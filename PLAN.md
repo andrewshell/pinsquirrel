@@ -17,15 +17,18 @@ is the only way to reach either one. OAuth has been driven end to end by real cl
 Code over CIMD and a loopback redirect, claude.ai as a custom connector over the fixed callback —
 and in process against the real app and a real database in `apps/hono/src/oauth-e2e.test.ts`.
 
-The Chrome extension has a scaffold, an OAuth client, an API client, a popup and the bookmark
-sync. `apps/chrome-extension/` builds a loadable Manifest V3 extension — esbuild bundles the two
-entry points into `dist/` alongside the manifest, popup and placeholder icons — `src/auth.ts` can
-connect, refresh and disconnect against a real server, over `src/storage.ts` and
-`src/oauth-metadata.ts`, `src/api-client.ts` reads tags and a tag's pins over that connection,
-`src/popup.ts` connects, lists tags, records the selection and asks for a sync, and
-`src/bookmark-sync.ts` turns the selected tags into bookmark folders and records what happened
-in storage. What is left is the thing that calls it: `src/background.ts` is still empty, so
-"Sync Now" reports that nothing answered, and nothing runs a sync on startup or on a schedule.
+The Chrome extension is code-complete. `apps/chrome-extension/` builds a loadable Manifest V3
+extension — esbuild bundles the two entry points into `dist/` alongside the manifest, popup and
+placeholder icons — `src/auth.ts` can connect, refresh and disconnect against a real server, over
+`src/storage.ts` and `src/oauth-metadata.ts`, `src/api-client.ts` reads tags and a tag's pins over
+that connection, `src/popup.ts` connects, lists tags, records the selection and asks for a sync,
+`src/bookmark-sync.ts` turns the selected tags into bookmark folders and records what happened in
+storage, and `src/background.ts` runs one on startup, on an hourly alarm, and whenever the popup
+asks. All of it is covered by tests against an in-memory `chrome`.
+
+What is left is 5g: driving the whole thing in a real Chrome against a real server. Nothing in
+the extension has ever met a live consent screen, a real `chrome.identity` redirect or a real
+bookmarks tree, and that is the only thing that can tell us it works.
 
 ### Ground rules for new work
 
@@ -264,18 +267,58 @@ the `https://pinsquirrel.com/api/v1` resource.
 
 ### 5f. Background service worker
 
-- [ ] Create `apps/chrome-extension/src/background.ts`
-  - `chrome.runtime.onStartup` → trigger sync
-  - `chrome.runtime.onInstalled` → set up alarm for periodic sync (optional)
-  - `chrome.runtime.onMessage` → answer the popup's manual sync. The contract is 5d's
-    `src/messages.ts`: `isSyncRequest()` to recognise it, a `SyncResponse` to answer with, and
-    the listener must return `true` so the channel stays open for the async answer. A sync
-    already running should be joined rather than started twice
-  - Sync logic calls into `bookmark-sync.ts` — `runSync()` is the whole of it, and it already
-    writes `lastSyncAt` / `lastSyncError`, so the worker's job is to run one at a time and turn
-    a rejection into a `SyncResponse`
+- [x] Create `apps/chrome-extension/src/background.ts`
+  - It is the entry point and nothing else, the same shape 5d gave the popup: the wiring is
+    `initBackground(deps)` in `src/background/init.ts`, and the two things a test cannot run —
+    `runSync` and somewhere to put a failure nobody is waiting for — are arguments. Registration
+    happens as the module is evaluated, which is the only moment MV3 offers: the worker is torn
+    down between events and the file runs again to deliver the next one, so a listener registered
+    after an `await` would miss the event that woke it
+  - [x] `chrome.runtime.onStartup` → trigger sync
+  - [x] `chrome.runtime.onInstalled` → create the repeating `sync` alarm, 60 minutes.
+        `chrome.alarms.onAlarm` for that name syncs; any other name is ignored. Startup checks
+        the alarm too — `alarms.get` first, `create` only if it is missing, because creating an
+        alarm that already exists restarts its period and would push the next sync forever
+        forwards, and because Chrome does drop alarms
+  - [x] `chrome.runtime.onMessage` → answer the popup's manual sync. The contract is 5d's
+        `src/messages.ts`: `isSyncRequest()` to recognise it, a `SyncResponse` to answer with,
+        and the listener returns `true` so the channel stays open for the async answer — and
+        `false` for a message that is not one, so the worker does not hold a channel open for
+        somebody else's listener. A sync already running is joined rather than started twice:
+        one promise, cleared when it settles, handed to every caller
+  - [x] Sync logic calls into `bookmark-sync.ts` — `runSync()` is the whole of it, and it
+        already writes `lastSyncAt` / `lastSyncError`, so the worker's job is to run one at a
+        time and turn a rejection into a `SyncResponse`
+  - A scheduled sync runs only when storage holds a `baseUrl` _and_ a refresh token, which 5f's
+    list did not name. Without that check every browser startup and every alarm would raise
+    `ReauthorizationRequiredError` out of `runSync` and write a sync failure the user would read
+    on their first ever look at the popup. The refresh token is the half that matters — an
+    expired access token gets refreshed, a missing refresh token is a grant that is gone.
+    "Sync Now" is exempt: the user asked, so the reason nothing happened is the answer
+  - A scheduled sync's rejection is swallowed after `runSync` has recorded it, and logged
+    through an injected `BackgroundLogger` rather than by naming `console` — `no-console` is on
+    everywhere under `src/`, and the entry point is the one place the rule is turned off,
+    because a service worker's only output is DevTools
+  - `stubChrome` grew the `chrome.runtime` and `chrome.alarms` events (`src/test/chrome-mock.ts`):
+    stubs holding the listeners the code registered with a `fire()` that calls them, plus an
+    in-memory alarm registry. The worker is driven with no browser to wake it — the test is the
+    browser — and the alarm is judged by what exists afterwards rather than by a call assertion
 
 ### 5g. Testing
+
+Against a dev server, nothing has to be reconfigured. `BASE_URL` defaults to
+`http://localhost:8100` outside production, which is already in the manifest's `host_permissions`,
+and the session cookie is only `Secure` in production, so plain http works in the auth window.
+Type `http://localhost:8100` into the popup — an origin, no path, which is all `parseBaseUrl`
+accepts. `/oauth/authorize` is behind `requireAuth()`, so be signed in to the app in the same
+Chrome profile first, or sign in inside the window `launchWebAuthFlow` opens.
+
+The redirect URI is `https://<extension-id>.chromiumapp.org/`, and it needs nothing on the server:
+registration accepts any https redirect, and the DCR `client_id` is derived from the metadata, so
+the same extension deduplicates to one row rather than one per connect. Chrome derives the ID of
+an unpacked extension from the directory path, so `dist/` keeps the same ID across reloads and a
+different checkout gets a different one — which is a second DCR row, and `/oauth/register` allows
+ten per IP per hour.
 
 - [ ] Load extension unpacked in Chrome
 - [ ] Connect via the OAuth flow: consent screen appears, `launchWebAuthFlow` closes cleanly,

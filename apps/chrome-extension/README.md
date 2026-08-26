@@ -9,6 +9,35 @@ other package in this monorepo and talks to PinSquirrel only over HTTP. Keep it
 that way; bundling shared code into a browser extension is what would force a
 release of the extension every time a library moves.
 
+## When it syncs
+
+The service worker runs a sync in three situations:
+
+| Trigger                    | When                                              |
+| -------------------------- | ------------------------------------------------- |
+| `chrome.runtime.onStartup` | Chrome starts and the profile loads the extension |
+| `chrome.alarms` — `sync`   | Every 60 minutes, from a repeating alarm          |
+| **Sync Now** in the popup  | Whenever the user asks                            |
+
+The alarm is created on `chrome.runtime.onInstalled` and checked again on
+startup — `alarms.get` first, `alarms.create` only if it is missing, because
+creating an alarm that already exists restarts its period and would push the
+next sync forever forwards. Chrome drops alarms in some profile-reset cases, so
+the startup check is what brings one back.
+
+A scheduled sync only runs once the extension is connected — a stored `baseUrl`
+_and_ a stored refresh token. Before that there is nothing to sync with, and
+running one anyway would write a failure to the popup's status line for a user
+who has not connected yet. **Sync Now** always runs, so a broken connection
+answers the popup with a reason instead of doing nothing.
+
+Only one sync runs at a time: whichever trigger comes second joins the run
+already in flight rather than starting a second pass over the same bookmark
+folders. Failures are recorded by `runSync` itself (`lastSyncError` in storage,
+shown next time the popup opens); a scheduled sync additionally logs to the
+worker's DevTools console, and a manual one comes back to the popup as
+`{ ok: false, error }`.
+
 ## Build
 
 ```bash
@@ -40,6 +69,11 @@ against that rather than against a mock per call, so a reconciliation is judged
 by the tree it leaves behind — and by `bookmarks.calls`, which is how "a folder
 already in step costs one read and no writes" is asserted.
 
+It also carries the `runtime` and `alarms` events, as stubs holding the
+listeners the code registered and a `fire()` that calls them, plus an in-memory
+alarm registry. That is how the service worker is driven without a browser to
+wake it: the test is the browser.
+
 ## Load unpacked
 
 1. Build, so `dist/` exists.
@@ -55,21 +89,22 @@ removed and re-added.
 
 ## Layout
 
-| Path                         | What it is                                                            |
-| ---------------------------- | --------------------------------------------------------------------- |
-| `manifest.json`              | Manifest V3: permissions, service worker, popup                       |
-| `popup.html`                 | Popup markup and styles; no inline scripts (extension CSP)            |
-| `src/background.ts`          | Service worker entry point                                            |
-| `src/popup.ts`               | Popup entry point: hands `initPopup` its real dependencies            |
-| `src/popup/`                 | The popup itself — `init.ts` wiring, `render.ts` and `format.ts` pure |
-| `src/messages.ts`            | The popup ↔ service worker message contract                           |
-| `src/auth.ts`                | OAuth client: connect, refresh, `authorizedFetch`, disconnect         |
-| `src/api-client.ts`          | `/api/v1` reads over `authorizedFetch`                                |
-| `src/bookmark-sync.ts`       | Tags to bookmark folders: `syncAll`, and `runSync` for the worker     |
-| `src/storage.ts`             | The only module that names `chrome.storage.local`                     |
-| `scripts/build.ts`           | esbuild bundle + asset copy                                           |
-| `scripts/manifest-assets.ts` | Derives the copy list from the manifest                               |
-| `icons/`                     | Placeholder artwork at 16/48/128, pending real icons                  |
+| Path                         | What it is                                                                |
+| ---------------------------- | ------------------------------------------------------------------------- |
+| `manifest.json`              | Manifest V3: permissions, service worker, popup                           |
+| `popup.html`                 | Popup markup and styles; no inline scripts (extension CSP)                |
+| `src/background.ts`          | Service worker entry point: hands `initBackground` `runSync` and a logger |
+| `src/background/init.ts`     | The worker itself: startup, the alarm, and the popup's sync request       |
+| `src/popup.ts`               | Popup entry point: hands `initPopup` its real dependencies                |
+| `src/popup/`                 | The popup itself — `init.ts` wiring, `render.ts` and `format.ts` pure     |
+| `src/messages.ts`            | The popup ↔ service worker message contract                               |
+| `src/auth.ts`                | OAuth client: connect, refresh, `authorizedFetch`, disconnect             |
+| `src/api-client.ts`          | `/api/v1` reads over `authorizedFetch`                                    |
+| `src/bookmark-sync.ts`       | Tags to bookmark folders: `syncAll`, and `runSync` for the worker         |
+| `src/storage.ts`             | The only module that names `chrome.storage.local`                         |
+| `scripts/build.ts`           | esbuild bundle + asset copy                                               |
+| `scripts/manifest-assets.ts` | Derives the copy list from the manifest                                   |
+| `icons/`                     | Placeholder artwork at 16/48/128, pending real icons                      |
 
 `tsconfig.json` covers `src` and `scripts` as one project. `types` carries
 `chrome` (the extension APIs), `node` (for the build script) and
