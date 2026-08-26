@@ -1,5 +1,75 @@
 # Changelog
 
+## [3.5.0](https://github.com/andrewshell/pinsquirrel/compare/v3.4.1...v3.5.0) (2026-08-26)
+
+
+### Features
+
+* **admin:** give the console a session TTL, a login lockout and Secure cookies (2.33) ([e038cde](https://github.com/andrewshell/pinsquirrel/commit/e038cdea87df2468c5456a3721015654db61be43))
+* **database:** add the authorization code repository ([66a8d07](https://github.com/andrewshell/pinsquirrel/commit/66a8d074f3a1895345eab6facbf4b1c3f7e2478d))
+* **database:** add the OAuth tables and the client repository ([c63b6a8](https://github.com/andrewshell/pinsquirrel/commit/c63b6a8e8a4726752b462672e8140c645ebcf0e5))
+* **database:** add the OAuth token repository and wire all three up ([ce55157](https://github.com/andrewshell/pinsquirrel/commit/ce551575b9e1e9f4a9b7445525f7a91cd33075ba))
+* **database:** drop the api_keys table ([7f58f4c](https://github.com/andrewshell/pinsquirrel/commit/7f58f4cd28d3fa5d1e33997ecc2579853f1222ac))
+* **domain:** add the OAuth client, code and token domain layer ([acd71ec](https://github.com/andrewshell/pinsquirrel/commit/acd71ec90fd7b150bbb5890ab026811c71a9210d))
+* **domain:** let a fetch refuse redirects ([e72a21e](https://github.com/andrewshell/pinsquirrel/commit/e72a21ea7cef59fbc6b437c9830ad5b0950f3d05))
+* **hono:** add BASE_URL config as the OAuth issuer and resource origin ([0140c0f](https://github.com/andrewshell/pinsquirrel/commit/0140c0fb365dd7961e2529c44bb5488d356df967))
+* **hono:** add the OAuth bearer middleware ([6599ba6](https://github.com/andrewshell/pinsquirrel/commit/6599ba6812f909bcbd88bd1e011d234854c7678b))
+* **hono:** drop the API key card from the profile page ([393ec44](https://github.com/andrewshell/pinsquirrel/commit/393ec44d0190df0c2475f3bd3c39c30ac56e9f85))
+* **hono:** list and revoke connected applications on the profile page ([1e848df](https://github.com/andrewshell/pinsquirrel/commit/1e848df761e6fe83ffccc4c05f6d8951a79a3786))
+* **hono:** pre-register OAuth clients from configuration ([8087537](https://github.com/andrewshell/pinsquirrel/commit/8087537706a5cfa991b905b081904d2ccba4ef62))
+* **hono:** rate limit the OAuth endpoints and both protected resources ([cb1cebc](https://github.com/andrewshell/pinsquirrel/commit/cb1cebc912c8a5bdffe71e0ad71102d8bfdf7bef))
+* **hono:** render the OAuth consent screen ([86d4798](https://github.com/andrewshell/pinsquirrel/commit/86d4798950dea73d03049076805d23aeaf336aee))
+* **hono:** return a discoverable WWW-Authenticate challenge on 401 ([081fa6c](https://github.com/andrewshell/pinsquirrel/commit/081fa6c9665a3bf757e1d4336527b52fc5316433))
+* **hono:** route /mcp and /api/v1 through OAuth, and mount the endpoints ([a85173c](https://github.com/andrewshell/pinsquirrel/commit/a85173c1c33f7a586fe71862f6d70a6c76b74d18))
+* **hono:** serve the OAuth discovery documents ([503aa47](https://github.com/andrewshell/pinsquirrel/commit/503aa47a67b1a49566fc32d614779b71bde8cdb8))
+* **hono:** serve the token, revocation and registration endpoints ([0a235f4](https://github.com/andrewshell/pinsquirrel/commit/0a235f46cd6512d809f46cf8a92ce045d9eee46b))
+* **services:** add OAuth URI normalization and RFC 9728 path helper ([452ad43](https://github.com/andrewshell/pinsquirrel/commit/452ad4344d7430887c54d3ad87418c9e362d0169))
+* **services:** exchange an authorization code for tokens ([f24fbe1](https://github.com/andrewshell/pinsquirrel/commit/f24fbe1cdaeef5af1b41bd2e380e56795047affa))
+* **services:** keep the token endpoint off the CIMD fetch path ([72b773d](https://github.com/andrewshell/pinsquirrel/commit/72b773db26091e2c63d3ab4ac7307a17e8d4d9a8))
+* **services:** match redirect URIs with the RFC 8252 loopback rule ([3a74bef](https://github.com/andrewshell/pinsquirrel/commit/3a74bef4ab91129676fa0dd03ecae173673961ca))
+* **services:** register DCR clients, list and revoke grants ([038ca17](https://github.com/andrewshell/pinsquirrel/commit/038ca17b167f343de310e341d54e3305c9c7313a))
+* **services:** resolve a bearer token to its principal ([555f4a4](https://github.com/andrewshell/pinsquirrel/commit/555f4a4bb1007a28ee7a4fedffa41e54c8c83752))
+* **services:** resolve an OAuth client, CIMD first ([93950b5](https://github.com/andrewshell/pinsquirrel/commit/93950b526176bd14773ecd007ae07cf098a46b34))
+* **services:** resolve and grant an authorization request ([d60973f](https://github.com/andrewshell/pinsquirrel/commit/d60973f4c575e8c21609d7979cc2f982e9126387))
+* **services:** rotate refresh tokens and detect a replay ([70cd2f3](https://github.com/andrewshell/pinsquirrel/commit/70cd2f3ce6bb34debe2c3ef124cf9c4f36ba82ac))
+* **services:** sweep the OAuth stores and wire the service up ([8724ece](https://github.com/andrewshell/pinsquirrel/commit/8724ecee5959082e49abc5b0454d203d5be53a98))
+* **services:** validate the OAuth wire formats ([1e9d84c](https://github.com/andrewshell/pinsquirrel/commit/1e9d84c5c11bb069c195a7f76688a9aa61f2a683))
+* ship a script-src 'self' Content-Security-Policy (2.18) ([28ad4e4](https://github.com/andrewshell/pinsquirrel/commit/28ad4e4547b6a7aebbc42889152def23754f0ee5))
+* sweep expired sessions and reset tokens (2.5) ([d0a7dad](https://github.com/andrewshell/pinsquirrel/commit/d0a7dad7ece00d13c9824c77a0d849a00f971e0f))
+
+
+### Bug Fixes
+
+* close the /\evil.com open redirect after sign-in (1.9) ([89d8983](https://github.com/andrewshell/pinsquirrel/commit/89d89835910b27074904ed2584f960ed8604342e))
+* confirm profile changes with a flash and a redirect (2.13) ([0e0b889](https://github.com/andrewshell/pinsquirrel/commit/0e0b88947b157fe58e483164d07330c6b75a4dcd))
+* enforce one account per email at the database (1.6) ([77e9ac2](https://github.com/andrewshell/pinsquirrel/commit/77e9ac232ae73250fe4255ff34a906881a094249))
+* escape interpolated values in the HTML email bodies (2.30) ([080ee4f](https://github.com/andrewshell/pinsquirrel/commit/080ee4f300db02eb9f56e44e9ccbc2e2c819c21d))
+* escape LIKE wildcards in the pin search term (2.12) ([b961444](https://github.com/andrewshell/pinsquirrel/commit/b961444ef7be8de24d0bc93d36f7a9fd8f0455f7))
+* fall back to page 1 for a non-numeric ?page (2.11) ([55e7026](https://github.com/andrewshell/pinsquirrel/commit/55e70265bf4154331dc11912780921ad18d8ef7c))
+* give toggle-read the same contract as its sibling routes (2.16) ([b5c6bb5](https://github.com/andrewshell/pinsquirrel/commit/b5c6bb5c82e9846669cfc8929a2f7cdd5023dc2b))
+* **hono:** build an MCP server and transport per request ([d1e8213](https://github.com/andrewshell/pinsquirrel/commit/d1e821312c039412afdd35a0b75446b74fb82ed7))
+* honour forwarding headers only behind a trusted proxy (1.8) ([abda250](https://github.com/andrewshell/pinsquirrel/commit/abda25070cc11bda921039e8be066ec19252e642))
+* keep the duplicate-pin link inside private mode (2.15) ([2de9ff8](https://github.com/andrewshell/pinsquirrel/commit/2de9ff811650fbb764dc649ec692e85f3cf2627f))
+* make fetchOrCreateByNames survive a concurrent create (1.5) ([afa39d9](https://github.com/andrewshell/pinsquirrel/commit/afa39d93902716a9696ab06d32aeb69f36ea1be6))
+* make sign-out POST-only (1.10) ([7a1a9ef](https://github.com/andrewshell/pinsquirrel/commit/7a1a9ef24c30202915cb7ba73b0181f4577f9d1b))
+* match SSRF-blocked addresses by CIDR, not string prefix (1.12) ([4c3fedc](https://github.com/andrewshell/pinsquirrel/commit/4c3fedc0fbe338eb6e8ba83576da680f43912f83))
+* refuse hostnames that resolve into private ranges (1.12) ([ebbffa3](https://github.com/andrewshell/pinsquirrel/commit/ebbffa3f79b130d54eb24b9e3a6bd9bc4697d5db))
+* report another user's pin as missing on the public surfaces (1.11) ([82fc005](https://github.com/andrewshell/pinsquirrel/commit/82fc005149f7c881782e7d867bcc46cc28b2adab))
+* report another user's pin or tag as missing over API and MCP (1.11) ([5f44477](https://github.com/andrewshell/pinsquirrel/commit/5f44477dae739f14355d556c385dd6b92439c764))
+* report metadata-fetch failures in the status line (2.14) ([fde07a0](https://github.com/andrewshell/pinsquirrel/commit/fde07a031c837d0ee4c4782e750e80d31b1c7727))
+* restrict pin urlSchema to http and https (1.7) ([faf9902](https://github.com/andrewshell/pinsquirrel/commit/faf99023d4443e5a123c24299c9a07ed4faa0691))
+* send Mailgun requests to the configured region (2.29) ([f33d48d](https://github.com/andrewshell/pinsquirrel/commit/f33d48df90e718308564523a4641da8f89873159))
+* stop casting parsed form fields to string in auth.tsx (2.17) ([836683a](https://github.com/andrewshell/pinsquirrel/commit/836683af66a88081d884a38147164f4d294b9439))
+* stop nesting sentences inside the id error templates (2.25) ([a483b0f](https://github.com/andrewshell/pinsquirrel/commit/a483b0f4aa206e86f6c8de46f92d8b70d67f2c1c))
+* write a pin and its tags in one transaction (1.4, 2.37) ([261744f](https://github.com/andrewshell/pinsquirrel/commit/261744f4b19859453614342d5631b31f172036eb))
+
+
+### Performance Improvements
+
+* index pins on (user_id, created_at) (2.34) ([75b15a2](https://github.com/andrewshell/pinsquirrel/commit/75b15a22a052de0299402e3e08ca2e87c3d3d203))
+* load roles for a whole status batch in one query (2.35) ([f4d9a8e](https://github.com/andrewshell/pinsquirrel/commit/f4d9a8e50fe67a860dd8451348fa2ce79f566af6))
+* merge tags in three statements instead of per pin (2.36) ([17d869c](https://github.com/andrewshell/pinsquirrel/commit/17d869c26b4e09f54fb99b4999542b2414e775de))
+
 ## [3.4.1](https://github.com/andrewshell/pinsquirrel/compare/v3.4.0...v3.4.1) (2026-08-18)
 
 
