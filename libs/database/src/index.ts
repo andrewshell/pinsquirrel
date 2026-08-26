@@ -18,3 +18,4 @@ export { DrizzlePasswordResetRepository } from './repositories/password-reset.js
 export { DrizzleSessionRepository } from './repositories/session.js'
 export { DrizzleApiKeyRepository } from './repositories/api-key.js'
 export { DrizzleOAuthClientRepository } from './repositories/oauth-client.js'
+export { DrizzleOAuthAuthorizationCodeRepository } from './repositories/oauth-authorization-code.js'
