@@ -1,4 +1,10 @@
-import type { Tag, TagWithCount } from './types.ts'
+import type {
+  PaginatedPins,
+  Pagination,
+  Pin,
+  Tag,
+  TagWithCount,
+} from './types.ts'
 
 /**
  * `fetch`, with a bearer token already on it.
@@ -90,6 +96,32 @@ function isTagWithCount(value: unknown): value is TagWithCount {
   return isTag(value) && typeof (value as TagWithCount).pinCount === 'number'
 }
 
+function isPin(value: unknown): value is Pin {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.url === 'string' &&
+    typeof value.title === 'string' &&
+    Array.isArray(value.tagNames)
+  )
+}
+
+function isPagination(value: unknown): value is Pagination {
+  return (
+    isRecord(value) &&
+    typeof value.page === 'number' &&
+    typeof value.totalPages === 'number'
+  )
+}
+
+function isPaginatedPins(value: unknown): value is PaginatedPins {
+  return (
+    isRecord(value) &&
+    isArrayOf(isPin)(value.pins) &&
+    isPagination(value.pagination)
+  )
+}
+
 function isArrayOf<T>(
   guard: (value: unknown) => value is T
 ): (value: unknown) => value is T[] {
@@ -121,6 +153,30 @@ export class PinSquirrelApiClient {
       '/api/v1/tags',
       withCounts ? { withCounts: 'true' } : {},
       isArrayOf(withCounts ? isTagWithCount : isTag)
+    )
+  }
+
+  /**
+   * One page of the pins carrying a tag.
+   *
+   * `page` and `pageSize` are left off when they are not given, so the server's
+   * own defaults apply rather than a second set of defaults drifting here.
+   */
+  async getPinsForTag(
+    tagId: string,
+    page?: number,
+    pageSize?: number
+  ): Promise<PaginatedPins> {
+    const query: Record<string, string> = {}
+    if (page !== undefined) query.page = String(page)
+    if (pageSize !== undefined) query.pageSize = String(pageSize)
+
+    // A tag id is a server-generated opaque string, but it goes into a path
+    // segment, so it is encoded rather than trusted to contain no `/` or `?`.
+    return this.get(
+      `/api/v1/tags/${encodeURIComponent(tagId)}/pins`,
+      query,
+      isPaginatedPins
     )
   }
 

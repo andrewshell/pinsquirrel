@@ -48,6 +48,68 @@ describe('getTags', () => {
   })
 })
 
+const PIN = {
+  id: 'pin-1',
+  userId: 'user-1',
+  url: 'https://example.com/article',
+  title: 'An article',
+  description: null,
+  readLater: false,
+  isPrivate: false,
+  tagNames: ['reading'],
+  createdAt: '2026-08-01T00:00:00.000Z',
+  updatedAt: '2026-08-01T00:00:00.000Z',
+}
+
+/** The pagination block the server computes, for a single full page. */
+function pageOf(pins: unknown[], page = 1, totalCount = pins.length) {
+  const pageSize = 100
+  return {
+    pins,
+    pagination: {
+      totalCount,
+      page,
+      pageSize,
+      offset: (page - 1) * pageSize,
+      totalPages: Math.max(1, Math.ceil(totalCount / pageSize)),
+      hasNext: page * pageSize < totalCount,
+      hasPrevious: page > 1,
+    },
+  }
+}
+
+describe('getPinsForTag', () => {
+  it('reads a page of pins off GET /api/v1/tags/:id/pins', async () => {
+    const body = pageOf([PIN])
+    const { client, server } = clientOver({
+      [`${BASE_URL}/api/v1/tags/tag-1/pins`]: jsonResponse(body),
+    })
+
+    await expect(client.getPinsForTag('tag-1')).resolves.toEqual(body)
+    expect(server.urls).toEqual([`${BASE_URL}/api/v1/tags/tag-1/pins`])
+  })
+
+  it('asks for the page and size it was given', async () => {
+    const url = `${BASE_URL}/api/v1/tags/tag-1/pins?page=2&pageSize=50`
+    const { client, server } = clientOver({
+      [url]: jsonResponse(pageOf([PIN], 2, 150)),
+    })
+
+    await client.getPinsForTag('tag-1', 2, 50)
+
+    expect(server.urls).toEqual([url])
+  })
+
+  it('encodes a tag id that is not URL-safe into the path', async () => {
+    const url = `${BASE_URL}/api/v1/tags/a%2Fb%20c/pins`
+    const { client, server } = clientOver({ [url]: jsonResponse(pageOf([])) })
+
+    await client.getPinsForTag('a/b c')
+
+    expect(server.urls).toEqual([url])
+  })
+})
+
 describe('failures', () => {
   it('throws the status and the message the API gave for a non-2xx', async () => {
     const { client } = clientOver({
