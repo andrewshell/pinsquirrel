@@ -12,7 +12,10 @@ vi.mock('../utils/crypto.js', () => {
   }
 })
 import type {
+  AuthorizationCode,
+  CreateOAuthTokenData,
   HttpFetcher,
+  OAuthToken,
   User,
   OAuthAuthorizationCodeRepository,
   OAuthClient,
@@ -25,6 +28,7 @@ import {
   OAuthAccessDeniedError,
   OAuthInvalidClientError,
   OAuthInvalidClientMetadataError,
+  OAuthInvalidGrantError,
   OAuthInvalidRequestError,
   OAuthInvalidScopeError,
   OAuthInvalidTargetError,
@@ -102,6 +106,40 @@ function makeClient(overrides: Partial<OAuthClient> = {}): OAuthClient {
     metadataFetchedAt: new Date(),
     completedAt: null,
     createdAt: new Date(),
+    ...overrides,
+  }
+}
+
+function makeCode(
+  overrides: Partial<AuthorizationCode> = {}
+): AuthorizationCode {
+  return {
+    id: 'code-1',
+    codeHash: 'hashed_raw-code',
+    clientId: CIMD_URL,
+    userId: user.id,
+    redirectUri: 'http://localhost:54321/callback',
+    codeChallenge: CODE_CHALLENGE,
+    scopes: ['pins:read', 'tags:read'],
+    resource: MCP_RESOURCE,
+    expiresAt: new Date(Date.now() + 60_000),
+    consumedAt: null,
+    createdAt: new Date(),
+    ...overrides,
+  }
+}
+
+function makeToken(
+  data: CreateOAuthTokenData,
+  overrides: Partial<OAuthToken> = {}
+): OAuthToken {
+  return {
+    id: `token-${data.kind}`,
+    revokedAt: null,
+    rotatedAt: null,
+    rotatedFrom: data.rotatedFrom ?? null,
+    createdAt: new Date(),
+    ...data,
     ...overrides,
   }
 }
@@ -511,5 +549,145 @@ describe('OAuthService.authorize', () => {
       })
     ).rejects.toBeInstanceOf(OAuthAccessDeniedError)
     expect(ctx.codeRepository.create).not.toHaveBeenCalled()
+  })
+})
+
+describe('OAuthService.exchangeAuthorizationCode', () => {
+  let ctx: ReturnType<typeof setup>
+
+  function tokenParams(
+    overrides: Record<string, unknown> = {}
+  ): Record<string, unknown> {
+    return {
+      grant_type: 'authorization_code',
+      code: 'raw-code',
+      redirect_uri: 'http://localhost:54321/callback',
+      client_id: CIMD_URL,
+      code_verifier: CODE_VERIFIER,
+      ...overrides,
+    }
+  }
+
+  beforeEach(() => {
+    ctx = setup()
+    vi.mocked(ctx.codeRepository.consume).mockResolvedValue(makeCode())
+    vi.mocked(ctx.tokenRepository.create).mockImplementation(data =>
+      Promise.resolve(makeToken(data))
+    )
+  })
+
+  it('exchanges a code for an access token bound to the requested resource', async () => {
+    const issued = await ctx.service.exchangeAuthorizationCode(tokenParams())
+
+    expect(ctx.codeRepository.consume).toHaveBeenCalledWith('hashed_raw-code')
+    expect(issued.tokenType).toBe('Bearer')
+    // Identifiable on sight if it is ever leaked or logged.
+    expect(issued.accessToken.startsWith('pso_')).toBe(true)
+    expect(issued.scopes).toEqual(['pins:read', 'tags:read'])
+    expect(issued.resource).toBe(MCP_RESOURCE)
+    expect(issued.expiresIn).toBeGreaterThan(0)
+
+    expect(ctx.tokenRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'access',
+        tokenHash: `hashed_${issued.accessToken}`,
+        clientId: CIMD_URL,
+        userId: user.id,
+        scopes: ['pins:read', 'tags:read'],
+        resource: MCP_RESOURCE,
+      })
+    )
+  })
+
+  it('issues no refresh token when offline_access was not granted', async () => {
+    const issued = await ctx.service.exchangeAuthorizationCode(tokenParams())
+
+    expect(issued.refreshToken).toBeNull()
+    expect(ctx.tokenRepository.create).toHaveBeenCalledOnce()
+  })
+
+  it('issues a refresh token bound to the same resource when offline_access was granted', async () => {
+    vi.mocked(ctx.codeRepository.consume).mockResolvedValue(
+      makeCode({ scopes: ['pins:read', 'offline_access'] })
+    )
+
+    const issued = await ctx.service.exchangeAuthorizationCode(tokenParams())
+
+    expect(issued.refreshToken).toBeTruthy()
+    expect(ctx.tokenRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'refresh',
+        tokenHash: `hashed_${issued.refreshToken ?? ''}`,
+        resource: MCP_RESOURCE,
+      })
+    )
+  })
+
+  // Single use is the repository's guarantee; a spent, expired or unknown code
+  // all arrive here the same way and all mean the same thing to the client.
+  it('refuses a code that was already spent, expired or never existed', async () => {
+    vi.mocked(ctx.codeRepository.consume).mockResolvedValue(null)
+
+    await expect(
+      ctx.service.exchangeAuthorizationCode(tokenParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+    expect(ctx.tokenRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses a verifier that does not hash to the stored challenge', async () => {
+    await expect(
+      ctx.service.exchangeAuthorizationCode(
+        tokenParams({
+          code_verifier: 'V-a-s-t-l-y-different-but-still-a-valid-PKCE-value',
+        })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+    expect(ctx.tokenRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses a code presented by a different client', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({ clientId: 'dcr_other' })
+    )
+
+    await expect(
+      ctx.service.exchangeAuthorizationCode(
+        tokenParams({ client_id: 'dcr_other' })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+  })
+
+  it('refuses a redirect URI that is not the one the code was issued to', async () => {
+    await expect(
+      ctx.service.exchangeAuthorizationCode(
+        tokenParams({ redirect_uri: 'http://localhost:54321/elsewhere' })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+  })
+
+  // RFC 8707: a repeated `resource` has to be the one the code was bound to,
+  // or the exchange would be a way to swap audiences after consent.
+  it('refuses a resource other than the one consent was given for', async () => {
+    await expect(
+      ctx.service.exchangeAuthorizationCode(
+        tokenParams({ resource: API_RESOURCE })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidTargetError)
+  })
+
+  it('accepts the resource repeated in a different but equivalent spelling', async () => {
+    const issued = await ctx.service.exchangeAuthorizationCode(
+      tokenParams({ resource: 'https://pinsquirrel.com/mcp/' })
+    )
+
+    expect(issued.resource).toBe(MCP_RESOURCE)
+  })
+
+  it('rejects a malformed token request as a validation failure', async () => {
+    await expect(
+      ctx.service.exchangeAuthorizationCode(
+        tokenParams({ code_verifier: undefined })
+      )
+    ).rejects.toBeInstanceOf(ValidationError)
   })
 })
