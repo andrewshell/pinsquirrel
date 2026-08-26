@@ -121,6 +121,35 @@ describe('NodeHttpFetcher', () => {
     })
   })
 
+  // CIMD documents are fetched from a caller-supplied URL, and a metadata URL
+  // that redirects is a misconfigured client rather than something to chase.
+  it('refuses to follow redirects when asked to', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('{}'),
+    })
+
+    await fetcher.fetch('https://example.com', { redirect: 'error' })
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://example.com',
+      expect.objectContaining({ redirect: 'error' })
+    )
+  })
+
+  // Every existing caller follows redirects, each hop re-checked by the
+  // dispatcher, so the option has to be absent unless it was asked for.
+  it('says nothing about redirects when no option is given', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('<html></html>'),
+    })
+
+    await fetcher.fetch('https://example.com')
+
+    expect(mockFetch.mock.calls[0][1]).not.toHaveProperty('redirect')
+  })
+
   it('should use custom timeout', async () => {
     const customFetcher = new NodeHttpFetcher(mockFetch, 3000)
     mockFetch.mockResolvedValue({
