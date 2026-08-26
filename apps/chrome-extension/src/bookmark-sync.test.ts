@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { findOrCreateFolder, syncTagFolder } from './bookmark-sync.ts'
+import {
+  findOrCreateFolder,
+  removeOrphanFolders,
+  syncTagFolder,
+} from './bookmark-sync.ts'
 import { stubChrome } from './test/chrome-mock.ts'
 import type { Pin } from './types.ts'
 
@@ -279,5 +283,48 @@ describe('syncTagFolder, ordering', () => {
       { id: expect.any(String), title: 'Newer', url: newer.url },
       { id: olderId, title: 'Older', url: older.url },
     ])
+  })
+})
+
+describe('removeOrphanFolders', () => {
+  it('removes a folder no selected tag is named after, contents and all', async () => {
+    const { bookmarks } = stubChrome()
+    const root = bookmarks.addFolder(bookmarks.barId, 'PinSquirrel')
+    const kept = bookmarks.addFolder(root, 'reading')
+    const orphan = bookmarks.addFolder(root, 'deselected')
+    bookmarks.addBookmark(orphan, 'A page', 'https://example.com/page')
+
+    await removeOrphanFolders(root, ['reading'])
+
+    expect(bookmarks.has(orphan)).toBe(false)
+    expect(bookmarks.childrenOf(root)).toEqual([{ id: kept, title: 'reading' }])
+  })
+
+  it('removes a second folder carrying an active tag name', async () => {
+    const { bookmarks } = stubChrome()
+    const root = bookmarks.addFolder(bookmarks.barId, 'PinSquirrel')
+    const first = bookmarks.addFolder(root, 'reading')
+    const duplicate = bookmarks.addFolder(root, 'reading')
+
+    await removeOrphanFolders(root, ['reading'])
+
+    expect(bookmarks.has(duplicate)).toBe(false)
+    expect(bookmarks.childrenOf(root)).toEqual([
+      { id: first, title: 'reading' },
+    ])
+  })
+
+  it('leaves a bookmark filed next to the tag folders alone', async () => {
+    const { bookmarks } = stubChrome()
+    const root = bookmarks.addFolder(bookmarks.barId, 'PinSquirrel')
+    const loose = bookmarks.addBookmark(
+      root,
+      'PinSquirrel',
+      'https://pinsquirrel.com'
+    )
+
+    await removeOrphanFolders(root, ['reading'])
+
+    expect(bookmarks.has(loose)).toBe(true)
   })
 })
