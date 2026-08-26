@@ -16,10 +16,10 @@ type OAuthGrantsCardProps = {
 /**
  * The applications a user has given access to, and the way to take it back.
  *
- * One entry per client and audience rather than per token: an authorization
- * mints an access token and a refresh token, and revoking takes the whole
- * family with it, so showing the plumbing would only invite somebody to revoke
- * half a grant.
+ * One entry per client, whatever it is authorized for: revoking takes every
+ * token the client holds, MCP and REST alike, so a row per audience would
+ * offer a Revoke button that does more than it says. The row lists what the
+ * client can reach instead.
  *
  * No inline script (CSP). A list and a form need none.
  */
@@ -46,7 +46,8 @@ export const OAuthGrantsCard: FC<OAuthGrantsCardProps> = ({ grants }) => (
                   {grant.clientName ?? grant.clientId}
                 </div>
                 <div class="text-xs text-muted-foreground">
-                  {resourceLabel(grant.resource)} · {grant.scopes.join(', ')}
+                  {grant.resources.map(resourceLabel).join(', ')} ·{' '}
+                  {grant.scopes.join(', ')}
                 </div>
                 <div class="text-xs text-muted-foreground">
                   Authorized {formatDate(grant.createdAt)} · Expires{' '}
