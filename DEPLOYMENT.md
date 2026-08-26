@@ -1,46 +1,36 @@
-# Production Deployment Guide
+# Production Deployment
 
-This guide covers deploying PinSquirrel to production with automatic database migrations.
+PinSquirrel ships as one Docker image built from `apps/hono/Dockerfile`, run behind a reverse
+proxy (Caddy) with a MySQL 8 database alongside it.
 
-## Migration Strategy
-
-PinSquirrel uses a **startup migration hook** pattern for production deployments. This ensures database migrations are automatically applied when the application starts or restarts.
-
-### How It Works
-
-1. **Migration Script**: `apps/hono/migrate-and-start.sh` runs migrations before starting the app
-2. **Docker Integration**: The migration script is included in the production Docker image
-3. **Automatic Execution**: Migrations run every time the container starts
-4. **Error Handling**: If migrations fail, the application won't start
-
-## Docker Build Process
-
-### Build Command
+## Build
 
 ```bash
-# Build from monorepo root (required for proper build context)
-docker build -f apps/hono/Dockerfile -t your-username/pinsquirrel:latest .
+# From the repo root — the build context is the whole monorepo
+docker build -f apps/hono/Dockerfile -t andrewshell/pinsquirrel:latest .
 
-# Or use the convenience script (builds and pushes to Docker Hub)
+# Or the script, which runs `pnpm quality` first and pushes to Docker Hub
 pnpm docker:build-push
+pnpm docker:build-push-skip-quality   # skip the gate
+pnpm docker:dry-run                   # build only
 ```
 
-### What's Included
+## Migrations
 
-The production Docker image includes:
+The container entrypoint is [`apps/hono/migrate-and-start.sh`](./apps/hono/migrate-and-start.sh):
+it defaults `NODE_ENV` to `production`, runs `drizzle-kit migrate`, exits non-zero if that fails,
+and only then starts the app. So every container start applies pending migrations, and a
+migration failure keeps the old schema from serving new code. The script's comments explain each
+step (notably the `--config.verify-deps-before-run=false` flag the runtime image needs).
 
-- Built Hono application
-- Static assets (CSS, JS, images)
-- Database migrations from `libs/database/src/migrations/`
-- Migration script with proper permissions
-- All necessary dependencies including `drizzle-kit`
+The database user needs CREATE, ALTER and DROP. Migrations are idempotent; nothing prevents two
+instances migrating at once, so start one instance first after a release that carries a
+migration.
 
-## Environment Setup
+## Environment
 
-### Environment Variables
-
-`apps/hono/.env.example` is the template; the table below is what each variable
-does in production.
+`apps/hono/.env.example` is the template; the table below is what each variable does in
+production.
 
 | Variable               | Required           | Default                   | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ---------------------- | ------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -59,34 +49,18 @@ does in production.
 | `NOTIFY_EMAIL`         | no                 | —                         | Address that receives a notification on each signup                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `EMAIL_PUBLIC_KEY`     | no                 | —                         | When set, signup emails are sealed to this key and this server can never decrypt them. Generate with `pnpm --filter @pinsquirrel/crypto keygen`; the private half stays with the admin console                                                                                                                                                                                                                                                                                                                                                                                                          |
 
-### Managed Database Configuration
-
-For managed MySQL databases (DigitalOcean, AWS RDS, etc.):
-
-- Use connection pooling if provided by your host
-- Configure SSL at the client/server level if required by your provider
-
-## Deployment Options
-
-### Option 1: DigitalOcean App Platform
-
-1. Create new app from GitHub repository
-2. Use `apps/hono/Dockerfile` as build configuration
-3. Set `DATABASE_URL`, `NODE_ENV=production` and `TRUST_PROXY=1` environment variables
-4. Deploy managed MySQL database separately
-
-### Option 2: Docker Compose with Dockge
+## Running it
 
 ```yaml
-version: '3.8'
 services:
   pinsquirrel:
-    image: your-username/pinsquirrel:latest
+    image: andrewshell/pinsquirrel:latest
     ports:
       - '8100:8100'
     environment:
       - DATABASE_URL=mysql://pinsquirrel:pinsquirrel@mysql:3306/pinsquirrel
       - NODE_ENV=production
+      - BASE_URL=https://pinsquirrel.com
       # The app sits behind Caddy, which sets x-forwarded-for.
       - TRUST_PROXY=1
     depends_on:
@@ -106,83 +80,9 @@ volumes:
   mysql_data:
 ```
 
-### Option 3: Self-hosted with External Database
-
-```bash
-docker run -d \
-  -p 8100:8100 \
-  -e DATABASE_URL="mysql://user:pass@your-db-host:3306/pinsquirrel" \
-  -e NODE_ENV=production \
-  -e TRUST_PROXY=1 \
-  your-username/pinsquirrel:latest
-```
-
-## Migration Process Details
-
-### Migration Script (`migrate-and-start.sh`)
-
-The container entrypoint is [`apps/hono/migrate-and-start.sh`](./apps/hono/migrate-and-start.sh).
-It defaults `NODE_ENV` to `production`, runs `db:migrate`, exits non-zero if the
-migration fails, and only then starts the app. Read the script rather than a copy
-of it here — the comments explain why each step is the way it is (notably the
-`--config.verify-deps-before-run=false` flag the runtime image needs).
-
-### Migration Safety
-
-- Migrations are idempotent (safe to run multiple times)
-- Script exits if migrations fail (prevents app from starting with wrong schema)
-- Drizzle handles migration versioning automatically
-- No manual database operations required
-
-## Troubleshooting
-
-### Migration Failures
-
-If migrations fail during startup:
-
-1. **Check database connectivity**:
-
-   ```bash
-   # Test connection string
-   mysql -h host -P 3306 -u user -p db
-   ```
-
-2. **Verify database permissions**:
-   - User must have CREATE, ALTER, DROP permissions
-   - User must be able to create tables and indexes
-
-3. **Check migration files**:
-   - Ensure all migration files are included in Docker image
-   - Verify migration journal is up to date
-
-### Container Logs
-
-```bash
-# View container logs to see migration progress
-docker logs <container-id>
-
-# Expected output:
-# Starting production deployment...
-# NODE_ENV: production
-# Running database migrations...
-# Database migrations completed successfully.
-# Starting PinSquirrel Hono application...
-```
-
-### Common Issues
-
-1. **Database URL Connection String**:
-   - Ensure proper encoding of special characters
-   - Configure SSL if required by your database provider
-   - Check firewall rules and network connectivity
-
-2. **Permission Issues**:
-   - Database user needs schema creation permissions
-   - Migration script must be executable (handled in Dockerfile)
-
-3. **Dependency Issues**:
-   - `drizzle-kit` must be in production dependencies
-   - All workspace packages must be available in container
+Startup logs read `Running database migrations...` → `Database migrations completed
+successfully.` → `Starting PinSquirrel Hono application...`; a stop before the last line is a
+migration failure, and the error above it is the one to read.
 
 ## Rate limiting
 
@@ -204,9 +104,7 @@ today, but that is the range to allow if a WAF or a firewall rule ever sits in
 front of `/mcp`, `/oauth/*` and the discovery documents. Blocking it blocks
 every hosted Claude connector.
 
-## Monitoring
-
-### Health Checks
+## Health check
 
 The application exposes a health check endpoint:
 
@@ -241,21 +139,3 @@ Database unreachable — **HTTP 503**, with `status` `degraded` and an added
 Point your orchestrator's health check at the status code, not the body: a
 degraded response is a real 503, so container readiness follows database
 connectivity without parsing JSON.
-
-### Backup Strategy
-
-Before major deployments:
-
-1. Take database backup
-2. Test migration on staging environment
-3. Monitor logs during production deployment
-4. Have rollback plan ready (restore from backup)
-
-## Future Improvements
-
-Consider these enhancements for larger scale deployments:
-
-1. **Init Container Pattern**: Separate migration container for orchestrated environments
-2. **Migration Locks**: Prevent concurrent migrations in multi-instance deployments
-3. **Migration Monitoring**: Structured logging and metrics for migration tracking
-4. **Backup Automation**: Automatic backups before migrations
