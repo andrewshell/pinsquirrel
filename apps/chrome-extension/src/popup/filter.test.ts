@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TagWithCount } from '../types.ts'
-import { filterTags } from './filter.ts'
+import { filterSelected, filterTags } from './filter.ts'
 
 function tag(id: string, name: string): TagWithCount {
   return {
@@ -51,5 +51,31 @@ describe('filterTags', () => {
 
   it('answers with nothing when no name contains the query', () => {
     expect(filterTags(TAGS, 'zzz')).toEqual([])
+  })
+})
+
+describe('filterSelected', () => {
+  it('keeps only the tags whose id is selected, in the order given', () => {
+    expect(
+      filterSelected(TAGS, new Set(['t3', 't1'])).map(match => match.id)
+    ).toEqual(['t1', 't3'])
+  })
+
+  it('answers with nothing when nothing is selected', () => {
+    expect(filterSelected(TAGS, new Set())).toEqual([])
+  })
+
+  it('ignores a selected id the account no longer has a tag for', () => {
+    expect(
+      filterSelected(TAGS, new Set(['t2', 'gone'])).map(match => match.id)
+    ).toEqual(['t2'])
+  })
+
+  it('composes with the text filter, both narrowing the list', () => {
+    expect(
+      filterSelected(filterTags(TAGS, 'us'), new Set(['t2', 't1'])).map(
+        match => match.id
+      )
+    ).toEqual(['t2'])
   })
 })

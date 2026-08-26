@@ -22,3 +22,19 @@ export function filterTags(
   if (needle === '') return tags
   return tags.filter(tag => tag.name.toLowerCase().includes(needle))
 }
+
+/**
+ * The tags that are selected, in the order they were given.
+ *
+ * Takes the selection rather than reading the boxes for the same reason the
+ * wiring holds it: the rows on screen are only what the text filter matched,
+ * and a selected tag it is hiding is still selected. Ids naming no tag in
+ * `tags` are simply not in the answer, so this composes with `filterTags` -
+ * hand it the matches and it narrows them to the picked ones.
+ */
+export function filterSelected(
+  tags: TagWithCount[],
+  selectedTagIds: ReadonlySet<string>
+): TagWithCount[] {
+  return tags.filter(tag => selectedTagIds.has(tag.id))
+}
