@@ -76,6 +76,14 @@ function click(selector: string): Promise<void> {
   return flush()
 }
 
+/** Type into the filter box the way a user does, and let the render happen. */
+function filter(query: string): Promise<void> {
+  const box = element<HTMLInputElement>('#tag-filter')
+  box.value = query
+  box.dispatchEvent(new Event('input', { bubbles: true }))
+  return flush()
+}
+
 const settingsShown = () => !element('#settings-view').hidden
 const mainShown = () => !element('#main-view').hidden
 const status = () => element('#status').textContent
@@ -233,6 +241,23 @@ describe('initPopup, with a connection stored', () => {
     await flush()
 
     expect(chrome.local.items.selectedTagIds).toEqual([])
+  })
+
+  it('draws only the tags whose name matches what was typed', async () => {
+    await initPopup(harness().deps)
+
+    await filter('rust')
+
+    expect(checkboxes().map(box => box.value)).toEqual(['t2'])
+  })
+
+  it('draws the whole list again when the box is cleared', async () => {
+    await initPopup(harness().deps)
+
+    await filter('rust')
+    await filter('')
+
+    expect(checkboxes().map(box => box.value)).toEqual(['t1', 't2'])
   })
 
   it('shows how long ago the last sync ran', async () => {

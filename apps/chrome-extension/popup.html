@@ -44,8 +44,14 @@
         cursor: progress;
         opacity: 0.6;
       }
+      #tag-filter {
+        width: 100%;
+        box-sizing: border-box;
+        margin-bottom: 6px;
+        padding: 6px;
+      }
       #tag-list {
-        max-height: 220px;
+        max-height: 300px;
         overflow-y: auto;
         margin-bottom: 8px;
         border: 1px solid rgba(128, 128, 128, 0.4);
@@ -117,6 +123,14 @@
       <!-- Shown once connected: tag selection, sync controls, status. -->
       <section id="main-view" hidden>
         <p id="connected-to" class="muted"></p>
+        <input
+          id="tag-filter"
+          type="search"
+          placeholder="Filter tags…"
+          aria-label="Filter tags"
+          autocomplete="off"
+          spellcheck="false"
+        />
         <div id="tag-list"></div>
         <p id="last-sync" class="muted"></p>
         <p id="sync-error" class="error" hidden></p>

@@ -2,6 +2,7 @@ import { ReauthorizationRequiredError } from '../auth.ts'
 import type { ConnectResponse, SyncResponse } from '../messages.ts'
 import * as storage from '../storage.ts'
 import type { TagWithCount } from '../types.ts'
+import { filterTags } from './filter.ts'
 import { formatLastSync, parseBaseUrl } from './format.ts'
 import { renderTagList, selectedTagIdsIn } from './render.ts'
 
@@ -55,6 +56,7 @@ function elements(doc: Document) {
     baseUrlInput: find<HTMLInputElement>('#base-url'),
     connectButton: find<HTMLButtonElement>('#connect'),
     connectedTo: find('#connected-to'),
+    tagFilter: find<HTMLInputElement>('#tag-filter'),
     tagList: find('#tag-list'),
     lastSync: find('#last-sync'),
     syncError: find('#sync-error'),
@@ -94,6 +96,17 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
 
   /** The server the popup is talking to, kept so a reconnect can prefill it. */
   let baseUrl: string | undefined
+
+  /**
+   * Every tag the account has, kept so filtering does not re-fetch.
+   *
+   * The list is drawn from this on every keystroke; the rendered rows are only
+   * ever the ones matching what is in the filter box.
+   */
+  let allTags: TagWithCount[] = []
+
+  /** The stored selection, as the last load or toggle left it. */
+  let selectedTagIds: string[] = []
 
   const setStatus = (text: string): void => {
     ui.status.textContent = text
@@ -157,10 +170,21 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
         deps.createApiClient(baseUrl).getTags(true),
         storage.get('selectedTagIds'),
       ])
-      renderTagList(ui.tagList, tags, selected ?? [])
+      allTags = tags
+      selectedTagIds = selected ?? []
+      drawTagList()
     } catch (error) {
       report(error)
     }
+  }
+
+  /** Draw the tags matching the filter box, ticked from the selection. */
+  function drawTagList(): void {
+    renderTagList(
+      ui.tagList,
+      filterTags(allTags, ui.tagFilter.value),
+      selectedTagIds
+    )
   }
 
   async function onConnect(): Promise<void> {
@@ -240,6 +264,9 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
   // One delegated listener, because the boxes themselves are replaced on
   // every render and per-box listeners would have to be re-attached each time.
   ui.tagList.addEventListener('change', () => void onTagToggled())
+  ui.tagFilter.addEventListener('input', () => {
+    drawTagList()
+  })
 
   const stored = await storage.getMany([
     'baseUrl',
