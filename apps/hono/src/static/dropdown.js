@@ -65,6 +65,16 @@ document.body.addEventListener('htmx:afterRequest', e => {
     target.classList.remove('is-loading')
   }
 })
+// htmx snapshots the page into history *before* it swaps the response in,
+// which is while the request is still in flight and `is-loading` is still on.
+// Restored as-is, the Back button lands on a dimmed list that no afterRequest
+// will ever clear. Strip the class from the snapshot instead.
+document.body.addEventListener('htmx:beforeHistorySave', e => {
+  const pinsContent = e.detail.historyElt?.querySelector('#pins-content')
+  if (pinsContent) {
+    pinsContent.classList.remove('is-loading')
+  }
+})
 
 // Close on escape key
 document.addEventListener('keydown', e => {
