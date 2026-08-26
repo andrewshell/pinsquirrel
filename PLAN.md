@@ -21,10 +21,10 @@ The Chrome extension is code-complete. `apps/chrome-extension/` builds a loadabl
 extension — esbuild bundles the two entry points into `dist/` alongside the manifest, popup and
 placeholder icons — `src/auth.ts` can connect, refresh and disconnect against a real server, over
 `src/storage.ts` and `src/oauth-metadata.ts`, `src/api-client.ts` reads tags and a tag's pins over
-that connection, `src/popup.ts` connects, lists tags, records the selection and asks for a sync,
+that connection, `src/popup.ts` lists tags, records the selection and asks the worker to connect or to sync,
 `src/bookmark-sync.ts` turns the selected tags into bookmark folders and records what happened in
-storage, and `src/background.ts` runs one on startup, on an hourly alarm, and whenever the popup
-asks. All of it is covered by tests against an in-memory `chrome`.
+storage, and `src/background.ts` runs the consent flow and runs a sync on startup, on an hourly
+alarm, and whenever the popup asks. All of it is covered by tests against an in-memory `chrome`.
 
 What is left is 5g: driving the whole thing in a real Chrome against a real server. Nothing in
 the extension has ever met a live consent screen, a real `chrome.identity` redirect or a real
@@ -122,6 +122,11 @@ the `https://pinsquirrel.com/api/v1` resource.
     the protected-resource document rather than assembled, so it matches the audience byte for
     byte
   - Request `offline_access` so the service worker can refresh without reopening a browser tab
+  - `connect()` is called by the service worker, never by the popup. `launchWebAuthFlow` opens a
+    window, and Chrome destroys the action popup the moment that window takes focus — which
+    killed the flow after the server had issued the tokens and before anything stored them, so
+    the user was left with a live grant on their profile and a popup that still asked them to
+    connect. The worker outlives the popup, so it is where the flow belongs
   - Endpoints are discovered, not hardcoded: `src/oauth-metadata.ts` reads
     `/.well-known/oauth-protected-resource/api/v1`, follows `authorization_servers[0]` to the
     authorization-server document, and takes every endpoint from there. The RFC 9207 `iss` on
@@ -177,14 +182,15 @@ the `https://pinsquirrel.com/api/v1` resource.
 
 - [x] Create `apps/chrome-extension/src/popup.ts`
   - It is the entry point and nothing else. The wiring is `initPopup(deps)` in
-    `src/popup/init.ts`, which takes the four things a test cannot run — `connect`, `disconnect`,
-    a `PinSquirrelApiClient` factory, and `requestSync` — as arguments, so the popup is driven in
+    `src/popup/init.ts`, which takes the four things a test cannot run — `requestConnect`,
+    `disconnect`, a `PinSquirrelApiClient` factory, and `requestSync` — as arguments, so the
+    popup is driven in
     happy-dom with none of them and no module mocking. Storage is not among them: it is already
     behind `chrome.storage.local`, which the tests stub at the `chrome` global. The pure pieces
     sit beside it — `src/popup/format.ts` (the base URL, the last-sync wording) and
     `src/popup/render.ts` (the tag checkboxes)
   - Settings view (unconfigured): URL input defaulted to `https://pinsquirrel.com`, and a
-    "Connect" button that launches the OAuth flow. Only an origin is accepted — both well-known
+    "Connect" button that asks the worker to run the OAuth flow. Only an origin is accepted — both well-known
     documents are read from the root of the base URL, so `https://host/app` would send discovery
     where the server does not publish, and saying so in the input beats a 404 halfway through
     consent
@@ -197,17 +203,24 @@ the `https://pinsquirrel.com/api/v1` resource.
     as it loses focus and there is nowhere to put a Save button — and reads `lastSyncAt` and
     `lastSyncError`, which 5e and 5f write. It re-reads those two after every sync rather than
     tracking them, since the worker also syncs while the popup is shut
-  - Connect calls `connect(baseUrl)`, Disconnect calls `disconnect()`, and a
+  - Connect calls `requestConnect(baseUrl)` and Disconnect calls `disconnect()` in the popup
+    itself — Disconnect opens no window, so nothing tears the popup down mid-call. A
     `ReauthorizationRequiredError` out of any call is what puts the popup back on Connect — with
     the server prefilled and a notice saying why
-- [x] Define the message contract, which 5d's list did not name: "Sync Now" cannot do the sync
-      itself, because the popup is closed for most of one. `src/messages.ts` holds
-      `SyncRequest`, `SyncResponse` and the guards, imported by both halves, and `requestSync()`
-      wraps `chrome.runtime.sendMessage`. A failure travels as `{ ok: false, error }` rather than
+  - The popup is usually gone before a connect finishes, so the view the user sees is the one
+    `initPopup` picks on its _next_ open, from the tokens the worker left in storage. The
+    response to `requestConnect` is handled anyway, for the case where the popup survived
+- [x] Define the message contract, which 5d's list did not name: neither "Sync Now" nor
+      "Connect" can do the work itself, because the popup is closed for most of a sync and for
+      nearly all of a consent flow. `src/messages.ts` holds `SyncRequest`/`SyncResponse`,
+      `ConnectRequest`/`ConnectResponse` and the guards, imported by both halves, and
+      `requestSync()` / `requestConnect(baseUrl)` wrap `chrome.runtime.sendMessage`. A failure travels as `{ ok: false, error }` rather than
       a rejection: an exception thrown inside a message handler does not cross the channel. A
       worker that is not installed yet rejects the send and one that returns without answering
       resolves it with `undefined` — both come back as that same failure, because the popup has
-      the same job either way
+      the same job either way. `ConnectResponse` carries a `reauthorizationRequired` flag
+      because `ReauthorizationRequiredError` is a class and a class does not cross the channel —
+      only its message would arrive, and the popup renders that one failure differently
 - [x] Views as markup, not strings
   - `popup.html` carries both sections and every id the popup looks up, and the wiring tests
     parse that file rather than a fixture — the code finds its elements by id, and a fixture
@@ -269,8 +282,8 @@ the `https://pinsquirrel.com/api/v1` resource.
 
 - [x] Create `apps/chrome-extension/src/background.ts`
   - It is the entry point and nothing else, the same shape 5d gave the popup: the wiring is
-    `initBackground(deps)` in `src/background/init.ts`, and the two things a test cannot run —
-    `runSync` and somewhere to put a failure nobody is waiting for — are arguments. Registration
+    `initBackground(deps)` in `src/background/init.ts`, and the three things a test cannot run —
+    `runSync`, `connect`, and somewhere to put a failure nobody is waiting for — are arguments. Registration
     happens as the module is evaluated, which is the only moment MV3 offers: the worker is torn
     down between events and the file runs again to deliver the next one, so a listener registered
     after an `await` would miss the event that woke it
@@ -286,6 +299,12 @@ the `https://pinsquirrel.com/api/v1` resource.
         `false` for a message that is not one, so the worker does not hold a channel open for
         somebody else's listener. A sync already running is joined rather than started twice:
         one promise, cleared when it settles, handed to every caller
+  - [x] `chrome.runtime.onMessage` → run the popup's connect. Same shape as the sync:
+        `isConnectRequest()`, a `ConnectResponse`, `true` to keep the channel open, and one flow
+        at a time so a second request cannot open a second consent window. This lives here
+        rather than in the popup because Chrome destroys the action popup when the consent
+        window takes focus; the answer usually lands nowhere, and the tokens `connect` wrote are
+        what the next popup opens on
   - [x] Sync logic calls into `bookmark-sync.ts` — `runSync()` is the whole of it, and it
         already writes `lastSyncAt` / `lastSyncError`, so the worker's job is to run one at a
         time and turn a rejection into a `SyncResponse`
@@ -322,7 +341,9 @@ ten per IP per hour.
 
 - [ ] Load extension unpacked in Chrome
 - [ ] Connect via the OAuth flow: consent screen appears, `launchWebAuthFlow` closes cleanly,
-      tokens land in `chrome.storage.local`
+      tokens land in `chrome.storage.local`. The popup will vanish as the consent window opens —
+      that is expected, and reopening it is how you see the result. Watch the flow in the service
+      worker's DevTools, not the popup's, which is gone by then
 - [ ] Select tags, sync, verify bookmark folders created
 - [ ] Add/remove pin on website, re-sync, verify bookmarks update
 - [ ] Deselect tag, sync, verify folder removed
