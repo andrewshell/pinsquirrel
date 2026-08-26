@@ -1,36 +1,23 @@
 # PinSquirrel API, OAuth & Chrome extension plan
 
-## Overview
+## Status (verified 2026-08-26)
 
 PinSquirrel serves a read-only REST API at `/api/v1` (pins, a single pin, tags, and the pins for
 a tag), an OpenAPI 3.1 spec at `/api/openapi.json` rendered with Scalar at `/api/docs`, and an
 MCP endpoint at `/mcp` with three read-only tools. OAuth 2.1 is the single authentication path
 for both, with PinSquirrel acting as its own authorization server and `/mcp` and `/api/v1`
-standing as two separately-identified protected resources. The Chrome extension that syncs
-bookmarks over `/api/v1` is built and tested. What remains is the read-write MCP tools that need
-a `pins:write` scope.
+standing as two separately-identified protected resources. It has been driven end to end by real
+clients — Claude Code over CIMD, claude.ai as a custom connector, and the Chrome extension over
+DCR — and in process against the real app and database in `apps/hono/src/oauth-e2e.test.ts`.
 
-## Current status (verified 2026-08-26)
+The Chrome extension (`apps/chrome-extension/`, its README is the reference) syncs selected tags
+into bookmark folders over `/api/v1` and is built and tested in a real Chrome. Distribution
+beyond "load unpacked" is deferred.
 
-The REST API, the docs, `/mcp` and the whole OAuth 2.1 authorization server are shipped and on
-`main`. `Authorization: Bearer` carrying an OAuth `pso_` access token bound to the right resource
-is the only way to reach either one. OAuth has been driven end to end by real clients — Claude
-Code over CIMD and a loopback redirect, claude.ai as a custom connector over the fixed callback —
-and in process against the real app and a real database in `apps/hono/src/oauth-e2e.test.ts`.
+The only open work is Phase 8. Everything else this plan once tracked has shipped; the reasoning
+that outlived the checklists is in the decision log below.
 
-The Chrome extension is code-complete. `apps/chrome-extension/` builds a loadable Manifest V3
-extension — esbuild bundles the two entry points into `dist/` alongside the manifest, popup and
-placeholder icons — `src/auth.ts` can connect, refresh and disconnect against a real server, over
-`src/storage.ts` and `src/oauth-metadata.ts`, `src/api-client.ts` reads tags and a tag's pins over
-that connection, `src/popup.ts` lists tags, records the selection and asks the worker to connect or to sync,
-`src/bookmark-sync.ts` turns the selected tags into bookmark folders and records what happened in
-storage, and `src/background.ts` runs the consent flow and runs a sync on startup, on an hourly
-alarm, and whenever the popup asks. All of it is covered by tests against an in-memory `chrome`.
-
-5g is done: the extension has been driven in a real Chrome against a real server — consent, the
-`chrome.identity` redirect, sync, refresh, revocation and the audience check. Phase 5 is complete.
-
-### Ground rules for new work
+## Ground rules
 
 CLAUDE.md's layering rule (apps call services, services call repositories) applies throughout and
 is not repeated here. On top of it:
@@ -63,303 +50,10 @@ is not repeated here. On top of it:
 - `/mcp` builds an `McpServer` and a `StreamableHTTPTransport` per request and closes both
   afterwards. Do not reintroduce a shared transport: it caps the process at one MCP session and
   maps responses back to requests by JSON-RPC id across every caller.
-
-## Open follow-ups
-
-- [ ] Read-write MCP tools. Own phase below; needs a `pins:write` scope.
-- [x] Decided what "disconnect" means for a client authorized for both `/mcp` and `/api/v1`:
-      a connection is a client, not a client and a resource. `revokeGrant` already took the whole
-      family, so `listGrants` now returns one row per client listing every audience it holds and
-      the profile card shows that row, rather than two rows whose Revoke buttons each did the
-      other's job too. No client needs both audiences today, so nothing is lost by revoking
-      both (Decision 19).
-- [x] `MAILGUN_BASE_URL` is wired through `apps/hono/src/lib/services.ts`, optional, for Mailgun EU.
-
----
-
-## Phase 5: Chrome extension
-
-The v1 REST endpoints it depends on (`GET /api/v1/tags`, `GET /api/v1/tags/{id}/pins`) are live
-and documented at `/api/docs`, so the API client can be written against the published OpenAPI
-spec. It authenticates with OAuth via `chrome.identity.launchWebAuthFlow` (Decision 17), against
-the `https://pinsquirrel.com/api/v1` resource.
-
-### 5a. Scaffold
-
-- [x] Create `apps/chrome-extension/package.json` (`@pinsquirrel/chrome-extension`)
-- [x] Create `apps/chrome-extension/tsconfig.json`
-- [x] Create `apps/chrome-extension/manifest.json` (Manifest V3)
-  - Permissions: `bookmarks`, `storage`, `alarms`, `identity` (required for
-    `launchWebAuthFlow`)
-  - Service worker: `background.js`
-  - Popup: `popup.html`
-  - Host permissions: `https://pinsquirrel.com/*` and `http://localhost:8100/*`
-- [x] Create `apps/chrome-extension/popup.html`
-- [x] Create build script (esbuild: bundle background.ts + popup.ts)
-  - `scripts/build.ts`, run by Node's type stripping. The list of files copied verbatim into
-    `dist/` is derived from the manifest by `scripts/manifest-assets.ts`, so an icon named in
-    `manifest.json` ships without the build script being edited
-- [x] Add icon placeholders
-
-### 5b. OAuth client
-
-- [x] Create `apps/chrome-extension/src/auth.ts`: authorization-code + PKCE via
-      `chrome.identity.launchWebAuthFlow` (Decision 17)
-  - Redirect URI is `chrome.identity.getRedirectURL()` →
-    `https://<extension-id>.chromiumapp.org/`. That is a fixed HTTPS callback, so none of the
-    loopback port-matching rules the server carries for native clients apply here
-  - ~~Register the extension as a CIMD client if it can host a metadata document, otherwise
-    DCR~~ — DCR, and there was never a choice: a CIMD `client_id` is an HTTPS URL the _client_
-    publishes a document at, and an extension has no origin to serve one from. The `client_id`
-    is cached in `chrome.storage.local` keyed by base URL; `invalid_client` from the exchange
-    drops it and runs the flow once more against a fresh registration
-  - Generate the PKCE verifier with `crypto.getRandomValues`; `S256` only. `src/pkce.ts`, pinned
-    to the RFC 7636 Appendix B vector
-  - Request `resource=https://pinsquirrel.com/api/v1` (RFC 8707), not the `/mcp` resource.
-    A token minted for `/mcp` must not work here (Decision 16). The identifier is read out of
-    the protected-resource document rather than assembled, so it matches the audience byte for
-    byte
-  - Request `offline_access` so the service worker can refresh without reopening a browser tab
-  - `connect()` is called by the service worker, never by the popup. `launchWebAuthFlow` opens a
-    window, and Chrome destroys the action popup the moment that window takes focus — which
-    killed the flow after the server had issued the tokens and before anything stored them, so
-    the user was left with a live grant on their profile and a popup that still asked them to
-    connect. The worker outlives the popup, so it is where the flow belongs
-  - Endpoints are discovered, not hardcoded: `src/oauth-metadata.ts` reads
-    `/.well-known/oauth-protected-resource/api/v1`, follows `authorization_servers[0]` to the
-    authorization-server document, and takes every endpoint from there. The RFC 9207 `iss` on
-    the redirect is checked against the issuer it named
-- [x] Token storage and refresh
-  - Persist tokens in `chrome.storage.local`; never in `chrome.storage.sync` (it replicates
-    across a user's machines and is not a secret store). `src/storage.ts` is the only module
-    that names a storage area
-  - Refresh on `401`, then retry once; on `invalid_grant`, drop the tokens and re-prompt consent
-    — `authorizedFetch()` does the retry, and the re-prompt signal is a distinguishable
-    `ReauthorizationRequiredError`. The user's `selectedTagIds` survive it
-  - Refresh-token rotation is mandatory server-side. Always persist the new refresh token from
-    the response that invalidated the old one, or the next refresh fails
-  - Concurrent refreshes share one in-flight promise. Two refreshes of the same token means one
-    loses the rotation race, and the server revokes the whole family for a replay
-- [x] `disconnect()`: `POST /oauth/revoke` the refresh token (which stands for the whole grant
-      server-side), then clear storage — including the cached registration — whether or not the
-      revocation reached the server
-
-### 5c. API client
-
-- [x] Add Tag, Pin and Pagination to `apps/chrome-extension/src/types.ts`, which 5b created with
-      `ExtensionStorage` and `StoredTokens` in it. `ExtensionStorage` carries two keys 5d's list
-      did not name: `clientId`, and `registeredClients` (base URL → dynamically registered
-      `client_id`)
-  - Four types, not three: `TagWithCount` joins them, because `withCounts` decides whether
-    `pinCount` is in the answer. Timestamps stay ISO 8601 strings — that is what came over the
-    wire, and nothing in the extension does date arithmetic with them
-- [x] Create `apps/chrome-extension/src/api-client.ts`
-  - `PinSquirrelApiClient` class (baseUrl + `authorizedFetch` from 5b, which owns the token, the
-    expiry and the `401` retry). The `fetch` is a constructor parameter rather than an import, so
-    a test hands it a stub and nothing below the seam knows a token exists
-  - `getTags(withCounts?)` → fetch `/api/v1/tags`. Overloaded on the argument: asking for counts
-    returns `TagWithCount[]`, so no caller checks for a field it already knows is there
-  - `getPinsForTag(tagId, page?, pageSize?)` → fetch `/api/v1/tags/:id/pins`. The id is
-    percent-encoded into the path; `page` and `pageSize` are only sent when given, so the
-    server's defaults stay the only defaults
-  - `getAllPinsForTag(tagId)` → paginate through all pages at `pageSize=100`, the cap
-    `pinListQuerySchema` enforces. The page count is taken from the first answer and not
-    re-read, so a server reporting a growing `totalPages` cannot spin the loop forever, and an
-    empty page inside the range ends it early
-  - Failures: a non-2xx becomes an `ApiError` carrying `status`, the message, and a `code` when
-    the server spelled the failure in RFC 6749 terms. The two error bodies are told apart by
-    `error_description` — a v1 route sends prose in `error`, the OAuth middleware sends a machine
-    code there — and the rate limiter's plain-text 429 falls back to the status rather than
-    surfacing a JSON parse error in place of the real one. A `ReauthorizationRequiredError` out
-    of the injected fetch passes through untouched: the popup branches on it
-  - A 200 is checked against the shape it claims to be before it is cast. Hand-written guards
-    over the fields the extension actually reads, not Zod — this package has no dependencies
-    (Decision 5)
-
-### 5d. Popup UI
-
-- [x] Create `apps/chrome-extension/src/popup.ts`
-  - It is the entry point and nothing else. The wiring is `initPopup(deps)` in
-    `src/popup/init.ts`, which takes the four things a test cannot run — `requestConnect`,
-    `disconnect`, a `PinSquirrelApiClient` factory, and `requestSync` — as arguments, so the
-    popup is driven in
-    happy-dom with none of them and no module mocking. Storage is not among them: it is already
-    behind `chrome.storage.local`, which the tests stub at the `chrome` global. The pure pieces
-    sit beside it — `src/popup/format.ts` (the base URL, the last-sync wording) and
-    `src/popup/render.ts` (the tag checkboxes)
-  - Settings view (unconfigured): URL input defaulted to `https://pinsquirrel.com`, and a
-    "Connect" button that asks the worker to run the OAuth flow. Only an origin is accepted — both well-known
-    documents are read from the root of the base URL, so `https://host/app` would send discovery
-    where the server does not publish, and saying so in the input beats a 404 halfway through
-    consent
-  - Main view (configured): a checkbox per tag with its pin count, "Sync Now", how long ago the
-    last sync ran, the last sync error if there is one, and "Disconnect". Disconnect revokes the
-    token server-side through `POST /oauth/revoke`, then clears local storage
-  - The tag list is filtered by a box above it, focused as the view opens: an account with a few
-    hundred tags is a list nobody scrolls. The match is a case-insensitive substring on the name
-    (`src/popup/filter.ts`), the list scrolls inside a fixed height, and a line under it counts
-    what is on screen against what the account has, plus how many are selected. The selection is
-    held in the popup and written whole, because reading it back off the boxes would drop every
-    tag the filter was hiding. A "Selected only" box beside the filter answers the other question
-    that list is too long for — what have I picked? — and the two narrowings compose. It is not
-    stored: a popup opening with four tags of four hundred because of a box ticked last week
-    looks broken. Nor does a tick re-render, so a tag unticked under selected-only keeps its row
-    until the user types or flips the toggle and can undo the mis-click
-  - Stores config in `chrome.storage.local` through `src/storage.ts`. 5b already writes
-    `baseUrl`, `clientId`, `accessToken`, `refreshToken`, `expiresAt` and `registeredClients`;
-    the popup writes `selectedTagIds` — the moment a box moves, because the popup closes as soon
-    as it loses focus and there is nowhere to put a Save button — and reads `lastSyncAt` and
-    `lastSyncError`, which 5e and 5f write. It re-reads those two after every sync rather than
-    tracking them, since the worker also syncs while the popup is shut
-  - Connect calls `requestConnect(baseUrl)` and Disconnect calls `disconnect()` in the popup
-    itself — Disconnect opens no window, so nothing tears the popup down mid-call. A
-    `ReauthorizationRequiredError` out of any call is what puts the popup back on Connect — with
-    the server prefilled and a notice saying why
-  - The popup is usually gone before a connect finishes, so the view the user sees is the one
-    `initPopup` picks on its _next_ open, from the tokens the worker left in storage. The
-    response to `requestConnect` is handled anyway, for the case where the popup survived
-- [x] Define the message contract, which 5d's list did not name: neither "Sync Now" nor
-      "Connect" can do the work itself, because the popup is closed for most of a sync and for
-      nearly all of a consent flow. `src/messages.ts` holds `SyncRequest`/`SyncResponse`,
-      `ConnectRequest`/`ConnectResponse` and the guards, imported by both halves, and
-      `requestSync()` / `requestConnect(baseUrl)` wrap `chrome.runtime.sendMessage`. A failure travels as `{ ok: false, error }` rather than
-      a rejection: an exception thrown inside a message handler does not cross the channel. A
-      worker that is not installed yet rejects the send and one that returns without answering
-      resolves it with `undefined` — both come back as that same failure, because the popup has
-      the same job either way. `ConnectResponse` carries a `reauthorizationRequired` flag
-      because `ReauthorizationRequiredError` is a class and a class does not cross the channel —
-      only its message would arrive, and the popup renders that one failure differently
-- [x] Views as markup, not strings
-  - `popup.html` carries both sections and every id the popup looks up, and the wiring tests
-    parse that file rather than a fixture — the code finds its elements by id, and a fixture
-    would let the two drift with no test noticing. Tag names are written with `textContent`, node
-    by node, because a tag is user data and this is the page holding the tokens
-  - Styling is an inline `<style>` in `popup.html`. The MV3 CSP forbids inline _scripts_, not
-    inline styles, and no manifest field names a stylesheet, so a `popup.css` would mean teaching
-    the build about an asset nothing points at
-
-### 5e. Bookmark sync
-
-- [x] Create `apps/chrome-extension/src/bookmark-sync.ts`
-  - `findOrCreateFolder(parentId, name)`: find or create a bookmark folder. A node with no `url`
-    is a folder, the same test the API uses; a _bookmark_ carrying the name is not a candidate,
-    since nothing can be filed under it
-  - `syncTagFolder(folderId, pins[])`: add missing bookmarks, remove extras, update changed
-    titles. Matching is by URL, compared as the exact string that came over the wire — Chrome
-    stores what it is given, so normalizing here would only stop a bookmark matching the pin it
-    was made from. The folder is left holding exactly one bookmark per pinned URL and nothing
-    else: a second bookmark for a URL pinned twice, and a subfolder someone filed inside a tag
-    folder, are both surplus and go. Order is newest pin first (`createdAt` descending, URL
-    breaking a tie), because Chrome keeps a folder in insertion order and the alternative is an
-    arrangement that depends on the history of syncs. An already-correct folder costs one
-    `getChildren` and no writes; a bookmark is only updated when its title moved and only moved
-    when its position did, always backwards, which is the direction where Chrome's same-parent
-    move index is unambiguous
-  - `removeOrphanFolders(parentFolderId, activeTagNames[])`: remove folders for deselected tags,
-    and a second folder carrying a name that is still active — `findOrCreateFolder` only ever
-    uses the first, so the rest are stale copies. Folders only: a bookmark the user filed beside
-    the tag folders is theirs, where a tag folder's whole contents are the extension's
-  - `syncAll({ apiClient, selectedTagIds })`: orchestrates the full sync:
-    1. Find/create "PinSquirrel" root folder in bookmark bar. The bar is found by walking
-       `getTree()` for the node whose `folderType` is `bookmarks-bar`, with `'1'` as the fallback
-       for a Chrome older than 134, rather than hardcoding the id
-    2. For each selected tag: find/create subfolder, fetch all pins, sync bookmarks. Tag _names_
-       come from `getTags()`, so a selected id the server no longer knows is skipped rather than
-       failing the run
-    3. Remove orphan subfolders
-    4. Store `lastSyncAt`, and clear or set `lastSyncError` — the popup renders both straight
-       from storage, so a run that fails silently reads as a run that succeeded. `lastSyncAt`
-       stays epoch milliseconds, which is what `ExtensionStorage` declares and what
-       `formatLastSync` subtracts from. A failed run leaves it alone: it means "when the
-       bookmarks were last correct". The failure is recorded _and_ rethrown, since 5f has to
-       answer the popup with it, and a `ReauthorizationRequiredError` is recorded as
-       "PinSquirrel needs to be reconnected: …" rather than as whatever the token layer called it
-  - `runSync()`, which 5e's list did not name: the argument-free form 5f calls. It reads
-    `baseUrl` and `selectedTagIds` back out of storage and builds the real
-    `PinSquirrelApiClient` over `authorizedFetch`, because a service worker wakes holding
-    nothing. `syncAll` stays injectable, so no test has to stand up a token to drive one. No
-    stored base URL raises the same `ReauthorizationRequiredError` a dead grant does, and does
-    not record a sync failure — the popup is on its Connect view either way
-  - `stubChrome` grew an in-memory `chrome.bookmarks` (`src/test/chrome-mock.ts`): a real tree
-    with a seeded bookmarks bar, `getTree`/`getChildren`/`create`/`update`/`move`/`remove`/
-    `removeTree`, and a log of every call made. The reconciliation is judged by the tree it
-    leaves behind rather than by a mock per call, and the call log is what pins down how many
-    round trips a sync costs
-
-### 5f. Background service worker
-
-- [x] Create `apps/chrome-extension/src/background.ts`
-  - It is the entry point and nothing else, the same shape 5d gave the popup: the wiring is
-    `initBackground(deps)` in `src/background/init.ts`, and the three things a test cannot run —
-    `runSync`, `connect`, and somewhere to put a failure nobody is waiting for — are arguments. Registration
-    happens as the module is evaluated, which is the only moment MV3 offers: the worker is torn
-    down between events and the file runs again to deliver the next one, so a listener registered
-    after an `await` would miss the event that woke it
-  - [x] `chrome.runtime.onStartup` → trigger sync
-  - [x] `chrome.runtime.onInstalled` → create the repeating `sync` alarm, 60 minutes.
-        `chrome.alarms.onAlarm` for that name syncs; any other name is ignored. Startup checks
-        the alarm too — `alarms.get` first, `create` only if it is missing, because creating an
-        alarm that already exists restarts its period and would push the next sync forever
-        forwards, and because Chrome does drop alarms
-  - [x] `chrome.runtime.onMessage` → answer the popup's manual sync. The contract is 5d's
-        `src/messages.ts`: `isSyncRequest()` to recognise it, a `SyncResponse` to answer with,
-        and the listener returns `true` so the channel stays open for the async answer — and
-        `false` for a message that is not one, so the worker does not hold a channel open for
-        somebody else's listener. A sync already running is joined rather than started twice:
-        one promise, cleared when it settles, handed to every caller
-  - [x] `chrome.runtime.onMessage` → run the popup's connect. Same shape as the sync:
-        `isConnectRequest()`, a `ConnectResponse`, `true` to keep the channel open, and one flow
-        at a time so a second request cannot open a second consent window. This lives here
-        rather than in the popup because Chrome destroys the action popup when the consent
-        window takes focus; the answer usually lands nowhere, and the tokens `connect` wrote are
-        what the next popup opens on
-  - [x] Sync logic calls into `bookmark-sync.ts` — `runSync()` is the whole of it, and it
-        already writes `lastSyncAt` / `lastSyncError`, so the worker's job is to run one at a
-        time and turn a rejection into a `SyncResponse`
-  - A scheduled sync runs only when storage holds a `baseUrl` _and_ a refresh token, which 5f's
-    list did not name. Without that check every browser startup and every alarm would raise
-    `ReauthorizationRequiredError` out of `runSync` and write a sync failure the user would read
-    on their first ever look at the popup. The refresh token is the half that matters — an
-    expired access token gets refreshed, a missing refresh token is a grant that is gone.
-    "Sync Now" is exempt: the user asked, so the reason nothing happened is the answer
-  - A scheduled sync's rejection is swallowed after `runSync` has recorded it, and logged
-    through an injected `BackgroundLogger` rather than by naming `console` — `no-console` is on
-    everywhere under `src/`, and the entry point is the one place the rule is turned off,
-    because a service worker's only output is DevTools
-  - `stubChrome` grew the `chrome.runtime` and `chrome.alarms` events (`src/test/chrome-mock.ts`):
-    stubs holding the listeners the code registered with a `fire()` that calls them, plus an
-    in-memory alarm registry. The worker is driven with no browser to wake it — the test is the
-    browser — and the alarm is judged by what exists afterwards rather than by a call assertion
-
-### 5g. Testing
-
-Against a dev server, nothing has to be reconfigured. `BASE_URL` defaults to
-`http://localhost:8100` outside production, which is already in the manifest's `host_permissions`,
-and the session cookie is only `Secure` in production, so plain http works in the auth window.
-Type `http://localhost:8100` into the popup — an origin, no path, which is all `parseBaseUrl`
-accepts. `/oauth/authorize` is behind `requireAuth()`, so be signed in to the app in the same
-Chrome profile first, or sign in inside the window `launchWebAuthFlow` opens.
-
-The redirect URI is `https://<extension-id>.chromiumapp.org/`, and it needs nothing on the server:
-registration accepts any https redirect, and the DCR `client_id` is derived from the metadata, so
-the same extension deduplicates to one row rather than one per connect. Chrome derives the ID of
-an unpacked extension from the directory path, so `dist/` keeps the same ID across reloads and a
-different checkout gets a different one — which is a second DCR row, and `/oauth/register` allows
-ten per IP per hour.
-
-- [x] Load extension unpacked in Chrome
-- [x] Connect via the OAuth flow: consent screen appears, `launchWebAuthFlow` closes cleanly,
-      tokens land in `chrome.storage.local`. The popup will vanish as the consent window opens —
-      that is expected, and reopening it is how you see the result. Watch the flow in the service
-      worker's DevTools, not the popup's, which is gone by then
-- [x] Select tags, sync, verify bookmark folders created
-- [x] Add/remove pin on website, re-sync, verify bookmarks update
-- [x] Deselect tag, sync, verify folder removed
-- [x] Force an access-token expiry and confirm the service worker refreshes and retries without
-      user interaction
-- [x] Revoke the grant from the profile page's Connected Applications card and confirm the
-      extension shows a re-consent prompt rather than silently failing forever
-- [x] Confirm a token minted for the `/mcp` resource is rejected by `/api/v1` (Decision 16)
+- Mount order in `apps/hono/src/app.tsx` is load-bearing: `.well-known`, `/oauth/token`,
+  `/oauth/register` and `/mcp` mount before `sessionMiddleware()` and `csrf()`, because a
+  bearer-authenticated or unauthenticated machine endpoint must not mint a session or demand a
+  CSRF token; `/oauth/authorize` and `/profile` mount after, because they are pages.
 
 ---
 
@@ -428,6 +122,25 @@ Deferred from the original MCP work until there is a concrete agent use case.
 4. The consent screen must name the connector and say it sends you back to `claude.ai`. Approve.
 5. Confirm the connector lists the tools and that a query returns your bookmarks.
 6. Check `/profile` shows the grant against MCP, and that revoking it disconnects the connector.
+
+### Chrome extension
+
+The extension's own README covers building it and loading `dist/` unpacked. Against a dev server
+nothing has to be reconfigured: `BASE_URL` defaults to `http://localhost:8100`, which is in the
+manifest's `host_permissions`, and the session cookie is only `Secure` in production.
+
+1. `pnpm db:up`, `pnpm dev`, and sign in to the app in the same Chrome profile —
+   `/oauth/authorize` is behind `requireAuth()`.
+2. Type `http://localhost:8100` into the popup: an origin, no path, which is all `parseBaseUrl`
+   accepts. Connect. The popup vanishes as the consent window opens — expected; reopen it to see
+   the result, and watch the flow in the service worker's DevTools, not the popup's.
+3. The redirect URI is `https://<extension-id>.chromiumapp.org/`, which needs nothing on the
+   server. The DCR `client_id` is derived from the metadata, so one extension dedups to one
+   `oauth_clients` row — but Chrome derives an unpacked extension's ID from its directory path,
+   so a second checkout is a second row, and `/oauth/register` allows ten per IP per hour.
+4. Tick tags, Sync Now, and check the bookmarks bar for a "PinSquirrel" folder. Revoke from
+   `/profile` and confirm the popup comes back on Connect with a notice rather than failing
+   silently.
 
 ---
 
@@ -522,77 +235,6 @@ Deferred from the original MCP work until there is a concrete agent use case.
     page lists one row per client naming every audience it holds, and revoking it takes both.
     Splitting families by audience would let a replay on one audience leave the other alive,
     which is the wrong direction for a security response, and no client uses both audiences.
-
-## Key files
-
-Where the API, MCP and OAuth code lives. All paths verified 2026-08-26.
-
-Domain:
-
-- `libs/domain/src/entities/oauth-client.ts`, `entities/oauth-grant.ts`: `OAuthClient`,
-  `AuthorizationCode`, `OAuthToken`
-- `libs/domain/src/interfaces/oauth-client-repository.ts`,
-  `oauth-authorization-code-repository.ts`, `oauth-token-repository.ts`
-- `libs/domain/src/errors/oauth.ts`: the nine RFC 6749 wire codes
-- `libs/domain/src/entities/access.ts`: `AccessControl`, `AccessGateable`
-- `libs/domain/src/entities/pagination.ts`: `Pagination`, including `totalCount`
-- `libs/domain/src/interfaces/http-fetcher.ts`: the `HttpFetcher` interface `OAuthService`
-  receives
-
-Database:
-
-- `libs/database/src/schema/oauth-clients.ts`, `oauth-authorization-codes.ts`,
-  `oauth-tokens.ts`: the hashed-secret-with-expiry table pattern, shared with `schema/sessions.ts`
-- `libs/database/src/repositories/oauth-client.ts`, `oauth-authorization-code.ts`,
-  `oauth-token.ts`
-- `libs/database/src/create-repositories.ts`: where every repository is constructed
-
-Services:
-
-- `libs/services/src/services/oauth.ts`: `OAuthService` — `resolveAuthorizationRequest`,
-  `authorize`, `exchangeAuthorizationCode`, `exchangeRefreshToken`, `verifyAccessToken`,
-  `registerClient`, `reconcileStaticClients`, `listGrants`, `revokeGrant`, `revokeToken`,
-  `resolveClient`. Also the scope constants and the token TTLs
-- `libs/services/src/validation/oauth.ts`: the request and client-metadata Zod schemas
-- `libs/services/src/validation/oauth-uri.ts`: `normalizeOAuthUri`,
-  `protectedResourceMetadataPath`, `isLoopbackRedirectHost`, `canonicalizeRedirectUri`,
-  `redirectUriMatches`, `matchRedirectUri`
-- `libs/services/src/services/maintenance.ts`: `sweepExpired()` / `SweepResult`, which OAuth
-  expiry joins
-- `libs/services/src/utils/crypto.ts`: `generateSecureToken()`, `hashToken()`
-- `libs/services/src/validation/url.ts`, `validation/zod-error.ts`
-- `libs/adapters/src/node-http-fetcher.ts`: the SSRF-guarded fetcher behind `HttpFetcher`
-
-App (`apps/hono/src`):
-
-- `lib/config.ts`: `resolveBaseUrl`, `createOAuthConfig`, `resolveStaticOAuthClients`,
-  `resourceLabel`, and the module-level `baseUrl` / `oauthConfig` / `staticOAuthClients`
-- `lib/services.ts`: the composition root. `lib/db.ts` destructures `createRepositories(db)`
-- `lib/expiry-sweep.ts`: the hourly `sweepExpired()` scheduler
-- `lib/oauth-error.ts`: `describeValidationError`, the `ValidationError` to RFC 6749
-  `error_description` flattening
-- `routes/oauth-metadata.ts`: the three discovery documents (two protected-resource, one
-  authorization-server), mounted pre-session by `createOAuthMetadataRoutes(oauthConfig)`
-- `routes/oauth.tsx`: `GET`/`POST /oauth/authorize`, the consent page
-- `routes/oauth-token.ts`: `POST /oauth/token` and `POST /oauth/revoke`
-- `routes/oauth-register.ts`: `POST /oauth/register` (RFC 7591 DCR fallback)
-- `middleware/oauth-auth.ts`: `oauthAuth(resource)`, `getOAuthPrincipal`, `getOAuthUser`
-- `middleware/www-authenticate.ts`: `bearerChallenge()`, shared by both resources
-- `middleware/rate-limit.ts` / `rate-limiter.ts`: `RateLimiter`, `rateLimitByIp`,
-  `rateLimitByClientId`, `getClientIp`, and the five OAuth/API limiters
-- `middleware/security-headers.ts`: the CSP the consent page and grants card satisfy;
-  `static/on-ready.js` is how page behaviour is attached
-- `middleware/session.ts`: `requireAuth()`, which `/oauth/authorize` reuses
-- `routes/api-v1.ts`: the four v1 routes as `OpenAPIHono` definitions
-- `routes/api-docs.ts`: `/api/openapi.json` and `/api/docs`, re-mounting v1 under `/v1`
-- `routes/api-internal.ts`: the session-authenticated frontend endpoints
-- `routes/mcp.ts`: the per-request server + transport; `mcp/server.ts` registers the tools,
-  `mcp/auth.ts` builds the SDK `AuthInfo`, `mcp/errors.ts` holds `mapDomainErrorToMcp()`
-- `views/pages/oauth-consent.tsx`, `views/pages/oauth-error.tsx`
-- `views/pages/profile/OAuthGrantsCard.tsx`: the "Connected Applications" card
-- `oauth-e2e.test.ts`: one whole OAuth connection in process against the real app and database
-- `app.tsx`: the mount order. `.well-known`, `/oauth/token`, `/oauth/register` and `/mcp` mount
-  before `sessionMiddleware()` and `csrf()`; `/oauth/authorize` and `/profile` after
 
 ## Reference
 
