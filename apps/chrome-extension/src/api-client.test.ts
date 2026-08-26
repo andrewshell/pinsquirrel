@@ -110,6 +110,70 @@ describe('getPinsForTag', () => {
   })
 })
 
+describe('getAllPinsForTag', () => {
+  /** `n` distinct pins, so a concatenation in the wrong order is visible. */
+  function pins(n: number, from = 0) {
+    return Array.from({ length: n }, (_, i) => ({
+      ...PIN,
+      id: `pin-${from + i}`,
+    }))
+  }
+
+  it('walks every page at the largest page size the server allows', async () => {
+    const total = 150
+    const { client, server } = clientOver({
+      [`${BASE_URL}/api/v1/tags/tag-1/pins?page=1&pageSize=100`]: jsonResponse(
+        pageOf(pins(100), 1, total)
+      ),
+      [`${BASE_URL}/api/v1/tags/tag-1/pins?page=2&pageSize=100`]: jsonResponse(
+        pageOf(pins(50, 100), 2, total)
+      ),
+    })
+
+    const all = await client.getAllPinsForTag('tag-1')
+
+    expect(all.map(p => p.id)).toEqual(pins(150).map(p => p.id))
+    expect(server.urls).toHaveLength(2)
+  })
+
+  it('stops at the page count the first answer gave, however the rest grow', async () => {
+    // A server whose every answer claims one more page than the last: an
+    // implementation that re-reads `totalPages` each time never stops.
+    let answered = 0
+    const { client, server } = clientOver({})
+    server.route(`${BASE_URL}/api/v1/tags/tag-1/pins?page=1&pageSize=100`, () =>
+      jsonResponse(pageOf(pins(100), 1, 200))
+    )
+    server.route(`${BASE_URL}/api/v1/tags/tag-1/pins?page=2&pageSize=100`, () =>
+      jsonResponse(pageOf(pins(100, 100), 2, 100 * (3 + answered++)))
+    )
+
+    const all = await client.getAllPinsForTag('tag-1')
+
+    expect(all).toHaveLength(200)
+    expect(server.urls).toHaveLength(2)
+  })
+
+  it('stops when a page inside the range comes back empty', async () => {
+    const { client, server } = clientOver({
+      [`${BASE_URL}/api/v1/tags/tag-1/pins?page=1&pageSize=100`]: jsonResponse(
+        pageOf(pins(100), 1, 300)
+      ),
+      [`${BASE_URL}/api/v1/tags/tag-1/pins?page=2&pageSize=100`]: jsonResponse(
+        pageOf([], 2, 300)
+      ),
+      [`${BASE_URL}/api/v1/tags/tag-1/pins?page=3&pageSize=100`]: jsonResponse(
+        pageOf(pins(100, 200), 3, 300)
+      ),
+    })
+
+    const all = await client.getAllPinsForTag('tag-1')
+
+    expect(all).toHaveLength(100)
+    expect(server.urls).toHaveLength(2)
+  })
+})
+
 describe('failures', () => {
   it('throws the status and the message the API gave for a non-2xx', async () => {
     const { client } = clientOver({

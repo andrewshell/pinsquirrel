@@ -128,6 +128,14 @@ function isArrayOf<T>(
   return (value): value is T[] => Array.isArray(value) && value.every(guard)
 }
 
+/**
+ * The largest page the server will serve.
+ *
+ * `pinListQuerySchema` caps `pageSize` at 100 and rejects anything larger with
+ * a 400, so this is the fewest round trips a full walk can take.
+ */
+const MAX_PAGE_SIZE = 100
+
 /** The PinSquirrel v1 REST API, as the extension reads it. */
 export class PinSquirrelApiClient {
   private readonly baseUrl: string
@@ -178,6 +186,29 @@ export class PinSquirrelApiClient {
       query,
       isPaginatedPins
     )
+  }
+
+  /**
+   * Every pin carrying a tag, page by page.
+   *
+   * The page count comes from the first response and is not re-read: a server
+   * that answered a growing `totalPages` on every request would otherwise keep
+   * this loop going forever, and a sync that never ends is worse than one that
+   * misses pins added while it ran - the next sync picks those up.
+   */
+  async getAllPinsForTag(tagId: string): Promise<Pin[]> {
+    const first = await this.getPinsForTag(tagId, 1, MAX_PAGE_SIZE)
+    const pins = [...first.pins]
+
+    for (let page = 2; page <= first.pagination.totalPages; page++) {
+      const next = await this.getPinsForTag(tagId, page, MAX_PAGE_SIZE)
+      // A page inside the reported range that comes back empty means the set
+      // shrank underneath the walk; there is nothing further to collect.
+      if (next.pins.length === 0) break
+      pins.push(...next.pins)
+    }
+
+    return pins
   }
 
   /**
