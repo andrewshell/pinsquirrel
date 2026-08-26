@@ -5,7 +5,7 @@
 A general-purpose REST API, API documentation, an MCP endpoint, OAuth 2.1 as the single
 authentication path for both, and a Chrome extension for bookmark syncing.
 
-## Current status (verified 2026-08-25)
+## Current status (verified 2026-08-26)
 
 > ### Architecture since 2026-08-17, and what Phase 6 now builds on
 >
@@ -54,6 +54,12 @@ authentication path for both, and a Chrome extension for bookmark syncing.
 >
 > The line-number references the 2026-08-17 revision carried (`app.tsx:63`, `api-auth.ts:19`,
 > `mcp/auth.ts:17-22`) are replaced below with symbol names. The review moved all of them.
+>
+> **Superseded in part, 2026-08-26.** Phase 7 landed, so every `ApiKeyService` /
+> `ApiKeyRepository` / `ApiKeysCard` reference in rules 1, 6 and 10 above names something that no
+> longer exists. They are kept as written because they are what Phase 6 was built against; the
+> shapes they describe survive in `OAuthService.verifyAccessToken`, in the `AccessControl` on
+> `listGrants` / `revokeGrant`, and in `OAuthGrantsCard.tsx`.
 
 > ### Auth pivot, decided 2026-08-17
 >
@@ -73,16 +79,20 @@ authentication path for both, and a Chrome extension for bookmark syncing.
 > via `chrome.identity.launchWebAuthFlow` and therefore now depends on Phase 6. Both `/mcp` and
 > `/api/v1` become OAuth protected resources with separate resource identifiers (Decision 18).
 
-**Phases 1-4 are shipped and on `main`.** Verified against the code: `api-keys` schema +
-`DrizzleApiKeyRepository`, `ApiKeyService`, profile-page key management UI, `/api/internal/*`,
+**Phases 3, 4, 6 and 7 are shipped and on `main`; Phases 1-2 shipped and have since been
+removed.** Verified against the code: `/api/internal/*`,
 `/api/v1/{pins,pins/:id,tags,tags/:id/pins}` via `OpenAPIHono`, `/api/openapi.json`, `/api/docs`
-(Scalar), and `/mcp` with the three read-only tools (`list_pins`, `get_pin`, `list_tags`).
-Phase 7 removes the API-key portions of Phases 1-2. They stay working until OAuth is proven
-end-to-end, then come out.
+(Scalar), `/mcp` with the three read-only tools (`list_pins`, `get_pin`, `list_tags`), and the
+full OAuth 2.1 authorization server behind both protected resources.
 
-**Phase 6 (OAuth 2.1) is the active next phase and the critical path for everything.**
-`/mcp` and `/api/v1/*` both depend on it, and so does Phase 5. The goal for MCP clients is
-unchanged. Paste the URL, click consent, connected. No hand-copied key.
+**Phase 7 is complete (2026-08-26).** The `ps_` API key path is gone: middleware, service,
+repository, entity, errors, profile card, and the `api_keys` table. OAuth is the only way to
+authenticate `/mcp` or `/api/v1`, which is what Decision 12 called for. A previously-issued
+`ps_` key now authenticates nothing anywhere.
+
+**Phase 6 (OAuth 2.1) is complete.** `/mcp` and `/api/v1/*` both authenticate through it, and so
+will Phase 5. The goal for MCP clients was met: paste the URL, click consent, connected. No
+hand-copied key.
 
 **Phase 5 (Chrome extension) is deferred and blocked on Phase 6.** `apps/chrome-extension/`
 does not exist, and its auth path is OAuth via `chrome.identity.launchWebAuthFlow` (Decision 19).
@@ -108,13 +118,20 @@ password checks) and 3.4.1 (production Docker build repaired for pnpm 11); then 
       there: five limiters, applied inside each route file.
 - [ ] Deferred read-write MCP tools. See Phase 3b-7. Gated on the `pins:write` scope
       from Phase 6, so do Phase 6 first.
-- [ ] Remove the API key infrastructure once OAuth is proven. New Phase 7.
+- [x] ~~Remove the API key infrastructure once OAuth is proven. New Phase 7.~~ Done 2026-08-26.
+      Phase 7 removed all of it, down to the `api_keys` table.
 - [x] ~~`/mcp` holds one MCP session per process, so two clients cannot be connected to one
       deployment at once, and the transport maps responses back to requests by JSON-RPC id
       across every caller.~~ Fixed 2026-08-25. `/mcp` now builds an `McpServer` and a
       `StreamableHTTPTransport` per request and closes both afterwards, the SDK's stateless
       pattern. See 6g for what the run found and what the change does. 6g's two real-client
       checks are no longer blocked.
+- [ ] Decide what "disconnect" means for a client authorized for both `/mcp` and `/api/v1`. The
+      profile page shows one row per client and audience, but `revokeGrant` revokes by user and
+      client, so revoking either row takes both. It errs towards revoking too much, and the same
+      family call is what a replayed refresh token has to trigger — a product decision, not a
+      defect. Phase 7 left it alone deliberately; with the API key card gone this is the only
+      revocation UI in the app. See 6g's notes for the full reasoning.
 - [ ] `MailgunConfig.baseUrl` is honoured by the email service but never set by
       `apps/hono/src/lib/services.ts`. Unrelated to OAuth; only matters if Mailgun EU is ever
       used. Wire a `MAILGUN_BASE_URL` env through when it does.
@@ -130,11 +147,11 @@ password checks) and 3.4.1 (production Docker build repaired for pnpm 11); then 
 
 ---
 
-## Phase 1: API key infrastructure (shipped, scheduled for removal)
+## Phase 1: API key infrastructure (shipped, removed 2026-08-26)
 
-> Shipped and working, but superseded by the 2026-08-17 auth pivot (Decision 12). Everything
-> below stays live until OAuth passes 6g, then comes out in Phase 7. Recorded as built, for
-> history. Do not extend it.
+> **Superseded** by the 2026-08-17 auth pivot (Decision 12) and **removed** by Phase 7 on
+> 2026-08-26. Nothing described below exists in the tree any more: no `ApiKey` entity, no
+> `ApiKeyRepository`, no `ApiKeyService`, no `api_keys` table. Recorded as built, for history.
 
 ### 1a. Domain layer
 
@@ -189,10 +206,11 @@ password checks) and 3.4.1 (production Docker build repaired for pnpm 11); then 
 
 ---
 
-## Phase 2: API key management UI (shipped, scheduled for removal)
+## Phase 2: API key management UI (shipped, removed 2026-08-26)
 
-> Superseded by the 2026-08-17 auth pivot (Decision 12). The OAuth grants list in 6f replaces
-> this card; Phase 7c tracks the removal.
+> **Superseded** by the 2026-08-17 auth pivot (Decision 12) and **removed** by Phase 7c on
+> 2026-08-26. The `OAuthGrantsCard` from 6f is the card in its place. Recorded as built, for
+> history.
 
 - [x] Update `apps/hono/src/routes/profile.tsx`
   - GET: fetch user's API keys via `apiKeyService.listApiKeys()`, pass to view
@@ -220,9 +238,10 @@ password checks) and 3.4.1 (production Docker build repaired for pnpm 11); then 
 
 ### 3b. Auth middleware
 
-> `apiKeyAuth()` and the `X-API-Key` header below are as-built history, superseded by the
-> 2026-08-17 auth pivot (Decision 12). Phase 6d adds a standalone OAuth middleware beside them;
-> Phase 7a deletes them.
+> **Superseded**: `apiKeyAuth()` and the `X-API-Key` header below are as-built history, replaced
+> by the 2026-08-17 auth pivot (Decision 12). Phase 6d added a standalone OAuth middleware beside
+> them; Phase 7a deleted them on 2026-08-26. `middleware/oauth-auth.ts` is what runs now, and
+> `X-API-Key` is read by nothing.
 
 - [x] Update `libs/domain/src/entities/pagination.ts` to add a `totalCount: number` readonly property (stored from `fromTotalCount()` first arg)
 - [x] Create `apps/hono/src/middleware/api-auth.ts`
@@ -1320,9 +1339,10 @@ before anything is removed. After Phase 7 there is no fallback credential to deb
   The suite needed somewhere to run, which is three small changes. `apps/hono/vitest.config.ts`
   pins `DATABASE_URL` to the same test database `libs/database` uses, so a `DATABASE_URL`
   exported in a shell can never be the one a test writes to. A `globalSetup`
-  (`src/test-support/database.ts`) applies the migrations additively through a new
-  `applyMigrations` export, rather than dropping every table the way `libs/database`'s own setup
-  does. And `turbo.json` orders `@pinsquirrel/hono#test` after `@pinsquirrel/database#test`, so
+  (`src/test-support/database.ts`) applies the migrations through a new `applyMigrations`
+  export, rather than dropping every table the way `libs/database`'s own setup does. (That
+  export described itself as additive-only until Phase 7's `DROP TABLE api_keys`; it still only
+  runs what has not run yet, which is the property this setup relies on.) And `turbo.json` orders `@pinsquirrel/hono#test` after `@pinsquirrel/database#test`, so
   that drop cannot land in the middle of this run.
 
 One smaller thing the run put in front of us, left as it is on purpose. The grants list groups
@@ -1331,8 +1351,8 @@ by client and audience, so a client authorized for both `/mcp` and `/api/v1` sho
 audience. Revoking either row therefore takes both. That errs towards revoking too much rather
 than too little, and the same family call is what a replayed refresh token has to trigger, so
 narrowing it is a product decision about what "disconnect" means rather than a defect to patch
-mid-phase. Worth settling before Phase 7 removes the API key card and this becomes the only
-revocation UI.
+mid-phase. Phase 7 landed on 2026-08-26 without touching it, so this is now the only revocation
+UI in the app and the question is still open. Tracked under "Open follow-ups".
 
 #### What the end-to-end run found: one MCP session per process (fixed)
 
@@ -1407,75 +1427,88 @@ mocked `mcpTransport` by name, so it now stands on the service the tool calls in
 
 ## Phase 7: Remove the API key path
 
-> **Gated on 6g passing, which it did on 2026-08-26.** OAuth is proven end-to-end against real
-> MCP clients (Claude Code over CIMD + loopback; claude.ai and ChatGPT as connectors over the
-> fixed callback) and against `/api/v1` in `oauth-e2e.test.ts`. The gate used to name the Chrome
-> extension as well, which was a mistake: Phase 5 has not started and is itself blocked on OAuth,
-> so read literally the gate could never open. The extension is built on the OAuth path Phase 7
-> leaves behind, not tested before it. Until this phase lands, `ps_` keys stay in the tree as an
-> already-disconnected fallback. That is the whole reason Phase 6 built alongside the key path
-> instead of replacing it in place.
+> **Complete, 2026-08-26.** Gated on 6g, which passed the same day: OAuth is proven end-to-end
+> against real MCP clients (Claude Code over CIMD + loopback; claude.ai and ChatGPT as connectors
+> over the fixed callback) and against `/api/v1` in `oauth-e2e.test.ts`. The gate used to name the
+> Chrome extension as well, which was a mistake: Phase 5 has not started and is itself blocked on
+> OAuth, so read literally the gate could never open. The extension is built on the OAuth path
+> Phase 7 leaves behind, not tested before it. Until this phase landed, `ps_` keys sat in the tree
+> as an already-disconnected fallback. That is the whole reason Phase 6 built alongside the key
+> path instead of replacing it in place.
 
 Decision 12 (rewritten) makes OAuth the only auth path. This phase collects the removal into one
 reviewable diff instead of letting it leak through Phase 6.
 
 ### 7a. Routes and middleware
 
-- [ ] Delete `apps/hono/src/middleware/bearer-auth.ts` and
+- [x] Delete `apps/hono/src/middleware/bearer-auth.ts` and
       `apps/hono/src/middleware/api-auth.ts` (`apiKeyAuth`, `getApiUser`, `getApiKey`)
-- [ ] Remove the `apiUser` / `apiKey` entries from the Hono `ContextVariableMap`
-- [ ] Confirm no route still references `X-API-Key`, and drop `apiKeyHeader` from the OpenAPI
-      security schemes if 6d has not already
-- [ ] `middleware/session.ts`: its header comment cites `ApiKeyService.authenticate` as the
+- [x] Remove the `apiUser` / `apiKey` entries from the Hono `ContextVariableMap`
+- [x] Confirm no route still references `X-API-Key`, and drop `apiKeyHeader` from the OpenAPI
+      security schemes if 6d has not already. 6d had: one `bearerAuth` scheme was already all
+      that was registered. The three tests asserting `X-API-Key` is rejected stay
+- [x] `middleware/session.ts`: its header comment cites `ApiKeyService.authenticate` as the
       service-side counterpart to session lookup. Point it at `OAuthService.verifyAccessToken`
 
 ### 7b. Service, database, domain
 
-- [ ] Delete `ApiKeyService`, its validation schema (`validation/api-key.ts`), and its tests
-- [ ] Delete `DrizzleApiKeyRepository`, the `ApiKeyRepository` interface, the `ApiKey` entity, and
+- [x] Delete `ApiKeyService`, its validation schema (`validation/api-key.ts`), and its tests
+- [x] Delete `DrizzleApiKeyRepository`, the `ApiKeyRepository` interface, the `ApiKey` entity, and
       the `api-key` error types; drop their exports from each package's `index.ts`
-- [ ] Remove `apiKeyRepository` from `createRepositories()` / the `Repositories` interface and
+- [x] Remove `apiKeyRepository` from `createRepositories()` / the `Repositories` interface and
       its test in `libs/database`, then from the destructuring in `lib/db.ts`; remove
       `apiKeyService` from `lib/services.ts`. (`apps/admin` never used it.)
-- [ ] Generate and run a migration dropping the `api_keys` table. Run it after the deploy that
+- [x] Generate and run a migration dropping the `api_keys` table. Run it after the deploy that
       removes the code. A migration that drops a table still referenced by running instances
-      takes the app down
+      takes the app down. Generated as `20260826121510_drop_api_keys`, a one-line
+      `DROP TABLE`, and **not run against any non-test database** — deploy it after the release
+      carrying this branch. Nothing referenced `api_keys` by foreign key; its only FK pointed
+      outward, at `users.id`. `applyMigrations` used to document itself as additive-only, which
+      this migration is the first to break, so its comment now says what it actually guarantees
 
 ### 7c. UI and docs
 
-- [ ] Delete `views/pages/profile/ApiKeysCard.tsx` and `static/api-key-copy.js`, drop the
+- [x] Delete `views/pages/profile/ApiKeysCard.tsx` and `static/api-key-copy.js`, drop the
       `apiKeys` / `newApiKey` props and the card line from `views/pages/profile.tsx`, and remove
       the `create-api-key` / `revoke-api-key` intents (and the `ApiKeyLimitExceededError` branch
       and the `listApiKeys` calls in the error path) from `routes/profile.tsx`; the
-      `OAuthGrantsCard` from 6f takes its place. Update `profile.test.tsx` accordingly
-- [ ] Purge `ps_` from the docs: `/api/docs` descriptions, README, and this plan's historical
-      decisions. The decisions get a "superseded" marker, not a silent edit
+      `OAuthGrantsCard` from 6f takes its place. Update `profile.test.tsx` accordingly. Both
+      intents now fall through to "Invalid action", which is what the replacement tests assert
+- [x] Purge `ps_` from the docs: `/api/docs` descriptions, README, and this plan's historical
+      decisions. The decisions get a "superseded" marker, not a silent edit. The `/api/docs`
+      descriptions had already been rewritten for OAuth in 6d, and neither README.md nor
+      DEPLOYMENT.md mentioned API keys (`MAILGUN_API_KEY` is unrelated). What was left was
+      comments across the OAuth code explaining themselves against `ApiKeyService`, which now
+      say the thing directly
 
 ### 7d. Verify
 
-- [ ] `pnpm quality` green
-- [ ] A previously-issued `ps_` key is rejected everywhere
-- [ ] `/mcp` and `/api/v1` both still work on OAuth alone (`oauth-e2e.test.ts` and a real-client
-      check against Claude Code)
+- [x] `pnpm quality` green
+- [x] A previously-issued `ps_` key is rejected everywhere. There is no code left that reads one:
+      `/api/v1` and `/mcp` both go through `oauthAuth`, which hashes the bearer token and looks
+      it up in `oauth_tokens`, and a `ps_` string finds nothing there
+- [x] `/mcp` and `/api/v1` both still work on OAuth alone (`oauth-e2e.test.ts` and a real-client
+      check against Claude Code). `oauth-e2e.test.ts` passes unchanged, which is the point: it
+      covers both resources on OAuth alone and never touched the key path
 
 ---
 
 ## Key technical decisions
 
-1. ~~**API key format**: `ps_` prefix + `generateSecureToken()` (base64url, 32 bytes). Stored as SHA-256 hash. Prefix shown for identification.~~ Superseded 2026-08-17 by Decision 12. API keys are being removed in Phase 7. Kept for history; the hashing approach carries over to OAuth tokens (`pso_`), which reuse the same `crypto.ts` helpers.
+1. ~~**API key format**: `ps_` prefix + `generateSecureToken()` (base64url, 32 bytes). Stored as SHA-256 hash. Prefix shown for identification.~~ Superseded 2026-08-17 by Decision 12; removed by Phase 7 on 2026-08-26. Kept for history; the hashing approach carries over to OAuth tokens (`pso_`), which reuse the same `crypto.ts` helpers.
 2. **API versioning**: `/api/v1/` path prefix for future compatibility
-3. ~~**Auth header**: Supports both `Authorization: Bearer` and `X-API-Key` for flexibility~~ Superseded 2026-08-17 by Decision 12. `X-API-Key` existed only for API keys and goes with them. `Authorization: Bearer` is the only credential form.
+3. ~~**Auth header**: Supports both `Authorization: Bearer` and `X-API-Key` for flexibility~~ Superseded 2026-08-17 by Decision 12; `X-API-Key` left with the API keys in Phase 7 on 2026-08-26 and is now read by nothing. `Authorization: Bearer` is the only credential form.
 4. **Pagination**: Page-based, not cursor-based, to match the existing `Pagination` class in the domain layer. Phase 1a adds `totalCount` to the `Pagination` class so API responses can be built directly from it.
 5. **Existing API separation**: Rename the existing `/api/metadata` (session-auth, frontend-only) to `/api/internal/metadata` so internal endpoints are separate from the public API.
 6. **One-way sync**: The extension never writes to PinSquirrel. Locally deleted bookmarks come back on the next sync.
 7. **Chrome extension is standalone**: No workspace dependency on other packages; it talks only over the HTTP API. Build uses esbuild on its own, outside the Turbo pipeline.
 8. **Read-only API for now**: Only GET endpoints in v1. Write endpoints can come later when there is a use case beyond the Chrome extension.
-9. **MCP transport**: Streamable HTTP via `@hono/mcp` (`@modelcontextprotocol/hono` does not exist as a published package). Mounted at `/mcp`. Bearer token auth, sharing the token-validation code with the REST API but with its own resource identifier (Decision 18). `ps_` API keys as shipped, OAuth `pso_` tokens after Phase 6, and OAuth only after Phase 7.
+9. **MCP transport**: Streamable HTTP via `@hono/mcp` (`@modelcontextprotocol/hono` does not exist as a published package). Mounted at `/mcp`. Bearer token auth, sharing the token-validation code with the REST API but with its own resource identifier (Decision 18). ~~`ps_` API keys as shipped~~, OAuth `pso_` tokens after Phase 6, and — since Phase 7 landed on 2026-08-26 — OAuth only.
 10. **MCP tools are read-only for now**: The initial implementation ships only `list_pins`, `get_pin`, `list_tags`, matching the read-only v1 REST API. Read-write tools (`create_pin`, `update_pin`, `delete_pin`) wait for a concrete agent use case.
 11. **API docs via OpenAPI + Scalar**: Instead of a hand-written JSX docs page, v1 routes use `@hono/zod-openapi` to generate an OpenAPI 3.1 spec (`/api/openapi.json`) rendered with Scalar (`/api/docs`). Schema-driven docs stay in sync with route definitions on their own.
 12. **OAuth 2.1 replaces `ps_` API keys. One auth path, not two** (decided 2026-08-17, reversing the 2026-08-16 position that they would coexist). The old reasoning was that the two serve different clients: OAuth for interactive clients that can survive a browser redirect, API keys for scripts, curl, and the Chrome extension. That trade no longer holds up. Nothing external consumes the REST API yet, so there is no migration cost to eat. The Chrome extension has a native OAuth path in MV3 that is _better_ than a pasted key (Decision 19). And a second live credential type is permanent maintenance, with separate storage, revocation UI, docs, and a dispatch branch in every auth site, all bought for a hypothetical.
 
-    It also removes work rather than adding it. The coexistence design required prefix dispatch in `authenticateBearer`, a discriminated-union result both consumers narrow, and an `allowOAuth` flag to keep OAuth off `/api/v1`. None of that gets built. One credential type means one code path. Phase 6 adds a standalone OAuth middleware next to the existing key path, and Phase 7 deletes the key path once 6g proves the replacement.
+    It also removes work rather than adding it. The coexistence design required prefix dispatch in `authenticateBearer`, a discriminated-union result both consumers narrow, and an `allowOAuth` flag to keep OAuth off `/api/v1`. None of that got built. One credential type means one code path. Phase 6 added a standalone OAuth middleware next to the existing key path, and Phase 7 deleted the key path on 2026-08-26 once 6g proved the replacement. **Carried out in full**: as of that date there is one credential type in the tree.
 
     Two types stay distinct and should not be conflated: the app's own auth result, and the MCP SDK's `AuthInfo`, which `mcpAuth()` builds _from_ it.
 
@@ -1507,7 +1540,7 @@ _All paths below re-verified 2026-08-25, present and accurate on `main`._
 
 - `libs/services/src/utils/crypto.ts`: `generateSecureToken()`, `hashToken()`. Written for API keys, reused as-is for OAuth `pso_` tokens and codes
 - `libs/domain/src/entities/access.ts`: `AccessControl`, `AccessGateable` for authorization
-- `libs/database/src/repositories/session.ts`: the hashed-secret-with-expiry repository pattern (was the model for `DrizzleApiKeyRepository`; now the model for the OAuth token/code repositories), including `deleteExpiredSessions()` as the sweep hook shape
+- `libs/database/src/repositories/session.ts`: the hashed-secret-with-expiry repository pattern (was the model for `DrizzleApiKeyRepository`, which Phase 7 removed; now the model for the OAuth token/code repositories), including `deleteExpiredSessions()` as the sweep hook shape
 - `libs/database/src/create-repositories.ts`: where every repository is constructed. OAuth's three join the `Repositories` interface here
 - `libs/domain/src/entities/pagination.ts`: `Pagination` class for API response pagination
 - `apps/hono/src/lib/services.ts`: the composition root. Service singletons for routes, middleware and MCP tool handlers, and where `BASE_URL` gets read
@@ -1515,7 +1548,7 @@ _All paths below re-verified 2026-08-25, present and accurate on `main`._
 
 ### Additional for Phase 6 (OAuth)
 
-- `libs/services/src/services/api-key.ts`: `ApiKeyService.authenticate()` is the token-to-principal shape `OAuthService.verifyAccessToken()` copies; `listApiKeys` / `revokeApiKey` are the `AccessControl` shape for grants
+- ~~`libs/services/src/services/api-key.ts`: `ApiKeyService.authenticate()` is the token-to-principal shape `OAuthService.verifyAccessToken()` copies; `listApiKeys` / `revokeApiKey` are the `AccessControl` shape for grants~~ Deleted by Phase 7 on 2026-08-26, having served its purpose. The shapes live on in `OAuthService.verifyAccessToken` and `listGrants` / `revokeGrant`
 - `libs/services/src/services/maintenance.ts` + `apps/hono/src/lib/expiry-sweep.ts`: `sweepExpired()` / `SweepResult` and the hourly scheduler. OAuth expiry joins the former, never adds to the latter
 - `libs/services/src/validation/zod-error.ts`: `validationErrorFromZod`, the one Zod to `ValidationError` conversion
 - `libs/services/src/validation/url.ts`: `validateUrlForFetching`, the CIMD pre-check
