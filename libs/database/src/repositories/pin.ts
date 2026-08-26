@@ -12,6 +12,7 @@ import {
   count,
   desc,
   eq,
+  exists,
   like,
   inArray,
   isNull,
@@ -101,6 +102,24 @@ export class DrizzlePinRepository implements PinRepository {
   }
 
   /**
+   * Does this pin carry a tag whose name matches the pattern?
+   *
+   * An `EXISTS` rather than a join: a join would repeat the pin once per
+   * matching tag, which would inflate `countByUserId` and hand pagination
+   * duplicate rows. The subquery's own `pins_tags` and `tags` shadow the ones
+   * the tag-filter branches join on the outside; only `pins.id` is correlated.
+   */
+  private tagNameMatches(pattern: string) {
+    return exists(
+      this.db
+        .select({ matched: sql`1` })
+        .from(pinsTags)
+        .innerJoin(tags, eq(pinsTags.tagId, tags.id))
+        .where(and(eq(pinsTags.pinId, pins.id), like(tags.name, pattern)))
+    )
+  }
+
+  /**
    * Conditions shared by every pin query for a user.
    *
    * `findByUserId` and `countByUserId` must agree exactly or a filtered list
@@ -131,7 +150,8 @@ export class DrizzlePinRepository implements PinRepository {
         const termCondition = or(
           like(pins.url, pattern),
           like(pins.title, pattern),
-          like(pins.description, pattern)
+          like(pins.description, pattern),
+          this.tagNameMatches(pattern)
         )
         if (termCondition) {
           conditions.push(termCondition)

@@ -988,6 +988,29 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         expect(result).toEqual([])
       })
 
+      it('matches a term against a tag name', async () => {
+        await pinRepository.create({
+          userId: testUser.id,
+          url: 'https://example.org/a-talk',
+          title: 'A talk',
+          description: null,
+          readLater: false,
+          isPrivate: false,
+          tagNames: ['jesseelder'],
+        })
+
+        const result = await pinRepository.findByUserId(testUser.id, {
+          search: 'jesse elder',
+        })
+
+        expect(result.map(p => p.title).sort()).toEqual([
+          'A talk',
+          'Elder things',
+          'Jesse Elder Library',
+          'Posts',
+        ])
+      })
+
       it('ignores runs of whitespace between terms', async () => {
         const result = await pinRepository.findByUserId(testUser.id, {
           search: '  jesse \t elder  ',
