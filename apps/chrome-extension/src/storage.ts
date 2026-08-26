@@ -37,6 +37,11 @@ export async function set(values: Partial<ExtensionStorage>): Promise<void> {
   await area().set(values)
 }
 
+/** Drop the given keys. Removing a key that is not there is not an error. */
+export async function remove(keys: StorageKey[]): Promise<void> {
+  await area().remove(keys)
+}
+
 /** Drop everything the extension has stored. */
 export async function clear(): Promise<void> {
   await area().clear()
