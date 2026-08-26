@@ -25,12 +25,19 @@ export interface StubbedStorageArea {
   items: Record<string, unknown>
 }
 
+/** `chrome.runtime.sendMessage`, in its promise form. */
+export type SendMessageMock = ReturnType<
+  typeof vi.fn<(message: unknown) => Promise<unknown>>
+>
+
 export interface ChromeStub {
   local: StubbedStorageArea
   sync: StubbedStorageArea
   /** Resolves to the redirect URL Chrome would land on. Set per flow. */
   launchWebAuthFlow: LaunchWebAuthFlowMock
   getRedirectURL: ReturnType<typeof vi.fn<() => string>>
+  /** What the service worker answers the popup with. Set per test. */
+  sendMessage: SendMessageMock
 }
 
 /** The callback-free half of `chrome.storage.StorageArea`, backed by an object. */
@@ -84,6 +91,7 @@ export function stubChrome(
         ) => Promise<string | undefined>
       >(),
     getRedirectURL: vi.fn<() => string>(() => STUB_REDIRECT_URL),
+    sendMessage: vi.fn<(message: unknown) => Promise<unknown>>(),
   }
 
   vi.stubGlobal('chrome', {
@@ -94,6 +102,9 @@ export function stubChrome(
     identity: {
       launchWebAuthFlow: stub.launchWebAuthFlow,
       getRedirectURL: stub.getRedirectURL,
+    },
+    runtime: {
+      sendMessage: stub.sendMessage,
     },
   })
 
