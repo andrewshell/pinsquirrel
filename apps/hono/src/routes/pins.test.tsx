@@ -203,6 +203,20 @@ describe('pins routes', () => {
       expect(html).toContain('/pins?tag=jesseelder')
     })
 
+    // The chip swaps the search for the tag, and nothing else: a compact view
+    // or a read filter the user set should not be lost by clicking it.
+    it('keeps the other filters on a matching-tag link and drops the search', async () => {
+      svc.searchTags.mockResolvedValue([makeTag({ name: 'jesseelder' })])
+
+      const html = await (
+        await app.request('/pins?search=jesse&view=compact&unread=true&page=2')
+      ).text()
+
+      expect(html).toMatch(
+        /href="\/pins\?(?=[^"]*view=compact)(?=[^"]*unread=true)(?=[^"]*tag=jesseelder)(?![^"]*search=)(?![^"]*page=)[^"]*"/
+      )
+    })
+
     it('says nothing about matching tags without a search', async () => {
       svc.searchTags.mockResolvedValue([makeTag({ name: 'jesseelder' })])
 
