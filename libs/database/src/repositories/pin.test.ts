@@ -934,6 +934,72 @@ describe('DrizzlePinRepository - Integration Tests', () => {
         expect(result.map(p => p.title)).toEqual(['a_c literal underscore'])
       })
     })
+
+    describe('whitespace-separated terms', () => {
+      beforeEach(async () => {
+        await pinRepository.create({
+          userId: testUser.id,
+          url: 'https://example.com/library',
+          title: 'Jesse Elder Library',
+          description: null,
+          readLater: false,
+          isPrivate: false,
+          tagNames: [],
+        })
+
+        await pinRepository.create({
+          userId: testUser.id,
+          url: 'https://jesseelder.com/posts/one',
+          title: 'Posts',
+          description: null,
+          readLater: false,
+          isPrivate: false,
+          tagNames: [],
+        })
+
+        await pinRepository.create({
+          userId: testUser.id,
+          url: 'https://jesse.example.com/',
+          title: 'Elder things',
+          description: null,
+          readLater: false,
+          isPrivate: false,
+          tagNames: [],
+        })
+      })
+
+      it('matches a pin whose URL runs the terms together', async () => {
+        const result = await pinRepository.findByUserId(testUser.id, {
+          search: 'jesse elder',
+        })
+
+        expect(result.map(p => p.title).sort()).toEqual([
+          'Elder things',
+          'Jesse Elder Library',
+          'Posts',
+        ])
+      })
+
+      it('requires every term to match, not just one', async () => {
+        const result = await pinRepository.findByUserId(testUser.id, {
+          search: 'jesse zzz',
+        })
+
+        expect(result).toEqual([])
+      })
+
+      it('ignores runs of whitespace between terms', async () => {
+        const result = await pinRepository.findByUserId(testUser.id, {
+          search: '  jesse \t elder  ',
+        })
+
+        expect(result.map(p => p.title).sort()).toEqual([
+          'Elder things',
+          'Jesse Elder Library',
+          'Posts',
+        ])
+      })
+    })
   })
 
   describe('countByUserId with search', () => {
