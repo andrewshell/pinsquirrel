@@ -34,6 +34,30 @@ export class TagService {
   }
 
   /**
+   * The user's tags matching a free-text search, for the "Matching tags" row
+   * above a searched pin list.
+   *
+   * Gated like `getUserTags` — a tag is readable only by its owner. A search
+   * with nothing in it but whitespace is answered here rather than at the
+   * database, which would otherwise be asked for every tag the user has.
+   */
+  async searchTags(
+    ac: AccessControl,
+    userId: string,
+    search: string
+  ): Promise<Tag[]> {
+    if (!ac.canRead({ userId })) {
+      return []
+    }
+
+    if (search.trim() === '') {
+      return []
+    }
+
+    return this.tagRepository.searchByName(userId, search)
+  }
+
+  /**
    * Get a single tag owned by the authenticated user.
    * Throws `TagNotFoundError` when the tag does not exist or the caller
    * cannot read it (404-style ownership obfuscation).
