@@ -1320,6 +1320,15 @@ before anything is removed. After Phase 7 there is no fallback credential to deb
   does. And `turbo.json` orders `@pinsquirrel/hono#test` after `@pinsquirrel/database#test`, so
   that drop cannot land in the middle of this run.
 
+One smaller thing the run put in front of us, left as it is on purpose. The grants list groups
+by client and audience, so a client authorized for both `/mcp` and `/api/v1` shows two rows, but
+`revokeGrant` calls `revokeGrantFamily`, which revokes by user and client and ignores the
+audience. Revoking either row therefore takes both. That errs towards revoking too much rather
+than too little, and the same family call is what a replayed refresh token has to trigger, so
+narrowing it is a product decision about what "disconnect" means rather than a defect to patch
+mid-phase. Worth settling before Phase 7 removes the API key card and this becomes the only
+revocation UI.
+
 #### What the end-to-end run found: one MCP session per process
 
 `apps/hono/src/mcp/server.ts` connects a single `StreamableHTTPTransport` at module load and
