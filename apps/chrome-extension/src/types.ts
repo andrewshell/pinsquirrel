@@ -53,3 +53,23 @@ export type StoredTokens = Pick<
   ExtensionStorage,
   'baseUrl' | 'clientId' | 'accessToken' | 'refreshToken' | 'expiresAt'
 >
+
+/**
+ * A tag, as `/api/v1` serves it.
+ *
+ * Timestamps stay ISO 8601 strings rather than being revived into `Date`s:
+ * that is what came over the wire, and nothing in the extension does date
+ * arithmetic with them.
+ */
+export interface Tag {
+  id: string
+  userId: string
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** A tag with the number of pins carrying it, from `GET /tags?withCounts=true`. */
+export interface TagWithCount extends Tag {
+  pinCount: number
+}
