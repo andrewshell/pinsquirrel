@@ -11,12 +11,12 @@
  * built in the first place, so there is no authorization to bypass and nothing
  * for a service to check. A SessionService would take no AccessControl, and
  * only this app could ever call it — the admin app keeps its sessions in
- * memory, and an API key or a CLI has no session at all.
+ * memory, and an API client or a CLI has no session at all.
  *
  * So the persistence stays here, alongside the parts that are unambiguously
  * web-only: the cookie itself, the flash message that survives one redirect,
  * and the private-unlock window. The equivalent for API callers does live in a
- * service — ApiKeyService.authenticate — because a token resolves to a
+ * service — OAuthService.verifyAccessToken — because a token resolves to a
  * principal the same way for every transport.
  *
  * If sessions ever need to be readable from outside this app, that is the
