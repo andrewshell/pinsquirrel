@@ -140,3 +140,18 @@ export function resolveStaticOAuthClients(
 export const baseUrl = resolveBaseUrl(process.env)
 export const oauthConfig = createOAuthConfig(baseUrl)
 export const staticOAuthClients = resolveStaticOAuthClients(process.env)
+
+/**
+ * What a resource identifier is called on screen.
+ *
+ * A token is bound to `https://…/mcp` or `https://…/api/v1`, which is the
+ * right string for the protocol and the wrong one to show somebody deciding
+ * whether to revoke a grant. Lives here because the config is what decides
+ * which identifiers exist; an unknown one falls back to itself rather than
+ * being hidden.
+ */
+export function resourceLabel(resource: string): string {
+  if (resource === oauthConfig.resources.mcp.resource) return 'MCP'
+  if (resource === oauthConfig.resources.apiV1.resource) return 'REST API'
+  return resource
+}

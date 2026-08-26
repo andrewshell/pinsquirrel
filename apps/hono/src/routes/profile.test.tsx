@@ -12,6 +12,7 @@ import type { ApiKey, User } from '@pinsquirrel/domain'
 import {
   AccessControl,
   InvalidCredentialsError,
+  OAuthInvalidGrantError,
   UserAlreadyExistsError,
   ValidationError,
 } from '@pinsquirrel/domain'
@@ -44,6 +45,21 @@ const svc = {
   listApiKeys: vi.fn(),
   createApiKey: vi.fn(),
   revokeApiKey: vi.fn(),
+  listGrants: vi.fn(),
+  revokeGrant: vi.fn(),
+}
+
+function makeGrant(overrides: Record<string, unknown> = {}) {
+  return {
+    tokenId: 'token-1',
+    clientId: 'https://claude.ai/oauth/claude-code-client-metadata',
+    clientName: 'Claude Code',
+    scopes: ['pins:read', 'tags:read'],
+    resource: 'http://localhost:8100/mcp',
+    expiresAt: new Date('2024-02-01'),
+    createdAt: new Date('2024-01-01'),
+    ...overrides,
+  }
 }
 
 vi.mock('../lib/services', () => ({
@@ -57,6 +73,10 @@ vi.mock('../lib/services', () => ({
     listApiKeys: (...a: unknown[]) => svc.listApiKeys(...a) as unknown,
     createApiKey: (...a: unknown[]) => svc.createApiKey(...a) as unknown,
     revokeApiKey: (...a: unknown[]) => svc.revokeApiKey(...a) as unknown,
+  },
+  oauthService: {
+    listGrants: (...a: unknown[]) => svc.listGrants(...a) as unknown,
+    revokeGrant: (...a: unknown[]) => svc.revokeGrant(...a) as unknown,
   },
 }))
 
@@ -93,6 +113,7 @@ describe('profile routes', () => {
     vi.clearAllMocks()
     flash = null
     svc.listApiKeys.mockResolvedValue([makeApiKey()])
+    svc.listGrants.mockResolvedValue([makeGrant()])
     app = new Hono()
     app.route('/profile', profileRoutes)
   })
@@ -255,5 +276,89 @@ describe('profile routes', () => {
 
     expect(res.status).toBe(400)
     expect(await res.text()).toContain('Invalid action')
+  })
+
+  describe('OAuth grants', () => {
+    it('lists a grant with what it can do and where', async () => {
+      const html = await (await app.request('/profile')).text()
+
+      expect(svc.listGrants).toHaveBeenCalledWith(expect.anything(), 'user-1')
+      expect(html).toContain('Claude Code')
+      expect(html).toContain('pins:read')
+      expect(html).toContain('tags:read')
+      // The audience the token is bound to, in the words a user has for it.
+      expect(html).toContain('MCP')
+    })
+
+    it('names the REST resource as such', async () => {
+      svc.listGrants.mockResolvedValue([
+        makeGrant({ resource: 'http://localhost:8100/api/v1' }),
+      ])
+
+      const html = await (await app.request('/profile')).text()
+
+      expect(html).toContain('REST API')
+    })
+
+    // A client that registered without a name is still something the user has
+    // to be able to recognise and revoke.
+    it('falls back to the client identifier when the client has no name', async () => {
+      svc.listGrants.mockResolvedValue([
+        makeGrant({ clientName: null, clientId: 'dcr_abc123' }),
+      ])
+
+      const html = await (await app.request('/profile')).text()
+
+      expect(html).toContain('dcr_abc123')
+    })
+
+    it('says so plainly when nothing has been authorized', async () => {
+      svc.listGrants.mockResolvedValue([])
+
+      const html = await (await app.request('/profile')).text()
+
+      expect(html).toMatch(/no applications|not authorized any/i)
+    })
+
+    it('revokes a grant and confirms it', async () => {
+      const res = await app.request(
+        '/profile',
+        formBody({ intent: 'revoke-oauth-grant', tokenId: 'token-1' })
+      )
+
+      expect(svc.revokeGrant).toHaveBeenCalledWith(expect.anything(), 'token-1')
+      expect(await renderedProfile(res)).toMatch(/access revoked/i)
+    })
+
+    // A second tab, or the back button: the grant is already gone by the time
+    // the form arrives. That is a stale form, not a server fault.
+    it('reports a grant that is already gone as a rejected form', async () => {
+      svc.revokeGrant.mockRejectedValue(
+        new OAuthInvalidGrantError('No such grant')
+      )
+
+      const res = await app.request(
+        '/profile',
+        formBody({ intent: 'revoke-oauth-grant', tokenId: 'gone' })
+      )
+
+      expect(res.status).toBe(400)
+    })
+
+    it('keeps the grants on screen when another action fails', async () => {
+      svc.changePassword.mockRejectedValue(new InvalidCredentialsError())
+
+      const res = await app.request(
+        '/profile',
+        formBody({
+          intent: 'change-password',
+          currentPassword: 'wrong',
+          newPassword: 'newpassword123',
+        })
+      )
+
+      expect(res.status).toBe(400)
+      expect(await res.text()).toContain('Claude Code')
+    })
   })
 })
