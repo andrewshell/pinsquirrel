@@ -474,3 +474,50 @@ export async function getAccessToken(): Promise<string> {
 
   return (await refreshTokens(tokens)).accessToken
 }
+
+/**
+ * A token to retry a rejected call with, or null if there is nothing to retry.
+ *
+ * Takes the token that was rejected, because a concurrent caller may have
+ * refreshed already: refreshing again would spend a token that was never used,
+ * and the extra rotation is pure risk for no gain.
+ */
+async function refreshedTokenAfter(rejected: string): Promise<string | null> {
+  const tokens = await storedTokens()
+  if (!tokens) return null
+  if (tokens.accessToken !== rejected) return tokens.accessToken
+  return (await refreshTokens(tokens)).accessToken
+}
+
+/**
+ * `fetch`, with the connection's bearer token on it.
+ *
+ * This is the seam the API client sits on (Phase 5c): it never sees a token,
+ * an expiry or a refresh, only a `Response`.
+ *
+ * A `401` buys exactly one refresh and one retry. The expiry check should have
+ * caught a spent token already, so a `401` means something the clock did not
+ * predict - a revoked grant, a skewed clock - and a second one means refreshing
+ * is not the answer, so it is returned rather than retried into a loop.
+ *
+ * The retry replays `init` as given, which is safe for the read-only v1 API
+ * (Decision 6) but would not be for a streamed request body.
+ */
+export async function authorizedFetch(
+  input: RequestInfo | URL,
+  init: RequestInit = {}
+): Promise<Response> {
+  const send = (token: string) => {
+    const headers = new Headers(init.headers)
+    headers.set('Authorization', `Bearer ${token}`)
+    return fetch(input, { ...init, headers })
+  }
+
+  const token = await getAccessToken()
+  const response = await send(token)
+  if (response.status !== 401) return response
+
+  const retryToken = await refreshedTokenAfter(token)
+  if (!retryToken) return response
+  return send(retryToken)
+}

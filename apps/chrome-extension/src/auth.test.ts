@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  authorizedFetch,
   buildAuthorizationUrl,
   connect,
   getAccessToken,
@@ -10,6 +11,7 @@ import {
 import type { OAuthEndpoints } from './oauth-metadata.ts'
 import { pkceChallengeFor } from './pkce.ts'
 import { STUB_REDIRECT_URL } from './test/chrome-mock.ts'
+import { jsonResponse } from './test/fetch-mock.ts'
 import {
   BASE_URL as SERVER_BASE_URL,
   oauthErrorResponse,
@@ -281,5 +283,56 @@ describe('getAccessToken', () => {
     expect(server.tokenRequests).toHaveLength(1)
     expect(one).toBe('pso_access')
     expect(other).toBe('pso_access')
+  })
+})
+
+const TAGS_URL = `${SERVER_BASE_URL}/api/v1/tags`
+
+describe('authorizedFetch', () => {
+  it('sends the access token as a bearer credential', async () => {
+    const server = stubOAuthServer(connected())
+    const sent: (string | null)[] = []
+    server.fetched.route(TAGS_URL, (_url, init) => {
+      sent.push(new Headers(init?.headers).get('Authorization'))
+      return jsonResponse({ tags: [] })
+    })
+
+    const response = await authorizedFetch(TAGS_URL)
+
+    expect(response.status).toBe(200)
+    expect(sent).toEqual(['Bearer pso_stored'])
+  })
+
+  // The token can die between the expiry check and the call - a clock skew, or
+  // a grant revoked from the profile page mid-sync.
+  it('refreshes once and retries once when the resource answers 401', async () => {
+    const server = stubOAuthServer(connected())
+    server.answerTokenWith(() =>
+      tokenResponse({ access_token: 'pso_fresh', refresh_token: 'refresh-2' })
+    )
+    const sent: (string | null)[] = []
+    server.fetched.route(TAGS_URL, (_url, init) => {
+      const authorization = new Headers(init?.headers).get('Authorization')
+      sent.push(authorization)
+      return authorization === 'Bearer pso_fresh'
+        ? jsonResponse({ tags: [] })
+        : new Response(null, { status: 401 })
+    })
+
+    const response = await authorizedFetch(TAGS_URL)
+
+    expect(response.status).toBe(200)
+    expect(sent).toEqual(['Bearer pso_stored', 'Bearer pso_fresh'])
+    expect(server.tokenRequests).toHaveLength(1)
+  })
+
+  it('hands back a 401 that survives the refresh rather than looping', async () => {
+    const server = stubOAuthServer(connected())
+    server.fetched.route(TAGS_URL, () => new Response(null, { status: 401 }))
+
+    const response = await authorizedFetch(TAGS_URL)
+
+    expect(response.status).toBe(401)
+    expect(server.tokenRequests).toHaveLength(1)
   })
 })
