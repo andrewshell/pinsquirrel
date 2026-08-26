@@ -127,7 +127,7 @@ removed and re-added.
 | `src/storage.ts`             | The only module that names `chrome.storage.local`                        |
 | `scripts/build.ts`           | esbuild bundle + asset copy                                              |
 | `scripts/manifest-assets.ts` | Derives the copy list from the manifest                                  |
-| `icons/`                     | Placeholder artwork at 16/48/128, pending real icons                     |
+| `icons/`                     | The app favicon at 16/48/128 (from `apps/hono/src/static/`)              |
 
 `tsconfig.json` covers `src` and `scripts` as one project. `types` carries
 `chrome` (the extension APIs), `node` (for the build script) and
