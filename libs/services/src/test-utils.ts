@@ -18,5 +18,6 @@ export function createMockUserRepository(): UserRepository {
     update: vi.fn(),
     delete: vi.fn(),
     addRole: vi.fn(),
+    removeRole: vi.fn(),
   }
 }

@@ -427,6 +427,50 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     })
   })
 
+  describe('roles', () => {
+    it('should remove a role the user holds, leaving the others', async () => {
+      const { id: userId } = await insertUser(testPool)
+      await repository.addRole(userId, Role.User)
+      await repository.addRole(userId, Role.Admin)
+
+      await repository.removeRole(userId, Role.Admin)
+
+      const loaded = await repository.findById(userId)
+      expect(loaded!.roles).toEqual([Role.User])
+    })
+
+    // The Users console renders a revoke button from a listing that may be a
+    // few seconds stale, so two admins can revoke the same role. The second
+    // one has nothing to do, and that is not an error.
+    it('should treat removing a role the user lacks as a no-op', async () => {
+      const { id: userId } = await insertUser(testPool)
+      await repository.addRole(userId, Role.User)
+
+      await expect(
+        repository.removeRole(userId, Role.Admin)
+      ).resolves.toBeUndefined()
+
+      const loaded = await repository.findById(userId)
+      expect(loaded!.roles).toEqual([Role.User])
+    })
+
+    it('should leave other users of the same role untouched', async () => {
+      const { id: keeperId } = await insertUser(testPool, {
+        emailHash: 'keeper_email',
+      })
+      const { id: loserId } = await insertUser(testPool, {
+        emailHash: 'loser_email',
+      })
+      await repository.addRole(keeperId, Role.Admin)
+      await repository.addRole(loserId, Role.Admin)
+
+      await repository.removeRole(loserId, Role.Admin)
+
+      expect((await repository.findById(keeperId))!.roles).toEqual([Role.Admin])
+      expect((await repository.findById(loserId))!.roles).toEqual([])
+    })
+  })
+
   describe('one account per email', () => {
     it('indexes email_hash, uniquely', async () => {
       // findByEmailHash runs on every signup and every password-reset request,

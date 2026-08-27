@@ -6,7 +6,7 @@ import type {
   Role,
 } from '@pinsquirrel/domain'
 import { UserAlreadyExistsError, UserStatus } from '@pinsquirrel/domain'
-import { eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { users } from '../schema/users.js'
 import { userRoles } from '../schema/user-roles.js'
@@ -242,5 +242,18 @@ export class DrizzleUserRepository implements UserRepository {
         createdAt: new Date(),
       })
       .onDuplicateKeyUpdate({ set: { createdAt: sql`created_at` } })
+  }
+
+  /**
+   * Drop one role from one user.
+   *
+   * A DELETE that matches nothing is already a no-op, so the idempotence the
+   * interface promises costs no extra read: two admins revoking the same role
+   * from a stale listing both succeed.
+   */
+  async removeRole(userId: string, role: Role): Promise<void> {
+    await this.db
+      .delete(userRoles)
+      .where(and(eq(userRoles.userId, userId), eq(userRoles.role, role)))
   }
 }
