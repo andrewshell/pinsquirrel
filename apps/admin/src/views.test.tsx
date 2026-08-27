@@ -50,13 +50,18 @@ const pages = {
         },
       ],
     }),
-  ComposePage: () => ComposePage({ envLabel: 'Test Env', recipientCount: 1 }),
+  ComposePage: () =>
+    ComposePage({ envLabel: 'Test Env', username: 'root', recipientCount: 1 }),
   SentPage: () =>
     SentPage({
       envLabel: 'Test Env',
+      username: 'root',
       results: [{ recipient: 'alice@example.com', ok: true }],
     }),
 } as const
+
+/** The pages behind the session gate all carry the shared header. */
+const signedInPages = ['WaitlistPage', 'ComposePage', 'SentPage'] as const
 
 describe.each(Object.keys(pages) as (keyof typeof pages)[])('%s', name => {
   it('links the compiled stylesheet and the theme script', async () => {
@@ -87,5 +92,51 @@ describe.each(Object.keys(pages) as (keyof typeof pages)[])('%s', name => {
     for (const token of SHARED_BUTTON_TOKENS) {
       expect(body).toContain(token)
     }
+  })
+})
+
+/**
+ * The signed-in pages navigate; the sign-in pages do not.
+ *
+ * Every page behind the session gate renders one shared Header rather than a
+ * heading and a logout button of its own, so switching sections and signing
+ * out sit in the same place everywhere.
+ */
+describe.each(signedInPages)('%s header', name => {
+  async function body(): Promise<string> {
+    return render(
+      pages[name]() as HtmlEscapedString | Promise<HtmlEscapedString>
+    )
+  }
+
+  it('renders the brand and the logo', async () => {
+    const html = await body()
+
+    expect(html).toContain('/static/pinsquirrel.svg')
+    expect(html).toContain('>Admin</span>')
+  })
+
+  it('links both sections', async () => {
+    const html = await body()
+
+    expect(html).toContain('href="/users"')
+    expect(html).toContain('href="/waitlist"')
+    expect(html).toContain('Users')
+    expect(html).toContain('Waitlist')
+  })
+
+  it('marks the current section', async () => {
+    expect(await body()).toContain('aria-current="page"')
+  })
+
+  it('signs out from the account menu', async () => {
+    const html = await body()
+
+    // The dropdown contract static/dropdown.js listens for.
+    expect(html).toContain('data-dropdown="container"')
+    expect(html).toContain('data-dropdown="toggle"')
+    expect(html).toContain('data-dropdown="menu"')
+    expect(html).toContain('root')
+    expect(html).toContain('action="/logout"')
   })
 })
