@@ -256,4 +256,22 @@ export class DrizzleUserRepository implements UserRepository {
       .delete(userRoles)
       .where(and(eq(userRoles.userId, userId), eq(userRoles.role, role)))
   }
+
+  /**
+   * How many users hold a role.
+   *
+   * Counted in the database rather than by loading the rows: the only caller
+   * compares the answer with zero, and on a live instance the User role covers
+   * every account there is.
+   */
+  async countByRole(role: Role): Promise<number> {
+    const [result] = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(userRoles)
+      .where(eq(userRoles.role, role))
+
+    // mysql2 hands COUNT(*) back as a number here, but the driver types it
+    // loosely enough that a string would pass the compiler.
+    return Number(result?.count ?? 0)
+  }
 }
