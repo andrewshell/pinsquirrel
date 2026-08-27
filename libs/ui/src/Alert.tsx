@@ -1,3 +1,6 @@
+/** @jsxRuntime automatic @jsxImportSource hono/jsx */
+// The pragma stands in for a tsconfig: tsx-run apps compile this file with
+// esbuild defaults (classic React JSX) since their tsconfig scope ends at src/.
 import type { FC, PropsWithChildren } from 'hono/jsx'
 
 type AlertVariant = 'default' | 'info' | 'success' | 'warning' | 'destructive'
