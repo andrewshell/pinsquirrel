@@ -480,12 +480,17 @@ export function createApp(config: AdminConfig): Hono {
       })
       const recipientCount = rows.filter(r => r.email.includes('@')).length
       return c.html(
-        <ComposePage envLabel={env.label} recipientCount={recipientCount} />
+        <ComposePage
+          envLabel={env.label}
+          username={sess.session.username}
+          recipientCount={recipientCount}
+        />
       )
     } catch (error) {
       return c.html(
         <ComposePage
           envLabel={env.label}
+          username={sess.session.username}
           recipientCount={0}
           error={dbErrorMessage(env, error)}
         />,
@@ -510,6 +515,7 @@ export function createApp(config: AdminConfig): Hono {
       return c.html(
         <ComposePage
           envLabel={env.label}
+          username={sess.session.username}
           recipientCount={0}
           subject={subject}
           body={messageBody}
@@ -532,6 +538,7 @@ export function createApp(config: AdminConfig): Hono {
       return c.html(
         <ComposePage
           envLabel={env.label}
+          username={sess.session.username}
           recipientCount={0}
           subject={subject}
           body={messageBody}
@@ -549,12 +556,19 @@ export function createApp(config: AdminConfig): Hono {
         subject,
         messageBody
       )
-      return c.html(<SentPage envLabel={env.label} results={results} />)
+      return c.html(
+        <SentPage
+          envLabel={env.label}
+          username={sess.session.username}
+          results={results}
+        />
+      )
     } catch (error) {
       console.error(`[admin] mail provider failure for "${env.name}":`, error)
       return c.html(
         <ComposePage
           envLabel={env.label}
+          username={sess.session.username}
           recipientCount={recipients.length}
           subject={subject}
           body={messageBody}

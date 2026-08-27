@@ -1,4 +1,4 @@
-import type { FC, PropsWithChildren } from 'hono/jsx'
+import type { Child, FC, PropsWithChildren } from 'hono/jsx'
 import { html } from 'hono/html'
 import type { SendResult } from '@pinsquirrel/mailgun'
 import {
@@ -8,9 +8,13 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  dropdownMenuItemClasses,
+  Header,
   Input,
   inputBaseClasses,
   Label,
+  NavLink,
+  ProfileDropdown,
   Textarea,
 } from '@pinsquirrel/ui'
 
@@ -34,8 +38,47 @@ const tdClasses = 'text-left px-3 py-2.5 border-b-2 border-foreground/20'
 const okClasses = 'text-green-700 dark:text-green-200 font-bold'
 const badClasses = 'text-red-700 dark:text-red-200 font-bold'
 
-const Layout: FC<PropsWithChildren<{ title: string }>> = ({
+/**
+ * The console's header, on every page behind the session gate.
+ *
+ * `currentPath` is the section the page belongs to rather than the request
+ * path: /compose and /send are waitlist work, so the Waitlist link stays lit
+ * while they are open.
+ */
+const AdminHeader: FC<{ username: string; currentPath: string }> = ({
+  username,
+  currentPath,
+}) => (
+  <Header
+    logoSrc="/static/pinsquirrel.svg"
+    brand="Admin"
+    nav={
+      <>
+        <NavLink href="/users" currentPath={currentPath}>
+          Users
+        </NavLink>
+        <NavLink href="/waitlist" currentPath={currentPath}>
+          Waitlist
+        </NavLink>
+      </>
+    }
+    actions={
+      <ProfileDropdown username={username}>
+        <form method="post" action="/logout">
+          <button type="submit" class={dropdownMenuItemClasses}>
+            Sign out
+          </button>
+        </form>
+      </ProfileDropdown>
+    }
+  />
+)
+
+// The header spans the viewport, so it sits outside the content column rather
+// than inside it. The sign-in pages pass none.
+const Layout: FC<PropsWithChildren<{ title: string; header?: Child }>> = ({
   title,
+  header,
   children,
 }) =>
   html`<!doctype html>
@@ -52,6 +95,7 @@ const Layout: FC<PropsWithChildren<{ title: string }>> = ({
         <link rel="stylesheet" href="/static/styles.css" />
       </head>
       <body class="bg-background text-foreground min-h-screen">
+        ${header ?? ''}
         <div class="max-w-4xl mx-auto px-5 pt-10 pb-16">${children}</div>
       </body>
     </html>`
@@ -134,20 +178,12 @@ export const WaitlistPage: FC<{
   notice?: string
   error?: string
 }> = ({ envLabel, username, rows, notice, error }) => (
-  <Layout title="Waitlist">
-    <div class="flex gap-4 items-center justify-between flex-wrap">
-      <div>
-        <h1 class="text-3xl font-bold">Waitlist · {rows.length}</h1>
-        <p class="text-muted-foreground text-sm mt-2">
-          {envLabel} — signed in as {username}
-        </p>
-      </div>
-      <form method="post" action="/logout">
-        <Button variant="outline" type="submit">
-          Sign out
-        </Button>
-      </form>
-    </div>
+  <Layout
+    title="Waitlist"
+    header={<AdminHeader username={username} currentPath="/waitlist" />}
+  >
+    <h1 class="text-3xl font-bold">Waitlist · {rows.length}</h1>
+    <p class="text-muted-foreground text-sm mt-2">{envLabel}</p>
     <Card class="mt-7">
       <CardContent class="space-y-4">
         {notice ? <Alert variant="success">{notice}</Alert> : ''}
@@ -231,24 +267,21 @@ export const WaitlistPage: FC<{
 
 export const ComposePage: FC<{
   envLabel: string
+  username: string
   recipientCount: number
   error?: string
   subject?: string
   body?: string
-}> = ({ envLabel, recipientCount, error, subject, body }) => (
-  <Layout title="Compose">
-    <div class="flex gap-4 items-center justify-between flex-wrap">
-      <div>
-        <h1 class="text-3xl font-bold">Compose message</h1>
-        <p class="text-muted-foreground text-sm mt-2">
-          {envLabel} — sends individually to {recipientCount} waitlisted{' '}
-          {recipientCount === 1 ? 'person' : 'people'}.
-        </p>
-      </div>
-      <Button variant="outline" href="/waitlist">
-        Back
-      </Button>
-    </div>
+}> = ({ envLabel, username, recipientCount, error, subject, body }) => (
+  <Layout
+    title="Compose"
+    header={<AdminHeader username={username} currentPath="/waitlist" />}
+  >
+    <h1 class="text-3xl font-bold">Compose message</h1>
+    <p class="text-muted-foreground text-sm mt-2">
+      {envLabel} — sends individually to {recipientCount} waitlisted{' '}
+      {recipientCount === 1 ? 'person' : 'people'}.
+    </p>
     <Card class="mt-7">
       <CardContent class="space-y-4">
         {error ? <Alert variant="destructive">{error}</Alert> : ''}
@@ -275,14 +308,18 @@ export const ComposePage: FC<{
   </Layout>
 )
 
-export const SentPage: FC<{ envLabel: string; results: SendResult[] }> = ({
-  envLabel,
-  results,
-}) => {
+export const SentPage: FC<{
+  envLabel: string
+  username: string
+  results: SendResult[]
+}> = ({ envLabel, username, results }) => {
   const sent = results.filter(r => r.ok).length
   const failed = results.length - sent
   return (
-    <Layout title="Sent">
+    <Layout
+      title="Sent"
+      header={<AdminHeader username={username} currentPath="/waitlist" />}
+    >
       <h1 class="text-3xl font-bold">Sent</h1>
       <p class="text-muted-foreground text-sm mt-2">
         {envLabel} — <span class={okClasses}>{sent} delivered</span>
