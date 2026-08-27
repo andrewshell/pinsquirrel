@@ -137,6 +137,13 @@ environment variables: `PORT` (default `8200`), `ADMIN_HOST` (default
 `ADMIN_SESSION_TTL_MS` (default 8 hours, after which the unlocked private key
 is dropped from memory).
 
+An environment's `privateKeyPath` is optional and pairs with the server's
+`EMAIL_PUBLIC_KEY`: give it the private half of that key, or omit it for an
+environment that seals no emails — as the example's `dev` entry does. Omitting
+it means the console signs straight in with no unlock step, shows `(locked)`
+for any address that _was_ sealed, and does not offer to mail the waitlist,
+which needs decrypted addresses.
+
 ### Prerequisites
 
 - **Node.js**: >= 24.0.0
