@@ -34,6 +34,7 @@ import {
   UserNotFoundError,
   UserNotEligibleError,
   CannotRevokeOwnRoleError,
+  AdminAlreadyExistsError,
   AccessControl,
 } from '@pinsquirrel/domain'
 import type { Hono } from 'hono'
@@ -45,10 +46,13 @@ import { loginLimiter } from './rate-limit.js'
 const userService = {
   getUserByUsername: vi.fn(),
   listByStatus: vi.fn(),
+  hasAdmin: vi.fn(),
 }
 
 const authService = {
   login: vi.fn(),
+  loginForBootstrap: vi.fn(),
+  bootstrapAdmin: vi.fn(),
   grantAccess: vi.fn(),
   grantRole: vi.fn(),
   revokeRole: vi.fn(),
@@ -160,6 +164,26 @@ const adminUser = makeUser({
   status: UserStatus.Active,
 })
 
+/**
+ * The operator of a database nobody has ever administered.
+ *
+ * Waitlisted, because reaching Active needs an admin to grant access and there
+ * is none — which is the whole of the cold-start problem.
+ */
+const claimant = makeUser({
+  id: 'claimant-1',
+  username: 'alice',
+  roles: [Role.User],
+  status: UserStatus.Waitlist,
+})
+
+/** The same account once the claim has gone through. */
+const claimedAdmin = makeUser({
+  ...claimant,
+  roles: [Role.User, Role.Admin],
+  status: UserStatus.Active,
+})
+
 let app: Hono
 
 /** Sign in and unlock, returning the session cookie for later requests. */
@@ -235,6 +259,12 @@ beforeEach(() => {
   app = createApp(makeConfig())
   userService.listByStatus.mockResolvedValue([])
   mockAdminLookup()
+  // The default for every test that is not about the cold start: this system
+  // has been bootstrapped, so there is no claim on offer and the services say
+  // so however they are asked.
+  userService.hasAdmin.mockResolvedValue(true)
+  authService.loginForBootstrap.mockRejectedValue(new AdminAlreadyExistsError())
+  authService.bootstrapAdmin.mockRejectedValue(new AdminAlreadyExistsError())
   crypto.openSealedEmail.mockResolvedValue('person@example.com')
   mailer.sendBulk.mockResolvedValue([])
 })
@@ -915,6 +945,398 @@ describe('POST /logout', () => {
     expect(res.status).toBe(302)
     expect(res.headers.get('location')).toBe('/login')
     expect(res.headers.get('set-cookie')).toContain('admin_session=;')
+  })
+})
+
+/**
+ * The cold start: a database nobody administers yet.
+ *
+ * Without this the console is unreachable on a fresh deployment — signing in
+ * requires the Admin role, granting the Admin role requires the console, and
+ * the operator's own account is still on the waitlist because admitting it
+ * needs an admin too.
+ */
+describe('bootstrap', () => {
+  /**
+   * Sign in to an environment that has no admin.
+   *
+   * login() turns the waitlisted operator away and loginForBootstrap admits
+   * them, which is the state every test below starts from.
+   */
+  async function signInToClaim(environment = 'test'): Promise<string> {
+    authService.login.mockRejectedValue(new AccessNotGrantedError())
+    authService.loginForBootstrap.mockResolvedValue(claimant)
+    userService.hasAdmin.mockResolvedValue(false)
+
+    const res = await app.request('/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        environment,
+        username: claimant.username,
+        password: 'correct-horse',
+      }),
+    })
+
+    const setCookie = res.headers.get('set-cookie')
+    if (!setCookie)
+      throw new Error('claim sign-in did not set a session cookie')
+    return setCookie.split(';')[0]
+  }
+
+  describe('POST /login', () => {
+    it('opens a session for a waitlisted operator and points it at the claim', async () => {
+      authService.login.mockRejectedValue(new AccessNotGrantedError())
+      authService.loginForBootstrap.mockResolvedValue(claimant)
+
+      const res = await app.request('/login', {
+        method: 'POST',
+        body: new URLSearchParams({
+          environment: 'test',
+          username: 'alice',
+          password: 'correct-horse',
+        }),
+      })
+
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toBe('/bootstrap')
+      expect(res.headers.get('set-cookie')).toContain('admin_session=')
+    })
+
+    // An account that can sign in but holds no Admin role is the other way to
+    // arrive here — a deployment where someone registered before the console
+    // was ever opened.
+    it('points a valid non-admin at the claim when nobody is admin', async () => {
+      const active = makeUser({ ...claimant, status: UserStatus.Active })
+      authService.login.mockResolvedValue(active)
+      authService.loginForBootstrap.mockResolvedValue(active)
+
+      const res = await app.request('/login', {
+        method: 'POST',
+        body: new URLSearchParams({
+          environment: 'test',
+          username: 'alice',
+          password: 'correct-horse',
+        }),
+      })
+
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toBe('/bootstrap')
+    })
+
+    // The console does not decide this for itself: it asks, and the service
+    // refusing is what keeps the 403 in place.
+    it('keeps the 403 for a non-admin once the system has an admin', async () => {
+      authService.login.mockResolvedValue(
+        makeUser({ roles: [Role.User], status: UserStatus.Active })
+      )
+
+      const res = await app.request('/login', {
+        method: 'POST',
+        body: new URLSearchParams({
+          environment: 'test',
+          username: 'alice',
+          password: 'correct-horse',
+        }),
+      })
+
+      expect(res.status).toBe(403)
+      expect(await res.text()).toContain('not an admin')
+      expect(res.headers.get('set-cookie')).toBeNull()
+      expect(authService.loginForBootstrap).toHaveBeenCalled()
+    })
+
+    it('still turns a waitlisted account away once the system has an admin', async () => {
+      authService.login.mockRejectedValue(new AccessNotGrantedError())
+
+      const res = await app.request('/login', {
+        method: 'POST',
+        body: new URLSearchParams({
+          environment: 'test',
+          username: 'alice',
+          password: 'correct-horse',
+        }),
+      })
+
+      expect(res.status).toBe(400)
+      expect(await res.text()).toContain('This account cannot sign in')
+      expect(res.headers.get('set-cookie')).toBeNull()
+    })
+
+    // An account that never confirmed its email has proved nothing, and the
+    // claim would carry it all the way to Active.
+    it('turns an unverified account away from the claim', async () => {
+      authService.login.mockRejectedValue(new AccessNotGrantedError())
+      authService.loginForBootstrap.mockRejectedValue(
+        new UserNotEligibleError(UserStatus.Unverified, 'not confirmed')
+      )
+
+      const res = await app.request('/login', {
+        method: 'POST',
+        body: new URLSearchParams({
+          environment: 'test',
+          username: 'alice',
+          password: 'correct-horse',
+        }),
+      })
+
+      expect(res.status).toBe(400)
+      expect(await res.text()).toContain('This account cannot sign in')
+      expect(res.headers.get('set-cookie')).toBeNull()
+    })
+
+    // A wrong password is not an operator waiting to be let in, and asking a
+    // second time would double what a guess costs the server.
+    it('does not offer the claim after a wrong password', async () => {
+      authService.login.mockRejectedValue(new InvalidCredentialsError())
+
+      const res = await app.request('/login', {
+        method: 'POST',
+        body: new URLSearchParams({
+          environment: 'test',
+          username: 'alice',
+          password: 'nope',
+        }),
+      })
+
+      expect(res.status).toBe(400)
+      expect(authService.loginForBootstrap).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('GET /bootstrap', () => {
+    it('names the environment and offers the claim to the signed-in user', async () => {
+      const cookie = await signInToClaim()
+
+      const res = await app.request('/bootstrap', {
+        headers: { Cookie: cookie },
+      })
+      const body = await res.text()
+
+      expect(res.status).toBe(200)
+      expect(body).toContain('No admin accounts exist in Test Env')
+      expect(body).toContain('alice')
+      expect(body).toContain('action="/bootstrap"')
+    })
+
+    it('redirects an unauthenticated visitor to /login', async () => {
+      const res = await app.request('/bootstrap')
+
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toBe('/login')
+    })
+
+    // An admin has no claim to make; the page is not a second route into the
+    // console for an account that already got in the front way.
+    it('sends an ordinary admin session on to the console', async () => {
+      const cookie = await signIn()
+
+      const res = await app.request('/bootstrap', {
+        headers: { Cookie: cookie },
+      })
+
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toBe('/waitlist')
+    })
+
+    // Another operator claimed it first. The session exists only to make a
+    // claim that is no longer on offer, so it is closed rather than left
+    // pointing at pages that would refuse it.
+    it('closes the session when an admin appeared meanwhile', async () => {
+      const cookie = await signInToClaim()
+      userService.hasAdmin.mockResolvedValue(true)
+      userService.getUserByUsername.mockResolvedValue(claimant)
+
+      const res = await app.request('/bootstrap', {
+        headers: { Cookie: cookie },
+      })
+
+      expect(res.status).toBe(403)
+      expect(await res.text()).toContain('not an admin')
+
+      const after = await app.request('/waitlist', {
+        headers: { Cookie: cookie },
+      })
+      expect(after.headers.get('location')).toBe('/login')
+    })
+
+    // ...unless the new admin granted this account the role, in which case
+    // there is nothing left to claim and nowhere to send them but in.
+    it('carries the claimant into the console if they became an admin meanwhile', async () => {
+      const cookie = await signInToClaim()
+      userService.hasAdmin.mockResolvedValue(true)
+      userService.getUserByUsername.mockResolvedValue(claimedAdmin)
+
+      const res = await app.request('/bootstrap', {
+        headers: { Cookie: cookie },
+      })
+
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toBe('/unlock')
+    })
+  })
+
+  describe('POST /bootstrap', () => {
+    it('claims admin for the session account and moves on to the unlock step', async () => {
+      const cookie = await signInToClaim()
+      authService.bootstrapAdmin.mockResolvedValue(claimedAdmin)
+
+      const res = await app.request('/bootstrap', form({}, cookie))
+
+      // The id comes off the session, never off the form: the claimant is
+      // whoever is signed in, not whoever the page names.
+      expect(authService.bootstrapAdmin).toHaveBeenCalledWith('claimant-1')
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toBe('/unlock')
+    })
+
+    it('lands on the waitlist where there is no key to unlock', async () => {
+      const cookie = await signInToClaim('keyless')
+      authService.bootstrapAdmin.mockResolvedValue(claimedAdmin)
+
+      const res = await app.request('/bootstrap', form({}, cookie))
+
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toBe('/waitlist')
+    })
+
+    // The whole point: the console is reachable afterwards, with the same
+    // session, without signing in again.
+    it('opens the console to the new admin', async () => {
+      const cookie = await signInToClaim('keyless')
+      authService.bootstrapAdmin.mockResolvedValue(claimedAdmin)
+      await app.request('/bootstrap', form({}, cookie))
+      userService.getUserByUsername.mockResolvedValue(claimedAdmin)
+
+      const res = await app.request('/users', { headers: { Cookie: cookie } })
+
+      expect(res.status).toBe(200)
+      expect(userService.listByStatus).toHaveBeenCalledWith(
+        expect.any(AccessControl),
+        UserStatus.Active
+      )
+    })
+
+    it('redirects an unauthenticated claim to /login', async () => {
+      const res = await app.request('/bootstrap', { method: 'POST' })
+
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toBe('/login')
+      expect(authService.bootstrapAdmin).not.toHaveBeenCalled()
+    })
+
+    // A stale page, or a second operator submitting at the same moment. The
+    // service's invariant is what refuses; the console only has to land the
+    // person somewhere that works.
+    it('sends the loser of the race back to sign in', async () => {
+      const cookie = await signInToClaim()
+      authService.bootstrapAdmin.mockRejectedValue(
+        new AdminAlreadyExistsError()
+      )
+      userService.getUserByUsername.mockResolvedValue(claimant)
+
+      const res = await app.request('/bootstrap', form({}, cookie))
+
+      expect(res.status).toBe(403)
+      expect(await res.text()).toContain('not an admin')
+
+      const after = await app.request('/bootstrap', {
+        headers: { Cookie: cookie },
+      })
+      expect(after.headers.get('location')).toBe('/login')
+    })
+
+    // A double submit: the first claim went through, so the second is refused
+    // by an invariant this very session established. Sending them back to the
+    // login page over their own success would be absurd.
+    it('carries a claimant who already succeeded into the console', async () => {
+      const cookie = await signInToClaim('keyless')
+      authService.bootstrapAdmin.mockRejectedValue(
+        new AdminAlreadyExistsError()
+      )
+      userService.getUserByUsername.mockResolvedValue(claimedAdmin)
+
+      const res = await app.request('/bootstrap', form({}, cookie))
+
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toBe('/waitlist')
+    })
+
+    it('reports an unverified claimant in the service words', async () => {
+      const cookie = await signInToClaim()
+      authService.bootstrapAdmin.mockRejectedValue(
+        new UserNotEligibleError(
+          UserStatus.Unverified,
+          'User "alice" has not confirmed their email yet'
+        )
+      )
+
+      const res = await app.request('/bootstrap', form({}, cookie))
+
+      expect(res.status).toBe(400)
+      expect(await res.text()).toContain('has not confirmed their email')
+    })
+
+    it('reports an unexpected failure as a 500 on the claim page', async () => {
+      const cookie = await signInToClaim()
+      authService.bootstrapAdmin.mockRejectedValue(new Error('ECONNREFUSED'))
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const res = await app.request('/bootstrap', form({}, cookie))
+
+      expect(res.status).toBe(500)
+      expect(await res.text()).toContain('Test Env')
+    })
+  })
+
+  /**
+   * Nothing behind the claim renders for a session that has not made it.
+   *
+   * The services would refuse these calls anyway — that is the layering
+   * guarantee — but a console that answers with half-broken pages and 500s
+   * tells the operator nothing about what to do next.
+   */
+  describe('containment before the claim', () => {
+    it.each(['/', '/waitlist', '/users', '/compose', '/unlock'])(
+      'steers %s to the claim page',
+      async path => {
+        const cookie = await signInToClaim()
+
+        const res = await app.request(path, { headers: { Cookie: cookie } })
+
+        expect(res.status).toBe(302)
+        expect(res.headers.get('location')).toBe('/bootstrap')
+      }
+    )
+
+    it.each(['/grant-access', '/roles/grant', '/roles/revoke', '/send'])(
+      'steers a post to %s to the claim page',
+      async path => {
+        const cookie = await signInToClaim()
+
+        const res = await app.request(path, form({ userId: 'x' }, cookie))
+
+        expect(res.status).toBe(302)
+        expect(res.headers.get('location')).toBe('/bootstrap')
+        expect(userService.listByStatus).not.toHaveBeenCalled()
+      }
+    )
+  })
+
+  // The operator who signs in and thinks better of it is not stuck on the one
+  // page their session can reach.
+  it('signs out from a session that has not claimed anything', async () => {
+    const cookie = await signInToClaim()
+
+    const res = await app.request('/logout', form({}, cookie))
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/login')
+    expect(res.headers.get('set-cookie')).toContain('admin_session=;')
+
+    const replayed = await app.request('/bootstrap', {
+      headers: { Cookie: cookie },
+    })
+    expect(replayed.headers.get('location')).toBe('/login')
   })
 })
 

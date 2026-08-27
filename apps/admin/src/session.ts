@@ -7,6 +7,16 @@ export interface AdminSession {
   // The unlocked base64 private key. Held only in this process's memory, never
   // written to a cookie or any database. Undefined until the key is unlocked.
   privateKey?: string
+  /**
+   * This session signed in to an environment that had no admin, and has not
+   * claimed the role yet.
+   *
+   * It is what makes such a session reach /bootstrap and nothing else. It
+   * grants nothing on its own — the claim itself re-checks that no admin
+   * exists, and every console page rebuilds its AccessControl from the
+   * database — so a stale `true` costs a redirect, not access.
+   */
+  bootstrap?: boolean
 }
 
 interface StoredSession extends AdminSession {

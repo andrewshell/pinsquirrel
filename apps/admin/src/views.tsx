@@ -163,6 +163,43 @@ export const LoginPage: FC<{
   </Layout>
 )
 
+/**
+ * The cold start: an environment nobody administers yet.
+ *
+ * Carries no header, like the other two pages before the console — the
+ * operator is signed in but there is nothing yet to navigate to, and the one
+ * account this page can act on is the one it was reached with, so the form is
+ * a single button rather than a picker.
+ */
+export const BootstrapPage: FC<{
+  envLabel: string
+  username: string
+  error?: string
+}> = ({ envLabel, username, error }) => (
+  <Layout title="Claim admin">
+    <h1 class="text-3xl font-black uppercase tracking-tight">
+      Claim admin access
+    </h1>
+    <p class="text-muted-foreground text-sm mt-2">
+      No admin accounts exist in {envLabel}.
+    </p>
+    <Card class="mt-7">
+      <CardContent class="space-y-4">
+        {error ? <Alert variant="destructive">{error}</Alert> : ''}
+        <p class="text-sm">
+          Nobody administers this environment yet, so the first signed-in
+          account may take the role. Claiming it activates{' '}
+          <strong>{username}</strong> and makes it the admin. Everyone after
+          this one is granted their roles from the Users page.
+        </p>
+        <form method="post" action="/bootstrap">
+          <Button type="submit">Activate {username} and claim admin</Button>
+        </form>
+      </CardContent>
+    </Card>
+  </Layout>
+)
+
 export const UnlockPage: FC<{ envLabel: string; error?: string }> = ({
   envLabel,
   error,
