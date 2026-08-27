@@ -42,9 +42,14 @@ const pages = {
     UsersPage({
       envLabel: 'Test Env',
       username: 'root',
+      roles: [
+        { name: 'Admin' },
+        { name: 'User', revokeHint: 'Revoking User suspends sign-in.' },
+      ],
       rows: [
-        { id: 'u1', username: 'alice', roles: ['user'], isAdmin: false },
-        { id: 'u2', username: 'root', roles: ['user', 'admin'], isAdmin: true },
+        { id: 'u1', username: 'alice', roles: ['User'], isSelf: false },
+        { id: 'u2', username: 'root', roles: ['Admin'], isSelf: true },
+        { id: 'u3', username: 'carol', roles: [], isSelf: false },
       ],
     }),
   WaitlistPage: () =>
@@ -176,25 +181,67 @@ describe('UsersPage', () => {
     return render(pages.UsersPage() as HtmlEscapedString)
   }
 
-  it('lists each user with their roles', async () => {
+  /**
+   * The markup of one user's row, so a per-row assertion stays per-row.
+   *
+   * Scoped to the body of the table: the header carries the signed-in admin's
+   * username too, in the account menu.
+   */
+  function rowFor(html: string, username: string): string {
+    const row = html
+      .split('<tbody>')[1]
+      .split('<tr>')
+      .find(part => part.includes(username))
+    expect(row).toBeDefined()
+    return row!
+  }
+
+  it('gives every role in the enum a column', async () => {
     const html = await body()
 
-    expect(html).toContain('alice')
-    expect(html).toContain('user')
-    expect(html).toContain('admin')
+    expect(html).toContain('>Admin</th>')
+    expect(html).toContain('>User</th>')
   })
 
-  // The grant is a per-row post, the same shape the waitlist uses, so the id
-  // travels with the button rather than being typed into a field.
-  it('offers the grant to a user who is not an admin', async () => {
+  it('shows whether each user holds each role', async () => {
     const html = await body()
 
-    expect(html).toContain('action="/grant-admin"')
-    expect(html).toContain('value="u1"')
-    expect(html).toContain('Grant admin')
+    expect(rowFor(html, 'alice')).toContain('alice')
+    expect(rowFor(html, 'carol')).toContain('carol')
   })
 
-  it('offers no grant to a user who already has the role', async () => {
-    expect(await body()).not.toContain('value="u2"')
+  // The change is a per-row post, the same shape the waitlist uses, so the id
+  // and the role travel with the button rather than being typed into a field.
+  it('offers a grant for a role the user lacks', async () => {
+    const row = rowFor(await body(), 'carol')
+
+    expect(row).toContain('action="/roles/grant"')
+    expect(row).toContain('value="u3"')
+    expect(row).toContain('value="Admin"')
+    expect(row).toContain('Grant')
+  })
+
+  it('offers a revoke for a role the user holds', async () => {
+    const row = rowFor(await body(), 'alice')
+
+    expect(row).toContain('action="/roles/revoke"')
+    expect(row).toContain('value="u1"')
+    expect(row).toContain('Revoke')
+  })
+
+  // Revoking User is a suspension, not a permission tweak — login() requires
+  // that role. The button says so rather than leaving it to be discovered.
+  it('warns that revoking the User role suspends sign-in', async () => {
+    expect(await body()).toContain('Revoking User suspends sign-in.')
+  })
+
+  // The service refuses a self-revoke outright; the row does not offer the
+  // button that would earn that error.
+  it('offers the signed-in admin no revoke on their own row', async () => {
+    const row = rowFor(await body(), 'root')
+
+    expect(row).not.toContain('action="/roles/revoke"')
+    // A role they lack is still theirs to grant themselves.
+    expect(row).toContain('action="/roles/grant"')
   })
 })

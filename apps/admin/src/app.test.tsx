@@ -33,6 +33,7 @@ import {
   ValidationError,
   UserNotFoundError,
   UserNotEligibleError,
+  CannotRevokeOwnRoleError,
   AccessControl,
 } from '@pinsquirrel/domain'
 import type { Hono } from 'hono'
@@ -49,7 +50,8 @@ const userService = {
 const authService = {
   login: vi.fn(),
   grantAccess: vi.fn(),
-  grantAdmin: vi.fn(),
+  grantRole: vi.fn(),
+  revokeRole: vi.fn(),
 }
 
 vi.mock('./runtime.js', () => ({
@@ -851,7 +853,7 @@ describe('GET /users', () => {
     status: UserStatus.Active,
   })
 
-  it('lists active users with their roles', async () => {
+  it('lists active users with a column per role', async () => {
     const cookie = await signIn()
     userService.listByStatus.mockResolvedValue([activeUser, adminUser])
 
@@ -860,10 +862,26 @@ describe('GET /users', () => {
 
     expect(res.status).toBe(200)
     expect(body).toContain('bob')
-    expect(body).toContain(`${Role.User}, ${Role.Admin}`)
-    // Only the account without the role is offered the grant.
-    expect(body).toContain(`value="${activeUser.id}"`)
-    expect(body).not.toContain(`value="${adminUser.id}"`)
+    for (const role of Object.values(Role)) {
+      expect(body).toContain(`>${role}</th>`)
+    }
+    // bob lacks Admin, so his row offers it; he holds User, so that one is
+    // offered back the other way.
+    expect(body).toContain('action="/roles/grant"')
+    expect(body).toContain('action="/roles/revoke"')
+  })
+
+  // The signed-in admin's own row is the one the service will refuse, so the
+  // page marks it and drops the buttons that would earn the refusal.
+  it('offers the signed-in admin no revoke on their own row', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockResolvedValue([adminUser])
+
+    const res = await app.request('/users', { headers: { Cookie: cookie } })
+    const row = (await res.text()).split('<tbody>')[1]
+
+    expect(row).toContain('(you)')
+    expect(row).not.toContain('action="/roles/revoke"')
   })
 
   // Listing is Admin-gated inside UserService, so the app hands it the
@@ -999,7 +1017,7 @@ describe('POST /grant-access', () => {
   })
 })
 
-describe('POST /grant-admin', () => {
+describe('POST /roles/grant', () => {
   /** An active account without the Admin role — a row on the Users page. */
   const target = makeUser({
     id: 'user-2',
@@ -1008,63 +1026,82 @@ describe('POST /grant-admin', () => {
     status: UserStatus.Active,
   })
 
-  it('grants the Admin role to the selected user', async () => {
+  it('grants the named role to the selected user', async () => {
     const cookie = await signIn()
     userService.listByStatus.mockResolvedValue([target])
-    authService.grantAdmin.mockResolvedValue({
+    authService.grantRole.mockResolvedValue({
       ...target,
       roles: [Role.User, Role.Admin],
     })
 
     const res = await app.request(
-      '/grant-admin',
-      form({ userId: target.id }, cookie)
+      '/roles/grant',
+      form({ userId: target.id, role: Role.Admin }, cookie)
     )
 
     expect(res.status).toBe(200)
     // The grant carries the signed-in admin's own AccessControl, so the
     // service decides the rule rather than trusting this app's session gate.
-    expect(authService.grantAdmin).toHaveBeenCalledWith(
+    expect(authService.grantRole).toHaveBeenCalledWith(
       new AccessControl(adminUser),
-      target.id
+      target.id,
+      Role.Admin
     )
     expect(await res.text()).toContain('Granted the Admin role to bob')
   })
 
   // The button is not rendered for a row that already has the role, so this
-  // only happens from a stale page — but grantAdmin is idempotent and cannot
+  // only happens from a stale page — but grantRole is idempotent and cannot
   // tell the two outcomes apart afterwards, so the row is read first.
-  it('reports no change for an existing admin without writing', async () => {
+  it('reports no change for a user who already holds the role', async () => {
     const cookie = await signIn()
     userService.listByStatus.mockResolvedValue([adminUser])
 
     const res = await app.request(
-      '/grant-admin',
-      form({ userId: adminUser.id }, cookie)
+      '/roles/grant',
+      form({ userId: adminUser.id, role: Role.Admin }, cookie)
     )
 
     expect(res.status).toBe(200)
-    expect(authService.grantAdmin).not.toHaveBeenCalled()
-    expect(await res.text()).toContain('root is already an admin')
+    expect(authService.grantRole).not.toHaveBeenCalled()
+    expect(await res.text()).toContain('root already has the Admin role')
   })
 
   it('rejects a submission with no user without touching the database', async () => {
     const cookie = await signIn()
 
-    const res = await app.request('/grant-admin', form({ userId: '' }, cookie))
+    const res = await app.request(
+      '/roles/grant',
+      form({ userId: '', role: Role.Admin }, cookie)
+    )
 
     expect(res.status).toBe(400)
-    expect(authService.grantAdmin).not.toHaveBeenCalled()
+    expect(authService.grantRole).not.toHaveBeenCalled()
+  })
+
+  // The role arrives as a form field, so it is whatever the client sent. Only
+  // a value the enum actually names reaches the service.
+  it('rejects a role the enum does not name', async () => {
+    const cookie = await signIn()
+
+    const res = await app.request(
+      '/roles/grant',
+      form({ userId: target.id, role: 'Superuser' }, cookie)
+    )
+
+    expect(res.status).toBe(400)
+    expect(authService.grantRole).not.toHaveBeenCalled()
+    expect(await res.text()).toContain('not a role')
   })
 
   it('returns 404 when the target was deleted before the grant', async () => {
     const cookie = await signIn()
     userService.listByStatus.mockResolvedValue([target])
-    authService.grantAdmin.mockRejectedValue(new UserNotFoundError(target.id))
+    authService.grantRole.mockRejectedValue(new UserNotFoundError(target.id))
 
     const res = await app.request(
-      '/grant-admin',
-      form({ userId: target.id }, cookie)
+      '/roles/grant',
+      form({ userId: target.id, role: Role.Admin }, cookie)
     )
 
     expect(res.status).toBe(404)
@@ -1074,11 +1111,11 @@ describe('POST /grant-admin', () => {
   it('reports an unexpected failure as a 500', async () => {
     const cookie = await signIn()
     userService.listByStatus.mockResolvedValue([target])
-    authService.grantAdmin.mockRejectedValue(new Error('connection reset'))
+    authService.grantRole.mockRejectedValue(new Error('connection reset'))
 
     const res = await app.request(
-      '/grant-admin',
-      form({ userId: target.id }, cookie)
+      '/roles/grant',
+      form({ userId: target.id, role: Role.Admin }, cookie)
     )
 
     expect(res.status).toBe(500)
@@ -1086,14 +1123,148 @@ describe('POST /grant-admin', () => {
   })
 
   it('redirects to /login when unauthenticated', async () => {
-    const res = await app.request('/grant-admin', {
+    const res = await app.request('/roles/grant', {
       method: 'POST',
-      body: new URLSearchParams({ userId: 'user-2' }),
+      body: new URLSearchParams({ userId: 'user-2', role: Role.Admin }),
     })
 
     expect(res.status).toBe(302)
     expect(res.headers.get('location')).toBe('/login')
-    expect(authService.grantAdmin).not.toHaveBeenCalled()
+    expect(authService.grantRole).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /roles/revoke', () => {
+  /** An active account holding both roles — every revoke has something to do. */
+  const target = makeUser({
+    id: 'user-2',
+    username: 'bob',
+    roles: [Role.User, Role.Admin],
+    status: UserStatus.Active,
+  })
+
+  it('revokes the named role from the selected user', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockResolvedValue([target])
+    authService.revokeRole.mockResolvedValue({ ...target, roles: [Role.User] })
+
+    const res = await app.request(
+      '/roles/revoke',
+      form({ userId: target.id, role: Role.Admin }, cookie)
+    )
+
+    expect(res.status).toBe(200)
+    expect(authService.revokeRole).toHaveBeenCalledWith(
+      new AccessControl(adminUser),
+      target.id,
+      Role.Admin
+    )
+    expect(await res.text()).toContain('Revoked the Admin role from bob')
+  })
+
+  // Losing the User role is a suspension: login() requires it. The notice says
+  // so, because nothing else on the page would.
+  it('says that revoking the User role suspends sign-in', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockResolvedValue([target])
+    authService.revokeRole.mockResolvedValue({ ...target, roles: [Role.Admin] })
+
+    const res = await app.request(
+      '/roles/revoke',
+      form({ userId: target.id, role: Role.User }, cookie)
+    )
+
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('can no longer sign in')
+  })
+
+  it('reports no change for a user who does not hold the role', async () => {
+    const cookie = await signIn()
+    const plain = makeUser({
+      id: 'user-3',
+      username: 'carol',
+      roles: [Role.User],
+      status: UserStatus.Active,
+    })
+    userService.listByStatus.mockResolvedValue([plain])
+
+    const res = await app.request(
+      '/roles/revoke',
+      form({ userId: plain.id, role: Role.Admin }, cookie)
+    )
+
+    expect(res.status).toBe(200)
+    expect(authService.revokeRole).not.toHaveBeenCalled()
+    expect(await res.text()).toContain('carol does not have the Admin role')
+  })
+
+  // The page hides the button, but the post is still reachable — and the
+  // service, not this app, is what actually refuses it.
+  it('reports the service refusing a self-revoke', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockResolvedValue([adminUser])
+    authService.revokeRole.mockRejectedValue(
+      new CannotRevokeOwnRoleError(Role.Admin)
+    )
+
+    const res = await app.request(
+      '/roles/revoke',
+      form({ userId: adminUser.id, role: Role.Admin }, cookie)
+    )
+
+    expect(res.status).toBe(400)
+    expect(await res.text()).toContain('your own account')
+  })
+
+  it('rejects a role the enum does not name', async () => {
+    const cookie = await signIn()
+
+    const res = await app.request(
+      '/roles/revoke',
+      form({ userId: target.id, role: 'Superuser' }, cookie)
+    )
+
+    expect(res.status).toBe(400)
+    expect(authService.revokeRole).not.toHaveBeenCalled()
+  })
+
+  it('returns 404 when the target was deleted before the revoke', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockResolvedValue([target])
+    authService.revokeRole.mockRejectedValue(new UserNotFoundError(target.id))
+
+    const res = await app.request(
+      '/roles/revoke',
+      form({ userId: target.id, role: Role.Admin }, cookie)
+    )
+
+    expect(res.status).toBe(404)
+    expect(await res.text()).toContain('no longer exists')
+  })
+
+  it('reports an unexpected failure as a 500', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockResolvedValue([target])
+    authService.revokeRole.mockRejectedValue(new Error('connection reset'))
+
+    const res = await app.request(
+      '/roles/revoke',
+      form({ userId: target.id, role: Role.Admin }, cookie)
+    )
+
+    expect(res.status).toBe(500)
+    expect(await res.text()).toContain('reach the Test Env database')
+  })
+
+  it('redirects to /login when unauthenticated', async () => {
+    const res = await app.request('/roles/revoke', {
+      method: 'POST',
+      body: new URLSearchParams({ userId: 'user-2', role: Role.Admin }),
+    })
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/login')
+    expect(authService.revokeRole).not.toHaveBeenCalled()
   })
 })
 

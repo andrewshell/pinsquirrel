@@ -187,13 +187,60 @@ export const UnlockPage: FC<{ envLabel: string; error?: string }> = ({
   </Layout>
 )
 
+/**
+ * One role's column on the Users table.
+ *
+ * The list comes from the app rather than the domain enum directly, so the
+ * page has no opinion about which roles exist or which one is load-bearing —
+ * `revokeHint` carries that as copy, and today only the User role has one.
+ */
+type RoleColumn = { name: string; revokeHint?: string }
+
+/**
+ * One role's state for one user, and the single button that changes it.
+ *
+ * The state and the action share a cell because the state _is_ what the button
+ * offers: a role the user holds can only be revoked, one they lack only
+ * granted. The exception is the signed-in admin's own row — the service
+ * refuses a self-revoke, so the row does not offer the button that earns it.
+ */
+const RoleCell: FC<{
+  userId: string
+  role: RoleColumn
+  has: boolean
+  isSelf: boolean
+}> = ({ userId, role, has, isSelf }) => (
+  <div class="flex items-center gap-2">
+    <span class={has ? okClasses : 'text-muted-foreground'}>
+      {has ? 'yes' : 'no'}
+    </span>
+    {has && isSelf ? (
+      ''
+    ) : (
+      <form method="post" action={has ? '/roles/revoke' : '/roles/grant'}>
+        <input type="hidden" name="userId" value={userId} />
+        <input type="hidden" name="role" value={role.name} />
+        <Button
+          type="submit"
+          size="sm"
+          variant={has ? 'outline' : 'default'}
+          title={has ? role.revokeHint : undefined}
+        >
+          {has ? 'Revoke' : 'Grant'}
+        </Button>
+      </form>
+    )}
+  </div>
+)
+
 export const UsersPage: FC<{
   envLabel: string
   username: string
-  rows: { id: string; username: string; roles: string[]; isAdmin: boolean }[]
+  roles: RoleColumn[]
+  rows: { id: string; username: string; roles: string[]; isSelf: boolean }[]
   notice?: string
   error?: string
-}> = ({ envLabel, username, rows, notice, error }) => (
+}> = ({ envLabel, username, roles, rows, notice, error }) => (
   <Layout
     title="Users"
     header={<AdminHeader username={username} currentPath="/users" />}
@@ -217,32 +264,32 @@ export const UsersPage: FC<{
             <thead>
               <tr>
                 <th class={thClasses}>Username</th>
-                <th class={thClasses}>Roles</th>
-                <th class={thClasses}></th>
+                {roles.map(role => (
+                  <th class={thClasses}>{role.name}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {rows.map(r => (
                 <tr>
-                  <td class={tdClasses}>{r.username}</td>
-                  <td class={`${tdClasses} text-muted-foreground`}>
-                    {r.roles.join(', ')}
-                  </td>
                   <td class={tdClasses}>
-                    {/* Nothing to offer an account that already holds the
-                        role: granting twice changes nothing, so the column
-                        stays empty rather than showing a no-op button. */}
-                    {r.isAdmin ? (
-                      ''
+                    {r.username}
+                    {r.isSelf ? (
+                      <span class="text-muted-foreground text-xs"> (you)</span>
                     ) : (
-                      <form method="post" action="/grant-admin">
-                        <input type="hidden" name="userId" value={r.id} />
-                        <Button type="submit" size="sm">
-                          Grant admin
-                        </Button>
-                      </form>
+                      ''
                     )}
                   </td>
+                  {roles.map(role => (
+                    <td class={tdClasses}>
+                      <RoleCell
+                        userId={r.id}
+                        role={role}
+                        has={r.roles.includes(role.name)}
+                        isSelf={r.isSelf}
+                      />
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
