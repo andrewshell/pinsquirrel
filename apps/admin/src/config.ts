@@ -11,7 +11,14 @@ export interface AdminEnvironment {
   name: string
   label: string
   databaseUrl: string
-  privateKeyPath: string
+  /**
+   * Where this environment's sealed-email private key lives.
+   *
+   * Optional, because sealing is: a server running without EMAIL_PUBLIC_KEY
+   * stores plain-null emails, so there is no key and nothing to unlock. Absent
+   * means exactly that — an empty string is a mistake, not a declaration.
+   */
+  privateKeyPath?: string
   mailgun: MailgunSettings
 }
 
@@ -32,6 +39,20 @@ function requireString(
   const value = obj[field]
   if (typeof value !== 'string' || value.length === 0) {
     invalid(`${context} is missing or has an invalid "${field}"`)
+  }
+  return value
+}
+
+/** An absent field is allowed; a present one still has to say something. */
+function optionalString(
+  obj: Record<string, unknown>,
+  field: string,
+  context: string
+): string | undefined {
+  const value = obj[field]
+  if (value === undefined || value === null) return undefined
+  if (typeof value !== 'string' || value.length === 0) {
+    invalid(`${context} has an invalid "${field}"`)
   }
   return value
 }
@@ -67,7 +88,7 @@ function parseEnvironment(value: unknown, index: number): AdminEnvironment {
     name,
     label,
     databaseUrl: requireString(obj, 'databaseUrl', context),
-    privateKeyPath: requireString(obj, 'privateKeyPath', context),
+    privateKeyPath: optionalString(obj, 'privateKeyPath', context),
     mailgun: parseMailgun(obj.mailgun, context),
   }
 }
