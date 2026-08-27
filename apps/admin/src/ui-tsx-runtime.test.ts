@@ -10,6 +10,7 @@ const script = `import('@pinsquirrel/ui')
   .then(m => {
     m.Card({ children: 'x' })
     m.Button({ children: 'x' })
+    m.UserIcon({})
   })
   .catch(e => {
     console.error(e.message)
