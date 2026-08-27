@@ -506,6 +506,122 @@ describe('AuthenticationService', () => {
     })
   })
 
+  /**
+   * The sign-in that only an unbootstrapped system answers.
+   *
+   * Same credentials as login(), a different set of account states: on a fresh
+   * database the operator's own account is still on the waitlist, because
+   * admitting it needs an admin who does not exist yet.
+   */
+  describe('loginForBootstrap', () => {
+    const credentials = { username: 'testuser', password: 'password12345' }
+
+    /** A verified account still waiting for an access grant. */
+    const waitlisted = {
+      ...mockUser,
+      passwordHash: '$2b$10$validhash',
+      status: UserStatus.Waitlist,
+    }
+
+    beforeEach(() => {
+      vi.mocked(verifyPassword).mockResolvedValue(true)
+      vi.mocked(mockUserRepository.countByRole).mockResolvedValue(0)
+    })
+
+    it('should admit a waitlisted account when nobody is admin', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(waitlisted)
+
+      await expect(authService.loginForBootstrap(credentials)).resolves.toEqual(
+        waitlisted
+      )
+    })
+
+    it('should admit an active account too', async () => {
+      const active = { ...waitlisted, status: UserStatus.Active }
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(active)
+
+      await expect(authService.loginForBootstrap(credentials)).resolves.toEqual(
+        active
+      )
+    })
+
+    // Otherwise this is simply a way around login()'s Active requirement.
+    it('should refuse once the system has an admin', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(waitlisted)
+      vi.mocked(mockUserRepository.countByRole).mockResolvedValue(1)
+
+      await expect(
+        authService.loginForBootstrap(credentials)
+      ).rejects.toBeInstanceOf(AdminAlreadyExistsError)
+    })
+
+    // An account that has not confirmed its email has proved nothing, and
+    // claiming admin would carry it to Active — the state grantAccess refuses
+    // to put it in for exactly the same reason.
+    it('should refuse an unverified account', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue({
+        ...waitlisted,
+        status: UserStatus.Unverified,
+      })
+
+      await expect(
+        authService.loginForBootstrap(credentials)
+      ).rejects.toBeInstanceOf(UserNotEligibleError)
+    })
+
+    it('should still require the password to be right', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(waitlisted)
+      vi.mocked(verifyPassword).mockResolvedValue(false)
+
+      await expect(authService.loginForBootstrap(credentials)).rejects.toThrow(
+        InvalidCredentialsError
+      )
+    })
+
+    it('should compare against a dummy hash for an unknown username', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(verifyPassword).mockResolvedValue(false)
+
+      await expect(authService.loginForBootstrap(credentials)).rejects.toThrow(
+        InvalidCredentialsError
+      )
+      expect(verifyPassword).toHaveBeenCalledWith(
+        'password12345',
+        'dummy_salt:dummy_key'
+      )
+    })
+
+    // The credentials are checked first, so the route cannot be used to ask
+    // whether an environment has been bootstrapped without an account on it.
+    it('should check the credentials before counting admins', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(verifyPassword).mockResolvedValue(false)
+
+      await expect(authService.loginForBootstrap(credentials)).rejects.toThrow(
+        InvalidCredentialsError
+      )
+      expect(mockUserRepository.countByRole).not.toHaveBeenCalled()
+    })
+
+    it('should still require the User role', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue({
+        ...waitlisted,
+        roles: [],
+      })
+
+      await expect(authService.loginForBootstrap(credentials)).rejects.toThrow(
+        MissingRoleError
+      )
+    })
+
+    it('should throw a validation error for a malformed submission', async () => {
+      await expect(
+        authService.loginForBootstrap({ username: '', password: '' })
+      ).rejects.toThrow(ValidationError)
+      expect(mockUserRepository.findByUsername).not.toHaveBeenCalled()
+    })
+  })
+
   describe('bootstrapAdmin', () => {
     /** The account claiming Admin, and the same account once it has. */
     const claimant = { ...mockUser, id: 'claimant-1', roles: [Role.User] }
@@ -581,6 +697,79 @@ describe('AuthenticationService', () => {
       await expect(authService.bootstrapAdmin(claimant.id)).rejects.toThrow(
         UserNotFoundError
       )
+    })
+
+    /**
+     * A fresh database has nobody who could have admitted the operator.
+     *
+     * Their account is therefore still on the waitlist, and an Admin role on
+     * an account login() will not let back in is a role nobody can use.
+     */
+    describe('a claimant the waitlist still holds', () => {
+      const waiting = { ...claimant, status: UserStatus.Waitlist }
+      const admitted = {
+        ...waiting,
+        status: UserStatus.Active,
+        roles: [Role.User, Role.Admin],
+      }
+
+      beforeEach(() => {
+        vi.mocked(mockUserRepository.countByRole).mockResolvedValue(0)
+      })
+
+      it('should activate the account as well as granting Admin', async () => {
+        vi.mocked(mockUserRepository.findById)
+          .mockResolvedValueOnce(waiting)
+          .mockResolvedValueOnce(admitted)
+        vi.mocked(mockUserRepository.update).mockResolvedValue(admitted)
+
+        const result = await authService.bootstrapAdmin(waiting.id)
+
+        expect(mockUserRepository.update).toHaveBeenCalledWith(waiting.id, {
+          status: UserStatus.Active,
+        })
+        expect(mockUserRepository.addRole).toHaveBeenCalledWith(
+          waiting.id,
+          Role.Admin
+        )
+        expect(result.status).toBe(UserStatus.Active)
+        expect(result.roles).toContain(Role.Admin)
+      })
+
+      it('should leave an already active claimant alone', async () => {
+        vi.mocked(mockUserRepository.findById)
+          .mockResolvedValueOnce(claimant)
+          .mockResolvedValueOnce(bootstrapped)
+
+        await authService.bootstrapAdmin(claimant.id)
+
+        expect(mockUserRepository.update).not.toHaveBeenCalled()
+      })
+
+      // The same rule grantAccess enforces: activating an account that never
+      // confirmed its email strands it as Active with no password to set.
+      it('should refuse an unverified claimant', async () => {
+        vi.mocked(mockUserRepository.findById).mockResolvedValue({
+          ...claimant,
+          status: UserStatus.Unverified,
+        })
+
+        await expect(
+          authService.bootstrapAdmin(claimant.id)
+        ).rejects.toBeInstanceOf(UserNotEligibleError)
+        expect(mockUserRepository.update).not.toHaveBeenCalled()
+        expect(mockUserRepository.addRole).not.toHaveBeenCalled()
+      })
+
+      it('should throw UserNotFoundError if the claimant vanishes at activation', async () => {
+        vi.mocked(mockUserRepository.findById).mockResolvedValue(waiting)
+        vi.mocked(mockUserRepository.update).mockResolvedValue(null)
+
+        await expect(authService.bootstrapAdmin(waiting.id)).rejects.toThrow(
+          UserNotFoundError
+        )
+        expect(mockUserRepository.addRole).not.toHaveBeenCalled()
+      })
     })
   })
 

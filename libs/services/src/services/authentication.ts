@@ -35,7 +35,21 @@ export interface EmailSealer {
 export class AuthenticationService {
   constructor(private readonly userRepository: UserRepository) {}
 
-  async login(input: { username: string; password: string }): Promise<User> {
+  /**
+   * Who these credentials belong to, if they are good for signing in at all.
+   *
+   * Everything the two sign-in paths agree on: the submission is well formed,
+   * the password matches, and the account holds the User role. Split out so
+   * the bootstrap path cannot drift from it — a second copy of the dummy-hash
+   * comparison would be a second place for the timing to go wrong.
+   *
+   * Which account *states* are acceptable is left to the caller, because that
+   * is the only thing the two differ on.
+   */
+  private async verifyCredentials(input: {
+    username: string
+    password: string
+  }): Promise<User> {
     // Validate inputs at service boundary
     const result = credentialsSchema.safeParse(input)
     if (!result.success) {
@@ -55,6 +69,12 @@ export class AuthenticationService {
       throw new MissingRoleError()
     }
 
+    return user
+  }
+
+  async login(input: { username: string; password: string }): Promise<User> {
+    const user = await this.verifyCredentials(input)
+
     // Only users who have been granted access can sign in. Verified accounts
     // awaiting an access grant are still on the early-access waitlist.
     if (user.status !== UserStatus.Active) {
@@ -62,6 +82,60 @@ export class AuthenticationService {
     }
 
     return user
+  }
+
+  /**
+   * Sign in to claim the first admin role, on a system that has none.
+   *
+   * `login()` requires an Active account, and on a fresh database no account
+   * can be Active: reaching that state needs `grantAccess`, which needs an
+   * admin, which is what is missing. The cold start has to accept the operator
+   * where they actually are — on the waitlist — or it does not start.
+   *
+   * That is not a way around the Active rule, because of what surrounds it:
+   *
+   * - The credentials are checked first, so this is never an oracle for
+   *   whether an environment has been bootstrapped.
+   * - It is refused outright once any admin exists, so the widened states are
+   *   reachable for exactly as long as nobody can grant access at all — and
+   *   the very first claim closes that window for good.
+   * - Unverified accounts stay out, on `grantAccess`'s reasoning: an account
+   *   that never confirmed its email has proved nothing, and the claim that
+   *   follows this sign-in would carry it to Active.
+   *
+   * The account it returns is still not Active. `bootstrapAdmin` is what
+   * admits it, and it re-checks all of this for itself.
+   */
+  async loginForBootstrap(input: {
+    username: string
+    password: string
+  }): Promise<User> {
+    const user = await this.verifyCredentials(input)
+
+    if ((await this.userRepository.countByRole(Role.Admin)) > 0) {
+      throw new AdminAlreadyExistsError()
+    }
+
+    this.requireBootstrapEligible(user)
+
+    return user
+  }
+
+  /**
+   * The account states a bootstrap claim may act on.
+   *
+   * Waitlist and Active both mean the email was confirmed. Unverified does
+   * not, and activating such an account would strand it: `resetPassword`'s
+   * Unverified guard would no longer match, leaving it Active with no way to
+   * set a password. `grantAccess` refuses it for the same reason.
+   */
+  private requireBootstrapEligible(user: User): void {
+    if (user.status === UserStatus.Unverified) {
+      throw new UserNotEligibleError(
+        user.status,
+        `User "${user.username}" has not confirmed their email yet`
+      )
+    }
   }
 
   /**
@@ -199,6 +273,12 @@ export class AuthenticationService {
    * closed here: two simultaneous claimants would both become admins, which
    * leaves the system administered rather than broken, and the console is
    * reached by one operator on a fresh deployment.
+   *
+   * The claimant is admitted as well as promoted. On a fresh database their
+   * account is still on the waitlist — nobody existed who could have let them
+   * in — and an Admin role on an account `login()` turns away is a role nobody
+   * can use. Both halves answer to the same invariant, so they happen together
+   * or not at all.
    */
   async bootstrapAdmin(userId: string): Promise<User> {
     if ((await this.userRepository.countByRole(Role.Admin)) > 0) {
@@ -208,6 +288,17 @@ export class AuthenticationService {
     const user = await this.userRepository.findById(userId)
     if (!user) {
       throw new UserNotFoundError(userId)
+    }
+
+    this.requireBootstrapEligible(user)
+
+    if (user.status === UserStatus.Waitlist) {
+      const activated = await this.userRepository.update(userId, {
+        status: UserStatus.Active,
+      })
+      if (!activated) {
+        throw new UserNotFoundError(userId)
+      }
     }
 
     await this.userRepository.addRole(userId, Role.Admin)
