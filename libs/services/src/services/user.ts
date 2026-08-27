@@ -23,12 +23,11 @@ export class UserService {
   /**
    * Whether the system has been bootstrapped: does anyone hold Admin?
    *
-   * Deliberately ungated — the third exception to "services enforce
-   * AccessControl", alongside the two in CLAUDE.md. Every other query on this
-   * service answers "what is in the database"; this one answers "has anyone
-   * been put in charge of it yet", which is a fact about the deployment rather
-   * than about any user: it names nobody, counts nobody, and reveals only a
-   * single bit that a fresh install advertises anyway by having no way in.
+   * Deliberately ungated. Every other query on this service answers "what is
+   * in the database"; this one answers "has anyone been put in charge of it
+   * yet", which is a fact about the deployment rather than about any user: it
+   * names nobody, counts nobody, and reveals only a single bit that a fresh
+   * install advertises anyway by having no way in.
    *
    * Gating it on Admin would be circular. The caller is the admin console's
    * bootstrap gate, which runs precisely when no admin exists and so has no
