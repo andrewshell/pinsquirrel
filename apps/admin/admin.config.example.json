@@ -5,7 +5,6 @@
       "name": "dev",
       "label": "Development",
       "databaseUrl": "mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel",
-      "privateKeyPath": "./keys/dev-email-key.json",
       "mailgun": {
         "apiKey": "key-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
         "domain": "mg.example.com",
