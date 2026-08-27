@@ -799,14 +799,16 @@ describe('GET /waitlist', () => {
     expect(res.headers.get('location')).toBe('/login')
   })
 
-  // Granting the Admin role belongs with the accounts it applies to, which is
-  // the Users page — the box here could only be filled in from memory.
-  it('no longer carries the grant-admin form', async () => {
+  // Role changes belong with the accounts they apply to, which is the Users
+  // page — a box here could only be filled in from memory.
+  it('carries no role form', async () => {
     const cookie = await signIn()
 
     const res = await app.request('/waitlist', { headers: { Cookie: cookie } })
+    const body = await res.text()
 
-    expect(await res.text()).not.toContain('/grant-admin')
+    expect(body).not.toContain('/roles/grant')
+    expect(body).not.toContain('/roles/revoke')
   })
 })
 
