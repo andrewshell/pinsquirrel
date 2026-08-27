@@ -28,11 +28,16 @@ interface HeaderProps {
 // The active and inactive states set the same properties, so they are split
 // rather than layered: two Tailwind border-colour classes on one element leave
 // the winner up to stylesheet order.
+//
+// Active is the filled "selected" treatment rather than the hover look — a
+// current link that borrows hover's colours reads as a link under the cursor,
+// and carries no hover of its own so it does not shift once you reach it.
 const navLinkBaseClasses =
   'text-base font-bold uppercase px-4 py-2 border-2 transition-all'
 const navLinkInactiveClasses =
   'text-foreground hover:text-primary border-transparent hover:border-foreground'
-const navLinkActiveClasses = 'text-primary border-foreground'
+const navLinkActiveClasses =
+  'bg-primary text-primary-foreground border-foreground'
 
 /**
  * A link is current when the path is the link's own or sits under it, so

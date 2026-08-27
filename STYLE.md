@@ -319,15 +319,39 @@ Four variants available via the `Button` component:
 
 ### Navigation Link
 
+Two variants over one set of base classes: an idle link that only reacts to the
+cursor, and the current page's link, which is filled. They set the same
+properties, so pick one — layering `border-transparent` over `border-foreground`
+leaves the winner to stylesheet order.
+
+Idle:
+
 ```html
 <a
   href="/page"
-  class="text-base font-bold text-foreground hover:text-accent uppercase
-          px-4 py-2 border-2 border-transparent hover:border-foreground transition-all"
+  class="text-base font-bold uppercase px-4 py-2 border-2 transition-all
+          text-foreground hover:text-primary border-transparent hover:border-foreground"
 >
   Nav Item
 </a>
 ```
+
+Current page — filled, and deliberately without a hover state of its own, so it
+does not shift once the cursor reaches it. Pair it with `aria-current="page"`:
+
+```html
+<a
+  href="/page"
+  class="text-base font-bold uppercase px-4 py-2 border-2 transition-all
+          bg-primary text-primary-foreground border-foreground"
+  aria-current="page"
+>
+  Nav Item
+</a>
+```
+
+`NavLink` from `@pinsquirrel/ui` renders both: give it a `currentPath` and it
+decides for itself, matching its own `href` and anything nested under it.
 
 ### Dropdown Menu
 

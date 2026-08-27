@@ -37,8 +37,39 @@ describe('NavLink', () => {
       </NavLink>
     )
 
-    expect(html).toContain('text-primary')
+    expect(html).toContain('aria-current="page"')
     expect(html).not.toContain('border-transparent')
+  })
+
+  // Active is the filled "selected" treatment, not the hover look — the two
+  // used to be the same class list, so a current link read as hovered.
+  it('fills the active link rather than reusing the hover look', async () => {
+    const html = await render(
+      <NavLink href="/users" currentPath="/users">
+        Users
+      </NavLink>
+    )
+
+    for (const token of [
+      'bg-primary',
+      'text-primary-foreground',
+      'border-foreground',
+    ]) {
+      expect(html).toContain(token)
+    }
+  })
+
+  // Two colour classes on one element leave the winner to stylesheet order, so
+  // the active variant must not carry the inactive one's colours or its hover.
+  it('does not carry the inactive colours or a hover state when active', async () => {
+    const html = await render(
+      <NavLink href="/users" currentPath="/users">
+        Users
+      </NavLink>
+    )
+
+    expect(html).not.toContain('text-foreground')
+    expect(html).not.toContain('hover:')
   })
 
   it('marks itself active for a path nested under the href', async () => {
