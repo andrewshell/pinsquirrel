@@ -36,6 +36,7 @@ import {
 import {
   LoginPage,
   UnlockPage,
+  UsersPage,
   WaitlistPage,
   ComposePage,
   SentPage,
@@ -112,6 +113,63 @@ async function loadWaitlist(
     })
   }
   return rows
+}
+
+interface UserRow {
+  id: string
+  username: string
+  roles: string[]
+  isAdmin: boolean
+}
+
+/** Every active account, with the roles the Users page shows and acts on. */
+async function loadUsers(
+  env: AdminEnvironment,
+  username: string
+): Promise<UserRow[]> {
+  const { userService } = getRuntime(env)
+  const ac = await adminAccessControl(env, username)
+  const users = await userService.listByStatus(ac, UserStatus.Active)
+  return users.map(user => ({
+    id: user.id,
+    username: user.username,
+    roles: user.roles,
+    isAdmin: user.roles.includes(Role.Admin),
+  }))
+}
+
+/**
+ * Re-render the users list with the outcome of an action.
+ *
+ * The same shape as renderWaitlist, and for the same reason: /grant-admin
+ * reports on the page it was invoked from rather than redirecting.
+ */
+async function renderUsers(
+  c: Context,
+  env: AdminEnvironment,
+  username: string,
+  outcome: { notice?: string; error?: string } = {},
+  status: 200 | 400 | 404 | 500 = 200
+) {
+  let rows: UserRow[] = []
+  let error = outcome.error
+  let code = status
+  try {
+    rows = await loadUsers(env, username)
+  } catch (err) {
+    error = error ?? dbErrorMessage(env, err)
+    code = 500
+  }
+  return c.html(
+    <UsersPage
+      envLabel={env.label}
+      username={username}
+      rows={rows}
+      notice={outcome.notice}
+      error={error}
+    />,
+    code
+  )
 }
 
 /**
@@ -347,6 +405,17 @@ export function createApp(config: AdminConfig): Hono {
       username: sess.session.username,
       privateKey: sess.session.privateKey,
     })
+  })
+
+  // The private key is not needed to list accounts, but the unlock gate is the
+  // console's, not the page's: a half-open session finishes unlocking first.
+  app.get('/users', async c => {
+    const sess = await currentSession(c)
+    if (!sess) return c.redirect('/login')
+    if (!sess.session.privateKey) return c.redirect('/unlock')
+
+    const env = getEnvironment(config, sess.session.environment)
+    return renderUsers(c, env, sess.session.username)
   })
 
   // Admit one person from the waitlist. Replaces the grant-access script, which

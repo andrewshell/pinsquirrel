@@ -171,6 +171,72 @@ export const UnlockPage: FC<{ envLabel: string; error?: string }> = ({
   </Layout>
 )
 
+export const UsersPage: FC<{
+  envLabel: string
+  username: string
+  rows: { id: string; username: string; roles: string[]; isAdmin: boolean }[]
+  notice?: string
+  error?: string
+}> = ({ envLabel, username, rows, notice, error }) => (
+  <Layout
+    title="Users"
+    header={<AdminHeader username={username} currentPath="/users" />}
+  >
+    <h1 class="text-3xl font-bold">Users · {rows.length}</h1>
+    <p class="text-muted-foreground text-sm mt-2">
+      {envLabel} — active accounts
+    </p>
+    <Card class="mt-7">
+      <CardContent class="space-y-4">
+        {notice ? <Alert variant="success">{notice}</Alert> : ''}
+        {error ? <Alert variant="destructive">{error}</Alert> : ''}
+        {rows.length === 0 ? (
+          error ? (
+            ''
+          ) : (
+            <p class="text-muted-foreground text-sm">No active accounts yet.</p>
+          )
+        ) : (
+          <table class={tableClasses}>
+            <thead>
+              <tr>
+                <th class={thClasses}>Username</th>
+                <th class={thClasses}>Roles</th>
+                <th class={thClasses}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <tr>
+                  <td class={tdClasses}>{r.username}</td>
+                  <td class={`${tdClasses} text-muted-foreground`}>
+                    {r.roles.join(', ')}
+                  </td>
+                  <td class={tdClasses}>
+                    {/* Nothing to offer an account that already holds the
+                        role: granting twice changes nothing, so the column
+                        stays empty rather than showing a no-op button. */}
+                    {r.isAdmin ? (
+                      ''
+                    ) : (
+                      <form method="post" action="/grant-admin">
+                        <input type="hidden" name="userId" value={r.id} />
+                        <Button type="submit" size="sm">
+                          Grant admin
+                        </Button>
+                      </form>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </CardContent>
+    </Card>
+  </Layout>
+)
+
 export const WaitlistPage: FC<{
   envLabel: string
   username: string

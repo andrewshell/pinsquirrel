@@ -801,6 +801,82 @@ describe('GET /waitlist', () => {
   })
 })
 
+describe('GET /users', () => {
+  const activeUser = makeUser({
+    id: 'user-2',
+    username: 'bob',
+    roles: [Role.User],
+    status: UserStatus.Active,
+  })
+
+  it('lists active users with their roles', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockResolvedValue([activeUser, adminUser])
+
+    const res = await app.request('/users', { headers: { Cookie: cookie } })
+    const body = await res.text()
+
+    expect(res.status).toBe(200)
+    expect(body).toContain('bob')
+    expect(body).toContain(`${Role.User}, ${Role.Admin}`)
+    // Only the account without the role is offered the grant.
+    expect(body).toContain(`value="${activeUser.id}"`)
+    expect(body).not.toContain(`value="${adminUser.id}"`)
+  })
+
+  // Listing is Admin-gated inside UserService, so the app hands it the
+  // signed-in account's AccessControl rather than deciding the rule here.
+  it('asks for the active users as the signed-in admin', async () => {
+    const cookie = await signIn()
+
+    await app.request('/users', { headers: { Cookie: cookie } })
+
+    expect(userService.listByStatus).toHaveBeenCalledWith(
+      new AccessControl(adminUser),
+      UserStatus.Active
+    )
+  })
+
+  it('reports a database failure without throwing', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockRejectedValue(new Error('connection lost'))
+
+    const res = await app.request('/users', { headers: { Cookie: cookie } })
+
+    expect(res.status).toBe(500)
+    expect(await res.text()).toContain('reach the Test Env database')
+  })
+
+  it('redirects to /login when unauthenticated', async () => {
+    const res = await app.request('/users')
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/login')
+    expect(userService.listByStatus).not.toHaveBeenCalled()
+  })
+
+  // The page itself needs no private key, but the console is one session:
+  // signing in without unlocking lands on /unlock wherever you point it.
+  it('redirects to /unlock while the session is locked', async () => {
+    app = createApp(makeConfig({ privateKeyPath: encryptedKeyPath }))
+    authService.login.mockResolvedValue(adminUser)
+    const login = await app.request('/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        environment: 'test',
+        username: 'root',
+        password: 'correct-horse',
+      }),
+    })
+    const cookie = login.headers.get('set-cookie')?.split(';')[0] ?? ''
+
+    const res = await app.request('/users', { headers: { Cookie: cookie } })
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/unlock')
+  })
+})
+
 describe('POST /grant-access', () => {
   it('grants access to the named user and reports it', async () => {
     const cookie = await signIn()
