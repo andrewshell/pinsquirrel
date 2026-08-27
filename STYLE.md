@@ -4,7 +4,7 @@
 
 This guide defines the Neo Brutalism design system used throughout the Hono app. Use these patterns to maintain visual consistency when creating new components.
 
-`apps/admin` is deliberately out of scope: it is a local operator tool nobody but the maintainer sees, so it ships its own small inline dark stylesheet (`apps/admin/src/views.tsx`) rather than pulling in Tailwind and this design system.
+`apps/admin` follows this design system too, but implements it by hand: it runs without a build step, so instead of Tailwind it ships a plain-CSS inline stylesheet in `apps/admin/src/views.tsx` with the tokens copied out of `apps/hono/src/styles/app.css`. `views.tsx` puts the light values on `:root` and the `.dark` values in a `prefers-color-scheme: dark` media query — the admin has no theme toggle and follows the OS, unlike the Hono app's localStorage-driven `.dark` class. Change a token value in `app.css` and mirror it in `views.tsx`.
 
 ## 1. Design Philosophy
 
