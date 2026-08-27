@@ -88,6 +88,21 @@ describe.each(Object.keys(pages) as (keyof typeof pages)[])('%s', name => {
     expect(body).toContain('<script src="/static/theme.js">')
   })
 
+  // The console ships the same icon set as the Hono app, so a pinned admin
+  // tab looks like a PinSquirrel tab rather than a blank sheet.
+  it('links the favicons', async () => {
+    const body = await render(
+      pages[name]() as HtmlEscapedString | Promise<HtmlEscapedString>
+    )
+
+    expect(body).toContain(
+      '<link rel="icon" type="image/x-icon" href="/static/favicon.ico"'
+    )
+    expect(body).toContain('href="/static/favicon-32x32.png"')
+    expect(body).toContain('href="/static/favicon-16x16.png"')
+    expect(body).toContain('href="/static/apple-touch-icon.png"')
+  })
+
   // The header's account menu is driven by static/dropdown.js, which is
   // deferred because it only touches the document after it is parsed. Every
   // page shares one Layout, so every page gets it.
