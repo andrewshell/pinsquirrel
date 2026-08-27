@@ -9,6 +9,8 @@ export {
   CardTitle,
 } from './Card.js'
 export { Checkbox } from './Checkbox.js'
+export { UserIcon } from './icons.js'
+export type { IconProps } from './icons.js'
 export { Input, inputBaseClasses } from './Input.js'
 export { Label } from './Label.js'
 export { Textarea } from './Textarea.js'
