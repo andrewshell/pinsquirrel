@@ -799,6 +799,16 @@ describe('GET /waitlist', () => {
     expect(res.status).toBe(302)
     expect(res.headers.get('location')).toBe('/login')
   })
+
+  // Granting the Admin role belongs with the accounts it applies to, which is
+  // the Users page — the box here could only be filled in from memory.
+  it('no longer carries the grant-admin form', async () => {
+    const cookie = await signIn()
+
+    const res = await app.request('/waitlist', { headers: { Cookie: cookie } })
+
+    expect(await res.text()).not.toContain('/grant-admin')
+  })
 })
 
 describe('GET /users', () => {
@@ -958,10 +968,17 @@ describe('POST /grant-access', () => {
 })
 
 describe('POST /grant-admin', () => {
-  it('grants the Admin role by username', async () => {
+  /** An active account without the Admin role — a row on the Users page. */
+  const target = makeUser({
+    id: 'user-2',
+    username: 'bob',
+    roles: [Role.User],
+    status: UserStatus.Active,
+  })
+
+  it('grants the Admin role to the selected user', async () => {
     const cookie = await signIn()
-    const target = makeUser({ username: 'bob', roles: [Role.User] })
-    usersByName({ bob: target })
+    userService.listByStatus.mockResolvedValue([target])
     authService.grantAdmin.mockResolvedValue({
       ...target,
       roles: [Role.User, Role.Admin],
@@ -969,77 +986,77 @@ describe('POST /grant-admin', () => {
 
     const res = await app.request(
       '/grant-admin',
-      form({ username: 'bob' }, cookie)
+      form({ userId: target.id }, cookie)
     )
 
     expect(res.status).toBe(200)
+    // The grant carries the signed-in admin's own AccessControl, so the
+    // service decides the rule rather than trusting this app's session gate.
     expect(authService.grantAdmin).toHaveBeenCalledWith(
       new AccessControl(adminUser),
-      'user-1'
+      target.id
     )
     expect(await res.text()).toContain('Granted the Admin role to bob')
   })
 
+  // The button is not rendered for a row that already has the role, so this
+  // only happens from a stale page — but grantAdmin is idempotent and cannot
+  // tell the two outcomes apart afterwards, so the row is read first.
   it('reports no change for an existing admin without writing', async () => {
     const cookie = await signIn()
-    usersByName({
-      bob: makeUser({ username: 'bob', roles: [Role.User, Role.Admin] }),
-    })
+    userService.listByStatus.mockResolvedValue([adminUser])
 
     const res = await app.request(
       '/grant-admin',
-      form({ username: 'bob' }, cookie)
+      form({ userId: adminUser.id }, cookie)
     )
 
     expect(res.status).toBe(200)
     expect(authService.grantAdmin).not.toHaveBeenCalled()
-    expect(await res.text()).toContain('bob is already an admin')
+    expect(await res.text()).toContain('root is already an admin')
   })
 
-  it('reports an unknown username', async () => {
-    const cookie = await signIn()
-    usersByName({})
-
-    const res = await app.request(
-      '/grant-admin',
-      form({ username: 'nobody' }, cookie)
-    )
-
-    expect(res.status).toBe(404)
-    expect(authService.grantAdmin).not.toHaveBeenCalled()
-    expect(await res.text()).toContain('No user named nobody')
-  })
-
-  it('rejects a blank username without touching the database', async () => {
+  it('rejects a submission with no user without touching the database', async () => {
     const cookie = await signIn()
 
-    const res = await app.request(
-      '/grant-admin',
-      form({ username: '' }, cookie)
-    )
+    const res = await app.request('/grant-admin', form({ userId: '' }, cookie))
 
     expect(res.status).toBe(400)
     expect(authService.grantAdmin).not.toHaveBeenCalled()
   })
 
-  it('returns 404 when the target is deleted between lookup and grant', async () => {
+  it('returns 404 when the target was deleted before the grant', async () => {
     const cookie = await signIn()
-    usersByName({ bob: makeUser({ username: 'bob', roles: [Role.User] }) })
-    authService.grantAdmin.mockRejectedValue(new UserNotFoundError('user-1'))
+    userService.listByStatus.mockResolvedValue([target])
+    authService.grantAdmin.mockRejectedValue(new UserNotFoundError(target.id))
 
     const res = await app.request(
       '/grant-admin',
-      form({ username: 'bob' }, cookie)
+      form({ userId: target.id }, cookie)
     )
 
     expect(res.status).toBe(404)
     expect(await res.text()).toContain('no longer exists')
   })
 
+  it('reports an unexpected failure as a 500', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockResolvedValue([target])
+    authService.grantAdmin.mockRejectedValue(new Error('connection reset'))
+
+    const res = await app.request(
+      '/grant-admin',
+      form({ userId: target.id }, cookie)
+    )
+
+    expect(res.status).toBe(500)
+    expect(await res.text()).toContain('reach the Test Env database')
+  })
+
   it('redirects to /login when unauthenticated', async () => {
     const res = await app.request('/grant-admin', {
       method: 'POST',
-      body: new URLSearchParams({ username: 'bob' }),
+      body: new URLSearchParams({ userId: 'user-2' }),
     })
 
     expect(res.status).toBe(302)

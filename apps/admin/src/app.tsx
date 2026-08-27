@@ -469,67 +469,53 @@ export function createApp(config: AdminConfig): Hono {
     }
   })
 
-  // Add the Admin role to any account. Replaces the grant-admin script.
+  // Add the Admin role to one account, from its row on the Users page.
   app.post('/grant-admin', async c => {
     const sess = await currentSession(c)
     if (!sess) return c.redirect('/login')
     if (!sess.session.privateKey) return c.redirect('/unlock')
 
     const env = getEnvironment(config, sess.session.environment)
-    const viewer = {
-      username: sess.session.username,
-      privateKey: sess.session.privateKey,
-    }
+    const username = sess.session.username
     const body = await c.req.parseBody()
-    const username = field(body, 'username').trim()
+    const userId = field(body, 'userId')
 
-    if (!username) {
-      return renderWaitlist(
+    if (!userId) {
+      return renderUsers(
         c,
         env,
-        viewer,
-        { error: 'Enter a username to grant the Admin role.' },
+        username,
+        { error: 'No user was selected.' },
         400
       )
     }
 
     try {
-      const { userService, authService } = getRuntime(env)
-      const ac = await adminAccessControl(env, viewer.username)
-      const user = await userService.getUserByUsername(username)
+      const ac = await adminAccessControl(env, username)
 
-      if (!user) {
-        return renderWaitlist(
-          c,
-          env,
-          viewer,
-          { error: `No user named ${username}.` },
-          404
-        )
-      }
-
-      // Checked here rather than relying on grantAdmin's idempotence, so the
-      // page can tell "nothing to do" apart from "role added".
-      if (user.roles.includes(Role.Admin)) {
-        return renderWaitlist(c, env, viewer, {
-          notice: `${user.username} is already an admin.`,
+      // Read the row before writing: grantAdmin is idempotent and its result
+      // cannot say whether the role was already there, so "nothing to do" is
+      // only distinguishable beforehand. A user missing from this list is
+      // left to grantAdmin — the service, not the listing, decides existence.
+      const target = (await loadUsers(env, username)).find(r => r.id === userId)
+      if (target?.isAdmin) {
+        return renderUsers(c, env, username, {
+          notice: `${target.username} is already an admin.`,
         })
       }
 
-      const updated = await authService.grantAdmin(ac, user.id)
-      return renderWaitlist(c, env, viewer, {
+      const updated = await getRuntime(env).authService.grantAdmin(ac, userId)
+      return renderUsers(c, env, username, {
         notice: `Granted the Admin role to ${updated.username}.`,
       })
     } catch (error) {
-      // grantAdmin re-reads the user, so a delete between the lookup above and
-      // the write surfaces here rather than as a missing-user render.
       if (error instanceof UserNotFoundError) {
-        return renderWaitlist(c, env, viewer, { error: GONE }, 404)
+        return renderUsers(c, env, username, { error: GONE }, 404)
       }
-      return renderWaitlist(
+      return renderUsers(
         c,
         env,
-        viewer,
+        username,
         { error: dbErrorMessage(env, error) },
         500
       )

@@ -6,8 +6,6 @@ import {
   Button,
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
   dropdownMenuItemClasses,
   Header,
   Input,
@@ -300,32 +298,6 @@ export const WaitlistPage: FC<{
         ) : (
           ''
         )}
-      </CardContent>
-    </Card>
-    <Card class="mt-7">
-      <CardHeader>
-        <CardTitle>Grant admin</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p class="text-muted-foreground text-sm mb-4">
-          Adds the Admin role to any existing account, on or off the waitlist.
-          Roles are additive and granting twice changes nothing.
-        </p>
-        <form method="post" action="/grant-admin" class="space-y-2">
-          <Label for="admin-username">Username</Label>
-          <div class="flex gap-3 items-start">
-            <div class="flex-1">
-              {/* h-11 only because the field sits inline with the h-11 button */}
-              <Input
-                id="admin-username"
-                name="username"
-                class="h-11"
-                required
-              />
-            </div>
-            <Button type="submit">Grant admin</Button>
-          </div>
-        </form>
       </CardContent>
     </Card>
   </Layout>
