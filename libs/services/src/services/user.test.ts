@@ -1,8 +1,8 @@
 /**
- * Tests for UserService.listByStatus.
+ * Tests for UserService.listByStatus and UserService.hasAdmin.
  *
- * UserService had no tests; these cover the method added for the admin
- * waitlist page. getUserByUsername remains uncovered.
+ * UserService had no tests; these cover the methods added for the admin
+ * waitlist page and its bootstrap gate. getUserByUsername remains uncovered.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createMockUserRepository } from '../test-utils.js'
@@ -84,5 +84,28 @@ describe('UserService.listByStatus', () => {
     await service.listByStatus(new AccessControl(admin), UserStatus.Unverified)
 
     expect(mockRepo.findByStatus).toHaveBeenCalledWith(UserStatus.Unverified)
+  })
+})
+
+describe('UserService.hasAdmin', () => {
+  it('is true when the system has an admin', async () => {
+    vi.mocked(mockRepo.countByRole).mockResolvedValue(1)
+
+    expect(await service.hasAdmin()).toBe(true)
+    expect(mockRepo.countByRole).toHaveBeenCalledWith(Role.Admin)
+  })
+
+  it('is false on a database nobody administers', async () => {
+    vi.mocked(mockRepo.countByRole).mockResolvedValue(0)
+
+    expect(await service.hasAdmin()).toBe(false)
+  })
+
+  // The gate this feeds runs before anyone holds the Admin role, so requiring
+  // that role to ask would make the answer unreachable exactly when it matters.
+  it('answers a caller with no roles at all', async () => {
+    vi.mocked(mockRepo.countByRole).mockResolvedValue(2)
+
+    await expect(service.hasAdmin()).resolves.toBe(true)
   })
 })
