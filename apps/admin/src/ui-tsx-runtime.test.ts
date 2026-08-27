@@ -13,6 +13,7 @@ const script = `import('@pinsquirrel/ui')
     m.UserIcon({})
     m.NavLink({ href: '/', children: 'x' })
     m.Header({ logoSrc: '/logo.svg', brand: 'Admin' })
+    m.ProfileDropdown({ username: 'x', children: 'x' })
   })
   .catch(e => {
     console.error(e.message)
