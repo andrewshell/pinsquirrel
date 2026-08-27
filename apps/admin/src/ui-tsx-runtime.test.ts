@@ -11,6 +11,8 @@ const script = `import('@pinsquirrel/ui')
     m.Card({ children: 'x' })
     m.Button({ children: 'x' })
     m.UserIcon({})
+    m.NavLink({ href: '/', children: 'x' })
+    m.Header({ logoSrc: '/logo.svg', brand: 'Admin' })
   })
   .catch(e => {
     console.error(e.message)

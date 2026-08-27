@@ -9,6 +9,7 @@ export {
   CardTitle,
 } from './Card.js'
 export { Checkbox } from './Checkbox.js'
+export { Header, NavLink } from './Header.js'
 export { UserIcon } from './icons.js'
 export type { IconProps } from './icons.js'
 export { Input, inputBaseClasses } from './Input.js'
