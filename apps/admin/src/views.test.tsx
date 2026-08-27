@@ -13,6 +13,7 @@ import type { HtmlEscapedString } from 'hono/utils/html'
 import {
   LoginPage,
   UnlockPage,
+  UsersPage,
   WaitlistPage,
   ComposePage,
   SentPage,
@@ -37,6 +38,15 @@ const pages = {
   LoginPage: () =>
     LoginPage({ environments: [{ name: 'test', label: 'Test Env' }] }),
   UnlockPage: () => UnlockPage({ envLabel: 'Test Env' }),
+  UsersPage: () =>
+    UsersPage({
+      envLabel: 'Test Env',
+      username: 'root',
+      rows: [
+        { id: 'u1', username: 'alice', roles: ['user'], isAdmin: false },
+        { id: 'u2', username: 'root', roles: ['user', 'admin'], isAdmin: true },
+      ],
+    }),
   WaitlistPage: () =>
     WaitlistPage({
       envLabel: 'Test Env',
@@ -61,7 +71,12 @@ const pages = {
 } as const
 
 /** The pages behind the session gate all carry the shared header. */
-const signedInPages = ['WaitlistPage', 'ComposePage', 'SentPage'] as const
+const signedInPages = [
+  'UsersPage',
+  'WaitlistPage',
+  'ComposePage',
+  'SentPage',
+] as const
 
 describe.each(Object.keys(pages) as (keyof typeof pages)[])('%s', name => {
   it('links the compiled stylesheet and the theme script', async () => {
@@ -138,5 +153,33 @@ describe.each(signedInPages)('%s header', name => {
     expect(html).toContain('data-dropdown="menu"')
     expect(html).toContain('root')
     expect(html).toContain('action="/logout"')
+  })
+})
+
+describe('UsersPage', () => {
+  async function body(): Promise<string> {
+    return render(pages.UsersPage() as HtmlEscapedString)
+  }
+
+  it('lists each user with their roles', async () => {
+    const html = await body()
+
+    expect(html).toContain('alice')
+    expect(html).toContain('user')
+    expect(html).toContain('admin')
+  })
+
+  // The grant is a per-row post, the same shape the waitlist uses, so the id
+  // travels with the button rather than being typed into a field.
+  it('offers the grant to a user who is not an admin', async () => {
+    const html = await body()
+
+    expect(html).toContain('action="/grant-admin"')
+    expect(html).toContain('value="u1"')
+    expect(html).toContain('Grant admin')
+  })
+
+  it('offers no grant to a user who already has the role', async () => {
+    expect(await body()).not.toContain('value="u2"')
   })
 })
