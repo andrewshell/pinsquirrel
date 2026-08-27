@@ -811,6 +811,41 @@ describe('GET /waitlist', () => {
   })
 })
 
+describe('GET /', () => {
+  // Two sections now sit behind the session, so where the root lands is a
+  // decision rather than the only option: the waitlist is the queue that
+  // needs working, the users list is a reference. Post-unlock lands there
+  // too, so there is one answer to "where does signing in put me".
+  it('lands an unlocked session on the waitlist', async () => {
+    const cookie = await signIn()
+
+    const res = await app.request('/', { headers: { Cookie: cookie } })
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/waitlist')
+  })
+
+  it('sends a locked session to /unlock and a stranger to /login', async () => {
+    app = createApp(makeConfig({ privateKeyPath: encryptedKeyPath }))
+    authService.login.mockResolvedValue(adminUser)
+    const login = await app.request('/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        environment: 'test',
+        username: 'root',
+        password: 'correct-horse',
+      }),
+    })
+    const cookie = login.headers.get('set-cookie')?.split(';')[0] ?? ''
+
+    const locked = await app.request('/', { headers: { Cookie: cookie } })
+    expect(locked.headers.get('location')).toBe('/unlock')
+
+    const stranger = await app.request('/')
+    expect(stranger.headers.get('location')).toBe('/login')
+  })
+})
+
 describe('GET /users', () => {
   const activeUser = makeUser({
     id: 'user-2',
