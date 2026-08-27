@@ -103,7 +103,19 @@ afterAll(() => {
   rmSync(tempDir, { recursive: true, force: true })
 })
 
-/** A one-environment config, by default pointing at the unencrypted key. */
+const mailgun = {
+  apiKey: 'key-test',
+  domain: 'mg.example.com',
+  fromEmail: 'noreply@example.com',
+}
+
+/**
+ * A two-environment config: one keyed, one not.
+ *
+ * The overrides apply to the keyed environment — it is the one whose key file
+ * the unlock tests vary. "keyless" models a server running without
+ * EMAIL_PUBLIC_KEY: nothing is sealed, so the console has no key to hold.
+ */
 function makeConfig(env: Partial<AdminEnvironment> = {}): AdminConfig {
   return {
     sessionSecret: 'test-secret-that-is-long-enough-to-sign-with',
@@ -113,12 +125,14 @@ function makeConfig(env: Partial<AdminEnvironment> = {}): AdminConfig {
         label: 'Test Env',
         databaseUrl: 'mysql://user:pass@localhost:3306/test',
         privateKeyPath: rawKeyPath,
-        mailgun: {
-          apiKey: 'key-test',
-          domain: 'mg.example.com',
-          fromEmail: 'noreply@example.com',
-        },
+        mailgun,
         ...env,
+      },
+      {
+        name: 'keyless',
+        label: 'Keyless Env',
+        databaseUrl: 'mysql://user:pass@localhost:3306/keyless',
+        mailgun,
       },
     ],
   }
@@ -169,6 +183,29 @@ async function signIn(): Promise<string> {
   await app.request('/unlock', { headers: { Cookie: cookie } })
 
   return cookie
+}
+
+/**
+ * Sign in to the keyless environment.
+ *
+ * No unlock step: there is no key file, so the session is complete as soon as
+ * the cookie is set — which is the behaviour most of these tests are about.
+ */
+async function signInKeyless(): Promise<string> {
+  authService.login.mockResolvedValue(adminUser)
+
+  const res = await app.request('/login', {
+    method: 'POST',
+    body: new URLSearchParams({
+      environment: 'keyless',
+      username: 'root',
+      password: 'correct-horse',
+    }),
+  })
+
+  const setCookie = res.headers.get('set-cookie')
+  if (!setCookie) throw new Error('sign-in did not set a session cookie')
+  return setCookie.split(';')[0]
 }
 
 /**
@@ -573,6 +610,108 @@ describe('unlock', () => {
 
     expect(res.status).toBe(302)
     expect(res.headers.get('location')).toBe('/login')
+  })
+})
+
+/**
+ * An environment whose server runs without EMAIL_PUBLIC_KEY.
+ *
+ * Nothing is sealed there, so the console has no key to unlock — and a gate
+ * with nothing behind it would lock the operator out of an environment they
+ * are otherwise entitled to administer.
+ */
+describe('keyless environment', () => {
+  it('lands a sign-in on the waitlist rather than the unlock step', async () => {
+    authService.login.mockResolvedValue(adminUser)
+
+    const res = await app.request('/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        environment: 'keyless',
+        username: 'root',
+        password: 'correct-horse',
+      }),
+    })
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/waitlist')
+  })
+
+  it('sends the root path to the waitlist', async () => {
+    const cookie = await signInKeyless()
+
+    const res = await app.request('/', { headers: { Cookie: cookie } })
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/waitlist')
+  })
+
+  it.each([
+    ['GET', () => ({ headers: { Cookie: '' } })],
+    ['POST', () => ({ method: 'POST' })],
+  ])('turns a %s /unlock away, having nothing to unlock', async (_l, init) => {
+    const cookie = await signInKeyless()
+
+    const res = await app.request('/unlock', {
+      ...init(),
+      headers: { Cookie: cookie },
+    })
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/waitlist')
+  })
+
+  it('serves the waitlist without an unlocked key', async () => {
+    const cookie = await signInKeyless()
+    userService.listByStatus.mockResolvedValue([makeUser()])
+
+    const res = await app.request('/waitlist', { headers: { Cookie: cookie } })
+
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('alice')
+  })
+
+  // A row sealed by a server that had a key, listed by a console that has
+  // none. Saying "(no sealed email)" would claim the address was never
+  // collected; the address is there, and this console cannot open it.
+  it('marks a sealed email locked and an absent one absent', async () => {
+    const cookie = await signInKeyless()
+    userService.listByStatus.mockResolvedValue([
+      makeUser({ id: 'a', username: 'alice' }),
+      makeUser({ id: 'b', username: 'bob', emailEncrypted: null }),
+    ])
+
+    const res = await app.request('/waitlist', { headers: { Cookie: cookie } })
+    const body = await res.text()
+
+    expect(res.status).toBe(200)
+    expect(body).toContain('(locked)')
+    expect(body).toContain('(no sealed email)')
+    expect(body).not.toContain('(decrypt failed)')
+    expect(crypto.openSealedEmail).not.toHaveBeenCalled()
+  })
+
+  it('serves the users page without an unlocked key', async () => {
+    const cookie = await signInKeyless()
+
+    const res = await app.request('/users', { headers: { Cookie: cookie } })
+
+    expect(res.status).toBe(200)
+  })
+
+  it('grants access without an unlocked key', async () => {
+    const cookie = await signInKeyless()
+    authService.grantAccess.mockResolvedValue(
+      makeUser({ status: UserStatus.Active })
+    )
+
+    const res = await app.request(
+      '/grant-access',
+      form({ userId: 'user-1' }, cookie)
+    )
+
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('Granted access to alice')
   })
 })
 

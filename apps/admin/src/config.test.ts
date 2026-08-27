@@ -54,6 +54,26 @@ describe('parseConfig', () => {
     expect(() => parseConfig(bad)).toThrow('Invalid admin config')
   })
 
+  // An environment whose server runs without EMAIL_PUBLIC_KEY seals nothing,
+  // so there is no private key for the console to hold.
+  it('accepts an environment with no privateKeyPath', () => {
+    const keyless = JSON.stringify({
+      sessionSecret: 's',
+      environments: [{ ...env, privateKeyPath: undefined }],
+    })
+    expect(parseConfig(keyless).environments[0].privateKeyPath).toBeUndefined()
+  })
+
+  // Omitting the field says "this environment seals nothing"; an empty string
+  // says nothing at all, and would only fail later as an unreadable path.
+  it('rejects an empty privateKeyPath', () => {
+    const bad = JSON.stringify({
+      sessionSecret: 's',
+      environments: [{ ...env, privateKeyPath: '' }],
+    })
+    expect(() => parseConfig(bad)).toThrow('Invalid admin config')
+  })
+
   it('rejects an environment with incomplete mailgun settings', () => {
     const bad = JSON.stringify({
       sessionSecret: 's',

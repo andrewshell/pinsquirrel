@@ -89,9 +89,28 @@ async function adminAccessControl(
   return new AccessControl(user)
 }
 
+/**
+ * Who is looking, and with which key.
+ *
+ * `privateKey` is absent on an environment that seals nothing: there is no key
+ * file to unlock, so no session there can ever hold one.
+ */
+interface Viewer {
+  username: string
+  privateKey?: string
+}
+
+/**
+ * What the session gate hands a route: somewhere to work, or somewhere to go.
+ *
+ * A route that gets a `redirect` returns it untouched — the gate has already
+ * decided the session cannot do this here.
+ */
+type Gate = { env: AdminEnvironment; viewer: Viewer } | { redirect: Response }
+
 async function loadWaitlist(
   env: AdminEnvironment,
-  viewer: { username: string; privateKey: string }
+  viewer: Viewer
 ): Promise<WaitlistRow[]> {
   const { userService } = getRuntime(env)
   const ac = await adminAccessControl(env, viewer.username)
@@ -100,10 +119,17 @@ async function loadWaitlist(
   for (const user of users) {
     let email = '(no sealed email)'
     if (user.emailEncrypted) {
-      try {
-        email = await openSealedEmail(user.emailEncrypted, viewer.privateKey)
-      } catch {
-        email = '(decrypt failed)'
+      // Sealed, but this console holds no key for the environment: the address
+      // exists and cannot be read here, which is not the same as never having
+      // been collected.
+      if (!viewer.privateKey) {
+        email = '(locked)'
+      } else {
+        try {
+          email = await openSealedEmail(user.emailEncrypted, viewer.privateKey)
+        } catch {
+          email = '(decrypt failed)'
+        }
       }
     }
     rows.push({
@@ -210,7 +236,7 @@ async function renderUsers(
 async function renderWaitlist(
   c: Context,
   env: AdminEnvironment,
-  viewer: { username: string; privateKey: string },
+  viewer: Viewer,
   outcome: { notice?: string; error?: string } = {},
   status: 200 | 400 | 404 | 500 = 200
 ) {
@@ -259,10 +285,46 @@ export function createApp(config: AdminConfig): Hono {
     return session ? { id, session } : null
   }
 
+  /**
+   * Where a session belongs right now: the console, or the step before it.
+   *
+   * The unlock gate is console-wide rather than per page — a half-open session
+   * finishes unlocking wherever it was pointed — so it is decided here once.
+   * An environment with no key path seals nothing, and a gate with nothing
+   * behind it would only lock the operator out.
+   */
+  function landing(env: AdminEnvironment, session: AdminSession): string {
+    return env.privateKeyPath && !session.privateKey ? '/unlock' : '/waitlist'
+  }
+
+  /**
+   * The session gate every signed-in route runs first.
+   *
+   * Returns the redirect to send instead when the caller may not proceed, so a
+   * route is `const gate = await requireSession(c); if ('redirect' in gate)…`
+   * rather than its own copy of the two checks.
+   */
+  async function requireSession(c: Context): Promise<Gate> {
+    const sess = await currentSession(c)
+    if (!sess) return { redirect: c.redirect('/login') }
+    const env = getEnvironment(config, sess.session.environment)
+    if (landing(env, sess.session) === '/unlock') {
+      return { redirect: c.redirect('/unlock') }
+    }
+    return {
+      env,
+      viewer: {
+        username: sess.session.username,
+        privateKey: sess.session.privateKey,
+      },
+    }
+  }
+
   app.get('/', async c => {
     const sess = await currentSession(c)
     if (!sess) return c.redirect('/login')
-    return c.redirect(sess.session.privateKey ? '/waitlist' : '/unlock')
+    const env = getEnvironment(config, sess.session.environment)
+    return c.redirect(landing(env, sess.session))
   })
 
   app.get('/login', async c => {
@@ -336,7 +398,7 @@ export function createApp(config: AdminConfig): Hono {
         // http and a Secure cookie would never come back.
         secure: process.env.NODE_ENV === 'production',
       })
-      return c.redirect('/unlock')
+      return c.redirect(env.privateKeyPath ? '/unlock' : '/waitlist')
     } catch (error) {
       let message: string
       if (
@@ -376,11 +438,15 @@ export function createApp(config: AdminConfig): Hono {
   app.get('/unlock', async c => {
     const sess = await currentSession(c)
     if (!sess) return c.redirect('/login')
-    if (sess.session.privateKey) return c.redirect('/waitlist')
 
     const env = getEnvironment(config, sess.session.environment)
+    // Nothing to unlock: either this session already did, or this environment
+    // has no key at all.
+    const keyPath = env.privateKeyPath
+    if (!keyPath || sess.session.privateKey) return c.redirect('/waitlist')
+
     try {
-      const contents = readFileSync(env.privateKeyPath, 'utf8')
+      const contents = readFileSync(keyPath, 'utf8')
       // Only prompt for a passphrase when the key file is actually encrypted.
       if (isEncryptedPrivateKey(contents)) {
         return c.html(<UnlockPage envLabel={env.label} />)
@@ -392,7 +458,7 @@ export function createApp(config: AdminConfig): Hono {
       return c.html(
         <UnlockPage
           envLabel={env.label}
-          error={`Could not read or unlock the key file at ${env.privateKeyPath}.`}
+          error={`Could not read or unlock the key file at ${keyPath}.`}
         />,
         500
       )
@@ -403,11 +469,14 @@ export function createApp(config: AdminConfig): Hono {
     const sess = await currentSession(c)
     if (!sess) return c.redirect('/login')
     const env = getEnvironment(config, sess.session.environment)
+    const keyPath = env.privateKeyPath
+    if (!keyPath) return c.redirect('/waitlist')
+
     const body = await c.req.parseBody()
     const passphrase = field(body, 'passphrase')
 
     try {
-      const contents = readFileSync(env.privateKeyPath, 'utf8')
+      const contents = readFileSync(keyPath, 'utf8')
       const privateKey = await loadPrivateKey(contents, passphrase)
       updateSession(sess.id, { privateKey })
       return c.redirect('/waitlist')
@@ -423,40 +492,26 @@ export function createApp(config: AdminConfig): Hono {
   })
 
   app.get('/waitlist', async c => {
-    const sess = await currentSession(c)
-    if (!sess) return c.redirect('/login')
-    if (!sess.session.privateKey) return c.redirect('/unlock')
+    const gate = await requireSession(c)
+    if ('redirect' in gate) return gate.redirect
 
-    const env = getEnvironment(config, sess.session.environment)
-    return renderWaitlist(c, env, {
-      username: sess.session.username,
-      privateKey: sess.session.privateKey,
-    })
+    return renderWaitlist(c, gate.env, gate.viewer)
   })
 
-  // The private key is not needed to list accounts, but the unlock gate is the
-  // console's, not the page's: a half-open session finishes unlocking first.
   app.get('/users', async c => {
-    const sess = await currentSession(c)
-    if (!sess) return c.redirect('/login')
-    if (!sess.session.privateKey) return c.redirect('/unlock')
+    const gate = await requireSession(c)
+    if ('redirect' in gate) return gate.redirect
 
-    const env = getEnvironment(config, sess.session.environment)
-    return renderUsers(c, env, sess.session.username)
+    return renderUsers(c, gate.env, gate.viewer.username)
   })
 
   // Admit one person from the waitlist. Replaces the grant-access script, which
   // could only be run from a dev checkout pointed at the target database.
   app.post('/grant-access', async c => {
-    const sess = await currentSession(c)
-    if (!sess) return c.redirect('/login')
-    if (!sess.session.privateKey) return c.redirect('/unlock')
+    const gate = await requireSession(c)
+    if ('redirect' in gate) return gate.redirect
 
-    const env = getEnvironment(config, sess.session.environment)
-    const viewer = {
-      username: sess.session.username,
-      privateKey: sess.session.privateKey,
-    }
+    const { env, viewer } = gate
     const body = await c.req.parseBody()
     const userId = field(body, 'userId')
 
@@ -504,12 +559,11 @@ export function createApp(config: AdminConfig): Hono {
    * the session gate, the validation and the four error cases.
    */
   async function changeRole(c: Context, action: 'grant' | 'revoke') {
-    const sess = await currentSession(c)
-    if (!sess) return c.redirect('/login')
-    if (!sess.session.privateKey) return c.redirect('/unlock')
+    const gate = await requireSession(c)
+    if ('redirect' in gate) return gate.redirect
 
-    const env = getEnvironment(config, sess.session.environment)
-    const username = sess.session.username
+    const { env } = gate
+    const username = gate.viewer.username
     const body = await c.req.parseBody()
     const userId = field(body, 'userId')
     const role = parseRole(field(body, 'role'))
@@ -592,21 +646,17 @@ export function createApp(config: AdminConfig): Hono {
   app.post('/roles/revoke', c => changeRole(c, 'revoke'))
 
   app.get('/compose', async c => {
-    const sess = await currentSession(c)
-    if (!sess) return c.redirect('/login')
-    if (!sess.session.privateKey) return c.redirect('/unlock')
+    const gate = await requireSession(c)
+    if ('redirect' in gate) return gate.redirect
 
-    const env = getEnvironment(config, sess.session.environment)
+    const { env, viewer } = gate
     try {
-      const rows = await loadWaitlist(env, {
-        username: sess.session.username,
-        privateKey: sess.session.privateKey,
-      })
+      const rows = await loadWaitlist(env, viewer)
       const recipientCount = rows.filter(r => r.email.includes('@')).length
       return c.html(
         <ComposePage
           envLabel={env.label}
-          username={sess.session.username}
+          username={viewer.username}
           recipientCount={recipientCount}
         />
       )
@@ -614,7 +664,7 @@ export function createApp(config: AdminConfig): Hono {
       return c.html(
         <ComposePage
           envLabel={env.label}
-          username={sess.session.username}
+          username={viewer.username}
           recipientCount={0}
           error={dbErrorMessage(env, error)}
         />,
@@ -624,11 +674,10 @@ export function createApp(config: AdminConfig): Hono {
   })
 
   app.post('/send', async c => {
-    const sess = await currentSession(c)
-    if (!sess) return c.redirect('/login')
-    if (!sess.session.privateKey) return c.redirect('/unlock')
+    const gate = await requireSession(c)
+    if ('redirect' in gate) return gate.redirect
 
-    const env = getEnvironment(config, sess.session.environment)
+    const { env, viewer } = gate
     const body = await c.req.parseBody()
     const subject = field(body, 'subject').trim()
     const messageBody = field(body, 'body').trim()
@@ -639,7 +688,7 @@ export function createApp(config: AdminConfig): Hono {
       return c.html(
         <ComposePage
           envLabel={env.label}
-          username={sess.session.username}
+          username={viewer.username}
           recipientCount={0}
           subject={subject}
           body={messageBody}
@@ -653,16 +702,13 @@ export function createApp(config: AdminConfig): Hono {
     // list and never put plaintext emails on the wire until send time.
     let recipients: string[]
     try {
-      const rows = await loadWaitlist(env, {
-        username: sess.session.username,
-        privateKey: sess.session.privateKey,
-      })
+      const rows = await loadWaitlist(env, viewer)
       recipients = rows.map(r => r.email).filter(e => e.includes('@'))
     } catch (error) {
       return c.html(
         <ComposePage
           envLabel={env.label}
-          username={sess.session.username}
+          username={viewer.username}
           recipientCount={0}
           subject={subject}
           body={messageBody}
@@ -683,7 +729,7 @@ export function createApp(config: AdminConfig): Hono {
       return c.html(
         <SentPage
           envLabel={env.label}
-          username={sess.session.username}
+          username={viewer.username}
           results={results}
         />
       )
@@ -692,7 +738,7 @@ export function createApp(config: AdminConfig): Hono {
       return c.html(
         <ComposePage
           envLabel={env.label}
-          username={sess.session.username}
+          username={viewer.username}
           recipientCount={recipients.length}
           subject={subject}
           body={messageBody}
