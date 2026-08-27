@@ -68,6 +68,17 @@ describe.each(Object.keys(pages) as (keyof typeof pages)[])('%s', name => {
     expect(body).toContain('<script src="/static/theme.js">')
   })
 
+  // The header's account menu is driven by static/dropdown.js, which is
+  // deferred because it only touches the document after it is parsed. Every
+  // page shares one Layout, so every page gets it.
+  it('defers the dropdown script', async () => {
+    const body = await render(
+      pages[name]() as HtmlEscapedString | Promise<HtmlEscapedString>
+    )
+
+    expect(body).toContain('<script defer src="/static/dropdown.js">')
+  })
+
   it('composes a shared @pinsquirrel/ui button', async () => {
     const body = await render(
       pages[name]() as HtmlEscapedString | Promise<HtmlEscapedString>

@@ -984,6 +984,18 @@ describe('/static', () => {
     expect(await res.text()).toContain('prefers-color-scheme: dark')
   })
 
+  // The header renders a logo and an account menu; both are static files the
+  // pages reference by URL, so a missing one is a broken page rather than a
+  // failing test elsewhere.
+  it('serves the dropdown script and the logo', async () => {
+    const script = await app.request('/static/dropdown.js')
+    expect(script.status).toBe(200)
+    expect(await script.text()).toContain('data-dropdown')
+
+    const logo = await app.request('/static/pinsquirrel.svg')
+    expect(logo.status).toBe(200)
+  })
+
   // Mounted before every session check, so a login page still gets its CSS
   // when the database is down.
   it('does not require a session', async () => {

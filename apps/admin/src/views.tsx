@@ -47,6 +47,8 @@ const Layout: FC<PropsWithChildren<{ title: string }>> = ({
         <!-- Not deferred: the theme class must be on <html> before first
              paint, or the light theme flashes first. -->
         <script src="/static/theme.js"></script>
+        <!-- Deferred: it only wires listeners onto markup already parsed. -->
+        <script defer src="/static/dropdown.js"></script>
         <link rel="stylesheet" href="/static/styles.css" />
       </head>
       <body class="bg-background text-foreground min-h-screen">
