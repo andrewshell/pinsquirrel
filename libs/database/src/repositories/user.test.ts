@@ -471,6 +471,50 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     })
   })
 
+  /**
+   * How many accounts hold a role, without loading them.
+   *
+   * The admin console's bootstrap gate asks only whether the count is zero, so
+   * the answer must not depend on being able to read the users themselves.
+   */
+  describe('countByRole', () => {
+    it('should count nobody on an empty table', async () => {
+      expect(await repository.countByRole(Role.Admin)).toBe(0)
+    })
+
+    it('should not count users who hold a different role', async () => {
+      const { id: userId } = await insertUser(testPool)
+      await repository.addRole(userId, Role.User)
+
+      expect(await repository.countByRole(Role.Admin)).toBe(0)
+      expect(await repository.countByRole(Role.User)).toBe(1)
+    })
+
+    it('should count every user holding the role', async () => {
+      const { id: firstId } = await insertUser(testPool, {
+        emailHash: 'first_email',
+      })
+      const { id: secondId } = await insertUser(testPool, {
+        emailHash: 'second_email',
+      })
+      await repository.addRole(firstId, Role.Admin)
+      await repository.addRole(secondId, Role.Admin)
+      // A second role on one of them must not double that user's contribution.
+      await repository.addRole(secondId, Role.User)
+
+      expect(await repository.countByRole(Role.Admin)).toBe(2)
+    })
+
+    it('should drop a user from the count once the role is revoked', async () => {
+      const { id: userId } = await insertUser(testPool)
+      await repository.addRole(userId, Role.Admin)
+
+      await repository.removeRole(userId, Role.Admin)
+
+      expect(await repository.countByRole(Role.Admin)).toBe(0)
+    })
+  })
+
   describe('one account per email', () => {
     it('indexes email_hash, uniquely', async () => {
       // findByEmailHash runs on every signup and every password-reset request,

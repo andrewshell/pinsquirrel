@@ -14,4 +14,12 @@ export interface UserRepository extends Repository<
   addRole(userId: string, role: Role): Promise<void>
   /** Idempotent: removing a role the user does not hold is a no-op. */
   removeRole(userId: string, role: Role): Promise<void>
+  /**
+   * How many users hold a role, without loading any of them.
+   *
+   * Exists so "does this system have an admin yet?" can be answered by a
+   * caller that is not one — listing the users would need the role it is
+   * asking about.
+   */
+  countByRole(role: Role): Promise<number>
 }
