@@ -29,6 +29,23 @@ export class UserNotEligibleError extends UserError {
 }
 
 /**
+ * An admin tried to take a role off their own account.
+ *
+ * Roles are what keep the admin console reachable and, in the case of
+ * `Role.User`, what lets the account sign in at all — so this is the one role
+ * change that can leave nobody able to undo it. Another admin can still do it.
+ */
+export class CannotRevokeOwnRoleError extends UserError {
+  constructor(
+    public readonly role: string,
+    message: string = `You cannot revoke the "${role}" role from your own account`
+  ) {
+    super(message)
+    this.name = 'CannotRevokeOwnRoleError'
+  }
+}
+
+/**
  * A user-account operation was attempted by someone other than that user.
  *
  * Distinct from `InvalidCredentialsError`: the credentials were never checked,

@@ -80,6 +80,7 @@ export {
   UserError,
   UserNotFoundError,
   UserNotEligibleError,
+  CannotRevokeOwnRoleError,
   UnauthorizedUserAccessError,
 } from './errors/user.js'
 export {

@@ -10,6 +10,7 @@ import {
   UserNotEligibleError,
   ValidationError,
   UnauthorizedUserAccessError,
+  CannotRevokeOwnRoleError,
   AccessControl,
   Role,
   UserStatus,
@@ -236,14 +237,24 @@ describe('AuthenticationService', () => {
       expect(mockUserRepository.update).not.toHaveBeenCalled()
     })
 
-    it('should refuse grantAdmin for a caller without the Admin role', async () => {
+    it('should refuse grantRole for a caller without the Admin role', async () => {
       const nonAdmin = new AccessControl({ ...mockUser, roles: [Role.User] })
 
       await expect(
-        authService.grantAdmin(nonAdmin, 'someone-else')
+        authService.grantRole(nonAdmin, 'someone-else', Role.Admin)
       ).rejects.toThrow(MissingRoleError)
       expect(mockUserRepository.findById).not.toHaveBeenCalled()
       expect(mockUserRepository.addRole).not.toHaveBeenCalled()
+    })
+
+    it('should refuse revokeRole for a caller without the Admin role', async () => {
+      const nonAdmin = new AccessControl({ ...mockUser, roles: [Role.User] })
+
+      await expect(
+        authService.revokeRole(nonAdmin, 'someone-else', Role.Admin)
+      ).rejects.toThrow(MissingRoleError)
+      expect(mockUserRepository.findById).not.toHaveBeenCalled()
+      expect(mockUserRepository.removeRole).not.toHaveBeenCalled()
     })
 
     it('should refuse changePassword for another user', async () => {
@@ -326,15 +337,19 @@ describe('AuthenticationService', () => {
     })
   })
 
-  describe('grantAdmin', () => {
-    it('should add the Admin role to a user who lacks it', async () => {
+  describe('grantRole', () => {
+    it('should add a role the user lacks', async () => {
       const plainUser = { ...mockUser, roles: [Role.User] }
       const adminUser = { ...mockUser, roles: [Role.User, Role.Admin] }
       vi.mocked(mockUserRepository.findById)
         .mockResolvedValueOnce(plainUser)
         .mockResolvedValueOnce(adminUser)
 
-      const result = await authService.grantAdmin(adminAc, plainUser.id)
+      const result = await authService.grantRole(
+        adminAc,
+        plainUser.id,
+        Role.Admin
+      )
 
       expect(mockUserRepository.addRole).toHaveBeenCalledWith(
         plainUser.id,
@@ -350,17 +365,25 @@ describe('AuthenticationService', () => {
         .mockResolvedValueOnce(plainUser)
         .mockResolvedValueOnce(adminUser)
 
-      const result = await authService.grantAdmin(adminAc, plainUser.id)
+      const result = await authService.grantRole(
+        adminAc,
+        plainUser.id,
+        Role.Admin
+      )
 
       expect(result.roles).toContain(Role.User)
       expect(mockUserRepository.update).not.toHaveBeenCalled()
     })
 
-    it('should be idempotent for an existing admin', async () => {
+    it('should be idempotent for a user who already holds the role', async () => {
       const adminUser = { ...mockUser, roles: [Role.User, Role.Admin] }
       vi.mocked(mockUserRepository.findById).mockResolvedValue(adminUser)
 
-      const result = await authService.grantAdmin(adminAc, adminUser.id)
+      const result = await authService.grantRole(
+        adminAc,
+        adminUser.id,
+        Role.Admin
+      )
 
       expect(mockUserRepository.addRole).not.toHaveBeenCalled()
       expect(result.roles).toContain(Role.Admin)
@@ -370,7 +393,7 @@ describe('AuthenticationService', () => {
       vi.mocked(mockUserRepository.findById).mockResolvedValue(null)
 
       await expect(
-        authService.grantAdmin(adminAc, 'missing-id')
+        authService.grantRole(adminAc, 'missing-id', Role.Admin)
       ).rejects.toThrow(UserNotFoundError)
       expect(mockUserRepository.addRole).not.toHaveBeenCalled()
     })
@@ -382,7 +405,102 @@ describe('AuthenticationService', () => {
         .mockResolvedValueOnce(null)
 
       await expect(
-        authService.grantAdmin(adminAc, plainUser.id)
+        authService.grantRole(adminAc, plainUser.id, Role.Admin)
+      ).rejects.toThrow(UserNotFoundError)
+    })
+  })
+
+  describe('revokeRole', () => {
+    it('should remove a role the user holds', async () => {
+      const adminUser = { ...mockUser, roles: [Role.User, Role.Admin] }
+      const plainUser = { ...mockUser, roles: [Role.User] }
+      vi.mocked(mockUserRepository.findById)
+        .mockResolvedValueOnce(adminUser)
+        .mockResolvedValueOnce(plainUser)
+
+      const result = await authService.revokeRole(
+        adminAc,
+        adminUser.id,
+        Role.Admin
+      )
+
+      expect(mockUserRepository.removeRole).toHaveBeenCalledWith(
+        adminUser.id,
+        Role.Admin
+      )
+      expect(result.roles).not.toContain(Role.Admin)
+    })
+
+    // Revoking Role.User is how an account is suspended: login() requires it.
+    it('should remove the User role, which suspends sign-in', async () => {
+      const plainUser = { ...mockUser, roles: [Role.User] }
+      const suspended = { ...mockUser, roles: [] }
+      vi.mocked(mockUserRepository.findById)
+        .mockResolvedValueOnce(plainUser)
+        .mockResolvedValueOnce(suspended)
+
+      const result = await authService.revokeRole(
+        adminAc,
+        plainUser.id,
+        Role.User
+      )
+
+      expect(mockUserRepository.removeRole).toHaveBeenCalledWith(
+        plainUser.id,
+        Role.User
+      )
+      expect(result.roles).toEqual([])
+    })
+
+    it('should be idempotent for a user who does not hold the role', async () => {
+      const plainUser = { ...mockUser, roles: [Role.User] }
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(plainUser)
+
+      const result = await authService.revokeRole(
+        adminAc,
+        plainUser.id,
+        Role.Admin
+      )
+
+      expect(mockUserRepository.removeRole).not.toHaveBeenCalled()
+      expect(result.roles).toEqual([Role.User])
+    })
+
+    // An admin who revokes their own Admin role loses the console on the next
+    // request, and revoking their own User role locks them out of the app
+    // entirely. Neither is recoverable from the console that did it.
+    it('should refuse to revoke a role from the caller own account', async () => {
+      await expect(
+        authService.revokeRole(adminAc, 'admin-1', Role.Admin)
+      ).rejects.toThrow(CannotRevokeOwnRoleError)
+      expect(mockUserRepository.findById).not.toHaveBeenCalled()
+      expect(mockUserRepository.removeRole).not.toHaveBeenCalled()
+    })
+
+    it('should refuse to revoke the User role from the caller own account', async () => {
+      await expect(
+        authService.revokeRole(adminAc, 'admin-1', Role.User)
+      ).rejects.toThrow(CannotRevokeOwnRoleError)
+      expect(mockUserRepository.removeRole).not.toHaveBeenCalled()
+    })
+
+    it('should throw UserNotFoundError when the user does not exist', async () => {
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(null)
+
+      await expect(
+        authService.revokeRole(adminAc, 'missing-id', Role.Admin)
+      ).rejects.toThrow(UserNotFoundError)
+      expect(mockUserRepository.removeRole).not.toHaveBeenCalled()
+    })
+
+    it('should throw UserNotFoundError if the user vanishes after the role write', async () => {
+      const adminUser = { ...mockUser, roles: [Role.User, Role.Admin] }
+      vi.mocked(mockUserRepository.findById)
+        .mockResolvedValueOnce(adminUser)
+        .mockResolvedValueOnce(null)
+
+      await expect(
+        authService.revokeRole(adminAc, adminUser.id, Role.Admin)
       ).rejects.toThrow(UserNotFoundError)
     })
   })

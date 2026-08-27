@@ -7,6 +7,7 @@ import {
   AccessNotGrantedError,
   UserNotFoundError,
   UserNotEligibleError,
+  CannotRevokeOwnRoleError,
   UnauthorizedUserAccessError,
 } from '@pinsquirrel/domain'
 import { hashPassword, verifyPassword, getDummyHash } from '../utils/crypto.js'
@@ -23,8 +24,8 @@ export interface EmailSealer {
 
 /**
  * Authentication and the user-lifecycle changes that need nothing but the user
- * store: signing in, admitting a user, granting the Admin role, and changing a
- * known password.
+ * store: signing in, admitting a user, granting and revoking roles, and
+ * changing a known password.
  *
  * Everything requiring the email pipeline or reset tokens lives in
  * AccountService, so this service's single dependency is always satisfiable —
@@ -106,14 +107,18 @@ export class AuthenticationService {
   }
 
   /**
-   * Add the Admin role to a user.
+   * Add one role to a user.
    *
-   * Roles are additive: existing roles and the user's status are left
-   * untouched. Idempotent — granting to an existing admin is a no-op.
+   * Roles are additive: the other roles and the user's status are left
+   * untouched. Idempotent — granting a role the user already holds is a no-op.
    *
    * Admin-only, enforced here for the same reason as grantAccess.
    */
-  async grantAdmin(ac: AccessControl, userId: string): Promise<User> {
+  async grantRole(
+    ac: AccessControl,
+    userId: string,
+    role: Role
+  ): Promise<User> {
     if (!ac.hasRole(Role.Admin)) {
       throw new MissingRoleError()
     }
@@ -123,13 +128,61 @@ export class AuthenticationService {
       throw new UserNotFoundError(userId)
     }
 
-    if (user.roles.includes(Role.Admin)) {
+    if (user.roles.includes(role)) {
       return user
     }
 
-    await this.userRepository.addRole(userId, Role.Admin)
+    await this.userRepository.addRole(userId, role)
 
-    // addRole resolves to void, so re-read to return the updated roles.
+    return this.rereadUser(userId)
+  }
+
+  /**
+   * Take one role off a user.
+   *
+   * The mirror of grantRole, with one rule of its own: an admin cannot revoke
+   * a role from their own account. Dropping Admin would close the console they
+   * are standing in, and dropping User suspends sign-in altogether — both need
+   * a second admin to undo, so neither is offered as a self-service mistake.
+   *
+   * Idempotent; revoking a role the user does not hold writes nothing.
+   */
+  async revokeRole(
+    ac: AccessControl,
+    userId: string,
+    role: Role
+  ): Promise<User> {
+    if (!ac.hasRole(Role.Admin)) {
+      throw new MissingRoleError()
+    }
+
+    // Checked before the read: whose account this is does not depend on the
+    // row, and a self-revoke should cost nothing.
+    if (ac.user?.id === userId) {
+      throw new CannotRevokeOwnRoleError(role)
+    }
+
+    const user = await this.userRepository.findById(userId)
+    if (!user) {
+      throw new UserNotFoundError(userId)
+    }
+
+    if (!user.roles.includes(role)) {
+      return user
+    }
+
+    await this.userRepository.removeRole(userId, role)
+
+    return this.rereadUser(userId)
+  }
+
+  /**
+   * Re-read a user after a role write.
+   *
+   * addRole/removeRole resolve to void, so the updated roles only exist in the
+   * store; a caller that renders the result needs them back.
+   */
+  private async rereadUser(userId: string): Promise<User> {
     const updated = await this.userRepository.findById(userId)
     if (!updated) {
       throw new UserNotFoundError(userId)

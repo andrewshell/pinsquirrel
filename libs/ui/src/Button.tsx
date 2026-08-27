@@ -18,6 +18,9 @@ interface ButtonProps {
   name?: string
   value?: string
   'aria-label'?: string
+  // Hover/focus copy for a button whose consequence is bigger than its label —
+  // "Revoke" on a role that also gates signing in, say.
+  title?: string
   // No `onclick`: the app ships a `script-src 'self'` CSP, so an inline
   // handler would not run. Use a data attribute and a listener in
   // src/static/*.js.
