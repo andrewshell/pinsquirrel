@@ -9,6 +9,7 @@ import {
   UserNotEligibleError,
   CannotRevokeOwnRoleError,
   UnauthorizedUserAccessError,
+  AdminAlreadyExistsError,
 } from '@pinsquirrel/domain'
 import { hashPassword, verifyPassword, getDummyHash } from '../utils/crypto.js'
 import { credentialsSchema, passwordChangeSchema } from '../validation/user.js'
@@ -172,6 +173,44 @@ export class AuthenticationService {
     }
 
     await this.userRepository.removeRole(userId, role)
+
+    return this.rereadUser(userId)
+  }
+
+  /**
+   * Claim the first Admin role on a system that has none.
+   *
+   * The one operation here that takes no `AccessControl`, and the reason is
+   * that there is nobody who could supply a useful one: on a fresh database no
+   * account holds Admin, so requiring an admin's authorization to create the
+   * first admin has no answer. The invariant is the guard instead — the count
+   * is re-read here, immediately before the write, and any admin at all makes
+   * this a refusal. That admits at most the first claimant and then closes for
+   * good; every later role change goes through grantRole, which does require
+   * an admin.
+   *
+   * The caller still has to be signed in — it passes the userId off its own
+   * session — so the claim is not open to the world, only to whichever
+   * authenticated account reaches an unbootstrapped system first. That is the
+   * same trust the operator already places in `login()`, which requires an
+   * Active account with the User role.
+   *
+   * The window between the check and the write is small but real. It is not
+   * closed here: two simultaneous claimants would both become admins, which
+   * leaves the system administered rather than broken, and the console is
+   * reached by one operator on a fresh deployment.
+   */
+  async bootstrapAdmin(userId: string): Promise<User> {
+    if ((await this.userRepository.countByRole(Role.Admin)) > 0) {
+      throw new AdminAlreadyExistsError()
+    }
+
+    const user = await this.userRepository.findById(userId)
+    if (!user) {
+      throw new UserNotFoundError(userId)
+    }
+
+    await this.userRepository.addRole(userId, Role.Admin)
 
     return this.rereadUser(userId)
   }

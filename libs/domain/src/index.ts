@@ -75,6 +75,7 @@ export {
   EmailSendError,
   MissingRoleError,
   AccessNotGrantedError,
+  AdminAlreadyExistsError,
 } from './errors/auth.js'
 export {
   UserError,
