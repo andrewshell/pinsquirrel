@@ -13,7 +13,9 @@ import {
   UserNotFoundError,
   UserNotEligibleError,
   CannotRevokeOwnRoleError,
+  AdminAlreadyExistsError,
 } from '@pinsquirrel/domain'
+import type { User } from '@pinsquirrel/domain'
 import { readFileSync } from 'node:fs'
 import {
   isEncryptedPrivateKey,
@@ -35,6 +37,7 @@ import {
   type AdminSession,
 } from './session.js'
 import {
+  BootstrapPage,
   LoginPage,
   UnlockPage,
   UsersPage,
@@ -46,8 +49,19 @@ import type { Context } from 'hono'
 
 const COOKIE = 'admin_session'
 
+/** Where landing() sends a session that has cleared every gate before it. */
+const CONSOLE = '/waitlist'
+
 /** Shown when a grant target is deleted mid-action. */
 const GONE = 'That user no longer exists.'
+
+/**
+ * Shown when a sign-in is valid but the console is not this account's to open.
+ *
+ * The same words whether the account simply is not an admin or lost a race for
+ * the first admin role: both mean this system has one and it is not them.
+ */
+const NOT_AN_ADMIN = 'This account is not an admin.'
 
 /**
  * Shown when the compose flow is reached on an environment with no key.
@@ -297,15 +311,22 @@ export function createApp(config: AdminConfig): Hono {
   }
 
   /**
-   * Where a session belongs right now: the console, or the step before it.
+   * Where a session belongs right now: the console, or a step before it.
    *
-   * The unlock gate is console-wide rather than per page — a half-open session
-   * finishes unlocking wherever it was pointed — so it is decided here once.
-   * An environment with no key path seals nothing, and a gate with nothing
-   * behind it would only lock the operator out.
+   * Both gates are console-wide rather than per page — a half-open session
+   * finishes opening wherever it was pointed — so they are decided here once,
+   * in the order they have to clear. An environment with no key path seals
+   * nothing, and a gate with nothing behind it would only lock the operator
+   * out.
+   *
+   * Claiming admin comes before unlocking: an account that is not an admin yet
+   * would be refused by every service call behind the key, so prompting it for
+   * a passphrase asks for work with nothing at the end of it.
    */
   function landing(env: AdminEnvironment, session: AdminSession): string {
-    return env.privateKeyPath && !session.privateKey ? '/unlock' : '/waitlist'
+    if (session.bootstrap) return '/bootstrap'
+    if (env.privateKeyPath && !session.privateKey) return '/unlock'
+    return CONSOLE
   }
 
   /**
@@ -313,14 +334,19 @@ export function createApp(config: AdminConfig): Hono {
    *
    * Returns the redirect to send instead when the caller may not proceed, so a
    * route is `const gate = await requireSession(c); if ('redirect' in gate)…`
-   * rather than its own copy of the two checks.
+   * rather than its own copy of the checks. A session that landing() puts on
+   * an earlier step is sent there, which is what keeps a pre-claim session off
+   * the console pages entirely: the services would refuse those calls anyway,
+   * but a page that renders nothing but its own error tells nobody what to do
+   * next.
    */
   async function requireSession(c: Context): Promise<Gate> {
     const sess = await currentSession(c)
     if (!sess) return { redirect: c.redirect('/login') }
     const env = getEnvironment(config, sess.session.environment)
-    if (landing(env, sess.session) === '/unlock') {
-      return { redirect: c.redirect('/unlock') }
+    const step = landing(env, sess.session)
+    if (step !== CONSOLE) {
+      return { redirect: c.redirect(step) }
     }
     return {
       env,
@@ -328,6 +354,57 @@ export function createApp(config: AdminConfig): Hono {
         username: sess.session.username,
         privateKey: sess.session.privateKey,
       },
+    }
+  }
+
+  /**
+   * Sign in, or find out that this account may claim the first admin role.
+   *
+   * Two of login()'s outcomes describe an account an unadministered system
+   * should still admit: a valid sign-in without the Admin role, and an account
+   * the waitlist still holds — which is where a fresh database leaves the
+   * operator, because admitting them needs an admin who does not exist.
+   *
+   * Which of those the environment actually accepts is not decided here.
+   * loginForBootstrap re-verifies the credentials and the zero-admin invariant
+   * for itself and refuses on its own terms; this only chooses which question
+   * to ask, and reports whichever refusal came back. Nothing proceeds past a
+   * service saying no.
+   */
+  async function signIn(
+    env: AdminEnvironment,
+    username: string,
+    password: string
+  ): Promise<{ user: User; bootstrap: boolean } | { notAdmin: true }> {
+    const { authService } = getRuntime(env)
+    let waitlisted: AccessNotGrantedError | null = null
+
+    try {
+      const user = await authService.login({ username, password })
+      if (user.roles.includes(Role.Admin)) {
+        return { user, bootstrap: false }
+      }
+    } catch (error) {
+      // Only "you are on the waitlist" is worth a second question. A wrong
+      // password is not an operator waiting to be let in, and asking twice
+      // would double what a guess costs the server.
+      if (!(error instanceof AccessNotGrantedError)) throw error
+      waitlisted = error
+    }
+
+    try {
+      return {
+        user: await authService.loginForBootstrap({ username, password }),
+        bootstrap: true,
+      }
+    } catch (error) {
+      // There is an admin, so there was never a claim to make. Report what
+      // stopped the ordinary sign-in instead of the claim's own refusal.
+      if (error instanceof AdminAlreadyExistsError) {
+        if (waitlisted) throw waitlisted
+        return { notAdmin: true }
+      }
+      throw error
     }
   }
 
@@ -379,28 +456,27 @@ export function createApp(config: AdminConfig): Hono {
     }
 
     try {
-      const user = await getRuntime(env).authService.login({
-        username,
-        password,
-      })
-      if (!user.roles.includes(Role.Admin)) {
+      const outcome = await signIn(env, username, password)
+      if ('notAdmin' in outcome) {
         return c.html(
           <LoginPage
             environments={config.environments}
             selected={environment}
             username={username}
-            error="This account is not an admin."
+            error={NOT_AN_ADMIN}
           />,
           403
         )
       }
       loginLimiter.reset(limitKey)
 
-      const id = createSession({
+      const session: AdminSession = {
         environment,
-        userId: user.id,
-        username: user.username,
-      })
+        userId: outcome.user.id,
+        username: outcome.user.username,
+        bootstrap: outcome.bootstrap,
+      }
+      const id = createSession(session)
       await setSignedCookie(c, COOKIE, id, config.sessionSecret, {
         httpOnly: true,
         sameSite: 'Lax',
@@ -409,7 +485,7 @@ export function createApp(config: AdminConfig): Hono {
         // http and a Secure cookie would never come back.
         secure: process.env.NODE_ENV === 'production',
       })
-      return c.redirect(env.privateKeyPath ? '/unlock' : '/waitlist')
+      return c.redirect(landing(env, session))
     } catch (error) {
       let message: string
       if (
@@ -425,7 +501,11 @@ export function createApp(config: AdminConfig): Hono {
         message = 'Invalid username or password.'
       } else if (
         error instanceof MissingRoleError ||
-        error instanceof AccessNotGrantedError
+        error instanceof AccessNotGrantedError ||
+        // The account never confirmed its email, so it is not eligible for the
+        // claim either. Said the same way as the waitlist refusal: which of
+        // the two it is, is the account holder's business, not a visitor's.
+        error instanceof UserNotEligibleError
       ) {
         message = 'This account cannot sign in.'
       } else {
@@ -446,15 +526,124 @@ export function createApp(config: AdminConfig): Hono {
     }
   })
 
+  /**
+   * The claim has been settled by someone other than this page.
+   *
+   * A claim only exists while nobody holds Admin, so once one does it cannot
+   * be offered again — but this account may have been granted the role in the
+   * meantime, by the new admin or by this session's own earlier submit.
+   * Re-reading decides between carrying on into the console and going back to
+   * sign in, so neither outcome is a page that refuses everything it renders.
+   */
+  async function claimSettled(
+    c: Context,
+    sess: { id: string; session: AdminSession },
+    env: AdminEnvironment
+  ): Promise<Response> {
+    const user = await getRuntime(env).userService.getUserByUsername(
+      sess.session.username
+    )
+
+    if (user?.roles.includes(Role.Admin)) {
+      const session = { ...sess.session, bootstrap: false }
+      updateSession(sess.id, session)
+      return c.redirect(landing(env, session))
+    }
+
+    // The session was opened only to make a claim that is gone, so it is
+    // closed rather than left pointing at pages that would all refuse it.
+    destroySession(sess.id)
+    deleteCookie(c, COOKIE, { path: '/' })
+    return c.html(
+      <LoginPage
+        environments={config.environments}
+        selected={env.name}
+        username={sess.session.username}
+        error={NOT_AN_ADMIN}
+      />,
+      403
+    )
+  }
+
+  app.get('/bootstrap', async c => {
+    const sess = await currentSession(c)
+    if (!sess) return c.redirect('/login')
+
+    const env = getEnvironment(config, sess.session.environment)
+    const step = landing(env, sess.session)
+    if (step !== '/bootstrap') return c.redirect(step)
+
+    // The session was flagged at sign-in and another operator may have claimed
+    // the role since. Asking again means the page never offers a claim that is
+    // certain to be refused; the submit re-checks it in the service anyway.
+    if (await getRuntime(env).userService.hasAdmin()) {
+      return claimSettled(c, sess, env)
+    }
+
+    return c.html(
+      <BootstrapPage envLabel={env.label} username={sess.session.username} />
+    )
+  })
+
+  app.post('/bootstrap', async c => {
+    const sess = await currentSession(c)
+    if (!sess) return c.redirect('/login')
+
+    const env = getEnvironment(config, sess.session.environment)
+    const step = landing(env, sess.session)
+    if (step !== '/bootstrap') return c.redirect(step)
+
+    try {
+      // The claimant is whoever is signed in, taken off the session — the form
+      // carries no user, so there is nothing on it to swap for someone else.
+      await getRuntime(env).authService.bootstrapAdmin(sess.session.userId)
+
+      // Clear the flag before deciding where they land, or landing() would
+      // send them straight back to the page they just finished with.
+      const session = { ...sess.session, bootstrap: false }
+      updateSession(sess.id, session)
+      return c.redirect(landing(env, session))
+    } catch (error) {
+      if (error instanceof AdminAlreadyExistsError) {
+        return claimSettled(c, sess, env)
+      }
+      // The account never confirmed its email. The service's message names it
+      // and says so; there is nothing this page can add.
+      if (error instanceof UserNotEligibleError) {
+        return c.html(
+          <BootstrapPage
+            envLabel={env.label}
+            username={sess.session.username}
+            error={error.message}
+          />,
+          400
+        )
+      }
+      console.error(`[admin] bootstrap failed for "${env.name}":`, error)
+      return c.html(
+        <BootstrapPage
+          envLabel={env.label}
+          username={sess.session.username}
+          error={`Couldn't reach the ${env.label} database. Please try again.`}
+        />,
+        500
+      )
+    }
+  })
+
   app.get('/unlock', async c => {
     const sess = await currentSession(c)
     if (!sess) return c.redirect('/login')
 
     const env = getEnvironment(config, sess.session.environment)
-    // Nothing to unlock: either this session already did, or this environment
-    // has no key at all.
+    // Nothing to unlock here: this session already did, this environment has
+    // no key at all, or it has not claimed admin yet and the key would open
+    // pages it cannot use.
+    const step = landing(env, sess.session)
+    // `!keyPath` is already implied by the step — landing() only answers
+    // /unlock where there is a key path — but it is what narrows the type.
     const keyPath = env.privateKeyPath
-    if (!keyPath || sess.session.privateKey) return c.redirect('/waitlist')
+    if (step !== '/unlock' || !keyPath) return c.redirect(step)
 
     try {
       const contents = readFileSync(keyPath, 'utf8')
@@ -481,7 +670,10 @@ export function createApp(config: AdminConfig): Hono {
     if (!sess) return c.redirect('/login')
     const env = getEnvironment(config, sess.session.environment)
     const keyPath = env.privateKeyPath
-    if (!keyPath) return c.redirect('/waitlist')
+    // A session with no claim behind it has no business holding the key, and
+    // an environment with no key file has nothing to hand it.
+    if (sess.session.bootstrap) return c.redirect('/bootstrap')
+    if (!keyPath) return c.redirect(CONSOLE)
 
     const body = await c.req.parseBody()
     const passphrase = field(body, 'passphrase')

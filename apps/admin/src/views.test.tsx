@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest'
 import { Hono } from 'hono'
 import type { HtmlEscapedString } from 'hono/utils/html'
 import {
+  BootstrapPage,
   LoginPage,
   UnlockPage,
   UsersPage,
@@ -52,6 +53,8 @@ const pages = {
   LoginPage: () =>
     LoginPage({ environments: [{ name: 'test', label: 'Test Env' }] }),
   UnlockPage: () => UnlockPage({ envLabel: 'Test Env' }),
+  BootstrapPage: () =>
+    BootstrapPage({ envLabel: 'Test Env', username: 'alice' }),
   UsersPage: () =>
     UsersPage({
       envLabel: 'Test Env',
@@ -175,6 +178,36 @@ describe.each(signedInPages)('%s header', name => {
     expect(html).toContain('data-dropdown="menu"')
     expect(html).toContain('root')
     expect(html).toContain('action="/logout"')
+  })
+})
+
+describe('BootstrapPage', () => {
+  async function body(): Promise<string> {
+    return render(pages.BootstrapPage() as HtmlEscapedString)
+  }
+
+  it('names the environment that has no admin', async () => {
+    expect(await body()).toContain('No admin accounts exist in Test Env')
+  })
+
+  // The claim does both — a fresh database leaves the operator on the waitlist
+  // — and a button that only said "claim admin" would hide half of what it
+  // changes about their account.
+  it('says the claim activates the account as well', async () => {
+    const html = await body()
+
+    expect(html).toContain('activates')
+    expect(html).toContain('alice')
+    expect(html).toContain('action="/bootstrap"')
+  })
+
+  // The operator is signed in but not in the console yet, so there is nothing
+  // to navigate to — the same reason Login and Unlock carry no header.
+  it('carries no console header', async () => {
+    const html = await body()
+
+    expect(html).not.toContain('data-dropdown="container"')
+    expect(html).not.toContain('href="/users"')
   })
 })
 
