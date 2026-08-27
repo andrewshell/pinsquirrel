@@ -170,17 +170,14 @@ async function signIn(): Promise<string> {
 }
 
 /**
- * Answer getUserByUsername for the signed-in admin plus any named targets.
+ * Answer getUserByUsername for the signed-in admin, and nobody else.
  *
  * The app re-reads its own account each request to build the AccessControl it
- * passes to listByStatus, so a blanket mockResolvedValue would hand the admin
- * lookup whatever the test meant for its target.
+ * passes to the services; every other lookup goes through listByStatus.
  */
-function usersByName(targets: Record<string, User | null> = {}): void {
+function mockAdminLookup(): void {
   userService.getUserByUsername.mockImplementation((name: string) =>
-    Promise.resolve(
-      name === adminUser.username ? adminUser : (targets[name] ?? null)
-    )
+    Promise.resolve(name === adminUser.username ? adminUser : null)
   )
 }
 
@@ -198,7 +195,7 @@ beforeEach(() => {
   loginLimiter.reset('unknown:alice')
   app = createApp(makeConfig())
   userService.listByStatus.mockResolvedValue([])
-  usersByName()
+  mockAdminLookup()
   crypto.openSealedEmail.mockResolvedValue('person@example.com')
   mailer.sendBulk.mockResolvedValue([])
 })
