@@ -92,6 +92,23 @@ export class MissingRoleError extends AuthenticationError {
   }
 }
 
+/**
+ * Someone tried to claim the first Admin role on a system that already has one.
+ *
+ * The bootstrap claim is open to any signed-in account precisely because there
+ * is no admin yet to authorize it, so "no admin exists" is the whole of its
+ * authorization. This is that check failing — a second claimant arriving
+ * between the page render and the submit, or a stale tab left open.
+ */
+export class AdminAlreadyExistsError extends AuthenticationError {
+  constructor() {
+    super(
+      'This system already has an administrator, so admin access cannot be claimed here'
+    )
+    this.name = 'AdminAlreadyExistsError'
+  }
+}
+
 export class AccessNotGrantedError extends AuthenticationError {
   constructor() {
     super(

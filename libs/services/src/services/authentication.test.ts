@@ -11,6 +11,7 @@ import {
   ValidationError,
   UnauthorizedUserAccessError,
   CannotRevokeOwnRoleError,
+  AdminAlreadyExistsError,
   AccessControl,
   Role,
   UserStatus,
@@ -502,6 +503,84 @@ describe('AuthenticationService', () => {
       await expect(
         authService.revokeRole(adminAc, adminUser.id, Role.Admin)
       ).rejects.toThrow(UserNotFoundError)
+    })
+  })
+
+  describe('bootstrapAdmin', () => {
+    /** The account claiming Admin, and the same account once it has. */
+    const claimant = { ...mockUser, id: 'claimant-1', roles: [Role.User] }
+    const bootstrapped = { ...claimant, roles: [Role.User, Role.Admin] }
+
+    it('should grant Admin when nobody holds it', async () => {
+      vi.mocked(mockUserRepository.countByRole).mockResolvedValue(0)
+      vi.mocked(mockUserRepository.findById)
+        .mockResolvedValueOnce(claimant)
+        .mockResolvedValueOnce(bootstrapped)
+
+      const result = await authService.bootstrapAdmin(claimant.id)
+
+      expect(mockUserRepository.addRole).toHaveBeenCalledWith(
+        claimant.id,
+        Role.Admin
+      )
+      expect(result.roles).toContain(Role.Admin)
+      // The claimant keeps what they had; roles are additive here too.
+      expect(result.roles).toContain(Role.User)
+    })
+
+    // The count is what stands in for an authorization check, so it has to be
+    // read from the store at claim time rather than trusted from the caller.
+    it('should count the admins itself rather than take the caller word', async () => {
+      vi.mocked(mockUserRepository.countByRole).mockResolvedValue(0)
+      vi.mocked(mockUserRepository.findById)
+        .mockResolvedValueOnce(claimant)
+        .mockResolvedValueOnce(bootstrapped)
+
+      await authService.bootstrapAdmin(claimant.id)
+
+      expect(mockUserRepository.countByRole).toHaveBeenCalledWith(Role.Admin)
+    })
+
+    // The console's gate and this call are separated by a page load, so a
+    // second claimant can arrive in between. The invariant, not the page,
+    // is what admits at most the first.
+    it('should refuse once any admin exists', async () => {
+      vi.mocked(mockUserRepository.countByRole).mockResolvedValue(1)
+
+      await expect(
+        authService.bootstrapAdmin(claimant.id)
+      ).rejects.toBeInstanceOf(AdminAlreadyExistsError)
+      expect(mockUserRepository.addRole).not.toHaveBeenCalled()
+    })
+
+    it('should refuse before reading the claimant at all', async () => {
+      vi.mocked(mockUserRepository.countByRole).mockResolvedValue(3)
+
+      await expect(authService.bootstrapAdmin(claimant.id)).rejects.toThrow(
+        AdminAlreadyExistsError
+      )
+      expect(mockUserRepository.findById).not.toHaveBeenCalled()
+    })
+
+    it('should throw UserNotFoundError when the claimant does not exist', async () => {
+      vi.mocked(mockUserRepository.countByRole).mockResolvedValue(0)
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(null)
+
+      await expect(authService.bootstrapAdmin('missing-id')).rejects.toThrow(
+        UserNotFoundError
+      )
+      expect(mockUserRepository.addRole).not.toHaveBeenCalled()
+    })
+
+    it('should throw UserNotFoundError if the claimant vanishes after the write', async () => {
+      vi.mocked(mockUserRepository.countByRole).mockResolvedValue(0)
+      vi.mocked(mockUserRepository.findById)
+        .mockResolvedValueOnce(claimant)
+        .mockResolvedValueOnce(null)
+
+      await expect(authService.bootstrapAdmin(claimant.id)).rejects.toThrow(
+        UserNotFoundError
+      )
     })
   })
 
