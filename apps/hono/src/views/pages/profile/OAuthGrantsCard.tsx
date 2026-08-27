@@ -1,12 +1,7 @@
 import type { OAuthGrant } from '@pinsquirrel/services'
 import type { FC } from 'hono/jsx'
 import { resourceLabel } from '../../../lib/config'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '../../components/ui/Card'
+import { Card, CardContent, CardHeader, CardTitle } from '@pinsquirrel/ui'
 import { formatDate } from './format-date'
 
 type OAuthGrantsCardProps = {

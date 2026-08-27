@@ -11,6 +11,7 @@ export default defineConfig({
     '@pinsquirrel/domain',
     '@pinsquirrel/mailgun',
     '@pinsquirrel/services',
+    '@pinsquirrel/ui',
   ],
   // Every third-party runtime dependency of the workspace packages bundled
   // above. Anything listed here stays a bare import in dist/index.js and is

@@ -15,6 +15,7 @@ coverage/
 
 # Generated CSS
 apps/hono/src/static/styles.css
+apps/admin/src/static/styles.css
 
 # IDE - keep shared config, exclude user-specific files
 .vscode/launch.json

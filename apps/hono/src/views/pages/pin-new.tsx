@@ -1,7 +1,7 @@
 import type { FC } from 'hono/jsx'
 import type { User } from '@pinsquirrel/domain'
 import { DefaultLayout } from '../layouts/default'
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
+import { Card, CardHeader, CardTitle, CardContent } from '@pinsquirrel/ui'
 import { FlashMessage } from '../components/FlashMessage'
 import { PinForm } from '../components/PinForm'
 import type { FlashType } from '../../middleware/session'

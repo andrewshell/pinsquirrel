@@ -9,6 +9,9 @@
    scanning too. */
 @source "../../../../libs/ui/src/**/*.tsx";
 
+/* The tokens ship on a `.dark` class, so the variant has to be declared per
+   app. This console has no theme toggle: static/theme.js puts the class on
+   <html> straight from the OS preference. */
 @custom-variant dark (&:is(.dark *));
 
 @theme {
@@ -21,29 +24,11 @@ html,
 body {
   @apply bg-background overflow-x-hidden;
 
+  /* Follows the OS, same as the class theme.js applies — so form controls and
+     scrollbars are painted to match. */
   @media (prefers-color-scheme: dark) {
     color-scheme: dark;
   }
-}
-
-.private-mode {
-  --background: oklch(0.97 0.01 280);
-  --card: oklch(0.95 0.01 280);
-  --popover: oklch(0.95 0.01 280);
-  --primary: oklch(0.45 0.15 280);
-  --accent: oklch(0.45 0.15 280);
-  --ring: oklch(0.45 0.15 280);
-  --input: oklch(0.95 0.01 280);
-}
-
-.dark.private-mode {
-  --background: oklch(0.08 0.02 280);
-  --card: oklch(0.12 0.02 280);
-  --popover: oklch(0.12 0.02 280);
-  --primary: oklch(0.7 0.2 280);
-  --accent: oklch(0.7 0.2 280);
-  --ring: oklch(0.7 0.2 280);
-  --input: oklch(0.12 0.02 280);
 }
 
 @layer base {
@@ -53,10 +38,4 @@ body {
   body {
     @apply bg-background text-foreground;
   }
-}
-
-/* HTMX loading indicator — dims pin list while a request is in flight */
-#pins-content.is-loading {
-  opacity: 0.5;
-  transition: opacity 200ms ease-in-out;
 }

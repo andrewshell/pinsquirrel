@@ -4,8 +4,8 @@
   "version": "3.5.3",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
+    "dev": "concurrently --kill-others \"tsx watch src/index.ts\" \"pnpm css:watch\"",
+    "start": "pnpm css:build && tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
@@ -13,7 +13,9 @@
     "format:check": "prettier --check .",
     "test": "vitest --run",
     "test:watch": "vitest --watch --coverage",
-    "test:coverage": "vitest --run --coverage"
+    "test:coverage": "vitest --run --coverage",
+    "css:build": "tailwindcss -i ./src/styles/app.css -o ./src/static/styles.css",
+    "css:watch": "tailwindcss -i ./src/styles/app.css -o ./src/static/styles.css --watch"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
@@ -22,14 +24,18 @@
     "@pinsquirrel/domain": "workspace:*",
     "@pinsquirrel/mailgun": "workspace:*",
     "@pinsquirrel/services": "workspace:*",
+    "@pinsquirrel/ui": "workspace:*",
     "dotenv": "^17.4.2",
     "hono": "^4.13.3"
   },
   "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
     "@types/node": "^26.2.0",
     "@vitest/coverage-v8": "^4.1.11",
+    "concurrently": "^10.0.5",
     "eslint": "^10.9.0",
     "prettier": "^3.9.6",
+    "tailwindcss": "^4.3.3",
     "tsx": "^4.23.12",
     "typescript": "^6.0.3",
     "vitest": "^4.1.11"

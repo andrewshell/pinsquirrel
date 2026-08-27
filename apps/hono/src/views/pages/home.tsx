@@ -1,5 +1,5 @@
 import type { FC } from 'hono/jsx'
-import { Button } from '../components/ui/Button'
+import { Button } from '@pinsquirrel/ui'
 
 export const HomePage: FC = () => {
   return (

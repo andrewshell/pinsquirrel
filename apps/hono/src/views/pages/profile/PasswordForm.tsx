@@ -1,12 +1,12 @@
 import type { User } from '@pinsquirrel/domain'
 import type { FC } from 'hono/jsx'
-import { Button } from '../../components/ui/Button'
 import {
+  Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-} from '../../components/ui/Card'
+} from '@pinsquirrel/ui'
 
 type PasswordFormProps = {
   user: User

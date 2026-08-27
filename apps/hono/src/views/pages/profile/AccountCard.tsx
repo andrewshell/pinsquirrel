@@ -1,11 +1,6 @@
 import type { User } from '@pinsquirrel/domain'
 import type { FC } from 'hono/jsx'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '../../components/ui/Card'
+import { Card, CardContent, CardHeader, CardTitle } from '@pinsquirrel/ui'
 import { formatDate } from './format-date'
 
 /** Read-only account facts: who you are and when the account changed. */

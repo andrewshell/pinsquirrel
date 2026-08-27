@@ -1,11 +1,13 @@
 import type { FC } from 'hono/jsx'
-import { Alert, AlertDescription, AlertTitle } from '../../components/ui/Alert'
 import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-} from '../../components/ui/Card'
+} from '@pinsquirrel/ui'
 
 /**
  * The drag-to-your-bookmarks-bar pin button.
