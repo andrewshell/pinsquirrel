@@ -691,6 +691,46 @@ describe('keyless environment', () => {
     expect(crypto.openSealedEmail).not.toHaveBeenCalled()
   })
 
+  // Mail goes to decrypted addresses, and there are none to decrypt here, so
+  // the page does not offer a form that could only fail.
+  it('offers no compose link on the waitlist', async () => {
+    const cookie = await signInKeyless()
+    userService.listByStatus.mockResolvedValue([makeUser()])
+
+    const res = await app.request('/waitlist', { headers: { Cookie: cookie } })
+
+    expect(await res.text()).not.toContain('/compose')
+  })
+
+  it.each([
+    ['GET', '/compose', (): RequestInit => ({})],
+    [
+      'POST',
+      '/send',
+      (): RequestInit => ({
+        method: 'POST',
+        body: new URLSearchParams({ subject: 'Hi', body: 'Hello' }),
+      }),
+    ],
+  ])(
+    'answers a %s %s with the waitlist and an explanation',
+    async (_method, path, init) => {
+      const cookie = await signInKeyless()
+      userService.listByStatus.mockResolvedValue([makeUser()])
+
+      const res = await app.request(path, {
+        ...init(),
+        headers: { Cookie: cookie },
+      })
+      const body = await res.text()
+
+      expect(res.status).toBe(400)
+      expect(body).toContain('Waitlist')
+      expect(body).toContain('no decryption key')
+      expect(mailer.sendBulk).not.toHaveBeenCalled()
+    }
+  )
+
   it('serves the users page without an unlocked key', async () => {
     const cookie = await signInKeyless()
 

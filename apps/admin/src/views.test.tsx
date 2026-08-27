@@ -34,6 +34,20 @@ async function render(
   return (await app.request('/')).text()
 }
 
+/** One waitlisted person, so the compose entry point has something to act on. */
+const waitlistProps = {
+  envLabel: 'Test Env',
+  username: 'root',
+  rows: [
+    {
+      id: 'u1',
+      username: 'alice',
+      email: 'alice@example.com',
+      joinedAt: '2026-01-01',
+    },
+  ],
+}
+
 const pages = {
   LoginPage: () =>
     LoginPage({ environments: [{ name: 'test', label: 'Test Env' }] }),
@@ -52,19 +66,7 @@ const pages = {
         { id: 'u3', username: 'carol', roles: [], isSelf: false },
       ],
     }),
-  WaitlistPage: () =>
-    WaitlistPage({
-      envLabel: 'Test Env',
-      username: 'root',
-      rows: [
-        {
-          id: 'u1',
-          username: 'alice',
-          email: 'alice@example.com',
-          joinedAt: '2026-01-01',
-        },
-      ],
-    }),
+  WaitlistPage: () => WaitlistPage({ ...waitlistProps, canCompose: true }),
   ComposePage: () =>
     ComposePage({ envLabel: 'Test Env', username: 'root', recipientCount: 1 }),
   SentPage: () =>
@@ -173,6 +175,30 @@ describe.each(signedInPages)('%s header', name => {
     expect(html).toContain('data-dropdown="menu"')
     expect(html).toContain('root')
     expect(html).toContain('action="/logout"')
+  })
+})
+
+describe('WaitlistPage', () => {
+  it('offers to write to the list when the console can decrypt it', async () => {
+    const html = await render(
+      WaitlistPage({ ...waitlistProps, canCompose: true }) as HtmlEscapedString
+    )
+
+    expect(html).toContain('href="/compose"')
+    expect(html).toContain('Compose message')
+  })
+
+  // An environment that seals nothing has no addresses to write to, so the
+  // page does not offer a form whose only outcome would be an error.
+  it('offers no compose link when it cannot', async () => {
+    const html = await render(
+      WaitlistPage({ ...waitlistProps, canCompose: false }) as HtmlEscapedString
+    )
+
+    expect(html).not.toContain('/compose')
+    // The rest of the page is unchanged: the list is still worked from here.
+    expect(html).toContain('alice')
+    expect(html).toContain('action="/grant-access"')
   })
 })
 

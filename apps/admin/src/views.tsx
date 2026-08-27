@@ -304,9 +304,16 @@ export const WaitlistPage: FC<{
   envLabel: string
   username: string
   rows: { id: string; username: string; email: string; joinedAt: string }[]
+  /**
+   * Whether this environment can produce addresses to write to.
+   *
+   * False where nothing is sealed and there is no key: the message would have
+   * nowhere to go, so the page does not offer to write one.
+   */
+  canCompose: boolean
   notice?: string
   error?: string
-}> = ({ envLabel, username, rows, notice, error }) => (
+}> = ({ envLabel, username, rows, canCompose, notice, error }) => (
   <Layout
     title="Waitlist"
     header={<AdminHeader username={username} currentPath="/waitlist" />}
@@ -358,7 +365,7 @@ export const WaitlistPage: FC<{
             </tbody>
           </table>
         )}
-        {rows.length > 0 ? (
+        {rows.length > 0 && canCompose ? (
           <Button href="/compose">Compose message</Button>
         ) : (
           ''

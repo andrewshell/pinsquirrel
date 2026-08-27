@@ -49,6 +49,16 @@ const COOKIE = 'admin_session'
 /** Shown when a grant target is deleted mid-action. */
 const GONE = 'That user no longer exists.'
 
+/**
+ * Shown when the compose flow is reached on an environment with no key.
+ *
+ * Mail goes to addresses this console decrypts, so an environment that seals
+ * nothing has none to send to. The waitlist hides the entry point; this covers
+ * a bookmark or a stale page reaching the routes anyway.
+ */
+const NO_KEY_TO_SEND =
+  'This environment has no decryption key, so waitlist email cannot be sent from here.'
+
 // Safely read a text field from a parsed form body (values may be File).
 function field(body: Record<string, string | File>, name: string): string {
   const value = body[name]
@@ -254,6 +264,7 @@ async function renderWaitlist(
       envLabel={env.label}
       username={viewer.username}
       rows={rows}
+      canCompose={Boolean(env.privateKeyPath)}
       notice={outcome.notice}
       error={error}
     />,
@@ -650,6 +661,10 @@ export function createApp(config: AdminConfig): Hono {
     if ('redirect' in gate) return gate.redirect
 
     const { env, viewer } = gate
+    if (!env.privateKeyPath) {
+      return renderWaitlist(c, env, viewer, { error: NO_KEY_TO_SEND }, 400)
+    }
+
     try {
       const rows = await loadWaitlist(env, viewer)
       const recipientCount = rows.filter(r => r.email.includes('@')).length
@@ -678,6 +693,10 @@ export function createApp(config: AdminConfig): Hono {
     if ('redirect' in gate) return gate.redirect
 
     const { env, viewer } = gate
+    if (!env.privateKeyPath) {
+      return renderWaitlist(c, env, viewer, { error: NO_KEY_TO_SEND }, 400)
+    }
+
     const body = await c.req.parseBody()
     const subject = field(body, 'subject').trim()
     const messageBody = field(body, 'body').trim()
