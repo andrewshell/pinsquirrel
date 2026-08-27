@@ -12,4 +12,6 @@ export interface UserRepository extends Repository<
   findByUsername(username: string): Promise<User | null>
   findByStatus(status: UserStatus): Promise<User[]>
   addRole(userId: string, role: Role): Promise<void>
+  /** Idempotent: removing a role the user does not hold is a no-op. */
+  removeRole(userId: string, role: Role): Promise<void>
 }
