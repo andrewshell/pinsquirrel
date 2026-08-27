@@ -109,6 +109,15 @@ describe('tag merge routes', () => {
       expect(res.status).toBe(200)
       expect(repo.deleteTagsWithNoPins).not.toHaveBeenCalled()
     })
+
+    // The header's desktop nav is the shared @pinsquirrel/ui NavLink, which
+    // marks the section you are in; Pins, which you are not in, stays plain.
+    it('marks the Tags link as the current page', async () => {
+      const html = await (await app.request('/tags')).text()
+
+      expect(html).toMatch(/href="\/tags"[^>]*aria-current="page"/)
+      expect(html).not.toMatch(/href="\/pins"[^>]*aria-current="page"/)
+    })
   })
 
   describe('GET /tags/merge', () => {

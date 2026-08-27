@@ -8,7 +8,7 @@ import {
   SearchIcon,
   UserIcon,
 } from './icons'
-import { Button } from '@pinsquirrel/ui'
+import { Button, NavLink } from '@pinsquirrel/ui'
 
 interface HeaderProps {
   user: User | null
@@ -25,12 +25,12 @@ type Layout = 'desktop' | 'mobile'
 
 type HtmxAttrs = Record<string, string>
 
-const linkClass: Record<Layout, string> = {
-  desktop:
-    'text-base font-bold text-foreground hover:text-primary uppercase px-4 py-2 border-2 border-transparent hover:border-foreground transition-all',
-  mobile:
-    'block px-4 py-2 text-center font-bold uppercase hover:bg-accent/10 transition-colors',
-}
+// The desktop nav links are the shared @pinsquirrel/ui NavLink, which carries
+// the same idle styling this file used to spell out and adds the current-page
+// state. The mobile panel is a different shape — full-width rows — so it still
+// styles its own.
+const mobileLinkClass =
+  'block px-4 py-2 text-center font-bold uppercase hover:bg-accent/10 transition-colors'
 
 const accountLinkClass: Record<Layout, string> = {
   desktop: 'block px-4 py-2 text-sm hover:bg-accent/10 transition-colors',
@@ -42,16 +42,30 @@ const NavLinks: FC<{
   layout: Layout
   pinsBase: string
   privateMode: boolean
-}> = ({ layout, pinsBase, privateMode }) => (
-  <>
-    <a href={pinsBase} class={linkClass[layout]}>
-      {privateMode ? 'Private' : 'Pins'}
-    </a>
-    <a href="/tags" class={linkClass[layout]}>
-      Tags
-    </a>
-  </>
-)
+  currentPath?: string
+}> = ({ layout, pinsBase, privateMode, currentPath }) => {
+  const pinsLabel = privateMode ? 'Private' : 'Pins'
+
+  return layout === 'desktop' ? (
+    <>
+      <NavLink href={pinsBase} currentPath={currentPath}>
+        {pinsLabel}
+      </NavLink>
+      <NavLink href="/tags" currentPath={currentPath}>
+        Tags
+      </NavLink>
+    </>
+  ) : (
+    <>
+      <a href={pinsBase} class={mobileLinkClass}>
+        {pinsLabel}
+      </a>
+      <a href="/tags" class={mobileLinkClass}>
+        Tags
+      </a>
+    </>
+  )
+}
 
 const AccountLinks: FC<{ layout: Layout; username: string }> = ({
   layout,
@@ -167,6 +181,7 @@ export const Header: FC<HeaderProps> = ({
                     layout="desktop"
                     pinsBase={pinsBase}
                     privateMode={privateMode}
+                    currentPath={currentPath}
                   />
                 </div>
 
