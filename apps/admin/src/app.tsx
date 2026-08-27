@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { serveStatic } from '@hono/node-server/serve-static'
 import { getSignedCookie, setSignedCookie, deleteCookie } from 'hono/cookie'
 import { loginLimiter, loginRateLimitKey } from './rate-limit.js'
 import {
@@ -158,6 +159,11 @@ async function renderWaitlist(
  */
 export function createApp(config: AdminConfig): Hono {
   const app = new Hono()
+
+  // The compiled stylesheet and the theme script. Mounted before every route
+  // that needs a session, so the login page still gets its CSS when the
+  // database is unreachable.
+  app.use('/static/*', serveStatic({ root: './src' }))
 
   async function currentSession(
     c: Context

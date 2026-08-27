@@ -971,3 +971,25 @@ describe('POST /grant-admin', () => {
     expect(authService.grantAdmin).not.toHaveBeenCalled()
   })
 })
+
+describe('/static', () => {
+  // The pages link a stylesheet and a theme script; without this mount they
+  // 404 and the console renders unstyled. Asserted on theme.js rather than
+  // styles.css because the stylesheet is a build artefact and may not exist
+  // yet, while the script is checked in.
+  it('serves the static directory', async () => {
+    const res = await app.request('/static/theme.js')
+
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('prefers-color-scheme: dark')
+  })
+
+  // Mounted before every session check, so a login page still gets its CSS
+  // when the database is down.
+  it('does not require a session', async () => {
+    const res = await app.request('/static/theme.js')
+
+    expect(res.status).toBe(200)
+    expect(res.headers.get('location')).toBeNull()
+  })
+})

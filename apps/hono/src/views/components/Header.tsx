@@ -8,7 +8,7 @@ import {
   SearchIcon,
   UserIcon,
 } from './icons'
-import { Button } from './ui/Button'
+import { Button } from '@pinsquirrel/ui'
 
 interface HeaderProps {
   user: User | null

@@ -1,10 +1,15 @@
 import type { FC } from 'hono/jsx'
 import type { User } from '@pinsquirrel/domain'
 import { DefaultLayout } from '../layouts/default'
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
-import { Button } from '../components/ui/Button'
-import { Input } from '../components/ui/Input'
-import { Label } from '../components/ui/Label'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Button,
+  Input,
+  Label,
+} from '@pinsquirrel/ui'
 import { ErrorMessage } from '../components/FlashMessage'
 
 interface PrivateUnlockPageProps {

@@ -1,8 +1,13 @@
 import type { FC } from 'hono/jsx'
 import type { User } from '@pinsquirrel/domain'
 import { DefaultLayout } from '../layouts/default'
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
-import { Button } from '../components/ui/Button'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Button,
+} from '@pinsquirrel/ui'
 
 /**
  * The OAuth consent screen.

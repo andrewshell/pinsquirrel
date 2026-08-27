@@ -2,7 +2,7 @@ import type { TagWithCount, User } from '@pinsquirrel/domain'
 import { DefaultLayout } from '../layouts/default'
 import { FlashMessage as FlashMessageComponent } from '../components/FlashMessage'
 import type { FlashMessage } from '../../middleware/session'
-import { Button } from '../components/ui/Button'
+import { Button } from '@pinsquirrel/ui'
 import { MergeIcon } from '../components/icons'
 
 export type TagFilterType = 'all' | 'toread'

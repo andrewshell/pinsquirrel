@@ -1,14 +1,14 @@
 import type { FC } from 'hono/jsx'
 import type { Pin, User } from '@pinsquirrel/domain'
-import { Button } from '../components/ui/Button'
 import {
+  Button,
   Card,
   CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
-} from '../components/ui/Card'
+} from '@pinsquirrel/ui'
 import { DefaultLayout } from '../layouts/default'
 
 interface PinDeletePageProps {

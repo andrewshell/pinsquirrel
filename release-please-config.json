@@ -56,6 +56,11 @@
           "type": "json",
           "path": "libs/services/package.json",
           "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "libs/ui/package.json",
+          "jsonpath": "$.version"
         }
       ]
     }

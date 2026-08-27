@@ -1,19 +1,19 @@
 import type { FC, PropsWithChildren } from 'hono/jsx'
 import type { User, Pin } from '@pinsquirrel/domain'
 import { DefaultLayout } from '../layouts/default'
-import { Button } from '../components/ui/Button'
-import { Input } from '../components/ui/Input'
-import { Textarea } from '../components/ui/Textarea'
-import { Checkbox } from '../components/ui/Checkbox'
-import { Label } from '../components/ui/Label'
 import {
+  Button,
+  Input,
+  Textarea,
+  Checkbox,
+  Label,
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
   CardFooter,
-} from '../components/ui/Card'
+} from '@pinsquirrel/ui'
 import {
   FlashMessage,
   SuccessMessage,
@@ -194,11 +194,7 @@ export const StyleGuidePage: FC<StyleGuidePageProps> = ({ user }) => {
       </Section>
 
       {/* 2. Buttons */}
-      <Section
-        id="buttons"
-        title="Buttons"
-        source="views/components/ui/Button.tsx"
-      >
+      <Section id="buttons" title="Buttons" source="libs/ui/src/Button.tsx">
         {buttonVariants.map(variant => (
           <div class="space-y-2">
             <p class="text-sm font-medium">
@@ -228,7 +224,7 @@ export const StyleGuidePage: FC<StyleGuidePageProps> = ({ user }) => {
       <Section
         id="forms"
         title="Form Inputs"
-        source="views/components/ui/Input.tsx, Textarea.tsx, Checkbox.tsx, Label.tsx"
+        source="libs/ui/src/Input.tsx, Textarea.tsx, Checkbox.tsx, Label.tsx"
       >
         <div class="max-w-md space-y-4">
           <div class="space-y-2">
@@ -357,7 +353,7 @@ export const StyleGuidePage: FC<StyleGuidePageProps> = ({ user }) => {
       <Section
         id="cards"
         title="Cards"
-        source="views/components/ui/Card.tsx, views/pages/profile.tsx"
+        source="libs/ui/src/Card.tsx, views/pages/profile.tsx"
       >
         <div class="max-w-xl">
           <Card>

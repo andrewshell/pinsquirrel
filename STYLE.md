@@ -4,7 +4,11 @@
 
 This guide defines the Neo Brutalism design system used throughout the Hono app. Use these patterns to maintain visual consistency when creating new components.
 
-`apps/admin` follows this design system too, but implements it by hand: it runs without a build step, so instead of Tailwind it ships a plain-CSS inline stylesheet in `apps/admin/src/views.tsx` with the tokens copied out of `apps/hono/src/styles/app.css`. `views.tsx` puts the light values on `:root` and the `.dark` values in a `prefers-color-scheme: dark` media query — the admin has no theme toggle and follows the OS, unlike the Hono app's localStorage-driven `.dark` class. Change a token value in `app.css` and mirror it in `views.tsx`.
+The tokens, the Tailwind colour mapping and the shadow utilities live in `libs/ui/src/styles.css`, alongside the shared primitives (Alert, Button, Card, Checkbox, Input, Label, Textarea) that render against them — that package is the single source of truth, so a token changes in one place.
+
+`apps/admin` consumes `@pinsquirrel/ui` too and runs its own Tailwind build (`pnpm --filter @pinsquirrel/admin css:build`, entry `apps/admin/src/styles/app.css`, output `src/static/styles.css`). The one difference from the Hono app is dark mode: the console has no theme toggle and nothing to remember, so `apps/admin/src/static/theme.js` mirrors `prefers-color-scheme` straight onto the `.dark` class, where the Hono app's `theme.js` drives that class from localStorage.
+
+Each app declares `@custom-variant dark` in its own `app.css`, not in the package — the variant is how an app chooses to apply the tokens, and the two apps choose differently.
 
 ## 1. Design Philosophy
 
@@ -19,7 +23,7 @@ Neo Brutalism is characterized by:
 
 ## 2. Color System
 
-Colors are defined using OKLch color space for perceptual uniformity. All CSS custom properties (light mode, dark mode, and theme mappings) are defined in `apps/hono/src/styles/app.css`. Refer to that file for the authoritative color values.
+Colors are defined using OKLch color space for perceptual uniformity. All CSS custom properties (light mode, dark mode, and theme mappings) are defined in `libs/ui/src/styles.css`. Refer to that file for the authoritative color values.
 
 ### Semantic Color Names
 
@@ -72,7 +76,7 @@ For flash messages and alerts, use Tailwind's color palette with dark mode varia
 
 ## 3. Typography
 
-The font family is set via `--font-sans` in `apps/hono/src/styles/app.css`.
+The font family is set via `--font-sans` in each app's own `src/styles/app.css` — fonts are an app decision, not a package one, and both apps set the same stack.
 
 ### Font Weights
 
@@ -111,7 +115,7 @@ The font family is set via `--font-sans` in `apps/hono/src/styles/app.css`.
 
 ## 4. Shadow System
 
-Five shadow utilities are defined in `apps/hono/src/styles/app.css` under `@layer utilities`:
+Five shadow utilities are defined in `libs/ui/src/styles.css` under `@layer utilities`:
 
 | Class                         | Effect     | Use Case                             |
 | ----------------------------- | ---------- | ------------------------------------ |

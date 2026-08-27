@@ -1,12 +1,12 @@
 import type { FC } from 'hono/jsx'
 import { ErrorMessage } from '../../components/FlashMessage'
-import { Button } from '../../components/ui/Button'
 import {
+  Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-} from '../../components/ui/Card'
+} from '@pinsquirrel/ui'
 
 type EmailFormProps = {
   errors?: Record<string, string[]>

@@ -5,4 +5,5 @@ dist/
 build/
 apps/hono/src/static/styles.css
 apps/hono/src/static/htmx.min.js
+apps/admin/src/static/styles.css
 apps/admin/keys/

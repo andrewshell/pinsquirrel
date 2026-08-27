@@ -104,7 +104,8 @@ pnpm --filter @pinsquirrel/database test:coverage
 │   ├── domain/                 # Domain entities and interfaces
 │   ├── adapters/               # External service adapters
 │   ├── crypto/                 # Email sealing and the keygen CLI
-│   └── mailgun/                # Email service implementation
+│   ├── mailgun/                # Email service implementation
+│   └── ui/                     # Shared Neo Brutalism primitives and tokens
 ├── docker-compose.dev.yml      # Development MySQL database
 ├── package.json                # Root package with workspace scripts
 └── turbo.json                  # Turbo build orchestration

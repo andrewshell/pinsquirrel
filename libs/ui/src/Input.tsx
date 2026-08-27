@@ -26,7 +26,9 @@ interface InputProps {
   'hx-vals'?: string
 }
 
-const baseClasses =
+// Exported for form controls that have no primitive of their own (a native
+// <select>, say) so they can match Input exactly instead of copying the list.
+export const inputBaseClasses =
   'w-full px-3 py-2 border-2 border-foreground bg-background text-foreground neobrutalism-shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
 
 export const Input: FC<InputProps> = ({
@@ -58,7 +60,11 @@ export const Input: FC<InputProps> = ({
   const describedBy =
     ariaDescribedBy || [helpId, errorId].filter(Boolean).join(' ') || undefined
 
-  const classes = [baseClasses, hasError ? 'border-red-500' : '', className]
+  const classes = [
+    inputBaseClasses,
+    hasError ? 'border-red-500' : '',
+    className,
+  ]
     .filter(Boolean)
     .join(' ')
 

@@ -75,6 +75,9 @@ importers:
       '@pinsquirrel/services':
         specifier: workspace:*
         version: link:../../libs/services
+      '@pinsquirrel/ui':
+        specifier: workspace:*
+        version: link:../../libs/ui
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -82,18 +85,27 @@ importers:
         specifier: ^4.13.3
         version: 4.13.3
     devDependencies:
+      '@tailwindcss/cli':
+        specifier: ^4.3.3
+        version: 4.3.3
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0
       '@vitest/coverage-v8':
         specifier: ^4.1.11
         version: 4.1.11(vitest@4.1.11)
+      concurrently:
+        specifier: ^10.0.5
+        version: 10.0.5
       eslint:
         specifier: ^10.9.0
         version: 10.9.0(jiti@2.7.0)(supports-color@10.2.2)
       prettier:
         specifier: ^3.9.6
         version: 3.9.6
+      tailwindcss:
+        specifier: ^4.3.3
+        version: 4.3.3
       tsx:
         specifier: ^4.23.12
         version: 4.23.12
@@ -166,6 +178,9 @@ importers:
       '@pinsquirrel/services':
         specifier: workspace:*
         version: link:../../libs/services
+      '@pinsquirrel/ui':
+        specifier: workspace:*
+        version: link:../../libs/ui
       '@scalar/hono-api-reference':
         specifier: ^0.11.16
         version: 0.11.16(hono@4.13.3)
@@ -389,6 +404,31 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
+      '@vitest/coverage-v8':
+        specifier: ^4.1.11
+        version: 4.1.11(vitest@4.1.11)
+      eslint:
+        specifier: ^10.9.0
+        version: 10.9.0(jiti@2.7.0)(supports-color@10.2.2)
+      prettier:
+        specifier: ^3.9.6
+        version: 3.9.6
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@26.2.0)(@vitest/coverage-v8@4.1.11)(happy-dom@20.11.6)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
+
+  libs/ui:
+    dependencies:
+      hono:
+        specifier: ^4.13.3
+        version: 4.13.3
     devDependencies:
       '@types/node':
         specifier: ^26.2.0

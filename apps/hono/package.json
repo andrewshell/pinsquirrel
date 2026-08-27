@@ -29,6 +29,7 @@
     "@pinsquirrel/domain": "workspace:*",
     "@pinsquirrel/mailgun": "workspace:*",
     "@pinsquirrel/services": "workspace:*",
+    "@pinsquirrel/ui": "workspace:*",
     "@scalar/hono-api-reference": "^0.11.16",
     "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
