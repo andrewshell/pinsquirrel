@@ -11,6 +11,7 @@ import {
   ValidationError,
   UnauthorizedUserAccessError,
   CannotRevokeOwnRoleError,
+  CannotDeleteOwnAccountError,
   AdminAlreadyExistsError,
   AccessControl,
   Role,
@@ -258,6 +259,13 @@ describe('AuthenticationService', () => {
       expect(mockUserRepository.removeRole).not.toHaveBeenCalled()
     })
 
+    it('should refuse deleteUser for a caller without the Admin role', async () => {
+      await expect(
+        authService.deleteUser(selfAc('user-1'), mockUser.id)
+      ).rejects.toThrow(MissingRoleError)
+      expect(mockUserRepository.delete).not.toHaveBeenCalled()
+    })
+
     it('should refuse changePassword for another user', async () => {
       const userA = new AccessControl({ ...mockUser, id: 'user-a' })
 
@@ -503,6 +511,37 @@ describe('AuthenticationService', () => {
       await expect(
         authService.revokeRole(adminAc, adminUser.id, Role.Admin)
       ).rejects.toThrow(UserNotFoundError)
+    })
+  })
+
+  describe('deleteUser', () => {
+    it('should delete the user and return who was deleted', async () => {
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.delete).mockResolvedValue(true)
+
+      const result = await authService.deleteUser(adminAc, mockUser.id)
+
+      expect(mockUserRepository.delete).toHaveBeenCalledWith(mockUser.id)
+      expect(result.username).toBe(mockUser.username)
+    })
+
+    // Deleting the account takes every role with it, so it is the same
+    // self-lockout revokeRole refuses — and it could remove the last admin.
+    it('should refuse to delete the caller own account', async () => {
+      await expect(authService.deleteUser(adminAc, 'admin-1')).rejects.toThrow(
+        CannotDeleteOwnAccountError
+      )
+      expect(mockUserRepository.findById).not.toHaveBeenCalled()
+      expect(mockUserRepository.delete).not.toHaveBeenCalled()
+    })
+
+    it('should throw UserNotFoundError when the user does not exist', async () => {
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(null)
+
+      await expect(
+        authService.deleteUser(adminAc, 'missing-id')
+      ).rejects.toThrow(UserNotFoundError)
+      expect(mockUserRepository.delete).not.toHaveBeenCalled()
     })
   })
 

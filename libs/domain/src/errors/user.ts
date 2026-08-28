@@ -46,6 +46,21 @@ export class CannotRevokeOwnRoleError extends UserError {
 }
 
 /**
+ * An admin tried to delete their own account.
+ *
+ * The same shape of self-lockout as `CannotRevokeOwnRoleError`, but total:
+ * deleting the account takes its roles, its session and everything it owns
+ * with it, and could remove the system's only admin. Another admin can still
+ * do it.
+ */
+export class CannotDeleteOwnAccountError extends UserError {
+  constructor(message = 'You cannot delete your own account') {
+    super(message)
+    this.name = 'CannotDeleteOwnAccountError'
+  }
+}
+
+/**
  * A user-account operation was attempted by someone other than that user.
  *
  * Distinct from `InvalidCredentialsError`: the credentials were never checked,
