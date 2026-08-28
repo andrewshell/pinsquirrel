@@ -15,6 +15,7 @@ import {
   ProfileDropdown,
   Textarea,
 } from '@pinsquirrel/ui'
+import { CheckIcon, CloseIcon, TrashIcon } from './icons.js'
 
 /* The console renders with the shared Neo Brutalism primitives and its own
    Tailwind build (`pnpm --filter @pinsquirrel/admin css:build`), so the tokens
@@ -106,8 +107,9 @@ const Layout: FC<PropsWithChildren<{ title: string; header?: Child }>> = ({
         <!-- Not deferred: the theme class must be on <html> before first
              paint, or the light theme flashes first. -->
         <script src="/static/theme.js"></script>
-        <!-- Deferred: it only wires listeners onto markup already parsed. -->
+        <!-- Deferred: they only wire listeners onto markup already parsed. -->
         <script defer src="/static/dropdown.js"></script>
+        <script defer src="/static/users.js"></script>
         <link rel="stylesheet" href="/static/styles.css" />
       </head>
       <body class="bg-background text-foreground min-h-screen">
@@ -233,48 +235,151 @@ export const UnlockPage: FC<{ envLabel: string; error?: string }> = ({
  */
 type RoleColumn = { name: string; revokeHint?: string }
 
-/**
- * One role's state for one user, and the single button that changes it.
- *
- * The state and the action share a cell because the state _is_ what the button
- * offers: a role the user holds can only be revoked, one they lack only
- * granted. The exception is the signed-in admin's own row — the service
- * refuses a self-revoke, so the row does not offer the button that earns it.
- */
-const RoleCell: FC<{
-  userId: string
-  role: RoleColumn
-  has: boolean
+type UserRow = {
+  id: string
+  username: string
+  roles: string[]
   isSelf: boolean
-}> = ({ userId, role, has, isSelf }) => (
-  <div class="flex items-center gap-2">
-    <span class={has ? okClasses : 'text-muted-foreground'}>
-      {has ? 'yes' : 'no'}
-    </span>
-    {has && isSelf ? (
-      ''
-    ) : (
-      <form method="post" action={has ? '/roles/revoke' : '/roles/grant'}>
-        <input type="hidden" name="userId" value={userId} />
-        <input type="hidden" name="role" value={role.name} />
-        <Button
-          type="submit"
-          size="sm"
-          variant={has ? 'outline' : 'default'}
-          title={has ? role.revokeHint : undefined}
-        >
-          {has ? 'Revoke' : 'Grant'}
-        </Button>
-      </form>
-    )}
-  </div>
+}
+
+// The shared icon size is a fit for a form, not a table row.
+const rowButtonClasses = 'h-9 w-9'
+
+const RoleValue: FC<{ has: boolean }> = ({ has }) => (
+  <span class={has ? okClasses : 'text-muted-foreground'}>
+    {has ? 'yes' : 'no'}
+  </span>
 )
+
+/**
+ * One user on the table: a display row, and the edit row users.js swaps in
+ * when the display row is clicked.
+ *
+ * The pair is linked by the same id on `data-user-row` and `data-user-edit` —
+ * the contract users.js listens for. Saving is one post for the whole row: the
+ * role selects join the actions cell's form by its id, because a `<form>`
+ * element cannot span table cells. Cancel is client-side only, so it must
+ * never submit the form it sits in.
+ *
+ * The signed-in admin's own row renders as a single inert row instead: the
+ * service refuses a self-revoke and a self-delete, so the row offers neither
+ * the edit that would earn one nor the delete.
+ */
+const UserRows: FC<{ roles: RoleColumn[]; row: UserRow }> = ({
+  roles,
+  row,
+}) => {
+  if (row.isSelf) {
+    return (
+      <tr>
+        <td class={tdClasses}>
+          {row.username}
+          <span class="text-muted-foreground text-xs"> (you)</span>
+        </td>
+        {roles.map(role => (
+          <td class={tdClasses}>
+            <RoleValue has={row.roles.includes(role.name)} />
+          </td>
+        ))}
+        <td class={tdClasses}></td>
+      </tr>
+    )
+  }
+
+  return (
+    <>
+      <tr
+        data-user-row={row.id}
+        class="cursor-pointer hover:bg-foreground/5"
+        title={`Edit ${row.username}'s roles`}
+      >
+        <td class={tdClasses}>{row.username}</td>
+        {roles.map(role => (
+          <td class={tdClasses}>
+            <RoleValue has={row.roles.includes(role.name)} />
+          </td>
+        ))}
+        <td class={`${tdClasses} text-right`}>
+          <form
+            method="post"
+            action="/users/delete"
+            class="inline-block"
+            data-confirm={`Delete ${row.username} and everything they own? This cannot be undone.`}
+          >
+            <input type="hidden" name="userId" value={row.id} />
+            <Button
+              type="submit"
+              size="icon"
+              variant="outline"
+              class={rowButtonClasses}
+              aria-label={`Delete ${row.username}`}
+              title={`Delete ${row.username} from the database`}
+            >
+              <TrashIcon />
+            </Button>
+          </form>
+        </td>
+      </tr>
+      <tr data-user-edit={row.id} class="hidden">
+        <td class={tdClasses}>{row.username}</td>
+        {roles.map(role => (
+          <td class={tdClasses}>
+            <select
+              name={`role-${role.name}`}
+              form={`edit-${row.id}`}
+              class={selectClasses}
+              aria-label={`${role.name} role for ${row.username}`}
+              title={role.revokeHint}
+            >
+              <option value="yes" selected={row.roles.includes(role.name)}>
+                yes
+              </option>
+              <option value="no" selected={!row.roles.includes(role.name)}>
+                no
+              </option>
+            </select>
+          </td>
+        ))}
+        <td class={`${tdClasses} text-right`}>
+          <form
+            id={`edit-${row.id}`}
+            method="post"
+            action="/users/update"
+            class="inline-flex gap-2"
+          >
+            <input type="hidden" name="userId" value={row.id} />
+            <Button
+              type="submit"
+              size="icon"
+              class={rowButtonClasses}
+              aria-label={`Save ${row.username}'s roles`}
+              title="Save"
+            >
+              <CheckIcon />
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              class={rowButtonClasses}
+              data-edit-cancel
+              aria-label={`Stop editing ${row.username}`}
+              title="Cancel"
+            >
+              <CloseIcon />
+            </Button>
+          </form>
+        </td>
+      </tr>
+    </>
+  )
+}
 
 export const UsersPage: FC<{
   envLabel: string
   username: string
   roles: RoleColumn[]
-  rows: { id: string; username: string; roles: string[]; isSelf: boolean }[]
+  rows: UserRow[]
   notice?: string
   error?: string
 }> = ({ envLabel, username, roles, rows, notice, error }) => (
@@ -304,30 +409,12 @@ export const UsersPage: FC<{
                 {roles.map(role => (
                   <th class={thClasses}>{role.name}</th>
                 ))}
+                <th class={thClasses}></th>
               </tr>
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr>
-                  <td class={tdClasses}>
-                    {r.username}
-                    {r.isSelf ? (
-                      <span class="text-muted-foreground text-xs"> (you)</span>
-                    ) : (
-                      ''
-                    )}
-                  </td>
-                  {roles.map(role => (
-                    <td class={tdClasses}>
-                      <RoleCell
-                        userId={r.id}
-                        role={role}
-                        has={r.roles.includes(role.name)}
-                        isSelf={r.isSelf}
-                      />
-                    </td>
-                  ))}
-                </tr>
+                <UserRows roles={roles} row={r} />
               ))}
             </tbody>
           </table>

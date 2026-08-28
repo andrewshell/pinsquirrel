@@ -13,6 +13,7 @@ import {
   UserNotFoundError,
   UserNotEligibleError,
   CannotRevokeOwnRoleError,
+  CannotDeleteOwnAccountError,
   AdminAlreadyExistsError,
 } from '@pinsquirrel/domain'
 import type { User } from '@pinsquirrel/domain'
@@ -188,13 +189,6 @@ const ROLE_COLUMNS = Object.values(Role).map(name => ({
       ? 'Revoking the User role suspends this account: it can no longer sign in.'
       : undefined,
 }))
-
-/** The submitted role, or null if it is not one the domain defines. */
-function parseRole(value: string): Role | null {
-  return (Object.values(Role) as string[]).includes(value)
-    ? (value as Role)
-    : null
-}
 
 /** Every active account, with the roles the Users page shows and acts on. */
 async function loadUsers(
@@ -755,13 +749,16 @@ export function createApp(config: AdminConfig): Hono {
   })
 
   /**
-   * Grant or revoke one role on one account, from its row on the Users page.
+   * Save one user's row of role dropdowns from the Users page.
    *
-   * One handler for both directions: the two differ only in which service
-   * method they call and what the notice says, and splitting them duplicated
-   * the session gate, the validation and the four error cases.
+   * The form posts a yes/no per role rather than one change, so the handler
+   * diffs the submitted states against the row as it stands and calls
+   * grantRole/revokeRole only for what actually moved — the services are
+   * idempotent but their results cannot say whether anything changed, which is
+   * why the row is read first. That read is also what makes "no changes" a
+   * reportable outcome rather than a silent write of nothing.
    */
-  async function changeRole(c: Context, action: 'grant' | 'revoke') {
+  app.post('/users/update', async c => {
     const gate = await requireSession(c)
     if ('redirect' in gate) return gate.redirect
 
@@ -769,7 +766,6 @@ export function createApp(config: AdminConfig): Hono {
     const username = gate.viewer.username
     const body = await c.req.parseBody()
     const userId = field(body, 'userId')
-    const role = parseRole(field(body, 'role'))
 
     if (!userId) {
       return renderUsers(
@@ -781,57 +777,66 @@ export function createApp(config: AdminConfig): Hono {
       )
     }
 
-    // The role is a form field, so it is whatever the client sent. Checked
-    // against the enum before the service sees it, rather than after.
-    if (!role) {
-      return renderUsers(
-        c,
-        env,
-        username,
-        { error: 'That is not a role.' },
-        400
-      )
+    // The states are form fields, so they are whatever the client sent. Every
+    // role the enum names must arrive as yes or no before a service is called.
+    const states = new Map<Role, boolean>()
+    for (const { name } of ROLE_COLUMNS) {
+      const state = field(body, `role-${name}`)
+      if (state !== 'yes' && state !== 'no') {
+        return renderUsers(
+          c,
+          env,
+          username,
+          { error: 'That is not a role.' },
+          400
+        )
+      }
+      states.set(name, state === 'yes')
     }
 
     try {
       const ac = await adminAccessControl(env, username)
 
-      // Read the row before writing: both operations are idempotent and their
-      // result cannot say whether anything changed, so "nothing to do" is only
-      // distinguishable beforehand. A user missing from this list is left to
-      // the service — it, not the listing, decides existence.
+      // The list decides nothing about existence — the services re-check — but
+      // a row that is not on it has nothing to diff against, and the edit form
+      // that posted it was rendered before the user went away.
       const target = (await loadUsers(env, username)).find(r => r.id === userId)
-      if (target && target.roles.includes(role) === (action === 'grant')) {
-        return renderUsers(c, env, username, {
-          notice:
-            action === 'grant'
-              ? `${target.username} already has the ${role} role.`
-              : `${target.username} does not have the ${role} role.`,
-        })
+      if (!target) {
+        return renderUsers(c, env, username, { error: GONE }, 404)
       }
 
       const { authService } = getRuntime(env)
-      if (action === 'grant') {
-        const updated = await authService.grantRole(ac, userId, role)
-        return renderUsers(c, env, username, {
-          notice: `Granted the ${role} role to ${updated.username}.`,
-        })
+      const changes: string[] = []
+      for (const [role, wanted] of states) {
+        if (wanted === target.roles.includes(role)) continue
+        if (wanted) {
+          await authService.grantRole(ac, userId, role)
+          changes.push(`Granted the ${role} role to ${target.username}.`)
+        } else {
+          await authService.revokeRole(ac, userId, role)
+          // Losing Role.User is a suspension rather than a permission tweak —
+          // login() requires it — and the table has no other place to say so.
+          const suspended =
+            role === Role.User ? ' They can no longer sign in.' : ''
+          changes.push(
+            `Revoked the ${role} role from ${target.username}.${suspended}`
+          )
+        }
       }
 
-      const updated = await authService.revokeRole(ac, userId, role)
-      // Losing Role.User is a suspension rather than a permission tweak —
-      // login() requires it — and the table has no other place to say so.
-      const suspended = role === Role.User ? ` They can no longer sign in.` : ''
       return renderUsers(c, env, username, {
-        notice: `Revoked the ${role} role from ${updated.username}.${suspended}`,
+        notice:
+          changes.length > 0
+            ? changes.join(' ')
+            : `No changes to ${target.username}.`,
       })
     } catch (error) {
       if (error instanceof UserNotFoundError) {
         return renderUsers(c, env, username, { error: GONE }, 404)
       }
-      // An admin cannot revoke their own roles. The page hides the button, so
-      // this is a stale render or a hand-made post; the service's message
-      // already says which role and why.
+      // An admin cannot revoke their own roles. The page leaves their row
+      // inert, so this is a stale render or a hand-made post; the service's
+      // message already says which role and why.
       if (error instanceof CannotRevokeOwnRoleError) {
         return renderUsers(c, env, username, { error: error.message }, 400)
       }
@@ -843,10 +848,53 @@ export function createApp(config: AdminConfig): Hono {
         500
       )
     }
-  }
+  })
 
-  app.post('/roles/grant', c => changeRole(c, 'grant'))
-  app.post('/roles/revoke', c => changeRole(c, 'revoke'))
+  // Delete one account outright, from the trash icon on its row. The service
+  // cascades everything the account owns and refuses a self-delete.
+  app.post('/users/delete', async c => {
+    const gate = await requireSession(c)
+    if ('redirect' in gate) return gate.redirect
+
+    const { env } = gate
+    const username = gate.viewer.username
+    const body = await c.req.parseBody()
+    const userId = field(body, 'userId')
+
+    if (!userId) {
+      return renderUsers(
+        c,
+        env,
+        username,
+        { error: 'No user was selected.' },
+        400
+      )
+    }
+
+    try {
+      const ac = await adminAccessControl(env, username)
+      const deleted = await getRuntime(env).authService.deleteUser(ac, userId)
+      return renderUsers(c, env, username, {
+        notice: `Deleted ${deleted.username} and everything they owned.`,
+      })
+    } catch (error) {
+      if (error instanceof UserNotFoundError) {
+        return renderUsers(c, env, username, { error: GONE }, 404)
+      }
+      // The page leaves the admin's own row inert, so this is a stale render
+      // or a hand-made post; the service's message says why it was refused.
+      if (error instanceof CannotDeleteOwnAccountError) {
+        return renderUsers(c, env, username, { error: error.message }, 400)
+      }
+      return renderUsers(
+        c,
+        env,
+        username,
+        { error: dbErrorMessage(env, error) },
+        500
+      )
+    }
+  })
 
   app.get('/compose', async c => {
     const gate = await requireSession(c)
