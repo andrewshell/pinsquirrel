@@ -113,15 +113,17 @@ describe.each(Object.keys(pages) as (keyof typeof pages)[])('%s', name => {
     expect(body).toContain('href="/static/apple-touch-icon.png"')
   })
 
-  // The header's account menu is driven by static/dropdown.js, which is
-  // deferred because it only touches the document after it is parsed. Every
-  // page shares one Layout, so every page gets it.
-  it('defers the dropdown script', async () => {
+  // The header's account menu is driven by static/dropdown.js and the Users
+  // table by static/users.js, both deferred because they only touch the
+  // document after it is parsed. Every page shares one Layout, so every page
+  // gets both.
+  it('defers the behaviour scripts', async () => {
     const body = await render(
       pages[name]() as HtmlEscapedString | Promise<HtmlEscapedString>
     )
 
     expect(body).toContain('<script defer src="/static/dropdown.js">')
+    expect(body).toContain('<script defer src="/static/users.js">')
   })
 
   it('composes a shared @pinsquirrel/ui button', async () => {
@@ -241,18 +243,25 @@ describe('UsersPage', () => {
   }
 
   /**
-   * The markup of one user's row, so a per-row assertion stays per-row.
+   * The markup of one `<tr>`, found by an attribute on the row itself.
    *
-   * Scoped to the body of the table: the header carries the signed-in admin's
-   * username too, in the account menu.
+   * Each user renders as a pair of rows — the display row users.js listens on
+   * and the hidden edit row it swaps in — so a per-row assertion is scoped by
+   * the data attribute that names which of the pair it is about.
    */
-  function rowFor(html: string, username: string): string {
-    const row = html
-      .split('<tbody>')[1]
-      .split('<tr>')
-      .find(part => part.includes(username))
-    expect(row).toBeDefined()
+  function rowByAttr(html: string, attr: string): string {
+    const row = html.split(/<tr[ >]/).find(part => part.includes(attr))
+    expect(row, `no <tr> carries ${attr}`).toBeDefined()
     return row!
+  }
+
+  /** The `<select>` for one role inside an edit row. */
+  function selectFor(row: string, role: string): string {
+    const select = row
+      .split('<select')
+      .find(part => part.includes(`name="role-${role}"`))
+    expect(select, `no select is named role-${role}`).toBeDefined()
+    return select!
   }
 
   it('gives every role in the enum a column', async () => {
@@ -263,44 +272,79 @@ describe('UsersPage', () => {
   })
 
   it('shows whether each user holds each role', async () => {
+    const row = rowByAttr(await body(), 'data-user-row="u1"')
+
+    expect(row).toContain('alice')
+    expect(row).toContain('yes')
+    expect(row).toContain('no')
+  })
+
+  // The row itself is the edit affordance — users.js swaps it for the edit row
+  // on click — so the pair is linked by the same id on both data attributes.
+  it('pairs every editable row with a hidden edit row', async () => {
     const html = await body()
 
-    expect(rowFor(html, 'alice')).toContain('alice')
-    expect(rowFor(html, 'carol')).toContain('carol')
+    for (const id of ['u1', 'u3']) {
+      expect(html).toContain(`data-user-row="${id}"`)
+      const edit = rowByAttr(html, `data-user-edit="${id}"`)
+      expect(edit).toContain('hidden')
+    }
   })
 
-  // The change is a per-row post, the same shape the waitlist uses, so the id
-  // and the role travel with the button rather than being typed into a field.
-  it('offers a grant for a role the user lacks', async () => {
-    const row = rowFor(await body(), 'carol')
+  it('renders each role as a dropdown preset to what the user holds', async () => {
+    const edit = rowByAttr(await body(), 'data-user-edit="u1"')
 
-    expect(row).toContain('action="/roles/grant"')
-    expect(row).toContain('value="u3"')
-    expect(row).toContain('value="Admin"')
-    expect(row).toContain('Grant')
+    // alice holds User but not Admin, so only the User select opens on yes.
+    expect(selectFor(edit, 'User')).toMatch(/value="yes"[^>]*selected/)
+    expect(selectFor(edit, 'Admin')).toMatch(/value="no"[^>]*selected/)
+    expect(selectFor(edit, 'Admin')).not.toMatch(/value="yes"[^>]*selected/)
   })
 
-  it('offers a revoke for a role the user holds', async () => {
-    const row = rowFor(await body(), 'alice')
+  // One save posts the whole row: the selects join the actions cell's form by
+  // its id, because a <form> element cannot span table cells.
+  it('saves the row as one post to /users/update', async () => {
+    const edit = rowByAttr(await body(), 'data-user-edit="u1"')
 
-    expect(row).toContain('action="/roles/revoke"')
+    expect(edit).toContain('action="/users/update"')
+    expect(edit).toContain('id="edit-u1"')
+    expect(edit).toContain('value="u1"')
+    expect(selectFor(edit, 'Admin')).toContain('form="edit-u1"')
+    expect(selectFor(edit, 'User')).toContain('form="edit-u1"')
+  })
+
+  // Cancel is client-side only — users.js resets the selects and swaps the
+  // display row back — so it must never submit the form it sits in.
+  it('offers a cancel that never posts', async () => {
+    const edit = rowByAttr(await body(), 'data-user-edit="u1"')
+
+    expect(edit).toContain('data-edit-cancel')
+    expect(edit).toMatch(
+      /type="button"[^>]*data-edit-cancel|data-edit-cancel[^>]*type="button"/
+    )
+  })
+
+  it('offers a delete on the display row, with a confirm', async () => {
+    const row = rowByAttr(await body(), 'data-user-row="u1"')
+
+    expect(row).toContain('action="/users/delete"')
     expect(row).toContain('value="u1"')
-    expect(row).toContain('Revoke')
+    expect(row).toContain('data-confirm')
   })
 
   // Revoking User is a suspension, not a permission tweak — login() requires
-  // that role. The button says so rather than leaving it to be discovered.
+  // that role. The select says so rather than leaving it to be discovered.
   it('warns that revoking the User role suspends sign-in', async () => {
     expect(await body()).toContain('Revoking User suspends sign-in.')
   })
 
-  // The service refuses a self-revoke outright; the row does not offer the
-  // button that would earn that error.
-  it('offers the signed-in admin no revoke on their own row', async () => {
-    const row = rowFor(await body(), 'root')
+  // The service refuses a self-revoke and a self-delete outright; the row
+  // offers neither the edit that would earn one nor the delete.
+  it('leaves the signed-in admin their own row inert', async () => {
+    const html = await body()
 
-    expect(row).not.toContain('action="/roles/revoke"')
-    // A role they lack is still theirs to grant themselves.
-    expect(row).toContain('action="/roles/grant"')
+    expect(html).not.toContain('data-user-row="u2"')
+    expect(html).not.toContain('data-user-edit="u2"')
+    expect(html).not.toContain('value="u2"')
+    expect(html).toContain('(you)')
   })
 })
