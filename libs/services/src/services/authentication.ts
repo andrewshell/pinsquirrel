@@ -8,6 +8,7 @@ import {
   UserNotFoundError,
   UserNotEligibleError,
   CannotRevokeOwnRoleError,
+  CannotDeleteOwnAccountError,
   UnauthorizedUserAccessError,
   AdminAlreadyExistsError,
 } from '@pinsquirrel/domain'
@@ -249,6 +250,38 @@ export class AuthenticationService {
     await this.userRepository.removeRole(userId, role)
 
     return this.rereadUser(userId)
+  }
+
+  /**
+   * Delete a user and, via the schema's cascades, everything they own — pins,
+   * tags, sessions, tokens, roles. There is no undo.
+   *
+   * Admin-only, enforced here for the same reason as grantAccess. The one rule
+   * of its own mirrors revokeRole's: not on the caller's own account, since
+   * that is every self-lockout revokeRole refuses at once, and could take the
+   * system's last admin with it.
+   *
+   * Returns the user as they were, so the caller can still name who is gone.
+   */
+  async deleteUser(ac: AccessControl, userId: string): Promise<User> {
+    if (!ac.hasRole(Role.Admin)) {
+      throw new MissingRoleError()
+    }
+
+    // Checked before the read, as in revokeRole: whose account this is does
+    // not depend on the row.
+    if (ac.user?.id === userId) {
+      throw new CannotDeleteOwnAccountError()
+    }
+
+    const user = await this.userRepository.findById(userId)
+    if (!user) {
+      throw new UserNotFoundError(userId)
+    }
+
+    await this.userRepository.delete(userId)
+
+    return user
   }
 
   /**
