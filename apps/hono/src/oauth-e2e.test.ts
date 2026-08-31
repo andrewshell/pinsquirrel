@@ -340,7 +340,12 @@ describe('OAuth discovery', () => {
 
     expect(res.status).toBe(200)
     expect(document.resource).toBe('http://localhost:8100/mcp')
-    expect(document.scopes_supported).toEqual(['pins:read', 'tags:read'])
+    expect(document.scopes_supported).toEqual([
+      'pins:read',
+      'tags:read',
+      'pins:write',
+      'tags:write',
+    ])
     expect(document.authorization_servers).toHaveLength(1)
 
     mcpResource = document.resource

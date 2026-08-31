@@ -81,11 +81,16 @@ describe('createOAuthConfig', () => {
     expect(config.resources.apiV1.resource).toBe('http://localhost:8100/api/v1')
   })
 
-  it('advertises the read scopes on each resource, without offline_access', () => {
+  // A scope a resource never advertises is one no client knows to ask for,
+  // so the writes have to appear here as well as in the challenge.
+  it('advertises the read and write scopes on each resource, without offline_access', () => {
     const config = createOAuthConfig('https://pinsquirrel.com')
 
-    expect(config.resources.mcp.scopes).toEqual(['pins:read', 'tags:read'])
-    expect(config.resources.apiV1.scopes).toEqual(['pins:read', 'tags:read'])
+    const expected = ['pins:read', 'tags:read', 'pins:write', 'tags:write']
+    expect(config.resources.mcp.scopes).toEqual(expected)
+    expect(config.resources.apiV1.scopes).toEqual(expected)
+    expect(config.resources.mcp.scopes).not.toContain('offline_access')
+    expect(config.resources.apiV1.scopes).not.toContain('offline_access')
   })
 })
 

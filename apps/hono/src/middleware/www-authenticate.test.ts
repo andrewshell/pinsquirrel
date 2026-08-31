@@ -22,13 +22,13 @@ describe('bearerChallenge', () => {
 
   it('advertises the scopes as a space-delimited list', () => {
     expect(bearerChallenge(config.resources.mcp)).toContain(
-      'scope="pins:read tags:read"'
+      'scope="pins:read tags:read pins:write tags:write"'
     )
   })
 
   it('separates parameters with a comma', () => {
     expect(bearerChallenge(config.resources.mcp)).toBe(
-      'Bearer resource_metadata="https://oauth.test:8443/.well-known/oauth-protected-resource/mcp", scope="pins:read tags:read"'
+      'Bearer resource_metadata="https://oauth.test:8443/.well-known/oauth-protected-resource/mcp", scope="pins:read tags:read pins:write tags:write"'
     )
   })
 })

@@ -7,6 +7,12 @@ import { createOAuthMetadataRoutes } from './oauth-metadata'
 // hardcoded value anywhere in the documents shows up as a failure.
 const BASE_URL = 'https://oauth.test:8443'
 
+/**
+ * Spelled out rather than imported from the config, so that widening the
+ * advertised set is a decision this test records rather than one it inherits.
+ */
+const RESOURCE_SCOPES = ['pins:read', 'tags:read', 'pins:write', 'tags:write']
+
 function buildApp(baseUrl = BASE_URL) {
   const app = new Hono()
   app.route('/', createOAuthMetadataRoutes(createOAuthConfig(baseUrl)))
@@ -28,7 +34,7 @@ describe('GET /.well-known/oauth-protected-resource/mcp', () => {
     expect(res.headers.get('content-type')).toContain('application/json')
     expect(body.resource).toBe('https://oauth.test:8443/mcp')
     expect(body.authorization_servers).toEqual(['https://oauth.test:8443'])
-    expect(body.scopes_supported).toEqual(['pins:read', 'tags:read'])
+    expect(body.scopes_supported).toEqual(RESOURCE_SCOPES)
   })
 
   it('does not advertise offline_access, which is not a resource requirement', async () => {
@@ -48,7 +54,7 @@ describe('GET /.well-known/oauth-protected-resource/api/v1', () => {
     expect(res.status).toBe(200)
     expect(body.resource).toBe('https://oauth.test:8443/api/v1')
     expect(body.authorization_servers).toEqual(['https://oauth.test:8443'])
-    expect(body.scopes_supported).toEqual(['pins:read', 'tags:read'])
+    expect(body.scopes_supported).toEqual(RESOURCE_SCOPES)
     expect(body.scopes_supported).not.toContain('offline_access')
   })
 })
@@ -66,7 +72,7 @@ describe('GET /.well-known/oauth-authorization-server', () => {
       token_endpoint: 'https://oauth.test:8443/oauth/token',
       registration_endpoint: 'https://oauth.test:8443/oauth/register',
       revocation_endpoint: 'https://oauth.test:8443/oauth/revoke',
-      scopes_supported: ['pins:read', 'tags:read', 'offline_access'],
+      scopes_supported: [...RESOURCE_SCOPES, 'offline_access'],
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code', 'refresh_token'],
       code_challenge_methods_supported: ['S256'],
