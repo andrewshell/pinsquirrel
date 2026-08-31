@@ -80,9 +80,20 @@ const OFFLINE_ACCESS_SCOPE = 'offline_access'
  * the protected resources do not advertise it and the authorization server
  * does.
  */
-const SUPPORTED_SCOPES = ['pins:read', 'tags:read', 'offline_access']
+const SUPPORTED_SCOPES = [
+  'pins:read',
+  'tags:read',
+  'pins:write',
+  'tags:write',
+  'offline_access',
+]
 
-/** What a request that names no scope is granted. */
+/**
+ * What a request that names no scope is granted: read-only, always. A write
+ * scope is granted because a client asked for it by name and the user
+ * approved it on the consent screen, never because it defaulted in
+ * (Decision 14).
+ */
 const DEFAULT_SCOPES = ['pins:read', 'tags:read']
 
 /** How long a fetched CIMD document is trusted before it is fetched again. */

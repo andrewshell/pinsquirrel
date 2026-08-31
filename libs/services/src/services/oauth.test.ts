@@ -418,9 +418,34 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
   it('rejects a scope that is not granted here', async () => {
     await expect(
       ctx.service.resolveAuthorizationRequest(
-        authorizeParams({ scope: 'pins:read pins:write' })
+        authorizeParams({ scope: 'pins:read pins:administer' })
       )
     ).rejects.toBeInstanceOf(OAuthInvalidScopeError)
+  })
+
+  it('grants the write scopes to a client that asks for them', async () => {
+    const resolved = await ctx.service.resolveAuthorizationRequest(
+      authorizeParams({
+        scope: 'pins:read tags:read pins:write tags:write',
+      })
+    )
+
+    expect(resolved.scopes).toEqual([
+      'pins:read',
+      'tags:read',
+      'pins:write',
+      'tags:write',
+    ])
+  })
+
+  // A write scope is never implied: it is granted because the client named it
+  // and the user approved it on the consent screen (Decision 14).
+  it('grants no write scope to a request that names none', async () => {
+    const resolved =
+      await ctx.service.resolveAuthorizationRequest(authorizeParams())
+
+    expect(resolved.scopes).not.toContain('pins:write')
+    expect(resolved.scopes).not.toContain('tags:write')
   })
 
   it('keeps offline_access, which is what buys a refresh token', async () => {
