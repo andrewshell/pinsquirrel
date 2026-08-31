@@ -12,7 +12,7 @@ vi.mock('../lib/services', () => ({
   },
 }))
 
-const { oauthAuth, getOAuthUser, getOAuthPrincipal } =
+const { oauthAuth, requireScope, getOAuthUser, getOAuthPrincipal } =
   await import('./oauth-auth')
 
 const testUser = { id: 'user-1', username: 'alice' } as unknown as User
@@ -135,7 +135,106 @@ describe('oauthAuth', () => {
         clientId: 'client-1',
         scopes: ['pins:read'],
         rawToken: 'pso_good',
+        // The resource that accepted the token travels with it, so a later
+        // requireScope refuses against this resource and not the other one.
+        resource: mcpResource,
       },
     })
+  })
+})
+
+describe('requireScope', () => {
+  function guarded(scope: string): Hono {
+    const app = new Hono()
+    app.use('*', oauthAuth(mcpResource))
+    app.post('/write', requireScope(scope), c => c.json({ wrote: true }))
+    return app
+  }
+
+  function withScopes(scopes: string[]) {
+    mockVerifyAccessToken.mockResolvedValue({
+      token: { id: 'token-1' },
+      user: testUser,
+      clientId: 'client-1',
+      scopes,
+    })
+  }
+
+  const post = (app: Hono) =>
+    app.request('/write', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer pso_good' },
+    })
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('lets a token carrying the scope through to the handler', async () => {
+    withScopes(['pins:read', 'pins:write'])
+
+    const res = await post(guarded('pins:write'))
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ wrote: true })
+  })
+
+  // 403, not 401: the token is perfectly valid, so re-presenting it will not
+  // help. Answering 401 would send a client round the refresh loop for a
+  // problem no refresh can fix.
+  it('refuses a token that does not carry the scope with a 403', async () => {
+    withScopes(['pins:read', 'tags:read'])
+
+    const res = await post(guarded('pins:write'))
+
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({
+      error: 'insufficient_scope',
+      error_description: 'This request requires the pins:write scope',
+    })
+  })
+
+  it('names the error and the missing scope in the challenge (RFC 6750 3.1)', async () => {
+    withScopes(['pins:read', 'tags:read'])
+
+    const res = await post(guarded('tags:write'))
+
+    expect(res.headers.get('WWW-Authenticate')).toBe(
+      'Bearer error="insufficient_scope", ' +
+        'resource_metadata="https://pinsquirrel.test/.well-known/oauth-protected-resource/mcp", ' +
+        'scope="tags:write"'
+    )
+  })
+
+  // The reads have to stay reachable on a read-only token, which is the whole
+  // reason the check sits on the operation and not on the resource
+  // (Decision 20).
+  it('leaves a read route alone', async () => {
+    withScopes(['pins:read'])
+    const app = new Hono()
+    app.use('*', oauthAuth(mcpResource))
+    app.get('/read', c => c.json({ read: true }))
+
+    const res = await app.request('/read', {
+      headers: { Authorization: 'Bearer pso_good' },
+    })
+
+    expect(res.status).toBe(200)
+  })
+
+  // The point of the guard: a grant issued before these scopes existed
+  // carries neither, and no amount of it being otherwise valid changes that.
+  it('refuses a token minted before the write scopes existed', async () => {
+    withScopes(['pins:read', 'tags:read', 'offline_access'])
+
+    expect((await post(guarded('pins:write'))).status).toBe(403)
+    expect((await post(guarded('tags:write'))).status).toBe(403)
+  })
+
+  it('does not confuse one write scope for the other', async () => {
+    withScopes(['pins:write'])
+
+    expect((await post(guarded('tags:write'))).status).toBe(403)
+    expect((await post(guarded('pins:write'))).status).toBe(200)
   })
 })

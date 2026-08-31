@@ -25,6 +25,13 @@ export interface OAuthPrincipal {
   scopes: string[]
   /** The token as presented, for callers that have to pass it on (MCP). */
   rawToken: string
+  /**
+   * The protected resource the token was accepted for. Carried so a later
+   * guard - `requireScope` - can phrase its refusal against the same resource
+   * that authenticated the request, rather than picking one out of the config
+   * and risking naming the other one's metadata document (Decision 16).
+   */
+  resource: ProtectedResourceConfig
 }
 
 interface OAuthAuthVariables {
@@ -100,7 +107,44 @@ export function oauthAuth(
       clientId: verified.clientId,
       scopes: verified.scopes,
       rawToken: extracted,
+      resource,
     })
+    await next()
+  }
+}
+
+/**
+ * Require one granted scope on the route behind it.
+ *
+ * Applied per route and never globally (Decision 20): the check belongs to the
+ * operation, so a read-only token keeps reading everything while a write is
+ * refused. Mounted globally it would either lock the reads behind a write
+ * scope or, applied to nothing, be decorative.
+ *
+ * 403 rather than 401, because the token is valid and re-presenting or
+ * refreshing it changes nothing. What the client has to do is send the user
+ * back through `/oauth/authorize` naming the wider scope, and the
+ * `insufficient_scope` challenge naming that scope is the entire signal it
+ * gets - there is no server-side upgrade path.
+ */
+export function requireScope(scope: string): MiddlewareHandler {
+  return async (c, next) => {
+    const principal = getOAuthPrincipal(c)
+    if (!principal.scopes.includes(scope)) {
+      return c.json(
+        {
+          error: 'insufficient_scope',
+          error_description: `This request requires the ${scope} scope`,
+        },
+        403,
+        {
+          'WWW-Authenticate': bearerChallenge(principal.resource, {
+            error: 'insufficient_scope',
+            scope,
+          }),
+        }
+      )
+    }
     await next()
   }
 }
