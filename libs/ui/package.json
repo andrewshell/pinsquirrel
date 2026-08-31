@@ -20,7 +20,7 @@
     "test:coverage": "vitest --run --coverage --passWithNoTests"
   },
   "dependencies": {
-    "hono": "^4.13.3"
+    "hono": "^4.13.5"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
