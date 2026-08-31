@@ -22,6 +22,11 @@ function getUserFromExtra(extra: {
  * A factory rather than a module-level instance because `/mcp` builds one per
  * request (see `routes/mcp.ts`): a server shared across callers is a session
  * shared across callers, and this process serves every client at once.
+ *
+ * Every tool here is a read and so requires no scope beyond a valid token. A
+ * write tool calls `requireScope(extra, 'pins:write')` from `./scopes.js`
+ * before it touches a service, and lets `mapDomainErrorToMcp` turn the refusal
+ * into a tool error.
  */
 export function createMcpServer(): McpServer {
   const server = new McpServer({
