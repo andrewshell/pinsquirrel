@@ -21,7 +21,12 @@ const DEV_BASE_URL = 'http://localhost:8100'
  * absent: it is a property of the authorization server, not of a resource, so
  * it appears only in the RFC 8414 document.
  */
-export const OAUTH_RESOURCE_SCOPES = ['pins:read', 'tags:read'] as const
+export const OAUTH_RESOURCE_SCOPES = [
+  'pins:read',
+  'tags:read',
+  'pins:write',
+  'tags:write',
+] as const
 
 export interface ProtectedResourceConfig {
   /** The resource identifier a token must be audience-bound to. */

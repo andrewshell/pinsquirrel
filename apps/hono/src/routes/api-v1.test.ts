@@ -129,7 +129,7 @@ describe('api-v1 routes', () => {
 
       expect(res.status).toBe(401)
       expect(res.headers.get('WWW-Authenticate')).toBe(
-        'Bearer resource_metadata="http://localhost:8100/.well-known/oauth-protected-resource/api/v1", scope="pins:read tags:read"'
+        'Bearer resource_metadata="http://localhost:8100/.well-known/oauth-protected-resource/api/v1", scope="pins:read tags:read pins:write tags:write"'
       )
     })
 

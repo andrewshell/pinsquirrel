@@ -37,7 +37,7 @@ const TOOL_CALL = JSON.stringify({
 })
 
 const EXPECTED_CHALLENGE =
-  'Bearer resource_metadata="http://localhost:8100/.well-known/oauth-protected-resource/mcp", scope="pins:read tags:read"'
+  'Bearer resource_metadata="http://localhost:8100/.well-known/oauth-protected-resource/mcp", scope="pins:read tags:read pins:write tags:write"'
 
 const testUser = { id: 'user-1', username: 'alice' } as unknown as User
 
