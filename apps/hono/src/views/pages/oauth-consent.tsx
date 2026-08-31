@@ -41,6 +41,11 @@ interface OAuthConsentPageProps {
 const SCOPE_DESCRIPTIONS: Record<string, string> = {
   'pins:read': 'Read your bookmarks, including their tags and descriptions',
   'tags:read': 'Read your tags',
+  // A pin's tags are pin data and travel under `pins:write`; `tags:write` is
+  // about the tag itself (Decision 21). Said this way round so somebody
+  // approving a Save button is not asked to agree to merging their tags.
+  'pins:write': 'Add, edit and delete your bookmarks',
+  'tags:write': 'Merge and delete your tags',
   offline_access: 'Stay connected without asking you again',
 }
 

@@ -162,6 +162,20 @@ describe('oauth authorize routes', () => {
       expect(html).toContain('offline_access')
     })
 
+    // An undescribed scope is one a user approves without being told what it
+    // does, and a write scope is exactly the one they need told about.
+    it('says what the write scopes let the client do, in the user own words', async () => {
+      mockResolveAuthorizationRequest.mockResolvedValue({
+        ...RESOLVED,
+        scopes: ['pins:write', 'tags:write'],
+      })
+
+      const html = await (await get()).text()
+
+      expect(html).toContain('Add, edit and delete your bookmarks')
+      expect(html).toContain('Merge and delete your tags')
+    })
+
     // A client that supplied no name still has to be identifiable, or the
     // consent screen is the only defense against loopback impersonation and
     // it says nothing.
