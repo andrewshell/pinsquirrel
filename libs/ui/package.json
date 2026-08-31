@@ -1,6 +1,6 @@
 {
   "name": "@pinsquirrel/ui",
-  "version": "3.5.3",
+  "version": "3.6.0",
   "description": "Shared Neo Brutalism UI primitives and design tokens for PinSquirrel",
   "type": "module",
   "main": "./src/index.ts",
@@ -20,7 +20,7 @@
     "test:coverage": "vitest --run --coverage --passWithNoTests"
   },
   "dependencies": {
-    "hono": "^4.13.5"
+    "hono": "^4.13.3"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
