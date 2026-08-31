@@ -18,14 +18,15 @@ Everything this plan once tracked as read-only has shipped; the reasoning that o
 checklists is in the decision log below. What is open is the write side, driven by two use cases:
 
 1. **Pin the current page from the extension**, so the bookmarklet is no longer the only way to
-   create a pin from a browser. Phase 9, over a write endpoint Phase 8 makes possible.
+   create a pin from a browser. Phase 9, by opening the site's own pin form in a popup window —
+   no API in the flow.
 2. **Let an LLM help retag a library** — the account has many tags holding one or two pins and
    many pins holding no tags, and that is a job for an agent that can read and write over MCP.
    Phase 10.
 
-Both need a write scope that the server actually enforces, which today it does not: `oauthAuth`
-puts the granted scopes on the principal and `mcpAuth` forwards them, and nothing reads them.
-That is Phase 8, and it comes first.
+The second needs a write scope that the server actually enforces, which today it does not:
+`oauthAuth` puts the granted scopes on the principal and `mcpAuth` forwards them, and nothing
+reads them. That is Phase 8. Phase 9 rides the browser session and depends on neither phase.
 
 ## Ground rules
 
@@ -93,8 +94,8 @@ not a searched column at all.
 
 Two scopes, `pins:write` and `tags:write`, at the same granularity as the reads. Tags on a pin
 are pin data and travel under `pins:write`; `tags:write` is for operations on the tag itself
-(merge, delete). The extension asks for `pins:write` only; an MCP client doing retagging asks
-for both.
+(merge, delete). An MCP client doing retagging asks for both; the extension asks for neither,
+because its pin flow runs on the browser session (Phase 9).
 
 - [ ] Add both to `SUPPORTED_SCOPES` in `libs/services/src/services/oauth.ts` and to
       `OAUTH_RESOURCE_SCOPES` in `apps/hono/src/lib/config.ts`, so both protected-resource
@@ -109,14 +110,17 @@ for both.
       `WWW-Authenticate: Bearer error="insufficient_scope", scope="pins:write"` (RFC 6750 §3.1).
       `bearerChallenge()` (`middleware/www-authenticate.ts`) only knows the resource today; give
       it an optional `error` and `scope` so both resources say it the same way. Applied
-      per route in `api-v1.ts`, never globally: the reads stay reachable on a read-only token.
+      per route, never globally, so the reads stay reachable on a read-only token — though with
+      Phase 9 no longer adding v1 write routes, the REST half has no consumer yet and the MCP
+      guard is the one that matters.
       For MCP, a `requireScope` guard inside the tool handler in `mcp/server.ts`, mapped by
       `mapDomainErrorToMcp()` to a tool error the model can read; the scopes are already on
       `AuthInfo`. A token minted before these scopes existed carries neither and is refused by
       both, which is the point
-- [ ] Test the negative in `oauth-e2e.test.ts`: a token granted `pins:read tags:read` gets 403
-      with the challenge from a write route, and a token granted `pins:write` gets through.
-      That is the one test that proves the scope is load-bearing rather than decorative
+- [ ] Test the negative in `oauth-e2e.test.ts`: a token granted `pins:read tags:read` gets a
+      scope refusal from a write surface, and a token granted `pins:write` gets through. The
+      first write surface is now Phase 10's `update_pin` tool, so this test lands alongside it.
+      It is the one test that proves the scope is load-bearing rather than decorative
 - [ ] Step-up is re-consent, nothing more. A client holding a read-only grant that wants to write
       sends the user back through `/oauth/authorize` naming the wider scope; the server issues a
       new token family and `listGrants` already shows the union per client (Decision 19). No
@@ -128,54 +132,67 @@ for both.
 
 ## Phase 9: Pin the current page from the extension
 
-The bookmarklet opens `/pins/new?url&title&description`, which looks the URL up with
-`findByUrl` and redirects to the existing pin's edit page if there is one. The extension
-replaces that with a form in the popup, and keeps the same two behaviours: prefill from the
-page, and never create a duplicate.
+The bookmarklet opens `/pins/new?url&title&description` in a new tab, and the route already
+handles dedup: `findByUrl` redirects to the existing pin's edit page. The extension keeps that
+flow and that form. It opens the same pages in a small popup window instead of replicating the
+form in extension UI, so a field added to the pin form is in the extension the day it ships on
+the site. An `embed=1` presentation trims the page to the card so the window reads as a dialog.
 
-### 9a. REST
+Why a popup window and not the site framed inside the action popup: `secureHeaders()` sends
+`X-Frame-Options: SAMEORIGIN`, and the session cookie is `SameSite=Lax`
+(`apps/hono/src/middleware/session.ts`), so a request from a frame on a `chrome-extension://`
+page is cross-site and arrives logged out — fixing that means `SameSite=None` on every session
+to serve one embed. A popup window (`chrome.windows.create({ type: 'popup' })`) is a top-level
+first-party navigation: the cookie flows, nothing about the site's headers changes, and the
+window survives losing focus, which the action popup does not. It also keeps OAuth out of the
+flow entirely — no `pins:write` grant, no step-up, and a signed-out user gets the site's own
+login page, the same as the bookmarklet.
 
-- [ ] `POST /api/v1/pins` in `routes/api-v1.ts`, behind `requireScope('pins:write')`, over
-      `PinService.createPin()`. Body is `createPinDataSchema` minus `userId`, `createdAt`,
-      `updatedAt` — the caller is the token's user and the server keeps the clock. `201` with
-      the pin and a `Location`. A `ValidationError` is `400` with the field errors, the same
-      shape the internal endpoints use; a URL the user already has is `409` with the existing
-      pin's id, because the client's next move is to open it rather than retry
-- [ ] Add `url` to `pinListInputSchema` (`libs/services/src/validation/pin-query.ts`) as an
-      exact-match filter — `PinFilter` already carries it, the schema just does not expose it —
-      so `GET /api/v1/pins?url=` is the lookup the extension runs before it shows the form. That
-      is the same question the bookmarklet's dedup asks, over the same service method
-- [ ] Both land in the OpenAPI document by construction (`@hono/zod-openapi`); check
-      `/api/docs` renders the `201`/`409` responses and the `pins:write` requirement, and add
-      the scope to the security scheme so the docs say which routes need it
+### 9a. Site: embed mode
+
+- [ ] `embed=1` on `/pins/new` and `/pins/:id/edit` renders the same content in a minimal
+      layout — the card and the flash, no header, nav or footer. Any other value, or none, is
+      the full page: nothing changes for the site's own users
+- [ ] The flag must survive the round trips. A hidden field carries it through the POST so a
+      validation error re-renders in embed mode, and the `findByUrl` dedup redirect in
+      `routes/pin-routes.tsx` appends it — which is how "already pinned" becomes the site's
+      real edit form in the same window instead of a link out
+- [ ] Success in embed mode redirects to a stable confirmation page — `/pins/embed/saved`,
+      embed layout, "Pin saved" — instead of to `/pins`. Stable URL because the extension
+      worker matches on it to close the window (9b); the page only says so, since a page that
+      was not script-opened cannot reliably `window.close()` itself. The edit form's save (and
+      its delete) redirect the same way when the flag rides along, so no path inside the
+      dialog dead-ends on the full site
 
 ### 9b. Extension
 
-- [ ] Manifest: add `activeTab`. Clicking the action is the user gesture that grants it, and it
-      is enough to read the current tab's URL and title through `chrome.tabs.query`. Not `tabs`,
-      which is a standing permission over every tab. Add `scripting` only if the popup is to
-      pull the meta description and the selection the bookmarklet grabs today, through
-      `chrome.scripting.executeScript` on the active tab; start without it and see whether the
-      title alone is enough
-- [ ] `src/api-client.ts`: `findPinByUrl(url)` and `createPin(input)`. The `409` maps to a
-      distinguishable `PinExistsError` carrying the id, and a `403 insufficient_scope` maps to
-      `ReauthorizationRequiredError`, because that is the existing path to the Connect view and
-      it already keeps `selectedTagIds` across a reconnect
-- [ ] `src/auth.ts`: request `pins:write` alongside the reads. An installed extension holding a
-      read-only grant hits the `403` on its first save and lands on Connect with a notice
-      saying why — the step-up from Phase 8, with no new code
-- [ ] Popup: a "Pin this page" section above the tag list in `popup.html`, wired in
-      `src/popup/init.ts` through the same `deps` seam. Opens with the title prefilled and
-      editable, a tag input, private and read-later boxes, and Save. If `findPinByUrl` finds
-      one, the section says so and links to `${baseUrl}/pins/${id}/edit` in a new tab instead
-      of offering the form — an editor in a popup that closes on blur is a worse editor than the
-      site already has. After a save, ask the worker for a sync so a pin tagged with a selected
-      tag shows up in the bookmarks bar without waiting for the hour
-- [ ] Tags in the form: a plain text input, comma-separated, matched against the tag list the
-      popup already has for autocomplete. The site's `tag-input-vanilla.js` is not shared
-      (Decision 5)
-- [ ] Tests, the same way as before: the popup driven in happy-dom with a stub `fetch`, the
-      worker with `stubChrome`. `chrome-mock.ts` grows `tabs.query`
+- [ ] Manifest: drop `default_popup` from the action, add `options_page`, add `activeTab`.
+      `chrome.action.onClicked` only fires when the action has no popup, and the click is the
+      gesture that grants `activeTab`, which is enough to read the current tab's URL and
+      title. Not `tabs`, which is a standing permission over every tab. No `scripting`: the
+      meta-description and selection prefill stay bookmarklet features until they are missed
+- [ ] Options page: the current popup UI (connect, tag list, Sync Now, disconnect) moves to
+      the options page nearly unchanged — `popup.html` and `src/popup/*` relocate, reached by
+      right-clicking the acorn → Options or from `chrome://extensions`. Settings are visited
+      rarely once tags are chosen; pinning is the everyday action and gets the single click
+- [ ] Worker: on `action.onClicked` (the event carries the tab, no query needed), build
+      `${baseUrl}/pins/new?url&title&embed=1`, open it with
+      `chrome.windows.create({ type: 'popup', width, height })`, and remember the window id. A
+      `tabs.onUpdated` listener watches that window for the saved page's URL, closes the window
+      with `chrome.windows.remove`, and triggers a bookmark sync, so a pin tagged with a
+      selected tag reaches the bookmarks bar without waiting for the hour
+- [ ] `commands`: a pin-this-page command with `suggested_key` Alt+D — the convention the
+      Delicious extension set and the Pinboard shortcut extensions kept, chosen because Chrome
+      reserves Ctrl/Cmd+D for its own bookmark (a user who wants it anyway can rebind at
+      `chrome://extensions/shortcuts`). A command grants `activeTab` like an action click, and
+      the handler is the same worker path
+- [ ] Tests, the same way as before: the options page driven in happy-dom (the popup tests,
+      relocated), the worker with `stubChrome`. `chrome-mock.ts` grows `action.onClicked`,
+      `tabs.onUpdated`, `windows.create` and `windows.remove`
+
+This phase previously added `POST /api/v1/pins` and a `url` filter on `GET /api/v1/pins`.
+Neither has a caller now, so neither is built: Decision 6 (read-only API until something needs
+it) stands, and nothing requests `pins:write` until Phase 10.
 
 ---
 
@@ -288,9 +305,10 @@ manifest's `host_permissions`, and the session cookie is only `Secure` in produc
    is a different thing from the sync inferring one from a bookmark, and the second stays out.
 5. **Chrome extension is standalone**: no workspace dependency on other packages; it talks only
    over the HTTP API. Build uses esbuild on its own, outside the Turbo pipeline.
-6. **Read-only API until there was a use case**: v1 shipped with GET only. `POST /api/v1/pins`
-   arrives in Phase 9 for pinning from the extension, behind `pins:write`; nothing else is
-   added until something needs it.
+6. **Read-only API until there is a use case**: v1 shipped with GET only. Phase 9 was going to
+   add `POST /api/v1/pins` for the extension, but the extension pins over the site's own form
+   in a popup window instead (Decision 22), so the API stays read-only until a real API client
+   needs a write.
 7. **MCP transport**: Streamable HTTP via `@hono/mcp` (`@modelcontextprotocol/hono` does not
    exist as a published package), mounted at `/mcp`, authenticated with OAuth `pso_` tokens
    bound to its own resource identifier (Decision 16). The route builds an `McpServer` and a
@@ -378,10 +396,15 @@ manifest's `host_permissions`, and the session cookie is only `Secure` in produc
     `tags:write` covers merge and delete of the tag itself. The extension only ever needs the
     first, and a consent screen that asks it to approve "merge and delete your tags" for a
     Save button is asking for more than it uses.
-22. **The extension pins; it does not edit.** The popup creates a pin for the current page and,
-    when one exists, links to the site's edit page. A popup closes on blur, which is the wrong
-    place for an editor the site already has, and duplicate detection is a lookup by URL, the
-    same `findByUrl` the bookmarklet uses.
+22. **The extension opens the site's pin form; it does not replicate it.** A form rebuilt in
+    extension UI is a second implementation that falls behind the first every time the site
+    grows a field. Framing the site inside the action popup is off the table — `X-Frame-Options:
+SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-extension://`
+    frame, where relaxing either would weaken the whole site to serve one embed — so the
+    extension opens `/pins/new?embed=1` in a popup window: top-level, first-party,
+    session-authenticated, no OAuth in the flow. `embed=1` is presentation only; dedup stays
+    the route's own `findByUrl` redirect, which in embed mode delivers the site's real edit
+    form in the same window.
 
 ## Reference
 
