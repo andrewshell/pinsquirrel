@@ -24,9 +24,11 @@ checklists is in the decision log below. What is open is the write side, driven 
    many pins holding no tags, and that is a job for an agent that can read and write over MCP.
    Phase 10.
 
-The second needs a write scope that the server actually enforces, which today it does not:
-`oauthAuth` puts the granted scopes on the principal and `mcpAuth` forwards them, and nothing
-reads them. That is Phase 8. Phase 9 rides the browser session and depends on neither phase.
+The second needs a write scope that the server actually enforces. Phase 8 built that:
+`pins:write` and `tags:write` are granted, advertised and described on the consent screen, and
+two guards refuse a call that lacks them — `requireScope` for a route and `mcp/scopes.ts` for a
+tool. What is still missing is a write surface for them to guard, which is Phase 10. Phase 9
+rides the browser session and depends on neither.
 
 ## Ground rules
 
@@ -97,36 +99,44 @@ are pin data and travel under `pins:write`; `tags:write` is for operations on th
 (merge, delete). An MCP client doing retagging asks for both; the extension asks for neither,
 because its pin flow runs on the browser session (Phase 9).
 
-- [ ] Add both to `SUPPORTED_SCOPES` in `libs/services/src/services/oauth.ts` and to
+- [x] Add both to `SUPPORTED_SCOPES` in `libs/services/src/services/oauth.ts` and to
       `OAUTH_RESOURCE_SCOPES` in `apps/hono/src/lib/config.ts`, so both protected-resource
       documents and both `WWW-Authenticate` challenges advertise them. `DEFAULT_SCOPES` stays
       read-only: a client that names no scope gets no write, and a request for `pins:write` is a
       request the user sees on the consent screen
-- [ ] Describe them in `SCOPE_DESCRIPTIONS` (`apps/hono/src/views/pages/oauth-consent.tsx`) in
+- [x] Describe them in `SCOPE_DESCRIPTIONS` (`apps/hono/src/views/pages/oauth-consent.tsx`) in
       the user's words — "Add, edit and delete your bookmarks", "Merge and delete your tags". An
       undescribed scope is one a user approves without being told what it does
-- [ ] Enforce. A `requireScope(scope)` next to `oauthAuth` in
+- [x] Enforce. A `requireScope(scope)` next to `oauthAuth` in
       `apps/hono/src/middleware/oauth-auth.ts` that answers `403` with
       `WWW-Authenticate: Bearer error="insufficient_scope", scope="pins:write"` (RFC 6750 §3.1).
-      `bearerChallenge()` (`middleware/www-authenticate.ts`) only knows the resource today; give
-      it an optional `error` and `scope` so both resources say it the same way. Applied
-      per route, never globally, so the reads stay reachable on a read-only token — though with
-      Phase 9 no longer adding v1 write routes, the REST half has no consumer yet and the MCP
-      guard is the one that matters.
-      For MCP, a `requireScope` guard inside the tool handler in `mcp/server.ts`, mapped by
-      `mapDomainErrorToMcp()` to a tool error the model can read; the scopes are already on
-      `AuthInfo`. A token minted before these scopes existed carries neither and is refused by
-      both, which is the point
+      `bearerChallenge()` (`middleware/www-authenticate.ts`) took an optional `error` and `scope`
+      so both resources say it the same way; it keeps `resource_metadata` in the challenge, so a
+      client can find its way back to the authorization server from a 403 and not only from a
+      401 response. The principal carries the resource that accepted the token, so the refusal
+      names that resource's metadata document, not the other one's. Applied per route, never
+      globally, so the reads stay reachable on a read-only token — with Phase 9 no longer adding
+      v1 write routes the REST half has no consumer, so the middleware is tested but mounted
+      nowhere, and the MCP guard is the one that matters.
+      For MCP, `requireScope(extra, scope)` in `mcp/scopes.ts` — beside the tools rather than
+      inside `server.ts`, so it is testable without building an `McpServer` — throwing
+      `InsufficientScopeError`, which `mapDomainErrorToMcp()` maps to a tool error naming the
+      scope and saying that reconnecting is the fix. It reads the scopes already on `AuthInfo`
+      and fails closed when there are none. A token minted before these scopes existed carries
+      neither and is refused by both, which is the point
 - [ ] Test the negative in `oauth-e2e.test.ts`: a token granted `pins:read tags:read` gets a
       scope refusal from a write surface, and a token granted `pins:write` gets through. The
       first write surface is now Phase 10's `update_pin` tool, so this test lands alongside it.
-      It is the one test that proves the scope is load-bearing rather than decorative
-- [ ] Step-up is re-consent, nothing more. A client holding a read-only grant that wants to write
-      sends the user back through `/oauth/authorize` naming the wider scope; the server issues a
-      new token family and `listGrants` already shows the union per client (Decision 19). No
-      server-side "upgrade" path: the `insufficient_scope` challenge is the signal, and the
-      client's job is to re-authorize. The old family stays valid until it expires or is
-      revoked — revoking it on step-up would break a second device holding the same client
+      It is the one test that proves the scope is load-bearing rather than decorative. **Open by
+      design**: until Phase 10 there is no write surface to point it at, and the guards
+      themselves are covered as units in `middleware/oauth-auth.test.ts` and `mcp/scopes.test.ts`
+
+Step-up is re-consent, nothing more, so there is nothing here to build. A client holding a
+read-only grant that wants to write sends the user back through `/oauth/authorize` naming the
+wider scope; the server issues a new token family and `listGrants` already shows the union per
+client (Decision 19). No server-side "upgrade" path: the `insufficient_scope` challenge is the
+signal, and the client's job is to re-authorize. The old family stays valid until it expires or
+is revoked — revoking it on step-up would break a second device holding the same client.
 
 ---
 
@@ -215,9 +225,12 @@ change a pin's tags and to fold tags together.
       Note for the tool description: `updatePin` already collects tags left with no pins
       (`collectOrphanedTags`), so retagging a pin away from a singleton tag deletes the tag —
       the agent does not need a delete call for that case
-- [ ] Every write tool checks its scope through the Phase 8 guard before touching a service,
-      and every error goes through `mapDomainErrorToMcp()` — `ValidationError`, `PinNotFound`,
-      `TagNotFound` and the unauthorized errors all have mappings already
+- [ ] Every write tool calls `requireScope(extra, …)` from `mcp/scopes.ts` before touching a
+      service, and every error goes through `mapDomainErrorToMcp()` — `ValidationError`,
+      `PinNotFound`, `TagNotFound`, `InsufficientScopeError` and the unauthorized errors all
+      have mappings already. `update_pin` is the first write surface, so Phase 8's open
+      `oauth-e2e.test.ts` negative test lands with it: a `pins:read tags:read` token is refused,
+      a `pins:write` token gets through
 - [ ] Tool descriptions written for the agent doing this job: say that `tagNames` replaces, not
       appends; say that `merge_tags` takes ids, which `list_tags` returns; say what
       `list_pins { noTags: true }` is for. The description is the only documentation the model
@@ -315,7 +328,8 @@ manifest's `host_permissions`, and the session cookie is only `Secure` in produc
    transport per request; a shared transport caps the process at one MCP session and mixes
    responses between concurrent callers by JSON-RPC id.
 8. **MCP tools are read-only for now**: `list_pins`, `get_pin`, `list_tags`, matching the
-   read-only v1 REST API. Read-write tools wait for a concrete agent use case (Phase 8).
+   read-only v1 REST API. Read-write tools wait for a concrete agent use case (Phase 10);
+   Phase 8 built the scope guard they will call.
 9. **API docs via OpenAPI + Scalar**: the v1 routes use `@hono/zod-openapi` to generate an
    OpenAPI 3.1 spec (`/api/openapi.json`) rendered with Scalar (`/api/docs`). Schema-driven
    docs stay in sync with route definitions on their own.
