@@ -5,6 +5,7 @@ import {
   UnauthorizedTagAccessError,
   ValidationError,
 } from '@pinsquirrel/domain'
+import { InsufficientScopeError } from './scopes.js'
 
 /**
  * Map a thrown domain error to an MCP `CallToolResult` with `isError: true`.
@@ -15,7 +16,14 @@ import {
  */
 export function mapDomainErrorToMcp(err: unknown) {
   let message: string
-  if (err instanceof ValidationError) {
+  if (err instanceof InsufficientScopeError) {
+    // The one refusal that says exactly what is wrong. Everything else here
+    // withholds detail because the caller might be probing; a scope the
+    // connection was never granted is not a fact the caller can misuse, and a
+    // model told only "internal server error" retries a call that can never
+    // succeed until the user re-authorizes.
+    message = err.message
+  } else if (err instanceof ValidationError) {
     message = 'Invalid request'
   } else if (
     err instanceof PinNotFoundError ||

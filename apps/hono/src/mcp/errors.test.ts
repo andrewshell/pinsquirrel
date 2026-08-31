@@ -7,6 +7,7 @@ import {
   ValidationError,
 } from '@pinsquirrel/domain'
 import { mapDomainErrorToMcp } from './errors'
+import { InsufficientScopeError } from './scopes'
 
 function textOf(result: ReturnType<typeof mapDomainErrorToMcp>) {
   return result.content[0].text
@@ -39,5 +40,17 @@ describe('mapDomainErrorToMcp', () => {
     const foreign = mapDomainErrorToMcp(new UnauthorizedTagAccessError('tag-1'))
     expect(textOf(missing)).toBe('Tag not found')
     expect(textOf(foreign)).toBe('Tag not found')
+  })
+
+  // A scope refusal is the one failure an agent must not retry its way out of,
+  // so unlike the others it says exactly what is wrong and what fixes it. The
+  // scope names itself because the model reads this and nothing else.
+  it('says which scope is missing and that reconnecting is the fix', () => {
+    const result = mapDomainErrorToMcp(new InsufficientScopeError('pins:write'))
+
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('pins:write')
+    expect(textOf(result)).toContain('Reconnect')
+    expect(textOf(result)).not.toBe('Internal server error')
   })
 })
