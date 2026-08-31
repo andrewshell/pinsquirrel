@@ -26,7 +26,7 @@
     "@pinsquirrel/services": "workspace:*",
     "@pinsquirrel/ui": "workspace:*",
     "dotenv": "^17.4.2",
-    "hono": "^4.13.3"
+    "hono": "^4.13.5"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3",
