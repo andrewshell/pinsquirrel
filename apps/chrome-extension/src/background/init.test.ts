@@ -246,6 +246,7 @@ describe('initBackground: the periodic sync alarm', () => {
       name: 'sync',
       scheduledTime: Date.now(),
       periodInMinutes: 60,
+      persistAcrossSessions: true,
     })
     initBackground(deps())
 
@@ -260,7 +261,11 @@ describe('initBackground: the periodic sync alarm', () => {
     const runSync = vi.fn(() => Promise.resolve())
     initBackground(deps({ runSync }))
 
-    chrome.alarms.onAlarm.fire({ name: 'sync', scheduledTime: Date.now() })
+    chrome.alarms.onAlarm.fire({
+      name: 'sync',
+      scheduledTime: Date.now(),
+      persistAcrossSessions: true,
+    })
 
     await vi.waitFor(() => {
       expect(runSync).toHaveBeenCalledTimes(1)
@@ -275,6 +280,7 @@ describe('initBackground: the periodic sync alarm', () => {
     chrome.alarms.onAlarm.fire({
       name: 'something-else',
       scheduledTime: Date.now(),
+      persistAcrossSessions: true,
     })
     await flush()
 
@@ -286,7 +292,11 @@ describe('initBackground: the periodic sync alarm', () => {
     const runSync = vi.fn(() => Promise.resolve())
     initBackground(deps({ runSync }))
 
-    chrome.alarms.onAlarm.fire({ name: 'sync', scheduledTime: Date.now() })
+    chrome.alarms.onAlarm.fire({
+      name: 'sync',
+      scheduledTime: Date.now(),
+      persistAcrossSessions: true,
+    })
     await flush()
 
     expect(runSync).not.toHaveBeenCalled()

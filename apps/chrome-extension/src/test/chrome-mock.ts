@@ -417,6 +417,7 @@ export function stubChrome(
         alarms.existing.set(name, {
           name,
           scheduledTime: Date.now(),
+          persistAcrossSessions: true,
           ...(info.periodInMinutes === undefined
             ? {}
             : { periodInMinutes: info.periodInMinutes }),
