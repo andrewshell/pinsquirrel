@@ -1,6 +1,6 @@
 {
   "name": "@pinsquirrel/crypto",
-  "version": "3.5.3",
+  "version": "3.6.0",
   "description": "Email sealing and key management crypto for PinSquirrel",
   "type": "module",
   "main": "./src/index.ts",
