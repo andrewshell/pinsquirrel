@@ -16,12 +16,12 @@
     "test:coverage": "vitest --run --coverage"
   },
   "devDependencies": {
-    "@types/chrome": "^0.2.7",
-    "@types/node": "^26.4.0",
+    "@types/chrome": "^0.2.8",
+    "@types/node": "^26.4.1",
     "@vitest/coverage-v8": "^4.1.11",
     "esbuild": "^0.28.1",
     "eslint": "^10.9.1",
-    "happy-dom": "^20.11.13",
+    "happy-dom": "^20.14.0",
     "prettier": "^3.9.6",
     "typescript": "^6.0.3",
     "vitest": "^4.1.11"
