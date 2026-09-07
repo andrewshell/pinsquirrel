@@ -150,16 +150,16 @@ importers:
     dependencies:
       '@hono/mcp':
         specifier: ^0.3.2
-        version: 0.3.2(@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.4.3))(hono-rate-limiter@0.5.3(hono@4.13.5))(hono@4.13.5)(zod@4.4.3)
+        version: 0.3.2(@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.5.4))(hono-rate-limiter@0.5.3(hono@4.13.5))(hono@4.13.5)(zod@4.5.4)
       '@hono/node-server':
         specifier: '>=2.0.5'
         version: 2.1.1(hono@4.13.5)
       '@hono/zod-openapi':
-        specifier: ^1.6.1
-        version: 1.6.1(hono@4.13.5)(zod@4.4.3)
+        specifier: ^1.6.3
+        version: 1.6.3(hono@4.13.5)(zod@4.5.4)
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
-        version: 1.30.0(supports-color@10.2.2)(zod@4.4.3)
+        version: 1.30.0(supports-color@10.2.2)(zod@4.5.4)
       '@pinsquirrel/adapters':
         specifier: workspace:*
         version: link:../../libs/adapters
@@ -192,7 +192,7 @@ importers:
         version: 17.4.2
       drizzle-orm:
         specifier: 1.0.0-rc.5-169397b
-        version: 1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.2(@types/node@26.4.0))(pg@8.16.3)(zod@4.4.3)
+        version: 1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.3(@types/node@26.4.0))(pg@8.16.3)(zod@4.5.4)
       hono:
         specifier: ^4.13.5
         version: 4.13.5
@@ -200,8 +200,8 @@ importers:
         specifier: ^14.0.0
         version: 14.0.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       mysql2:
-        specifier: ^3.24.2
-        version: 3.24.2(@types/node@26.4.0)
+        specifier: ^3.24.3
+        version: 3.24.3(@types/node@26.4.0)
       pino:
         specifier: ^10.3.1
         version: 10.3.1
@@ -210,10 +210,10 @@ importers:
         version: 7.2.4
       undici:
         specifier: '>=8.9.0'
-        version: 8.10.0
+        version: 8.10.1
       zod:
-        specifier: ^4.4.3
-        version: 4.4.3
+        specifier: ^4.5.4
+        version: 4.5.4
     devDependencies:
       '@tailwindcss/cli':
         specifier: ^4.3.3
@@ -262,7 +262,7 @@ importers:
         version: 1.2.0
       undici:
         specifier: '>=8.9.0'
-        version: 8.10.0
+        version: 8.10.1
     devDependencies:
       '@types/node':
         specifier: ^26.4.0
@@ -317,10 +317,10 @@ importers:
         version: 1.0.0-rc.5-ab785fc
       drizzle-orm:
         specifier: 1.0.0-rc.5-169397b
-        version: 1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.2(@types/node@26.4.0))(pg@8.16.3)(zod@4.4.3)
+        version: 1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.3(@types/node@26.4.0))(pg@8.16.3)(zod@4.5.4)
       mysql2:
-        specifier: ^3.24.2
-        version: 3.24.2(@types/node@26.4.0)
+        specifier: ^3.24.3
+        version: 3.24.3(@types/node@26.4.0)
     devDependencies:
       '@types/node':
         specifier: ^26.4.0
@@ -397,13 +397,13 @@ importers:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
-        version: 1.30.0(supports-color@10.2.2)(zod@4.4.3)
+        version: 1.30.0(supports-color@10.2.2)(zod@4.5.4)
       '@pinsquirrel/domain':
         specifier: workspace:*
         version: link:../domain
       zod:
-        specifier: ^4.4.3
-        version: 4.4.3
+        specifier: ^4.5.4
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: ^26.4.0
@@ -845,15 +845,15 @@ packages:
     peerDependencies:
       hono: ^4
 
-  '@hono/zod-openapi@1.6.1':
-    resolution: {integrity: sha512-z1xS3FZxl4bBkU3kMIsQsLtsqxPTha5XZCsDEPMSZ6+3RRBQI7KED1GeoDpq2WueXCacsNIjcB0MtCnEHY7ahQ==}
+  '@hono/zod-openapi@1.6.3':
+    resolution: {integrity: sha512-VYR82Y60plu8g3pN60OUXMVKpmxh3R04Qs++3DY9vtwZ9/sA/BRY0PcRIR+Z37/3itWtM7pYwT9bKiH9JhqV6Q==}
     engines: {node: '>=16.0.0'}
     peerDependencies:
       hono: '>=4.10.0'
       zod: ^4.0.0
 
-  '@hono/zod-validator@0.9.0':
-    resolution: {integrity: sha512-n0ZSXmCiHVIp4Y5wlOOyZCeTd/rsawA/qW1cipB8QOYKZ9N8Tk0nZUZCXho9cu374AN4JpDNKioNKBJ/W+LBug==}
+  '@hono/zod-validator@0.9.1':
+    resolution: {integrity: sha512-iiv6w0qrIc0arfvCtUqBWsvl4fXjzaTcQcCJTTtCnkawF9HHGE+KjEl0ox3gQJ6rKZEgE3mLExlQCF72M+mNuw==}
     peerDependencies:
       hono: '>=4.11.2'
       zod: ^3.25.0 || ^4.0.0
@@ -2533,8 +2533,8 @@ packages:
   long@5.3.2:
     resolution: {integrity: sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==}
 
-  lru.min@1.1.4:
-    resolution: {integrity: sha512-DqC6n3QQ77zdFpCMASA1a3Jlb64Hv2N2DciFGkO/4L9+q/IpIAuRlKOvCXabtRW6cQf8usbmM6BE/TOPysCdIA==}
+  lru.min@1.1.5:
+    resolution: {integrity: sha512-5J9ysMYUpYIg9RF2vJpy9SinEmSviFSe0GyPpCQ4L5QSkLAgeLXlTAOu2ZwWUU5m+0SBl6gUU1R1ZQB3aKypfA==}
     engines: {bun: '>=1.0.0', deno: '>=1.30.0', node: '>=8.0.0'}
 
   magic-string@0.30.21:
@@ -2601,8 +2601,8 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
-  mysql2@3.24.2:
-    resolution: {integrity: sha512-l9kXeKGwd6VCbSjmpO/bLWb+YCYpbvE4whte8ec6InXebvCNyEEydyRCnRU+TSHNqRLJ8B+Tk1uWb+vMCJgJzA==}
+  mysql2@3.24.3:
+    resolution: {integrity: sha512-OKfWHkMAg9v06neq8FmSyhbxPQKABN9PAW5G9/bDTXzJBO5xXtkKL0V27vju7HQWk9UD4Od5BZsvCtBTB1CPEw==}
     engines: {node: '>= 8.0'}
     peerDependencies:
       '@types/node': '>= 8'
@@ -3135,8 +3135,8 @@ packages:
   undici-types@8.3.0:
     resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
 
-  undici@8.10.0:
-    resolution: {integrity: sha512-HvltHd7avK13QIw/oLe4qoOLyoVSoafqJ2jYOrtMRBkbYT31eiBQ8O0ehRKZiEZCMEyLFQNIADpgCWC5fALvYQ==}
+  undici@8.10.1:
+    resolution: {integrity: sha512-YQ3WlbqjYMmNpdvDH64jAgLjxuAR9+649calDWhbshYaeQGO2bR4nI94ORJmwI3J9YhoKQnpyGOK+0zlWS5N5Q==}
     engines: {node: '>=22.19.0'}
 
   unpipe@1.0.0:
@@ -3313,15 +3313,15 @@ packages:
     peerDependencies:
       zod: ^3.25.28 || ^4
 
-  zod@4.4.3:
-    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+  zod@4.5.4:
+    resolution: {integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==}
 
 snapshots:
 
-  '@asteasolutions/zod-to-openapi@9.1.0(zod@4.4.3)':
+  '@asteasolutions/zod-to-openapi@9.1.0(zod@4.5.4)':
     dependencies:
       openapi3-ts: 4.6.1
-      zod: 4.4.3
+      zod: 4.5.4
 
   '@babel/helper-string-parser@7.29.7': {}
 
@@ -3530,30 +3530,30 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@hono/mcp@0.3.2(@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.4.3))(hono-rate-limiter@0.5.3(hono@4.13.5))(hono@4.13.5)(zod@4.4.3)':
+  '@hono/mcp@0.3.2(@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.5.4))(hono-rate-limiter@0.5.3(hono@4.13.5))(hono@4.13.5)(zod@4.5.4)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.30.0(supports-color@10.2.2)(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.30.0(supports-color@10.2.2)(zod@4.5.4)
       hono: 4.13.5
       hono-rate-limiter: 0.5.3(hono@4.13.5)
       pkce-challenge: 5.0.1
-      zod: 4.4.3
+      zod: 4.5.4
 
   '@hono/node-server@2.1.1(hono@4.13.5)':
     dependencies:
       hono: 4.13.5
 
-  '@hono/zod-openapi@1.6.1(hono@4.13.5)(zod@4.4.3)':
+  '@hono/zod-openapi@1.6.3(hono@4.13.5)(zod@4.5.4)':
     dependencies:
-      '@asteasolutions/zod-to-openapi': 9.1.0(zod@4.4.3)
-      '@hono/zod-validator': 0.9.0(hono@4.13.5)(zod@4.4.3)
+      '@asteasolutions/zod-to-openapi': 9.1.0(zod@4.5.4)
+      '@hono/zod-validator': 0.9.1(hono@4.13.5)(zod@4.5.4)
       hono: 4.13.5
       openapi3-ts: 4.6.1
-      zod: 4.4.3
+      zod: 4.5.4
 
-  '@hono/zod-validator@0.9.0(hono@4.13.5)(zod@4.4.3)':
+  '@hono/zod-validator@0.9.1(hono@4.13.5)(zod@4.5.4)':
     dependencies:
       hono: 4.13.5
-      zod: 4.4.3
+      zod: 4.5.4
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -3596,7 +3596,7 @@ snapshots:
 
   '@mixmark-io/domino@2.2.0': {}
 
-  '@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.4.3)':
+  '@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.5.4)':
     dependencies:
       '@hono/node-server': 2.1.1(hono@4.13.5)
       ajv: 8.18.0
@@ -3613,8 +3613,8 @@ snapshots:
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 4.4.3
-      zod-to-json-schema: 3.25.2(zod@4.4.3)
+      zod: 4.5.4
+      zod-to-json-schema: 3.25.2(zod@4.5.4)
     transitivePeerDependencies:
       - supports-color
 
@@ -3826,7 +3826,7 @@ snapshots:
       '@scalar/helpers': 0.11.2
       nanoid: 5.1.16
       type-fest: 5.8.0
-      zod: 4.4.3
+      zod: 4.5.4
 
   '@scalar/validation@0.6.3': {}
 
@@ -4256,7 +4256,7 @@ snapshots:
       parse5: 7.3.0
       parse5-htmlparser2-tree-adapter: 7.1.0
       parse5-parser-stream: 7.1.2
-      undici: 8.10.0
+      undici: 8.10.1
       whatwg-mimetype: 4.0.0
 
   chokidar@4.0.3:
@@ -4365,12 +4365,12 @@ snapshots:
       get-tsconfig: 4.13.7
       jiti: 2.7.0
 
-  drizzle-orm@1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.2(@types/node@26.4.0))(pg@8.16.3)(zod@4.4.3):
+  drizzle-orm@1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.3(@types/node@26.4.0))(pg@8.16.3)(zod@4.5.4):
     optionalDependencies:
       '@types/pg': 8.15.5
-      mysql2: 3.24.2(@types/node@26.4.0)
+      mysql2: 3.24.3(@types/node@26.4.0)
       pg: 8.16.3
-      zod: 4.4.3
+      zod: 4.5.4
 
   dunder-proto@1.0.1:
     dependencies:
@@ -4977,7 +4977,7 @@ snapshots:
 
   long@5.3.2: {}
 
-  lru.min@1.1.4: {}
+  lru.min@1.1.5: {}
 
   magic-string@0.30.21:
     dependencies:
@@ -5042,14 +5042,14 @@ snapshots:
 
   ms@2.1.3: {}
 
-  mysql2@3.24.2(@types/node@26.4.0):
+  mysql2@3.24.3(@types/node@26.4.0):
     dependencies:
       '@types/node': 26.4.0
       aws-ssl-profiles: 1.1.2
       generate-function: 2.3.1
       iconv-lite: 0.7.3
       long: 5.3.2
-      lru.min: 1.1.4
+      lru.min: 1.1.5
       named-placeholders: 1.1.6
       sql-escaper: 1.5.1
 
@@ -5061,7 +5061,7 @@ snapshots:
 
   named-placeholders@1.1.6:
     dependencies:
-      lru.min: 1.1.4
+      lru.min: 1.1.5
 
   nanoid@3.3.18: {}
 
@@ -5613,7 +5613,7 @@ snapshots:
 
   undici-types@8.3.0: {}
 
-  undici@8.10.0: {}
+  undici@8.10.1: {}
 
   unpipe@1.0.0: {}
 
@@ -5718,8 +5718,8 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod-to-json-schema@3.25.2(zod@4.4.3):
+  zod-to-json-schema@3.25.2(zod@4.5.4):
     dependencies:
-      zod: 4.4.3
+      zod: 4.5.4
 
-  zod@4.4.3: {}
+  zod@4.5.4: {}
