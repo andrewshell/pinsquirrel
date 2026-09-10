@@ -25,16 +25,30 @@ function getUserFromExtra(extra: {
 }
 
 /**
- * Build a fresh MCP server with the read-only tools registered.
+ * Build a fresh MCP server with the pin and tag tools registered.
  *
  * A factory rather than a module-level instance because `/mcp` builds one per
  * request (see `routes/mcp.ts`): a server shared across callers is a session
  * shared across callers, and this process serves every client at once.
  *
- * Every tool here is a read and so requires no scope beyond a valid token. A
- * write tool calls `requireScope(extra, 'pins:write')` from `./scopes.js`
- * before it touches a service, and lets `mapDomainErrorToMcp` turn the refusal
- * into a tool error.
+ * The three reads need no scope beyond a valid token. Each write calls
+ * `requireScope(extra, …)` from `./scopes.js` before it touches a service,
+ * inside the same `try`, so the refusal travels back through
+ * `mapDomainErrorToMcp` as a tool error the model can act on rather than as a
+ * transport failure it will retry.
+ *
+ * Every tool is a public-pins-only surface, reads and writes alike:
+ * `pinFilterFromInput` forces `isPrivate: false`, `get_pin` goes through
+ * `getPublicPin`, and the writes go through `updatePublicPin` /
+ * `deletePublicPin`, which resolve a pin the same way. A private pin a client
+ * cannot see is one it cannot change or delete either, and `create_pin` cannot
+ * make one. That rule lives in `PinService`, not here - a transport deciding
+ * for itself which pins it may touch is how the REST API once listed private
+ * pins.
+ *
+ * The descriptions are written for the job these tools exist for: an agent
+ * consolidating a library of one- and two-pin tags. They are the only
+ * documentation it reads.
  */
 export function createMcpServer(): McpServer {
   const server = new McpServer({
@@ -47,7 +61,10 @@ export function createMcpServer(): McpServer {
     {
       title: 'List Pins',
       description:
-        'List and search bookmarks with filtering and pagination. Returns pins sorted by creation date (newest first) by default.',
+        'List and search bookmarks with filtering and pagination. Returns ' +
+        'pins sorted by creation date (newest first) by default. Set ' +
+        'noTags: true to find the pins that carry no tags at all, which is ' +
+        'where a retagging pass starts.',
       inputSchema: pinListInputSchema.shape,
       annotations: { readOnlyHint: true },
     },
@@ -96,7 +113,11 @@ export function createMcpServer(): McpServer {
     'list_tags',
     {
       title: 'List Tags',
-      description: 'List your tags, optionally with bookmark counts per tag.',
+      description:
+        'List your tags. Set withCounts: true for the number of bookmarks ' +
+        'on each, which is how to find the tags holding only one or two pins ' +
+        'and worth consolidating. The IDs it returns are what merge_tags and ' +
+        'delete_tag take.',
       inputSchema: tagListInputSchema.shape,
       annotations: { readOnlyHint: true },
     },
