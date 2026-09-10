@@ -604,6 +604,23 @@ describe('pins routes', () => {
       expect(html).toContain('href="/pins/pin-existing/edit?embed=1"')
     })
 
+    // The 500 branch keeps the flag only because `embed` sits in the props
+    // both re-renders share. Nothing else would notice if it stopped.
+    it('keeps the flag when an embedded submit fails unexpectedly', async () => {
+      svc.createPin.mockRejectedValue(new Error('database on fire'))
+
+      const res = await app.request(
+        '/pins/new',
+        formBody({ url: 'https://x.test/a', title: 'Half-typed', embed: '1' })
+      )
+      const html = await res.text()
+
+      expect(res.status).toBe(500)
+      expect(html).toContain('Failed to create pin')
+      expect(html).not.toContain('<header')
+      expect(html).toContain('name="embed"')
+    })
+
     it('reports an unexpected failure as a 500 without losing the form', async () => {
       svc.createPin.mockRejectedValue(new Error('database on fire'))
 
@@ -855,6 +872,22 @@ describe('pins routes', () => {
       expect(res.status).toBe(500)
       expect(html).toContain('Failed to update pin')
       expect(html).not.toContain('database on fire')
+    })
+
+    // As on POST /new: the 500 branch carries the flag by inheritance only.
+    it('keeps the flag when an embedded save fails unexpectedly', async () => {
+      svc.updatePin.mockRejectedValue(new Error('database on fire'))
+
+      const res = await app.request(
+        '/pins/pin-1/edit',
+        formBody({ url: 'https://x.test/b', title: 'Updated', embed: '1' })
+      )
+      const html = await res.text()
+
+      expect(res.status).toBe(500)
+      expect(html).toContain('Failed to update pin')
+      expect(html).not.toContain('<header')
+      expect(html).toContain('name="embed"')
     })
 
     it('uses HX-Redirect instead of a 302 for HTMX submissions', async () => {
