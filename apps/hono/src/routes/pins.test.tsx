@@ -493,6 +493,67 @@ describe('pins routes', () => {
       expect(await res.text()).toContain('/pins/pin-existing/edit')
     })
 
+    it('sends a successful embed submit to the confirmation page', async () => {
+      svc.createPin.mockResolvedValue(makePin())
+
+      const res = await app.request(
+        '/pins/new',
+        formBody({ url: 'https://x.test/a', title: 'T', embed: '1' })
+      )
+
+      expect(res.status).toBe(302)
+      expect(res.headers.get('Location')).toBe('/pins/embed/saved')
+    })
+
+    it('sends an HTMX embed submit to the confirmation page too', async () => {
+      svc.createPin.mockResolvedValue(makePin())
+
+      const res = await app.request('/pins/new', {
+        ...formBody({ url: 'https://x.test/a', title: 'T', embed: '1' }),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'HX-Request': 'true',
+        },
+      })
+
+      expect(res.headers.get('HX-Redirect')).toBe('/pins/embed/saved')
+    })
+
+    it('re-renders a rejected embed submit in the embed layout, flag intact', async () => {
+      svc.createPin.mockRejectedValue(
+        new ValidationError({ url: ['Must be a valid URL'] })
+      )
+
+      const res = await app.request(
+        '/pins/new',
+        formBody({ url: 'nope', title: 'T', embed: '1' })
+      )
+      const html = await res.text()
+
+      expect(html).toContain('Must be a valid URL')
+      expect(html).not.toContain('<header')
+      // Without this a second failed submit would forget it was embedded.
+      expect(html).toContain('name="embed"')
+    })
+
+    it('keeps the flag on the HTMX fragment of a rejected embed submit', async () => {
+      svc.createPin.mockRejectedValue(
+        new ValidationError({ url: ['Must be a valid URL'] })
+      )
+
+      const res = await app.request('/pins/new', {
+        ...formBody({ url: 'nope', title: 'T', embed: '1' }),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'HX-Request': 'true',
+        },
+      })
+      const html = await res.text()
+
+      expect(html).not.toContain('<html')
+      expect(html).toContain('name="embed"')
+    })
+
     it('reports an unexpected failure as a 500 without losing the form', async () => {
       svc.createPin.mockRejectedValue(new Error('database on fire'))
 
