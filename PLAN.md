@@ -4,18 +4,20 @@
 
 PinSquirrel serves a read-only REST API at `/api/v1` (pins, a single pin, tags, and the pins for
 a tag), an OpenAPI 3.1 spec at `/api/openapi.json` rendered with Scalar at `/api/docs`, and an
-MCP endpoint at `/mcp` with three read-only tools. OAuth 2.1 is the single authentication path
-for both, with PinSquirrel acting as its own authorization server and `/mcp` and `/api/v1`
-standing as two separately-identified protected resources. It has been driven end to end by real
-clients — Claude Code over CIMD, claude.ai as a custom connector, and the Chrome extension over
-DCR — and in process against the real app and database in `apps/hono/src/oauth-e2e.test.ts`.
+MCP endpoint at `/mcp` with eight tools — three reads, and five writes behind the write scopes.
+OAuth 2.1 is the single authentication path for both, with PinSquirrel acting as its own
+authorization server and `/mcp` and `/api/v1` standing as two separately-identified protected
+resources. It has been driven end to end by real clients — Claude Code over CIMD, claude.ai as a
+custom connector, and the Chrome extension over DCR — and in process against the real app and
+database in `apps/hono/src/oauth-e2e.test.ts`.
 
 The Chrome extension (`apps/chrome-extension/`, its README is the reference) syncs selected tags
 into bookmark folders over `/api/v1` and is built and tested in a real Chrome. Distribution
 beyond "load unpacked" is deferred.
 
-Everything this plan once tracked as read-only has shipped; the reasoning that outlived the
-checklists is in the decision log below. What is open is the write side, driven by two use cases:
+Everything this plan once tracked as read-only has shipped, and so has the write side it was
+opened for; the reasoning that outlived the checklists is in the decision log below. The two use
+cases that drove it:
 
 1. **Pin the current page from the extension**, so the bookmarklet is no longer the only way to
    create a pin from a browser. Phase 9, by opening the site's own pin form in a popup window —
@@ -27,8 +29,9 @@ checklists is in the decision log below. What is open is the write side, driven 
 The second needs a write scope that the server actually enforces. Phase 8 built that:
 `pins:write` and `tags:write` are granted, advertised and described on the consent screen, and
 two guards refuse a call that lacks them — `requireScope` for a route and `mcp/scopes.ts` for a
-tool. What is still missing is a write surface for them to guard, which is Phase 10. Phase 9
-rides the browser session and depends on neither.
+tool. Phase 10 built the write surface they guard, and with it the end-to-end test that proves a
+read-only grant cannot write. Phase 9 rides the browser session and depends on neither. What is
+left is one manual run of the retagging job over the Claude Code runbook.
 
 ## Ground rules
 
@@ -124,12 +127,15 @@ because its pin flow runs on the browser session (Phase 9).
       scope and saying that reconnecting is the fix. It reads the scopes already on `AuthInfo`
       and fails closed when there are none. A token minted before these scopes existed carries
       neither and is refused by both, which is the point
-- [ ] Test the negative in `oauth-e2e.test.ts`: a token granted `pins:read tags:read` gets a
-      scope refusal from a write surface, and a token granted `pins:write` gets through. The
-      first write surface is now Phase 10's `update_pin` tool, so this test lands alongside it.
-      It is the one test that proves the scope is load-bearing rather than decorative. **Open by
-      design**: until Phase 10 there is no write surface to point it at, and the guards
-      themselves are covered as units in `middleware/oauth-auth.test.ts` and `mcp/scopes.test.ts`
+- [x] Test the negative in `oauth-e2e.test.ts`: a token granted `pins:read tags:read` gets a
+      scope refusal from a write surface, and a token granted `pins:write` gets through. Landed
+      with Phase 10's `update_pin`, as a `write scopes` describe: the read-only grant made at the
+      top of that file is refused by name, then a second connection asking for both write scopes
+      creates a pin, retags it, reads the new tags back and deletes it. It is the one test that
+      proves the scope is load-bearing rather than decorative — the unit tests either side of it
+      (`middleware/oauth-auth.test.ts`, `mcp/scopes.test.ts`, `routes/mcp-write-tools.test.ts`)
+      all hold the token as a fixture, so none of them can show that the scope a real grant
+      carries is the one the guard reads
 
 Step-up is re-consent, nothing more, so there is nothing here to build. A client holding a
 read-only grant that wants to write sends the user back through `/oauth/authorize` naming the
@@ -216,35 +222,38 @@ pins with none, proposes a consolidation, and applies it. `list_tags` with count
 `list_pins` with `noTags` already exist, so the read half is done; what is missing is a way to
 change a pin's tags and to fold tags together.
 
-- [ ] `update_pin` — id plus any of `updatePinDataSchema` — over `PinService.updatePin()`. This
-      is the retagging tool: `tagNames` replaces the pin's tags. Requires `pins:write`.
-      Annotations: `idempotentHint: true`, no `destructiveHint`
-- [ ] `create_pin` and `delete_pin` over `createPin()` / `deletePin()`, because a write scope
-      that can edit but not create or delete is a strange one to explain. `delete_pin` carries
-      `destructiveHint: true` so a client can confirm before calling. Requires `pins:write`
-- [ ] `merge_tags` over `TagService.mergeTags(sourceTagIds, targetTagId)`, which is the
+- [x] `update_pin` — id plus any of `updatePinDataSchema` bar `isPrivate` — over
+      `PinService.updatePublicPin()`. This is the retagging tool: `tagNames` replaces the pin's
+      tags. Requires `pins:write`. Annotations: `idempotentHint: true`, no `destructiveHint`
+- [x] `create_pin` and `delete_pin` over `createPin()` / `deletePublicPin()`, because a write
+      scope that can edit but not create or delete is a strange one to explain. `delete_pin`
+      carries `destructiveHint: true` so a client can confirm before calling. Requires
+      `pins:write`
+- [x] `merge_tags` over `TagService.mergeTags(sourceTagIds, targetTagId)`, which is the
       consolidation primitive: every pin under the sources gets the target and the sources go.
       Requires `tags:write`. `delete_tag` over `deleteTag()` alongside it, `destructiveHint`.
-      Note for the tool description: `updatePin` already collects tags left with no pins
+      Both descriptions say so: `updatePin` already collects tags left with no pins
       (`collectOrphanedTags`), so retagging a pin away from a singleton tag deletes the tag —
       the agent does not need a delete call for that case
-- [ ] Every write tool calls `requireScope(extra, …)` from `mcp/scopes.ts` before touching a
-      service, and every error goes through `mapDomainErrorToMcp()` — `ValidationError`,
-      `PinNotFound`, `TagNotFound`, `InsufficientScopeError` and the unauthorized errors all
-      have mappings already. `update_pin` is the first write surface, so Phase 8's open
-      `oauth-e2e.test.ts` negative test lands with it: a `pins:read tags:read` token is refused,
-      a `pins:write` token gets through
-- [ ] Tool descriptions written for the agent doing this job: say that `tagNames` replaces, not
-      appends; say that `merge_tags` takes ids, which `list_tags` returns; say what
-      `list_pins { noTags: true }` is for. The description is the only documentation the model
-      reads
-- [ ] Bulk is the agent looping. `update_pin` one pin at a time is correct for a few hundred
-      pins, and the `/mcp` rate limiter — `mcpLimiter`, 300 requests per five minutes per IP —
-      is what bounds an agent that loops badly. That is roughly one pin a second, which a retag
-      session over a few hundred pins will hit; either raise it or key it by client, and decide
-      before shipping rather than when the first session stalls
+- [x] Every write tool calls `requireScope(extra, …)` from `mcp/scopes.ts` before touching a
+      service and inside the same `try`, so the refusal comes back through
+      `mapDomainErrorToMcp()` as a tool error rather than a transport failure. `ValidationError`,
+      `PinNotFound`, `TagNotFound`, `InsufficientScopeError` and the unauthorized errors had
+      mappings already; `DuplicatePinError` did not, and collapsed to "Internal server error",
+      which teaches an agent to retry a call that can never succeed (Decision 24). Phase 8's open
+      `oauth-e2e.test.ts` negative landed here
+- [x] Tool descriptions written for the agent doing this job: `tagNames` replaces rather than
+      appends, `merge_tags` takes the ids `list_tags` returns, `list_pins { noTags: true }` is
+      where a retagging pass starts, and `list_tags { withCounts: true }` is how to find the
+      one- and two-pin tags. The description is the only documentation the model reads
+- [x] Bulk is the agent looping. `update_pin` one pin at a time is correct for a few hundred
+      pins, and `mcpLimiter` is what bounds an agent that loops badly. Raised to 1200 per five
+      minutes per IP — four a second — rather than keyed by client, which is not available in
+      front of the auth middleware (Decision 24). `apiV1Limiter` stays at 300
 - [ ] Drive it with Claude Code over the runbook: reconnect (the step-up), ask it to find tags
-      with one pin and propose merges, approve a few, and confirm `/tags` on the site agrees
+      with one pin and propose merges, approve a few, and confirm `/tags` on the site agrees.
+      **Still open**: this is a manual run against a real client and a real library, and nothing
+      in the suite substitutes for it
 
 ---
 
@@ -260,8 +269,12 @@ change a pin's tags and to fold tags together.
 3. Run `/mcp` in Claude Code, pick `pinsquirrel`, and choose to authenticate. A browser opens on
    `http://localhost:8100/oauth/authorize?...`.
 4. Sign in if you are not already. The consent screen must name Claude Code, say it sends you
-   back to `127.0.0.1` or `localhost`, and list `pins:read`, `tags:read` and `offline_access`.
-   Approve it. The browser lands on a loopback port Claude Code is listening on.
+   back to `127.0.0.1` or `localhost`, and list the scopes the client asked for — `pins:read`,
+   `tags:read` and `offline_access` by default. A client that will retag asks for
+   `pins:write` and `tags:write` on top, and the screen must describe them as adding, editing
+   and deleting bookmarks and as merging and deleting tags: an undescribed scope is one you
+   approve without being told what it does. Approve it. The browser lands on a loopback port
+   Claude Code is listening on.
 5. Back in Claude Code the server reads as connected. Ask it to list your bookmarks.
 6. Check the registration took the CIMD path rather than the DCR fallback:
    `select client_id, registration_type from oauth_clients` should show
@@ -269,7 +282,8 @@ change a pin's tags and to fold tags together.
    the metadata document was not selected, and the authorization-server document is where to
    look (`client_id_metadata_document_supported` and `"none"` both have to be advertised).
 7. Open `/profile`. The Connected Applications card should name Claude Code, say MCP, list the
-   three scopes, and carry today's date. Revoke it and confirm the client has to ask again.
+   scopes that grant actually carries, and carry today's date. Revoke it and confirm the client
+   has to ask again.
 
 ### claude.ai as a custom connector
 
@@ -333,9 +347,12 @@ manifest's `host_permissions`, and the session cookie is only `Secure` in produc
    bound to its own resource identifier (Decision 16). The route builds an `McpServer` and a
    transport per request; a shared transport caps the process at one MCP session and mixes
    responses between concurrent callers by JSON-RPC id.
-8. **MCP tools are read-only for now**: `list_pins`, `get_pin`, `list_tags`, matching the
-   read-only v1 REST API. Read-write tools wait for a concrete agent use case (Phase 10);
-   Phase 8 built the scope guard they will call.
+8. **The MCP tools read and write; the v1 REST API still only reads.** Three reads —
+   `list_pins`, `get_pin`, `list_tags` — and five writes: `update_pin`, `create_pin`,
+   `delete_pin` behind `pins:write`, `merge_tags` and `delete_tag` behind `tags:write`. The
+   writes exist because retagging a library is a concrete agent use case (Phase 10); the REST
+   API has no such caller, so Decision 6 stands there. The two surfaces are no longer symmetric,
+   and that asymmetry is a use case rather than an oversight.
 9. **API docs via OpenAPI + Scalar**: the v1 routes use `@hono/zod-openapi` to generate an
    OpenAPI 3.1 spec (`/api/openapi.json`) rendered with Scalar (`/api/docs`). Schema-driven
    docs stay in sync with route definitions on their own.
@@ -425,6 +442,31 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     session-authenticated, no OAuth in the flow. `embed=1` is presentation only; dedup stays
     the route's own `findByUrl` redirect, which in embed mode delivers the site's real edit
     form in the same window.
+
+23. **The MCP write surface is public pins only, and the rule lives in the service.**
+    `pinFilterFromInput` forces `isPrivate: false` and `get_pin` goes through `getPublicPin`, so
+    an MCP client never sees a private pin. It must not be able to change or delete one either,
+    or create one it could not then read back. `PinService.updatePublicPin()` and
+    `deletePublicPin()` resolve a pin through the same check the read uses — private, foreign
+    and missing all come back as `PinNotFoundError` before anything is written — and neither
+    `update_pin` nor `create_pin` has an `isPrivate` field to send. The check sits in the
+    service rather than in the tool for the reason CLAUDE.md gives: a transport re-deciding a
+    rule is how the REST API once listed private pins, and how the internal check-url endpoint
+    ran with no `AccessControl` at all. A private pin stays a thing only the browser session
+    can touch.
+
+24. **`/mcp` gets four requests a second per IP, and a duplicate URL names the pin it collided
+    with.** Two decisions the write tools forced, both about an agent that cannot ask a person
+    what went wrong. `mcpLimiter` went from 300 per five minutes to 1200: bulk here is the agent
+    looping, one `update_pin` per pin plus the reads around it, and one request a second stalls
+    a few-hundred-pin retag halfway through. Keying by client instead was the alternative and is
+    not available — `rateLimitByIp(mcpLimiter)` runs in front of the auth middleware, so there
+    is no client id yet, and moving it behind auth would make an unauthenticated flood free. One
+    IP here is one user's agent. `apiV1Limiter` stays at 300. Separately, `DuplicatePinError`
+    now maps to a tool error naming the existing pin's id and pointing at `update_pin`, joining
+    `InsufficientScopeError` as the second exception to withholding detail: the colliding pin is
+    the caller's own, so the id is not a leak, and an agent told only "internal server error"
+    retries a call that can never succeed.
 
 ## Reference
 
