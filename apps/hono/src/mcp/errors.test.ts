@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  DuplicatePinError,
   PinNotFoundError,
   TagNotFoundError,
   UnauthorizedPinAccessError,
@@ -40,6 +41,21 @@ describe('mapDomainErrorToMcp', () => {
     const foreign = mapDomainErrorToMcp(new UnauthorizedTagAccessError('tag-1'))
     expect(textOf(missing)).toBe('Tag not found')
     expect(textOf(foreign)).toBe('Tag not found')
+  })
+
+  // The duplicate is the caller's own pin, so naming it leaks nothing the
+  // caller could not list, and it turns a dead end into the next call.
+  it('names the existing pin on a duplicate URL and says what to call instead', () => {
+    const result = mapDomainErrorToMcp(
+      new DuplicatePinError('https://example.com', {
+        id: 'pin-123',
+        createdAt: new Date('2024-01-01'),
+      })
+    )
+
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('pin-123')
+    expect(textOf(result)).toContain('update_pin')
   })
 
   // A scope refusal is the one failure an agent must not retry its way out of,

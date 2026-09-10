@@ -1,4 +1,5 @@
 import {
+  DuplicatePinError,
   PinNotFoundError,
   TagNotFoundError,
   UnauthorizedPinAccessError,
@@ -23,6 +24,16 @@ export function mapDomainErrorToMcp(err: unknown) {
     // model told only "internal server error" retries a call that can never
     // succeed until the user re-authorizes.
     message = err.message
+  } else if (err instanceof DuplicatePinError) {
+    // The other exception to withholding detail, and the same reasoning: the
+    // pin this collides with is the caller's own — `createPin` looks for a
+    // duplicate only under the caller's user id — so the id is one it could
+    // have listed anyway, and it is what turns a call that can never succeed
+    // into the next call the agent should make.
+    message = err.existingPin
+      ? `A pin with this URL already exists (id: ${err.existingPin.id}). ` +
+        `Use update_pin to change it.`
+      : 'A pin with this URL already exists. Use update_pin to change it.'
   } else if (err instanceof ValidationError) {
     message = 'Invalid request'
   } else if (
