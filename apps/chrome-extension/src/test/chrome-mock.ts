@@ -7,9 +7,9 @@ import { vi } from 'vitest'
  * `storage.sync` (present so a test can prove nothing writes to it), the two
  * `identity` calls the OAuth flow makes, the `bookmarks` calls the sync makes,
  * the `runtime`, `alarms`, `action`, `commands` and `tabs` events the service
- * worker listens on, and the `windows` calls the pin flow makes. Anything else
- * is left off on purpose - a test that reaches for it should fail loudly
- * rather than get an empty object back.
+ * worker listens on, and the `windows` calls and event the pin flow uses.
+ * Anything else is left off on purpose - a test that reaches for it should
+ * fail loudly rather than get an empty object back.
  *
  * `vi.unstubAllGlobals()` in an `afterEach` is what undoes it.
  */
@@ -77,6 +77,8 @@ export interface WindowsStub {
    * the outcome.
    */
   removed: number[]
+  /** How the worker hears that a window has gone, whoever closed it. */
+  onRemoved: EventStub<[number]>
 }
 
 /** An in-memory `chrome.alarms`: what exists, and what asked for it. */
@@ -117,7 +119,7 @@ export interface ChromeStub {
   tabs: {
     onUpdated: EventStub<[number, chrome.tabs.OnUpdatedInfo, chrome.tabs.Tab]>
   }
-  /** The pin window, for a test to see opened and closed. */
+  /** The pin window, for a test to see opened and closed, and to close. */
   windows: WindowsStub
 }
 
@@ -410,7 +412,8 @@ export function stubChrome(
   const onCommand = eventStub<[string, chrome.tabs.Tab | undefined]>()
   const onUpdated =
     eventStub<[number, chrome.tabs.OnUpdatedInfo, chrome.tabs.Tab]>()
-  const windows: WindowsStub = { created: [], removed: [] }
+  const onRemoved = eventStub<[number]>()
+  const windows: WindowsStub = { created: [], removed: [], onRemoved }
   let nextWindowId = 100
 
   const stub: ChromeStub = {
@@ -492,6 +495,7 @@ export function stubChrome(
         }
         return Promise.resolve(window)
       },
+      onRemoved,
       remove: (windowId: number) => {
         const gone = windows.removed.includes(windowId)
         windows.removed.push(windowId)
