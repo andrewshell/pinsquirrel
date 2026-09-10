@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
-import type { User } from '@pinsquirrel/domain'
+import { DuplicatePinError, type User } from '@pinsquirrel/domain'
 
 const mockVerifyAccessToken = vi.fn()
 const mockUpdatePublicPin = vi.fn()
+const mockCreatePin = vi.fn()
 
 /**
  * The write tools, driven the way a client drives them: JSON-RPC in over
@@ -26,6 +27,7 @@ vi.mock('../lib/services', () => ({
     getPublicPin: vi.fn(),
     updatePublicPin: (...args: unknown[]) =>
       mockUpdatePublicPin(...args) as unknown,
+    createPin: (...args: unknown[]) => mockCreatePin(...args) as unknown,
   },
   tagService: {
     getUserTags: vi.fn(),
@@ -126,6 +128,69 @@ describe('mcp write tools', () => {
         userId: 'user-1',
         tagNames: ['rust'],
       })
+    })
+  })
+
+  describe('create_pin', () => {
+    it('refuses a connection that was not granted pins:write', async () => {
+      granted(READ_ONLY)
+
+      const result = await callTool('create_pin', {
+        url: 'https://example.com',
+        title: 'Example',
+      })
+
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('pins:write')
+      expect(mockCreatePin).not.toHaveBeenCalled()
+    })
+
+    it('creates the pin for the token’s user and returns it', async () => {
+      granted(FULL)
+      const pin = { id: 'pin-9', url: 'https://example.com', title: 'Example' }
+      mockCreatePin.mockResolvedValue(pin)
+
+      const result = await callTool('create_pin', {
+        url: 'https://example.com',
+        title: 'Example',
+        tagNames: ['rust'],
+      })
+
+      expect(result.isError).toBeFalsy()
+      expect(JSON.parse(result.content[0].text)).toMatchObject(pin)
+      // Public, said out loud rather than left to a default: this surface
+      // only ever reads public pins, so it must not create one it could not
+      // then read back.
+      expect(mockCreatePin).toHaveBeenCalledWith(expect.anything(), {
+        userId: 'user-1',
+        url: 'https://example.com',
+        title: 'Example',
+        description: null,
+        readLater: false,
+        isPrivate: false,
+        tagNames: ['rust'],
+      })
+    })
+
+    // Without a mapping this came back as "Internal server error", which an
+    // agent answers by trying the same call again.
+    it('names the existing pin when the URL is already saved', async () => {
+      granted(FULL)
+      mockCreatePin.mockRejectedValue(
+        new DuplicatePinError('https://example.com', {
+          id: 'pin-1',
+          createdAt: new Date('2024-01-01'),
+        })
+      )
+
+      const result = await callTool('create_pin', {
+        url: 'https://example.com',
+        title: 'Example',
+      })
+
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('pin-1')
+      expect(result.content[0].text).toContain('update_pin')
     })
   })
 })

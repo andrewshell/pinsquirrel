@@ -3,9 +3,11 @@ import { AccessControl, type User } from '@pinsquirrel/domain'
 import {
   pinListInputSchema,
   pinGetInputSchema,
+  pinCreateInputSchema,
   pinUpdateInputSchema,
   tagListInputSchema,
   pinFilterFromInput,
+  type PinCreateInput,
   type PinListInput,
   type PinUpdateInput,
 } from '@pinsquirrel/services'
@@ -136,6 +138,44 @@ export function createMcpServer(): McpServer {
         const pin = await pinService.updatePublicPin(ac, {
           ...input,
           userId: user.id,
+        })
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(pin) }],
+        }
+      } catch (err) {
+        return mapDomainErrorToMcp(err)
+      }
+    }
+  )
+
+  server.registerTool(
+    'create_pin',
+    {
+      title: 'Create Pin',
+      description:
+        'Save a new bookmark. Fails if you have already saved this URL; the ' +
+        'error names the existing pin, which update_pin can change. New ' +
+        'pins are public. Requires the pins:write scope.',
+      inputSchema: pinCreateInputSchema.shape,
+      annotations: {},
+    },
+    async (args, extra) => {
+      try {
+        requireScope(extra, 'pins:write')
+        const user = getUserFromExtra(extra)
+        const ac = new AccessControl(user)
+        const input = args as PinCreateInput
+        // `isPrivate` is not in the input and is set here rather than left to
+        // the service's default: this surface exposes public pins only, so it
+        // must not create one it could not then read back.
+        const pin = await pinService.createPin(ac, {
+          userId: user.id,
+          url: input.url,
+          title: input.title,
+          description: input.description ?? null,
+          readLater: input.readLater ?? false,
+          isPrivate: false,
+          tagNames: input.tagNames ?? [],
         })
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(pin) }],
