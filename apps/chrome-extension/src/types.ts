@@ -42,7 +42,7 @@ export interface ExtensionStorage {
    * form. A window id held in memory would be gone by the time the save
    * arrived, and nothing would close the window.
    */
-  pinWindowId?: number
+  pinWindowId: number
   /**
    * Dynamically registered `client_id`s, keyed by the base URL they were
    * registered with, so connecting a second time reuses the first
