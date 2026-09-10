@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.ts",
+    "package": "NODE_ENV=production node scripts/build.ts && node scripts/package.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src scripts",
     "lint:fix": "eslint \"{src,scripts}/**/*.ts\" --fix",

@@ -11,3 +11,4 @@ apps/admin/keys/
 # every array onto its own lines; prettier collapses short ones back. The two
 # disagree on every release, so the file is left to the bot.
 apps/chrome-extension/manifest.json
+apps/chrome-extension/release/

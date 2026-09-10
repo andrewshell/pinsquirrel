@@ -1,5 +1,7 @@
 /** The parts of a Manifest V3 document the build script cares about. */
 export type ExtensionManifest = {
+  version?: string
+  host_permissions?: string[]
   action?: {
     default_popup?: string
     default_icon?: Record<string, string>
