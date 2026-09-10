@@ -55,7 +55,7 @@ describe('requestSync', () => {
 })
 
 describe('isSyncRequest', () => {
-  it('recognises the request the popup sends', () => {
+  it('recognises the request the options page sends', () => {
     expect(isSyncRequest(SYNC_REQUEST)).toBe(true)
   })
 
@@ -119,7 +119,7 @@ describe('requestConnect', () => {
 })
 
 describe('isConnectRequest', () => {
-  it('recognises the request the popup sends, and keeps its server', () => {
+  it('recognises the request the options page sends, and keeps its server', () => {
     const request = { type: 'connect', baseUrl: 'https://pinsquirrel.com' }
 
     expect(isConnectRequest(request)).toBe(true)

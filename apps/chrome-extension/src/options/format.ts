@@ -1,5 +1,5 @@
 /**
- * The popup's text, worked out without touching the DOM.
+ * The options page's text, worked out without touching the DOM.
  *
  * Everything here is a pure function of its arguments - the clock included -
  * so the wiring tests do not have to freeze time and these can be read as the
@@ -90,7 +90,7 @@ const DAY = 24 * HOUR
 /**
  * When the last sync ran, in words.
  *
- * Relative rather than absolute, because the question the popup answers is
+ * Relative rather than absolute, because the question the page answers is
  * "is this stale?" and a wall-clock time makes the reader do that subtraction
  * themselves. A timestamp from the future - a clock that moved backwards -
  * reads as just now rather than as a negative age.

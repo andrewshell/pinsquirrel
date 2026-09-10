@@ -216,7 +216,7 @@ export class PinSquirrelApiClient {
    * is the shape the caller asked for before handing it over.
    *
    * Anything the injected `fetch` throws - a `ReauthorizationRequiredError`
-   * above all - passes straight through. The popup branches on that one, and
+   * above all - passes straight through. The options page branches on that one, and
    * wrapping it in an `ApiError` would turn "the user must consent again" into
    * "the sync failed, try later".
    */

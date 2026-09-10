@@ -411,7 +411,7 @@ describe('syncAll, against tags that moved on', () => {
   })
 })
 
-describe('syncAll, reporting to the popup through storage', () => {
+describe('syncAll, reporting to the options page through storage', () => {
   it('records when the sync ran and clears the last failure', async () => {
     const { local } = stubChrome({ lastSyncError: 'A previous failure' })
     const before = Date.now()

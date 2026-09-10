@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <title>PinSquirrel</title>
-    <!-- Inline rather than a popup.css: the MV3 CSP forbids inline *scripts*,
+    <!-- Inline rather than an options.css: the MV3 CSP forbids inline *scripts*,
          not inline styles, and a stylesheet is not something the manifest names,
          so a separate file would mean teaching the build about an asset no
          manifest field points at. -->
@@ -12,7 +12,7 @@
         color-scheme: light dark;
       }
       body {
-        width: 320px;
+        max-width: 480px;
         margin: 0;
         padding: 12px;
         font:
@@ -53,7 +53,7 @@
       #tag-filter {
         flex: 1;
         /* Without this a flex item refuses to shrink below the width its
-           placeholder wants, which pushes the toggle off a 320px popup. */
+           placeholder wants, which pushes the toggle off a narrow page. */
         min-width: 0;
         box-sizing: border-box;
         padding: 6px;
@@ -115,7 +115,7 @@
     </style>
   </head>
   <body>
-    <main id="popup">
+    <main id="options">
       <h1>PinSquirrel</h1>
 
       <!-- Shown while the extension has no connection to a PinSquirrel
@@ -166,6 +166,6 @@
     </main>
 
     <!-- No inline scripts: the extension CSP forbids them. -->
-    <script type="module" src="popup.js"></script>
+    <script type="module" src="options.js"></script>
   </body>
 </html>

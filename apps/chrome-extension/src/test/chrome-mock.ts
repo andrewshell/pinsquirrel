@@ -77,7 +77,7 @@ export interface ChromeStub {
   /** Resolves to the redirect URL Chrome would land on. Set per flow. */
   launchWebAuthFlow: LaunchWebAuthFlowMock
   getRedirectURL: ReturnType<typeof vi.fn<() => string>>
-  /** What the service worker answers the popup with. Set per test. */
+  /** What the service worker answers the options page with. Set per test. */
   sendMessage: SendMessageMock
   /** The bookmark tree the sync reads and writes. */
   bookmarks: BookmarksStub

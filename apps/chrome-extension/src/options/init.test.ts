@@ -2,9 +2,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ReauthorizationRequiredError } from '../auth.ts'
 import { stubChrome, type ChromeStub } from '../test/chrome-mock.ts'
-import { loadPopupDocument } from '../test/popup-dom.ts'
+import { loadOptionsDocument } from '../test/options-dom.ts'
 import type { TagWithCount } from '../types.ts'
-import { initPopup, type PopupDeps } from './init.ts'
+import { initOptions, type OptionsDeps } from './init.ts'
 
 const NOW = Date.parse('2026-08-26T12:00:00Z')
 
@@ -34,20 +34,20 @@ let chrome: ChromeStub
 let doc: Document
 
 interface Harness {
-  deps: PopupDeps
+  deps: OptionsDeps
   requestConnect: ReturnType<typeof vi.fn>
   disconnect: ReturnType<typeof vi.fn>
   getTags: ReturnType<typeof vi.fn>
   requestSync: ReturnType<typeof vi.fn>
 }
 
-function harness(overrides: Partial<PopupDeps> = {}): Harness {
+function harness(overrides: Partial<OptionsDeps> = {}): Harness {
   const requestConnect = vi.fn(() => Promise.resolve({ ok: true as const }))
   const disconnect = vi.fn(() => Promise.resolve())
   const getTags = vi.fn(() => Promise.resolve(TAGS))
   const requestSync = vi.fn(() => Promise.resolve({ ok: true as const }))
 
-  const deps: PopupDeps = {
+  const deps: OptionsDeps = {
     document: doc,
     requestConnect,
     disconnect,
@@ -67,7 +67,7 @@ function flush(): Promise<void> {
 
 function element<T extends HTMLElement>(selector: string): T {
   const found = doc.querySelector<T>(selector)
-  if (!found) throw new Error(`popup.html has no ${selector}`)
+  if (!found) throw new Error(`options.html has no ${selector}`)
   return found
 }
 
@@ -100,7 +100,7 @@ const checkboxes = () => [
 ]
 
 beforeEach(() => {
-  doc = loadPopupDocument()
+  doc = loadOptionsDocument()
   chrome = stubChrome()
 })
 
@@ -108,9 +108,9 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('initPopup, with no connection stored', () => {
+describe('initOptions, with no connection stored', () => {
   it('opens on the settings view with pinsquirrel.com offered', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     expect(settingsShown()).toBe(true)
     expect(mainShown()).toBe(false)
@@ -121,7 +121,7 @@ describe('initPopup, with no connection stored', () => {
 
   it('refuses to start a flow against an address that is not an origin', async () => {
     const { deps, requestConnect } = harness()
-    await initPopup(deps)
+    await initOptions(deps)
 
     element<HTMLInputElement>('#base-url').value = 'pinsquirrel.com'
     await click('#connect')
@@ -133,7 +133,7 @@ describe('initPopup, with no connection stored', () => {
 
   it('asks the worker to connect, and shows the tag list if it survives', async () => {
     const { deps, requestConnect } = harness()
-    await initPopup(deps)
+    await initOptions(deps)
 
     element<HTMLInputElement>('#base-url').value = 'https://pinsquirrel.com/'
     await click('#connect')
@@ -153,7 +153,7 @@ describe('initPopup, with no connection stored', () => {
         })
       ),
     })
-    await initPopup(deps)
+    await initOptions(deps)
     await click('#connect')
 
     expect(settingsShown()).toBe(true)
@@ -170,7 +170,7 @@ describe('initPopup, with no connection stored', () => {
         })
       ),
     })
-    await initPopup(deps)
+    await initOptions(deps)
     await click('#connect')
 
     expect(settingsShown()).toBe(true)
@@ -178,37 +178,39 @@ describe('initPopup, with no connection stored', () => {
   })
 
   /**
-   * The bug this arrangement exists for: Chrome destroys the popup when the
-   * consent window takes focus, so the flow finishes with nobody listening.
-   * What the user sees is the popup they open next.
+   * The bug this arrangement exists for: as the action popup, Chrome
+   * destroyed this page when the consent window took focus, so the flow
+   * finished with nobody listening. An options tab survives that, but the
+   * worker still owns the flow, so the page has to read the result out of
+   * storage on its next open rather than wait for an answer.
    */
   it('opens on the main view when the worker connected after it closed', async () => {
     const torndown = harness({
       requestConnect: vi.fn(() => {
         Object.assign(chrome.local.items, CONNECTED)
-        // Never answers - the popup that asked is gone.
+        // Never answers - stands for the page that asked being gone.
         return new Promise<never>(() => {})
       }),
     })
-    await initPopup(torndown.deps)
+    await initOptions(torndown.deps)
     await click('#connect')
 
-    doc = loadPopupDocument()
-    await initPopup(harness().deps)
+    doc = loadOptionsDocument()
+    await initOptions(harness().deps)
 
     expect(mainShown()).toBe(true)
     expect(settingsShown()).toBe(false)
   })
 })
 
-describe('initPopup, with a connection stored', () => {
+describe('initOptions, with a connection stored', () => {
   beforeEach(() => {
     Object.assign(chrome.local.items, CONNECTED, { selectedTagIds: ['t2'] })
   })
 
   it('opens on the main view with the stored selection ticked', async () => {
     const { deps, getTags } = harness()
-    await initPopup(deps)
+    await initOptions(deps)
 
     expect(mainShown()).toBe(true)
     expect(settingsShown()).toBe(false)
@@ -220,13 +222,13 @@ describe('initPopup, with a connection stored', () => {
     const createApiClient = vi.fn(() => ({
       getTags: () => Promise.resolve(TAGS),
     }))
-    await initPopup(harness({ createApiClient }).deps)
+    await initOptions(harness({ createApiClient }).deps)
 
     expect(createApiClient).toHaveBeenCalledWith('https://pinsquirrel.com')
   })
 
   it('names the server it is connected to', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     expect(element('#connected-to').textContent).toContain(
       'https://pinsquirrel.com'
@@ -234,7 +236,7 @@ describe('initPopup, with a connection stored', () => {
   })
 
   it('stores a tag the moment its box is ticked', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     checkboxes()[0].click()
     await flush()
@@ -243,7 +245,7 @@ describe('initPopup, with a connection stored', () => {
   })
 
   it('stores the shorter list the moment a box is unticked', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     checkboxes()[1].click()
     await flush()
@@ -257,7 +259,7 @@ describe('initPopup, with a connection stored', () => {
    * filter narrow enough to be useful, is nearly all of them.
    */
   it('keeps a selected tag the filter is hiding', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     // 't2' is selected and now hidden; the user ticks the one tag on screen.
     await filter('reading')
@@ -269,7 +271,7 @@ describe('initPopup, with a connection stored', () => {
 
   it('unticks only the tag whose box moved', async () => {
     Object.assign(chrome.local.items, { selectedTagIds: ['t1', 't2'] })
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     await filter('rust')
     checkboxes()[0].click()
@@ -279,7 +281,7 @@ describe('initPopup, with a connection stored', () => {
   })
 
   it('still shows a tag as ticked after the filter has hidden and shown it', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     checkboxes()[0].click()
     await flush()
@@ -290,7 +292,7 @@ describe('initPopup, with a connection stored', () => {
   })
 
   it('draws only the tags whose name matches what was typed', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     await filter('rust')
 
@@ -298,7 +300,7 @@ describe('initPopup, with a connection stored', () => {
   })
 
   it('draws only the selected tags once selected-only is ticked', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     await selectedOnly(true)
 
@@ -306,7 +308,7 @@ describe('initPopup, with a connection stored', () => {
   })
 
   it('draws the whole list again when the box is cleared', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     await filter('rust')
     await filter('')
@@ -315,13 +317,13 @@ describe('initPopup, with a connection stored', () => {
   })
 
   it('puts the cursor in the filter box, so the user can just type', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     expect(doc.activeElement).toBe(element('#tag-filter'))
   })
 
   it('says so rather than going blank when nothing matches', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     await filter('zzz')
 
@@ -331,13 +333,13 @@ describe('initPopup, with a connection stored', () => {
   })
 
   it('counts the tags and the selection under the list', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     expect(element('#tag-summary').textContent).toBe('2 tags · 1 selected')
   })
 
   it('re-counts as the filter narrows the list', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     await filter('rust')
 
@@ -345,7 +347,7 @@ describe('initPopup, with a connection stored', () => {
   })
 
   it('re-counts the moment a box moves, hidden tags included', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     await filter('reading')
     checkboxes()[0].click()
@@ -356,7 +358,7 @@ describe('initPopup, with a connection stored', () => {
 
   it('narrows by name and by selection at once', async () => {
     Object.assign(chrome.local.items, { selectedTagIds: ['t1', 't2'] })
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     await selectedOnly(true)
     await filter('rust')
@@ -365,7 +367,7 @@ describe('initPopup, with a connection stored', () => {
   })
 
   it('draws the whole list again when selected-only is unticked', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     await selectedOnly(true)
     await selectedOnly(false)
@@ -375,7 +377,7 @@ describe('initPopup, with a connection stored', () => {
 
   it('says the selection is empty rather than that the account is', async () => {
     Object.assign(chrome.local.items, { selectedTagIds: [] })
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     await selectedOnly(true)
 
@@ -389,7 +391,7 @@ describe('initPopup, with a connection stored', () => {
    * it, leaving nothing to tick again. The row goes on the next render.
    */
   it('leaves an unticked tag on screen under selected-only', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     await selectedOnly(true)
     checkboxes()[0].click()
@@ -401,7 +403,7 @@ describe('initPopup, with a connection stored', () => {
   })
 
   it('drops the unticked tag on the next render', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     await selectedOnly(true)
     checkboxes()[0].click()
@@ -412,23 +414,23 @@ describe('initPopup, with a connection stored', () => {
   })
 
   /**
-   * A way of looking at the list for a moment, not a setting: a popup that
+   * A way of looking at the list for a moment, not a setting: a page that
    * opened showing four tags out of four hundred because of a box ticked last
    * week would look broken.
    */
   it('opens with selected-only off, however it was left', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
     await selectedOnly(true)
 
-    doc = loadPopupDocument()
-    await initPopup(harness().deps)
+    doc = loadOptionsDocument()
+    await initOptions(harness().deps)
 
     expect(element<HTMLInputElement>('#selected-only').checked).toBe(false)
     expect(checkboxes().map(box => box.value)).toEqual(['t1', 't2'])
   })
 
   it('counts what selected-only left on screen against the whole account', async () => {
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     await selectedOnly(true)
 
@@ -437,7 +439,7 @@ describe('initPopup, with a connection stored', () => {
 
   it('shows how long ago the last sync ran', async () => {
     chrome.local.items.lastSyncAt = NOW - 5 * 60_000
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     expect(element('#last-sync').textContent).toBe('Last synced 5 minutes ago')
     expect(element('#sync-error').hidden).toBe(true)
@@ -445,7 +447,7 @@ describe('initPopup, with a connection stored', () => {
 
   it('shows why the last sync failed', async () => {
     chrome.local.items.lastSyncError = 'Bookmarks permission denied'
-    await initPopup(harness().deps)
+    await initOptions(harness().deps)
 
     expect(element('#sync-error').hidden).toBe(false)
     expect(element('#sync-error').textContent).toContain(
@@ -455,12 +457,12 @@ describe('initPopup, with a connection stored', () => {
 
   it('asks the worker to sync and re-reads what the worker wrote', async () => {
     const requestSync = vi.fn(() => {
-      // The worker records the sync; the popup has to notice.
+      // The worker records the sync; the page has to notice.
       chrome.local.items.lastSyncAt = NOW
       return Promise.resolve({ ok: true as const })
     })
     chrome.local.items.lastSyncAt = NOW - 3 * 24 * 60 * 60_000
-    await initPopup(harness({ requestSync }).deps)
+    await initOptions(harness({ requestSync }).deps)
 
     await click('#sync-now')
 
@@ -472,7 +474,7 @@ describe('initPopup, with a connection stored', () => {
     const requestSync = vi.fn(() =>
       Promise.resolve({ ok: false as const, error: 'No bookmarks permission' })
     )
-    await initPopup(harness({ requestSync }).deps)
+    await initOptions(harness({ requestSync }).deps)
 
     await click('#sync-now')
 
@@ -487,7 +489,7 @@ describe('initPopup, with a connection stored', () => {
           finish = () => resolve({ ok: true })
         })
     )
-    await initPopup(harness({ requestSync }).deps)
+    await initOptions(harness({ requestSync }).deps)
 
     element<HTMLButtonElement>('#sync-now').click()
     await flush()
@@ -500,7 +502,7 @@ describe('initPopup, with a connection stored', () => {
 
   it('goes back to the settings view on disconnect, server prefilled', async () => {
     const { deps, disconnect } = harness()
-    await initPopup(deps)
+    await initOptions(deps)
 
     await click('#disconnect')
 
@@ -514,7 +516,7 @@ describe('initPopup, with a connection stored', () => {
   })
 })
 
-describe('initPopup, when the grant is gone', () => {
+describe('initOptions, when the grant is gone', () => {
   beforeEach(() => {
     Object.assign(chrome.local.items, CONNECTED)
   })
@@ -523,7 +525,7 @@ describe('initPopup, when the grant is gone', () => {
     const getTags = vi.fn(() =>
       Promise.reject(new ReauthorizationRequiredError('invalid_grant'))
     )
-    await initPopup(harness({ createApiClient: () => ({ getTags }) }).deps)
+    await initOptions(harness({ createApiClient: () => ({ getTags }) }).deps)
 
     expect(settingsShown()).toBe(true)
     expect(element('#reconnect-notice').hidden).toBe(false)
@@ -536,7 +538,7 @@ describe('initPopup, when the grant is gone', () => {
     const requestSync = vi.fn(() =>
       Promise.reject(new ReauthorizationRequiredError('invalid_grant'))
     )
-    await initPopup(harness({ requestSync }).deps)
+    await initOptions(harness({ requestSync }).deps)
 
     await click('#sync-now')
 

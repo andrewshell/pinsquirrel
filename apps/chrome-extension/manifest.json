@@ -9,8 +9,8 @@
     "service_worker": "background.js",
     "type": "module"
   },
+  "options_page": "options.html",
   "action": {
-    "default_popup": "popup.html",
     "default_title": "PinSquirrel",
     "default_icon": {
       "16": "icons/icon16.png",
