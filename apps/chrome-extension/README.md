@@ -129,7 +129,8 @@ developer dashboard takes. The archive is made from inside `dist/` so that
 version comes from the manifest. The extension is its own release-please
 package: only commits under `apps/chrome-extension` bump it, its tags are
 `chrome-extension-vX.Y.Z`, and it keeps its own `CHANGELOG.md`, so a site
-release leaves the store version alone. `release/` is git-ignored.
+release leaves the store version alone. Its versions start at 1.0.0, the first
+store release. `release/` is git-ignored.
 
 ## Tests
 
