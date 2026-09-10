@@ -148,9 +148,11 @@ describe('mcp write tools', () => {
       // Retagging is a re-send-safe operation, and it destroys nothing: the
       // tags it drops off a pin are the caller's own instruction.
       expect(byName.get('update_pin')?.annotations?.idempotentHint).toBe(true)
-      expect(byName.get('update_pin')?.annotations?.destructiveHint).toBe(
-        undefined
-      )
+      // Explicitly false, not absent: the spec's default for a missing
+      // `destructiveHint` is true, so leaving it off would have a compliant
+      // client confirm every update_pin in a retag loop.
+      expect(byName.get('update_pin')?.annotations?.destructiveHint).toBe(false)
+      expect(byName.get('create_pin')?.annotations?.destructiveHint).toBe(false)
       for (const name of ['delete_pin', 'delete_tag', 'merge_tags']) {
         expect(byName.get(name)?.annotations?.destructiveHint).toBe(true)
       }

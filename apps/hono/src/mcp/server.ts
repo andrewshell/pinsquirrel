@@ -49,6 +49,11 @@ function getUserFromExtra(extra: {
  * The descriptions are written for the job these tools exist for: an agent
  * consolidating a library of one- and two-pin tags. They are the only
  * documentation it reads.
+ *
+ * `destructiveHint` defaults to *true* when absent, so a non-destructive tool
+ * has to say `destructiveHint: false` rather than leave it off - do not tidy
+ * those away. Left off, `update_pin` reads as destructive and a compliant
+ * client asks the user to confirm every pin in a retag loop.
  */
 export function createMcpServer(): McpServer {
   const server = new McpServer({
@@ -149,9 +154,9 @@ export function createMcpServer(): McpServer {
         'delete_tag call afterwards. Requires the pins:write scope.',
       inputSchema: pinUpdateInputSchema.shape,
       // Idempotent because sending the same fields again lands the pin in the
-      // same state. Not destructive: nothing here removes a pin, and the tags
-      // it drops are the caller's own instruction.
-      annotations: { idempotentHint: true },
+      // same state. `destructiveHint` is false and said out loud: nothing here
+      // removes a pin, and the tags it drops are the caller's own instruction.
+      annotations: { idempotentHint: true, destructiveHint: false },
     },
     async (args, extra) => {
       try {
@@ -181,7 +186,9 @@ export function createMcpServer(): McpServer {
         'error names the existing pin, which update_pin can change. New ' +
         'pins are public. Requires the pins:write scope.',
       inputSchema: pinCreateInputSchema.shape,
-      annotations: {},
+      // Creating destroys nothing, and a duplicate URL is refused rather than
+      // overwritten. Not idempotent: the second call is the one that fails.
+      annotations: { destructiveHint: false },
     },
     async (args, extra) => {
       try {
