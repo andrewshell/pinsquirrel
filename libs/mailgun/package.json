@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@pinsquirrel/domain": "workspace:*",
-    "mailgun.js": "^14.0.0"
+    "mailgun.js": "^14.0.1"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
