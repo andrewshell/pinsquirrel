@@ -595,6 +595,29 @@ describe('pins routes', () => {
       expect(await res.text()).toContain('Existing')
       expect(svc.getPin).toHaveBeenCalledWith(expect.anything(), 'pin-1')
     })
+
+    it('drops the site chrome when embed=1 and keeps the flag on the form', async () => {
+      svc.getPin.mockResolvedValue(makePin())
+
+      const res = await app.request('/pins/pin-1/edit?embed=1')
+      const html = await res.text()
+
+      expect(res.status).toBe(200)
+      expect(html).not.toContain('<header')
+      expect(html).not.toContain('<footer')
+      expect(html).not.toContain('Back to Pins')
+      expect(html).toContain('name="embed"')
+    })
+
+    it('keeps embed out of the params the form action carries back', async () => {
+      // Otherwise POST /:id/edit would read it as a list filter and redirect
+      // to `/pins?embed=1`.
+      svc.getPin.mockResolvedValue(makePin())
+
+      const res = await app.request('/pins/pin-1/edit?tag=foo&embed=1')
+
+      expect(await res.text()).toContain('action="/pins/pin-1/edit?tag=foo"')
+    })
   })
 
   describe('POST /:id/edit — update', () => {
