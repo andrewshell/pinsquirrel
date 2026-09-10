@@ -5,7 +5,7 @@ import type { TagWithCount } from '../types.ts'
  *
  * Built node by node rather than from an HTML string: a tag name is user data,
  * and `innerHTML` would let one containing markup run as markup inside the
- * popup, which is the one page in the extension holding the tokens.
+ * options page, which is the one page in the extension holding the tokens.
  *
  * Nothing here listens for anything. The wiring puts one `change` listener on
  * the container and picks the box out of the event with `asCheckbox`, so a

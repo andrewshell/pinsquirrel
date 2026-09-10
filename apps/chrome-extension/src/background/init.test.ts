@@ -49,7 +49,7 @@ function deliver(chrome: ChromeStub, message: unknown = SYNC_REQUEST) {
   return { kept, sendResponse }
 }
 
-describe("initBackground: the popup's sync request", () => {
+describe("initBackground: the options page's sync request", () => {
   it('runs a sync and answers that it worked', async () => {
     const chrome = stubChrome(CONNECTED)
     const runSync = vi.fn(() => Promise.resolve())
@@ -303,11 +303,11 @@ describe('initBackground: the periodic sync alarm', () => {
   })
 })
 
-/** The connect request, as the popup sends it. */
+/** The connect request, as the options page sends it. */
 const CONNECT_REQUEST = { type: 'connect', baseUrl: 'https://pinsquirrel.com' }
 
-describe("initBackground: the popup's connect request", () => {
-  it('runs the OAuth flow against the server the popup named', async () => {
+describe("initBackground: the options page's connect request", () => {
+  it('runs the OAuth flow against the server the options page named', async () => {
     const chrome = stubChrome()
     const connect = vi.fn(() => Promise.resolve())
     initBackground(deps({ connect }))
@@ -356,7 +356,7 @@ describe("initBackground: the popup's connect request", () => {
     })
   })
 
-  it('does not sync when the popup asked to connect', async () => {
+  it('does not sync when the options page asked to connect', async () => {
     const chrome = stubChrome(CONNECTED)
     const runSync = vi.fn(() => Promise.resolve())
     initBackground(deps({ runSync }))

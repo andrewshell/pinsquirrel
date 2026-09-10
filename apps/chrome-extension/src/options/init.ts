@@ -12,37 +12,39 @@ import {
 import { asCheckbox, renderTagList } from './render.ts'
 
 /**
- * The slice of `PinSquirrelApiClient` the popup uses.
+ * The slice of `PinSquirrelApiClient` the options page uses.
  *
- * Narrower than the class on purpose: the popup only lists tags, and a test
+ * Narrower than the class on purpose: the page only lists tags, and a test
  * handing over the whole client would have to stub methods nothing here calls.
  */
-export interface PopupApiClient {
+export interface OptionsApiClient {
   getTags(withCounts: true): Promise<TagWithCount[]>
 }
 
 /**
- * Everything the popup does that is not the DOM.
+ * Everything the options page does that is not the DOM.
  *
  * Injected rather than imported so the wiring tests can drive it without
  * mocking modules: the two `request*` calls wake a service worker, and `now`
  * is a clock. What is *not* here is storage - it is already behind
  * `chrome.storage.local`, which the tests stub at the `chrome` global.
  */
-export interface PopupDeps {
+export interface OptionsDeps {
   document: Document
   /**
    * Ask the service worker to run the OAuth flow; it does not run here.
    *
-   * `chrome.identity.launchWebAuthFlow` opens a window, and Chrome destroys
-   * this popup the moment that window takes focus - so a flow started here
-   * died half-finished, after the server had issued the tokens and before
-   * anything could store them. What the user saw was a grant on their profile
-   * and a popup that still asked them to connect.
+   * `chrome.identity.launchWebAuthFlow` opens a window, and when this page
+   * was the action popup Chrome destroyed it the moment that window took
+   * focus - so a flow started here died half-finished, after the server had
+   * issued the tokens and before anything could store them. What the user saw
+   * was a grant on their profile and a page that still asked them to connect.
+   * An options tab survives losing focus, but the worker is still the right
+   * owner of a flow whose result has to land whether this page is open or not.
    */
   requestConnect(baseUrl: string): Promise<ConnectResponse>
   disconnect(): Promise<void>
-  createApiClient(baseUrl: string): PopupApiClient
+  createApiClient(baseUrl: string): OptionsApiClient
   requestSync(): Promise<SyncResponse>
   now(): number
 }
@@ -50,7 +52,7 @@ export interface PopupDeps {
 function elements(doc: Document) {
   const find = <T extends HTMLElement>(selector: string): T => {
     const element = doc.querySelector<T>(selector)
-    if (!element) throw new Error(`popup.html is missing ${selector}`)
+    if (!element) throw new Error(`options.html is missing ${selector}`)
     return element
   }
 
@@ -93,15 +95,15 @@ async function whileBusy(
 }
 
 /**
- * Wire the popup up and show whichever view the stored state calls for.
+ * Wire the options page up and show whichever view the stored state calls for.
  *
- * Called once, when the popup opens. Listeners go on elements that live for as
+ * Called once, when the page opens. Listeners go on elements that live for as
  * long as the document, so switching views never has to add or remove one.
  */
-export async function initPopup(deps: PopupDeps): Promise<void> {
+export async function initOptions(deps: OptionsDeps): Promise<void> {
   const ui = elements(deps.document)
 
-  /** The server the popup is talking to, kept so a reconnect can prefill it. */
+  /** The server the page is talking to, kept so a reconnect can prefill it. */
   let baseUrl: string | undefined
 
   /**
@@ -137,9 +139,9 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
     ui.mainView.hidden = false
     ui.reconnectNotice.hidden = true
     ui.connectedTo.textContent = `Connected to ${baseUrl ?? ''}`
-    // Before the tags are in: the popup opens under the cursor, and the user
-    // who came to find one tag among hundreds can start typing straight away.
-    // `autofocus` in the markup would not do it - the view starts hidden.
+    // Before the tags are in, so the user who came to find one tag among
+    // hundreds can start typing the moment the page paints. `autofocus` in
+    // the markup would not do it - the view starts hidden.
     ui.tagFilter.focus()
     await refreshSyncStatus()
     await loadTags()
@@ -148,8 +150,8 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
   /**
    * Re-read what the last sync left behind.
    *
-   * The popup does not run the sync - the service worker does, and it can run
-   * one while the popup is closed - so these two keys are read from storage
+   * This page does not run the sync - the service worker does, and it can run
+   * one while the page is closed - so these two keys are read from storage
    * every time rather than tracked here.
    */
   async function refreshSyncStatus(): Promise<void> {
@@ -163,7 +165,7 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
    * A failure the user has to see.
    *
    * `ReauthorizationRequiredError` is the one that changes the view: the grant
-   * is gone and no retry will bring it back, so the popup goes to Connect with
+   * is gone and no retry will bring it back, so the page goes to Connect with
    * the server it was talking to already filled in.
    */
   function report(error: unknown): void {
@@ -201,7 +203,7 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
    * narrowed to the selection if the toggle is on.
    *
    * The toggle is read off the box rather than tracked, and it is deliberately
-   * not stored: it is a way of looking at the list for a moment, and a popup
+   * not stored: it is a way of looking at the list for a moment, and a page
    * that opened showing four tags out of four hundred because of a box ticked
    * last week would look broken.
    */
@@ -271,11 +273,11 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
     setStatus('Waiting for you to approve the extension...')
     await whileBusy(ui.connectButton, async () => {
       try {
-        // Usually this never returns: the consent window takes focus and
-        // Chrome destroys the popup mid-await. The flow carries on in the
-        // worker, and what the user sees is the popup they open next - which
-        // finds the tokens in storage and opens on the main view. Everything
-        // below is the case where the popup happened to survive.
+        // As the action popup this usually never returned: the consent
+        // window took focus and Chrome destroyed the page mid-await, leaving
+        // the flow to finish in the worker. An options tab survives that, so
+        // the answer normally does arrive - but the worker still owns the
+        // flow, so everything below has to cope with never hearing back.
         const response = await deps.requestConnect(origin)
         if (!response.ok) {
           if (response.reauthorizationRequired) askToReconnect()
@@ -294,8 +296,10 @@ export async function initPopup(deps: PopupDeps): Promise<void> {
   /**
    * The selection, written the moment a box moves.
    *
-   * No Save button: the popup closes the instant it loses focus, and a
-   * selection the user made but did not save would be gone.
+   * No Save button: as the action popup this page closed the instant it lost
+   * focus, taking an unsaved selection with it. An options tab does not, but
+   * a ticked box already reads as the decision, so writing on the toggle is
+   * what it should mean.
    *
    * Only the box that moved is applied to the selection - the rest of the
    * selection is whatever it already was, including the tags the filter is

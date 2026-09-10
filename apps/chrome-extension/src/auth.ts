@@ -63,7 +63,7 @@ export class OAuthProtocolError extends Error {
  * The grant is gone and only the user can bring it back.
  *
  * Distinguishable from every other failure on purpose: a caller that catches
- * this puts the popup back on its Connect button, where a network error or a
+ * this puts the options page back on its Connect button, where a network error or a
  * 500 should leave the connection alone and be retried.
  */
 export class ReauthorizationRequiredError extends Error {
@@ -407,7 +407,7 @@ function isSpent(tokens: StoredTokens): boolean {
  *
  * Rotation is mandatory server-side and a rotated token is a replay: two
  * concurrent refreshes of the same token means one of them loses the race and
- * the *whole grant* is revoked. The popup and the service worker can both want
+ * the *whole grant* is revoked. The options page and the service worker can both want
  * a token at once, so they share this promise rather than each posting.
  */
 let refreshInFlight: Promise<StoredTokens> | null = null

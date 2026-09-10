@@ -212,7 +212,7 @@ export interface SyncApiClient {
   getAllPinsForTag(tagId: string): Promise<Pin[]>
 }
 
-/** What the popup shows for a failed run. */
+/** What the options page shows for a failed run. */
 function syncErrorMessage(error: unknown): string {
   // The one failure the user has to act on: the grant is gone, and only a
   // fresh consent brings it back. Saying so beats a message about a token the
@@ -227,11 +227,11 @@ function syncErrorMessage(error: unknown): string {
 /**
  * Mirror the selected tags into the bookmark tree, and report the run.
  *
- * The report is the point of the wrapper: the popup renders `lastSyncAt` and
- * `lastSyncError` straight out of storage and is usually shut while a sync
- * runs, so a failure that was not written down reads as a run that worked. The
- * failure is rethrown as well, because the service worker (5f) has to answer
- * the popup's `SyncRequest` with it when the popup *is* open.
+ * The report is the point of the wrapper: the options page renders
+ * `lastSyncAt` and `lastSyncError` straight out of storage and is usually shut
+ * while a sync runs, so a failure that was not written down reads as a run
+ * that worked. The failure is rethrown as well, because the service worker
+ * (5f) has to answer the page's `SyncRequest` with it when the page *is* open.
  *
  * `lastSyncAt` is left alone by a failed run: it means "when the bookmarks
  * were last correct", and a failure did not change that.
@@ -290,8 +290,8 @@ async function mirrorTags(input: {
  * `syncAll` stays the injectable one, so a test never has to stand up a token.
  *
  * No base URL means the extension was never connected or has been
- * disconnected. That is not a sync failure to record - the popup is showing
- * its Connect view either way - so it is raised as the same
+ * disconnected. That is not a sync failure to record - the options page is
+ * showing its Connect view either way - so it is raised as the same
  * `ReauthorizationRequiredError` a dead grant raises and left to the caller.
  */
 export async function runSync(): Promise<void> {

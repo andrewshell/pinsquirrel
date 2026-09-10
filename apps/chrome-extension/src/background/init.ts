@@ -37,13 +37,15 @@ export interface BackgroundDeps {
   /**
    * The whole OAuth flow against `baseUrl`, ending with tokens in storage.
    *
-   * This runs here rather than in the popup that asked for it because
-   * `chrome.identity.launchWebAuthFlow` opens a window, and Chrome destroys
-   * the action popup the moment that window takes focus. The flow died
-   * mid-exchange: the server had issued the tokens and nothing was left alive
-   * to store them, so the user got a grant on their profile and a popup that
-   * still asked them to connect. The worker outlives the popup, so it does not
-   * matter here that the popup is gone before this returns.
+   * This runs here rather than in the page that asked for it because
+   * `chrome.identity.launchWebAuthFlow` opens a window, and Chrome destroyed
+   * the action popup - which is what that UI was - the moment that window took
+   * focus. The flow died mid-exchange: the server had issued the tokens and
+   * nothing was left alive to store them, so the user got a grant on their
+   * profile and a popup that still asked them to connect. The UI is an options
+   * tab now and survives that, but the worker outliving it is still what makes
+   * this safe: it does not matter here whether the page is gone before this
+   * returns.
    */
   connect(baseUrl: string): Promise<void>
   logger: BackgroundLogger
@@ -56,7 +58,7 @@ export interface BackgroundDeps {
  * against two reads of the same tags; two connects means two consent windows
  * for one server. Everything that asks for one while it is running joins the
  * run already in flight instead, including a connect naming a different server
- * - the popup only ever offers one at a time, and its button is disabled for
+ * - the options page only ever offers one at a time, and its button is disabled for
  * the duration. Every caller has to attach its own handler: the shared promise
  * rejects once and is handed to each of them.
  */
@@ -105,7 +107,7 @@ export function initBackground(deps: BackgroundDeps): void {
    * A sync nobody is watching: on browser startup, or on the alarm.
    *
    * `runSync` has already written the failure to `lastSyncError` by the time
-   * it rethrows, and the popup reads that on its next open, so there is
+   * it rethrows, and the options page reads that on its next open, so there is
    * nothing left to do with the rejection but say it out loud. Letting it
    * escape would only be an unhandled rejection in the worker.
    */
@@ -120,8 +122,8 @@ export function initBackground(deps: BackgroundDeps): void {
     }
   }
 
-  /** A sync the popup is waiting on, with its outcome as a value. */
-  async function syncForPopup(): Promise<SyncResponse> {
+  /** A sync the options page is waiting on, with its outcome as a value. */
+  async function syncForOptions(): Promise<SyncResponse> {
     try {
       await sync()
       return { ok: true }
@@ -131,14 +133,15 @@ export function initBackground(deps: BackgroundDeps): void {
   }
 
   /**
-   * A connect the popup asked for, with its outcome as a value.
+   * A connect the options page asked for, with its outcome as a value.
    *
-   * Usually nobody is left to hear it: the consent window takes focus, Chrome
-   * tears the popup down, and `sendResponse` lands nowhere. That is fine -
-   * `connect` has written the tokens to storage by then, and the popup reads
-   * them on its next open. The answer only matters when the popup survived.
+   * It may well be that nobody is left to hear it: as the action popup, the
+   * consent window took focus, Chrome tore the page down, and `sendResponse`
+   * landed nowhere. That was fine - `connect` has written the tokens to
+   * storage by then, and the page reads them on its next open - and it stays
+   * fine now that an options tab usually does survive to hear the answer.
    */
-  async function connectForPopup(baseUrl: string): Promise<ConnectResponse> {
+  async function connectForOptions(baseUrl: string): Promise<ConnectResponse> {
     try {
       await connect(baseUrl)
       return { ok: true }
@@ -183,12 +186,12 @@ export function initBackground(deps: BackgroundDeps): void {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     // Both answers come later, so Chrome has to keep the channel open.
     if (isSyncRequest(message)) {
-      void syncForPopup().then(sendResponse)
+      void syncForOptions().then(sendResponse)
       return true
     }
 
     if (isConnectRequest(message)) {
-      void connectForPopup(message.baseUrl).then(sendResponse)
+      void connectForOptions(message.baseUrl).then(sendResponse)
       return true
     }
 

@@ -3,7 +3,7 @@
  * a client secret.
  *
  * `crypto.getRandomValues` and `crypto.subtle` are both on the global in an MV3
- * service worker and in the popup, so nothing here needs a polyfill or a
+ * service worker and in the options page, so nothing here needs a polyfill or a
  * bundled hash implementation.
  */
 

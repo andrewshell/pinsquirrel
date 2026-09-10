@@ -1,5 +1,5 @@
 /**
- * The contract between the popup and the service worker.
+ * The contract between the options page and the service worker.
  *
  * `chrome.runtime.sendMessage` carries `any` in both directions, so without a
  * shared module the two halves of the extension would each describe the
@@ -7,7 +7,7 @@
  * the other. Both sides import these types; the guards are how the untyped
  * value coming off the channel is turned into one of them.
  *
- * The popup sends. The service worker answers.
+ * The options page sends. The service worker answers.
  */
 
 /** "Sync the selected tags into bookmarks now." */
@@ -18,21 +18,21 @@ export interface SyncRequest {
 /**
  * "Connect to this server", meaning the whole OAuth flow.
  *
- * The popup cannot run this itself. `chrome.identity.launchWebAuthFlow` opens
- * a window, and Chrome destroys the action popup the moment that window takes
- * focus - taking the half-finished flow with it, after the server has already
- * issued the tokens. The user is left with a live grant on their profile, no
- * tokens in storage, and a popup that reopens on Connect. So the popup asks the
- * worker, which outlives it, and reads the tokens out of storage next time it
- * opens.
+ * The page cannot run this itself. `chrome.identity.launchWebAuthFlow` opens
+ * a window, and when this UI was the action popup Chrome destroyed it the
+ * moment that window took focus - taking the half-finished flow with it, after
+ * the server had already issued the tokens. The user was left with a live
+ * grant on their profile, no tokens in storage, and a popup that reopened on
+ * Connect. So the page asks the worker, which outlives it, and reads the
+ * tokens out of storage next time it opens.
  */
 export interface ConnectRequest {
   type: 'connect'
-  /** The origin to connect to, already normalized by the popup. */
+  /** The origin to connect to, already normalized by the options page. */
   baseUrl: string
 }
 
-/** Every message the popup can send. */
+/** Every message the options page can send. */
 export type ExtensionMessage = SyncRequest | ConnectRequest
 
 /**
@@ -47,10 +47,10 @@ export type SyncResponse = { ok: true } | { ok: false; error: string }
 /**
  * What the worker answers a `ConnectRequest` with.
  *
- * `reauthorizationRequired` is how the one failure the popup renders
+ * `reauthorizationRequired` is how the one failure the options page renders
  * differently survives the trip: `ReauthorizationRequiredError` is a class, and
  * a class does not cross the message channel - only its message would arrive,
- * and the popup would show it as ordinary status text.
+ * and the page would show it as ordinary status text.
  */
 export type ConnectResponse =
   { ok: true } | { ok: false; error: string; reauthorizationRequired?: boolean }
@@ -62,12 +62,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-/** For the worker: is this untyped message the popup's sync request? */
+/** For the worker: is this untyped message the options page's sync request? */
 export function isSyncRequest(value: unknown): value is SyncRequest {
   return isRecord(value) && value.type === 'sync'
 }
 
-/** For the worker: is this untyped message the popup's connect request? */
+/** For the worker: is this untyped message the options page's connect request? */
 export function isConnectRequest(value: unknown): value is ConnectRequest {
   return (
     isRecord(value) &&
@@ -76,14 +76,14 @@ export function isConnectRequest(value: unknown): value is ConnectRequest {
   )
 }
 
-/** For the popup: did the worker answer in the shape it promised? */
+/** For the options page: did the worker answer in the shape it promised? */
 export function isSyncResponse(value: unknown): value is SyncResponse {
   if (!isRecord(value)) return false
   if (value.ok === true) return true
   return value.ok === false && typeof value.error === 'string'
 }
 
-/** For the popup: did the worker answer in the shape it promised? */
+/** For the options page: did the worker answer in the shape it promised? */
 export function isConnectResponse(value: unknown): value is ConnectResponse {
   if (!isRecord(value)) return false
   if (value.ok === true) return true
@@ -96,7 +96,7 @@ export function isConnectResponse(value: unknown): value is ConnectResponse {
  * Ask the service worker to sync, and always come back with a `SyncResponse`.
  *
  * Two things that are not failures of the sync itself are reported as one
- * anyway, because the popup has the same job either way - say why nothing
+ * anyway, because the page has the same job either way - say why nothing
  * happened. A worker that is not installed yet rejects the send with "Receiving
  * end does not exist"; a worker that returns without answering resolves it with
  * `undefined`.
@@ -108,10 +108,10 @@ export async function requestSync(): Promise<SyncResponse> {
 /**
  * Ask the service worker to run the OAuth flow against `baseUrl`.
  *
- * Answers the same way `requestSync` does - but the answer usually arrives
- * nowhere, because the consent window closes the popup that is waiting for it.
- * The connection the flow made is read from storage on the popup's next open;
- * this response only matters in the case where the popup happened to survive.
+ * Answers the same way `requestSync` does - but the answer is not what the
+ * connection rests on: the worker owns the flow, and the page reads what it
+ * stored on its next open. As the action popup the answer arrived nowhere at
+ * all, because the consent window closed the page waiting for it.
  */
 export async function requestConnect(
   baseUrl: string

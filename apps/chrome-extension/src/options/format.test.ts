@@ -32,7 +32,7 @@ describe('parseBaseUrl', () => {
   it('rejects a scheme that is not http or https', () => {
     expect(parseBaseUrl('ftp://pinsquirrel.com')).toBeNull()
     expect(parseBaseUrl('javascript:alert(1)')).toBeNull()
-    expect(parseBaseUrl('chrome-extension://abc/popup.html')).toBeNull()
+    expect(parseBaseUrl('chrome-extension://abc/options.html')).toBeNull()
   })
 
   it('rejects anything past the origin, which discovery could not use', () => {
