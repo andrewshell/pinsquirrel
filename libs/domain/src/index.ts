@@ -93,6 +93,7 @@ export {
   TagError,
   TagNotFoundError,
   UnauthorizedTagAccessError,
+  type ExistingPinRef,
 } from './errors/pin.js'
 export {
   MetadataError,

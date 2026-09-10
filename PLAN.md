@@ -463,10 +463,16 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     not available — `rateLimitByIp(mcpLimiter)` runs in front of the auth middleware, so there
     is no client id yet, and moving it behind auth would make an unauthenticated flood free. One
     IP here is one user's agent. `apiV1Limiter` stays at 300. Separately, `DuplicatePinError`
-    now maps to a tool error naming the existing pin's id and pointing at `update_pin`, joining
-    `InsufficientScopeError` as the second exception to withholding detail: the colliding pin is
-    the caller's own, so the id is not a leak, and an agent told only "internal server error"
-    retries a call that can never succeed.
+    now maps to a tool error pointing at `update_pin` instead of collapsing to "internal server
+    error", which an agent answers by retrying a call that can never succeed. It names the
+    existing pin's id only when that pin is public. The duplicate lookup is scoped to the user
+    but not to what this surface may see, so the collision can be a private pin — one that
+    `get_pin`, `update_pin` and `delete_pin` all report as missing — and naming it would hand
+    back an identifier for a pin the caller is told everywhere else does not exist. That is why
+    `DuplicatePinError.existingPin` carries `isPrivate`, and why an absent flag is read as
+    unnameable. The collision itself is still reported on the private path: the URL was the
+    caller's own input, and a silent failure or a fake success sends the agent round in circles.
+    Existence is disclosed there and the id is not, deliberately.
 
 ## Reference
 
