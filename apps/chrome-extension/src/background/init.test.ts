@@ -485,3 +485,121 @@ describe('initBackground: pinning with nowhere to pin to', () => {
     expect(chrome.local.items.pinWindowId).toBeUndefined()
   })
 })
+
+/** The window the pin form was opened in, as storage remembers it. */
+const PIN_WINDOW_ID = 100
+
+/** Storage as it looks with a pin window open. */
+const PINNING = { ...CONNECTED, pinWindowId: PIN_WINDOW_ID }
+
+/** The saved page, as the pin form redirects to it in embed mode (9a). */
+const SAVED_URL = 'https://pinsquirrel.com/pins/embed/saved'
+
+/** A navigation in the pin window, the way Chrome reports one. */
+function navigated(
+  url: string | undefined,
+  windowId = PIN_WINDOW_ID
+): [number, chrome.tabs.OnUpdatedInfo, chrome.tabs.Tab] {
+  return [
+    7,
+    url === undefined ? { status: 'complete' } : { url },
+    tab({ windowId, url }),
+  ]
+}
+
+describe('initBackground: the pin window reaching the saved page', () => {
+  it('closes the window and forgets it', async () => {
+    const chrome = stubChrome(PINNING)
+    initBackground(deps())
+
+    chrome.tabs.onUpdated.fire(...navigated(SAVED_URL))
+    await flush()
+
+    expect(chrome.windows.removed).toEqual([PIN_WINDOW_ID])
+    expect(chrome.local.items.pinWindowId).toBeUndefined()
+  })
+
+  it('syncs, so a pin on a selected tag reaches the bookmarks bar', async () => {
+    const chrome = stubChrome(PINNING)
+    const runSync = vi.fn(() => Promise.resolve())
+    initBackground(deps({ runSync }))
+
+    chrome.tabs.onUpdated.fire(...navigated(SAVED_URL))
+
+    await vi.waitFor(() => {
+      expect(runSync).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('does not sync when there is no grant to sync over', async () => {
+    const chrome = stubChrome({
+      baseUrl: 'https://pinsquirrel.com',
+      pinWindowId: PIN_WINDOW_ID,
+    })
+    const runSync = vi.fn(() => Promise.resolve())
+    initBackground(deps({ runSync }))
+
+    chrome.tabs.onUpdated.fire(...navigated(SAVED_URL))
+    await flush()
+
+    expect(chrome.windows.removed).toEqual([PIN_WINDOW_ID])
+    expect(runSync).not.toHaveBeenCalled()
+  })
+
+  it('reads the URL off the tab when the change did not carry one', async () => {
+    const chrome = stubChrome(PINNING)
+    initBackground(deps())
+
+    chrome.tabs.onUpdated.fire(
+      7,
+      { status: 'complete' },
+      tab({
+        windowId: PIN_WINDOW_ID,
+        url: SAVED_URL,
+      })
+    )
+    await flush()
+
+    expect(chrome.windows.removed).toEqual([PIN_WINDOW_ID])
+  })
+
+  it('leaves the window alone while the form is still open', async () => {
+    const chrome = stubChrome(PINNING)
+    const runSync = vi.fn(() => Promise.resolve())
+    initBackground(deps({ runSync }))
+
+    chrome.tabs.onUpdated.fire(
+      ...navigated('https://pinsquirrel.com/pins/new?embed=1')
+    )
+    await flush()
+
+    expect(chrome.windows.removed).toEqual([])
+    expect(chrome.local.items.pinWindowId).toBe(PIN_WINDOW_ID)
+    expect(runSync).not.toHaveBeenCalled()
+  })
+
+  it('ignores the saved page reached in a window it is not watching', async () => {
+    const chrome = stubChrome(PINNING)
+    const runSync = vi.fn(() => Promise.resolve())
+    initBackground(deps({ runSync }))
+
+    chrome.tabs.onUpdated.fire(...navigated(SAVED_URL, 42))
+    await flush()
+
+    expect(chrome.windows.removed).toEqual([])
+    expect(chrome.local.items.pinWindowId).toBe(PIN_WINDOW_ID)
+    expect(runSync).not.toHaveBeenCalled()
+  })
+
+  it('ignores an update with no pin window open at all', async () => {
+    const chrome = stubChrome(CONNECTED)
+    const runSync = vi.fn(() => Promise.resolve())
+    initBackground(deps({ runSync }))
+
+    chrome.tabs.onUpdated.fire(...navigated(SAVED_URL))
+    await flush()
+
+    expect(chrome.windows.removed).toEqual([])
+    expect(runSync).not.toHaveBeenCalled()
+  })
+})
