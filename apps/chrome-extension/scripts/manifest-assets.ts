@@ -4,6 +4,7 @@ export type ExtensionManifest = {
     default_popup?: string
     default_icon?: Record<string, string>
   }
+  options_page?: string
   icons?: Record<string, string>
   background?: {
     service_worker?: string
@@ -24,6 +25,7 @@ export function staticAssetsToCopy(manifest: ExtensionManifest): string[] {
     ...Object.values(manifest.icons ?? {}),
     ...Object.values(manifest.action?.default_icon ?? {}),
     ...(manifest.action?.default_popup ? [manifest.action.default_popup] : []),
+    ...(manifest.options_page ? [manifest.options_page] : []),
   ]
 
   return [...new Set(paths)].sort()
