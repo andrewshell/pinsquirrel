@@ -49,6 +49,16 @@ describe('requireScope', () => {
     expect(() => requireScope({}, 'pins:write')).toThrow(InsufficientScopeError)
   })
 
+  // The half-populated case between the two above, and the one most likely
+  // to arrive for real: an authenticated connection whose `AuthInfo` carries
+  // no scope list at all. `?? []` has to catch a missing key, not only a
+  // missing `authInfo`, or an authenticated caller writes unscoped.
+  it('refuses when the auth info carries no scope list', () => {
+    expect(() => requireScope({ authInfo: {} }, 'pins:write')).toThrow(
+      InsufficientScopeError
+    )
+  })
+
   it('names the scope it wanted, so the refusal can say which', () => {
     let thrown: unknown
     try {
