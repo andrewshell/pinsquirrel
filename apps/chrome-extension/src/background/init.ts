@@ -223,12 +223,47 @@ export function initBackground(deps: BackgroundDeps): void {
     }
   }
 
+  /**
+   * The pin window has navigated: close it if the pin has been saved.
+   *
+   * `/pins/embed/saved` is the stable confirmation the embed form redirects to
+   * (9a), and matching on it is why that URL is stable. The page cannot close
+   * itself - a page that was not script-opened may not - so the worker does
+   * it, and the sync afterwards is what puts a pin tagged with a selected tag
+   * on the bookmarks bar without waiting for the hour.
+   *
+   * Every other update is somebody else's tab: another window entirely, or the
+   * form still being filled in.
+   */
+  async function onPinWindowUpdated(
+    changeInfo: chrome.tabs.OnUpdatedInfo,
+    tab: chrome.tabs.Tab
+  ): Promise<void> {
+    const stored = await storage.getMany(['baseUrl', 'pinWindowId'])
+    if (stored.pinWindowId === undefined || stored.baseUrl === undefined) return
+    if (tab.windowId !== stored.pinWindowId) return
+
+    // `changeInfo.url` is only there on the update that changed it; the
+    // `status: 'complete'` that follows carries the URL on the tab instead.
+    const url = changeInfo.url ?? tab.url
+    if (url === undefined) return
+    if (!url.startsWith(`${stored.baseUrl}/pins/embed/saved`)) return
+
+    await chrome.windows.remove(stored.pinWindowId)
+    await storage.remove(['pinWindowId'])
+    await syncQuietly('pin')
+  }
+
   chrome.runtime.onInstalled.addListener(() => {
     void ensureAlarm()
   })
 
   chrome.action.onClicked.addListener(tab => {
     void pinTab(tab)
+  })
+
+  chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
+    void onPinWindowUpdated(changeInfo, tab)
   })
 
   chrome.runtime.onStartup.addListener(() => {
