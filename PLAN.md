@@ -480,9 +480,10 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     a site release and a site release does not bump the extension. This reverses the earlier
     choice to bump the manifest with every release: the manifest version is what the Chrome
     Web Store shows and what a new upload is judged against, so a version that moved without
-    the code moving was noise for users and a review for nothing. Both packages start from
-    3.6.0, the last shared release. `pnpm extension:package` names the zip after the manifest,
-    so the store upload and the tag agree.
+    the code moving was noise for users and a review for nothing. The extension's first solo
+    release is 1.0.0, which is what the store sees first, set with a `Release-As` footer on
+    the commit that reset its version; the site carries on from 3.6.0. `pnpm extension:package`
+    names the zip after the manifest, so the store upload and the tag agree.
 
 ## Reference
 
