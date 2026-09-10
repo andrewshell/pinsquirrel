@@ -821,6 +821,38 @@ describe('pins routes', () => {
     })
   })
 
+  describe('GET /embed/saved — confirmation', () => {
+    it('renders the confirmation in the embed layout', async () => {
+      const res = await app.request('/pins/embed/saved')
+      const html = await res.text()
+
+      expect(res.status).toBe(200)
+      expect(html).toContain('Pin saved')
+      expect(html).not.toContain('<header')
+      expect(html).not.toContain('<footer')
+      // A page the extension did not script-open cannot close itself, so it
+      // says so and the worker does the closing.
+      expect(html).toContain('close this window')
+    })
+
+    it('shows the flash the save set', async () => {
+      session.getFlash.mockReturnValue({
+        type: 'success',
+        message: 'Pin created successfully!',
+      })
+
+      const res = await app.request('/pins/embed/saved')
+
+      expect(await res.text()).toContain('Pin created successfully!')
+    })
+
+    it('is not read as a pin id', async () => {
+      await app.request('/pins/embed/saved')
+
+      expect(svc.getPin).not.toHaveBeenCalled()
+    })
+  })
+
   describe('POST /:id/toggle-read', () => {
     it('flips readLater and returns just the card', async () => {
       svc.getPin.mockResolvedValue(makePin({ readLater: false }))
