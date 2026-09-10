@@ -603,3 +603,38 @@ describe('initBackground: the pin window reaching the saved page', () => {
     expect(runSync).not.toHaveBeenCalled()
   })
 })
+
+describe('initBackground: the pin-page keyboard shortcut', () => {
+  it('takes the same path as a click on the acorn', async () => {
+    const chrome = stubChrome(CONNECTED)
+    initBackground(deps())
+
+    chrome.commands.onCommand.fire('pin-page', tab())
+    await flush()
+
+    expect(chrome.windows.created.map(window => window.url)).toEqual([
+      'https://pinsquirrel.com/pins/new' +
+        '?url=https%3A%2F%2Fexample.com%2Farticle&title=An+article&embed=1',
+    ])
+  })
+
+  it('ignores a command that is not this one', async () => {
+    const chrome = stubChrome(CONNECTED)
+    initBackground(deps())
+
+    chrome.commands.onCommand.fire('something-else', tab())
+    await flush()
+
+    expect(chrome.windows.created).toEqual([])
+  })
+
+  it('does nothing when Chrome sends no tab with the command', async () => {
+    const chrome = stubChrome(CONNECTED)
+    initBackground(deps())
+
+    chrome.commands.onCommand.fire('pin-page', undefined)
+    await flush()
+
+    expect(chrome.windows.created).toEqual([])
+  })
+})
