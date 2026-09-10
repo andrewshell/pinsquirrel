@@ -474,6 +474,16 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     caller's own input, and a silent failure or a fake success sends the agent round in circles.
     Existence is disclosed there and the id is not, deliberately.
 
+25. **The Chrome extension is versioned on its own.** It is its own release-please package
+    (`apps/chrome-extension`, tagged `chrome-extension-vX.Y.Z`, own `CHANGELOG.md`), and the
+    root package excludes that path, so a commit that only touches the extension does not cut
+    a site release and a site release does not bump the extension. This reverses the earlier
+    choice to bump the manifest with every release: the manifest version is what the Chrome
+    Web Store shows and what a new upload is judged against, so a version that moved without
+    the code moving was noise for users and a review for nothing. Both packages start from
+    3.6.0, the last shared release. `pnpm extension:package` names the zip after the manifest,
+    so the store upload and the tag agree.
+
 ## Reference
 
 - [MCP spec: Authorization](https://modelcontextprotocol.io/specification/draft/basic/authorization)

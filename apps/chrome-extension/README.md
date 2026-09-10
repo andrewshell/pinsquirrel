@@ -126,8 +126,10 @@ Runs a production build and zips the contents of `dist/` into
 `release/pinsquirrel-chrome-extension-<version>.zip`, which is the file the
 developer dashboard takes. The archive is made from inside `dist/` so that
 `manifest.json` sits at its root, which is where the store looks for it. The
-version comes from the manifest, and release-please bumps that with every
-release, so every upload is a new version. `release/` is git-ignored.
+version comes from the manifest. The extension is its own release-please
+package: only commits under `apps/chrome-extension` bump it, its tags are
+`chrome-extension-vX.Y.Z`, and it keeps its own `CHANGELOG.md`, so a site
+release leaves the store version alone. `release/` is git-ignored.
 
 ## Tests
 
