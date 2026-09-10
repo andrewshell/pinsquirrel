@@ -4,6 +4,7 @@ import {
   pinListInputSchema,
   pinGetInputSchema,
   pinCreateInputSchema,
+  pinDeleteInputSchema,
   pinUpdateInputSchema,
   tagListInputSchema,
   pinFilterFromInput,
@@ -179,6 +180,31 @@ export function createMcpServer(): McpServer {
         })
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(pin) }],
+        }
+      } catch (err) {
+        return mapDomainErrorToMcp(err)
+      }
+    }
+  )
+
+  server.registerTool(
+    'delete_pin',
+    {
+      title: 'Delete Pin',
+      description:
+        'Delete a bookmark permanently. Any tag left with no pins goes with ' +
+        'it. Requires the pins:write scope.',
+      inputSchema: pinDeleteInputSchema.shape,
+      annotations: { destructiveHint: true },
+    },
+    async ({ id }, extra) => {
+      try {
+        requireScope(extra, 'pins:write')
+        const user = getUserFromExtra(extra)
+        const ac = new AccessControl(user)
+        await pinService.deletePublicPin(ac, id)
+        return {
+          content: [{ type: 'text' as const, text: `Deleted pin ${id}.` }],
         }
       } catch (err) {
         return mapDomainErrorToMcp(err)
