@@ -258,7 +258,11 @@ export function createPinRoutes({
         const existing = await pinService.findByUrl(ac, prefillUrl)
 
         if (existing) {
-          return c.redirect(`${baseUrl}/${existing.id}/edit`)
+          // In the popup, "already pinned" has to become the site's real edit
+          // form in the same window rather than a link out to the full site.
+          return c.redirect(
+            `${baseUrl}/${existing.id}/edit${embed ? '?embed=1' : ''}`
+          )
         }
       }
     }
