@@ -6,9 +6,10 @@ import { vi } from 'vitest'
  * Only the surface this extension actually uses is here: `storage.local`,
  * `storage.sync` (present so a test can prove nothing writes to it), the two
  * `identity` calls the OAuth flow makes, the `bookmarks` calls the sync makes,
- * and the `runtime` and `alarms` events the service worker listens on.
- * Anything else is left off on purpose - a test that reaches for it should
- * fail loudly rather than get an empty object back.
+ * the `runtime`, `alarms`, `action`, `commands` and `tabs` events the service
+ * worker listens on, and the `windows` calls the pin flow makes. Anything else
+ * is left off on purpose - a test that reaches for it should fail loudly
+ * rather than get an empty object back.
  *
  * `vi.unstubAllGlobals()` in an `afterEach` is what undoes it.
  */
@@ -59,6 +60,20 @@ export interface RuntimeEventsStub {
   >
 }
 
+/**
+ * An in-memory `chrome.windows`: the windows the pin flow opened and closed.
+ *
+ * `create` answers a window with an id, because the worker keeps that id to
+ * recognise the window a `tabs.onUpdated` came from. Ids start at 100 so a
+ * test that mixes them up with a tab id or a bookmark id notices.
+ */
+export interface WindowsStub {
+  /** Every `chrome.windows.create` call, in order. */
+  created: chrome.windows.CreateData[]
+  /** Every window id handed to `chrome.windows.remove`, in order. */
+  removed: number[]
+}
+
 /** An in-memory `chrome.alarms`: what exists, and what asked for it. */
 export interface AlarmsStub {
   /** Every `chrome.alarms.create` call, in order. */
@@ -83,8 +98,22 @@ export interface ChromeStub {
   bookmarks: BookmarksStub
   /** The events the service worker registers on, for a test to fire. */
   runtime: RuntimeEventsStub
+  /** `chrome.runtime.openOptionsPage`, which the pin flow falls back to. */
+  openOptionsPage: ReturnType<typeof vi.fn<() => Promise<void>>>
   /** The periodic sync alarm, for a test to inspect and fire. */
   alarms: AlarmsStub
+  /** The toolbar click that asks for the current page to be pinned. */
+  action: { onClicked: EventStub<[chrome.tabs.Tab]> }
+  /** The keyboard shortcut that asks for the same thing. */
+  commands: {
+    onCommand: EventStub<[string, chrome.tabs.Tab | undefined]>
+  }
+  /** How the worker hears that the pin window has navigated. */
+  tabs: {
+    onUpdated: EventStub<[number, chrome.tabs.OnUpdatedInfo, chrome.tabs.Tab]>
+  }
+  /** The pin window, for a test to see opened and closed. */
+  windows: WindowsStub
 }
 
 /** One event stub, plus the `addListener` the extension code calls. */
@@ -372,6 +401,13 @@ export function stubChrome(
   const onAlarm = eventStub<[chrome.alarms.Alarm]>()
   const alarms: AlarmsStub = { created: [], existing: new Map(), onAlarm }
 
+  const onClicked = eventStub<[chrome.tabs.Tab]>()
+  const onCommand = eventStub<[string, chrome.tabs.Tab | undefined]>()
+  const onUpdated =
+    eventStub<[number, chrome.tabs.OnUpdatedInfo, chrome.tabs.Tab]>()
+  const windows: WindowsStub = { created: [], removed: [] }
+  let nextWindowId = 100
+
   const stub: ChromeStub = {
     local: { items: { ...initialLocal } },
     sync: { items: {} },
@@ -393,7 +429,12 @@ export function stubChrome(
       calls: [],
     },
     runtime: runtimeEvents,
+    openOptionsPage: vi.fn<() => Promise<void>>(() => Promise.resolve()),
     alarms,
+    action: { onClicked },
+    commands: { onCommand },
+    tabs: { onUpdated },
+    windows,
   }
 
   vi.stubGlobal('chrome', {
@@ -407,9 +448,49 @@ export function stubChrome(
     },
     runtime: {
       sendMessage: stub.sendMessage,
+      openOptionsPage: stub.openOptionsPage,
       onStartup: runtimeEvents.onStartup,
       onInstalled: runtimeEvents.onInstalled,
       onMessage: runtimeEvents.onMessage,
+    },
+    action: { onClicked },
+    commands: { onCommand },
+    tabs: { onUpdated },
+    windows: {
+      create: (data: chrome.windows.CreateData) => {
+        windows.created.push(data)
+        const id = nextWindowId++
+        const window: chrome.windows.Window = {
+          id,
+          focused: true,
+          alwaysOnTop: false,
+          incognito: false,
+          type: data.type,
+          tabs: [
+            {
+              id,
+              index: 0,
+              windowId: id,
+              ...(typeof data.url === 'string' ? { url: data.url } : {}),
+              active: true,
+              pinned: false,
+              highlighted: true,
+              selected: true,
+              incognito: false,
+              discarded: false,
+              frozen: false,
+              autoDiscardable: true,
+              groupId: -1,
+              lastAccessed: Date.now(),
+            },
+          ],
+        }
+        return Promise.resolve(window)
+      },
+      remove: (windowId: number) => {
+        windows.removed.push(windowId)
+        return Promise.resolve()
+      },
     },
     alarms: {
       create: (name: string, info: chrome.alarms.AlarmCreateInfo) => {

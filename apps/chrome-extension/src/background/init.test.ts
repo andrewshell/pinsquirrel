@@ -400,3 +400,74 @@ describe('initBackground: one connect at a time', () => {
     expect(connect).toHaveBeenCalledTimes(2)
   })
 })
+
+/**
+ * A tab as the click and the command events hand one over.
+ *
+ * Only `url`, `title` and `windowId` are ever read; the rest is what
+ * `chrome.tabs.Tab` insists on and stands for nothing.
+ */
+function tab(overrides: Partial<chrome.tabs.Tab> = {}): chrome.tabs.Tab {
+  return {
+    id: 7,
+    index: 0,
+    windowId: 1,
+    url: 'https://example.com/article',
+    title: 'An article',
+    active: true,
+    pinned: false,
+    highlighted: true,
+    selected: true,
+    incognito: false,
+    discarded: false,
+    frozen: false,
+    autoDiscardable: true,
+    groupId: -1,
+    lastAccessed: 0,
+    ...overrides,
+  }
+}
+
+describe('initBackground: pinning the current page', () => {
+  it("opens the site's own pin form, prefilled, as a popup window", async () => {
+    const chrome = stubChrome(CONNECTED)
+    initBackground(deps())
+
+    chrome.action.onClicked.fire(tab())
+    await flush()
+
+    expect(chrome.windows.created).toEqual([
+      {
+        url:
+          'https://pinsquirrel.com/pins/new' +
+          '?url=https%3A%2F%2Fexample.com%2Farticle&title=An+article&embed=1',
+        type: 'popup',
+        width: 520,
+        height: 680,
+      },
+    ])
+  })
+
+  it('leaves out a field the tab does not have', async () => {
+    const chrome = stubChrome(CONNECTED)
+    initBackground(deps())
+
+    chrome.action.onClicked.fire(tab({ title: undefined }))
+    await flush()
+
+    expect(chrome.windows.created[0]?.url).toBe(
+      'https://pinsquirrel.com/pins/new' +
+        '?url=https%3A%2F%2Fexample.com%2Farticle&embed=1'
+    )
+  })
+
+  it('remembers the window in storage, which outlives the worker', async () => {
+    const chrome = stubChrome(CONNECTED)
+    initBackground(deps())
+
+    chrome.action.onClicked.fire(tab())
+    await flush()
+
+    expect(chrome.local.items.pinWindowId).toBe(100)
+  })
+})
