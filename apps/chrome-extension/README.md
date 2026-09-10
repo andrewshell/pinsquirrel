@@ -111,7 +111,23 @@ copies `manifest.json`, `options.html` and the icons alongside them. The copy li
 is derived from the manifest (`scripts/manifest-assets.ts`), so an icon added to
 `manifest.json` ships without touching the build script.
 
-Set `NODE_ENV=production` to minify and drop the source maps.
+Set `NODE_ENV=production` to minify, drop the source maps, and write the
+release manifest: `scripts/manifest-release.ts` strips every `http://` host
+permission, so the dev server's `http://localhost:8100/*` never reaches a user's
+install prompt. The checked-in `manifest.json` keeps it for load-unpacked work.
+
+## Package for the Chrome Web Store
+
+```bash
+pnpm --filter @pinsquirrel/chrome-extension package
+```
+
+Runs a production build and zips the contents of `dist/` into
+`release/pinsquirrel-chrome-extension-<version>.zip`, which is the file the
+developer dashboard takes. The archive is made from inside `dist/` so that
+`manifest.json` sits at its root, which is where the store looks for it. The
+version comes from the manifest, and release-please bumps that with every
+release, so every upload is a new version. `release/` is git-ignored.
 
 ## Tests
 
@@ -157,22 +173,24 @@ removed and re-added.
 
 ## Layout
 
-| Path                         | What it is                                                                |
-| ---------------------------- | ------------------------------------------------------------------------- |
-| `manifest.json`              | Manifest V3: permissions, service worker, options page, `pin-page`        |
-| `options.html`               | Options markup and styles; no inline scripts (extension CSP)              |
-| `src/background.ts`          | Service worker entry point: hands `initBackground` its real dependencies  |
-| `src/background/init.ts`     | The worker itself: startup, the alarm, pinning, and the page's requests   |
-| `src/options.ts`             | Options entry point: hands `initOptions` its real dependencies            |
-| `src/options/`               | The page itself — `init.ts` wiring, `render.ts` and `format.ts` pure      |
-| `src/messages.ts`            | The options page ↔ service worker message contract                        |
-| `src/auth.ts`                | OAuth client: connect, refresh, `authorizedFetch`, disconnect             |
-| `src/api-client.ts`          | `/api/v1` reads over `authorizedFetch`                                    |
-| `src/bookmark-sync.ts`       | Tags to bookmark folders: `syncAll`, and `runSync` for the worker         |
-| `src/storage.ts`             | The only module that names `chrome.storage.local`                         |
-| `scripts/build.ts`           | esbuild bundle + asset copy                                               |
-| `scripts/manifest-assets.ts` | Derives the copy list from the manifest                                   |
-| `icons/`                     | The acorn favicon at 16/48/128; 48 and 128 are upscaled from the 32px PNG |
+| Path                          | What it is                                                                |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| `manifest.json`               | Manifest V3: permissions, service worker, options page, `pin-page`        |
+| `options.html`                | Options markup and styles; no inline scripts (extension CSP)              |
+| `src/background.ts`           | Service worker entry point: hands `initBackground` its real dependencies  |
+| `src/background/init.ts`      | The worker itself: startup, the alarm, pinning, and the page's requests   |
+| `src/options.ts`              | Options entry point: hands `initOptions` its real dependencies            |
+| `src/options/`                | The page itself — `init.ts` wiring, `render.ts` and `format.ts` pure      |
+| `src/messages.ts`             | The options page ↔ service worker message contract                        |
+| `src/auth.ts`                 | OAuth client: connect, refresh, `authorizedFetch`, disconnect             |
+| `src/api-client.ts`           | `/api/v1` reads over `authorizedFetch`                                    |
+| `src/bookmark-sync.ts`        | Tags to bookmark folders: `syncAll`, and `runSync` for the worker         |
+| `src/storage.ts`              | The only module that names `chrome.storage.local`                         |
+| `scripts/build.ts`            | esbuild bundle + asset copy                                               |
+| `scripts/package.ts`          | Zips `dist/` into `release/` for the store                                |
+| `scripts/manifest-assets.ts`  | Derives the copy list from the manifest                                   |
+| `scripts/manifest-release.ts` | The shipped manifest and the zip's name                                   |
+| `icons/`                      | The acorn favicon at 16/48/128; 48 and 128 are upscaled from the 32px PNG |
 
 `tsconfig.json` covers `src` and `scripts` as one project. `types` carries
 `chrome` (the extension APIs), `node` (for the build script) and

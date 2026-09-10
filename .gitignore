@@ -24,3 +24,6 @@ apps/admin/src/static/styles.css
 .idea/
 *.swp
 *.swo
+
+# Chrome Web Store upload zips
+apps/chrome-extension/release/
