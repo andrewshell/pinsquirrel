@@ -102,10 +102,14 @@ export const PinForm: FC<PinFormProps> = ({
             hx-trigger="change"
             hx-target="#url-check-result"
             hx-swap="innerHTML"
-            hx-params="url,exclude,baseUrl"
-            hx-vals={JSON.stringify(
-              pinId ? { baseUrl, exclude: pinId } : { baseUrl }
-            )}
+            hx-params={`url,exclude,baseUrl${embed ? ',embed' : ''}`}
+            hx-vals={JSON.stringify({
+              baseUrl,
+              ...(pinId ? { exclude: pinId } : {}),
+              // The probe renders its own copy of the notice below, so it
+              // needs to know it is answering the popup.
+              ...(embed ? { embed: '1' } : {}),
+            })}
           />
           <div id="url-check-result">
             {duplicatePinId && (
@@ -115,7 +119,9 @@ export const PinForm: FC<PinFormProps> = ({
               >
                 This URL is already saved.{' '}
                 <a
-                  href={`${baseUrl}/${duplicatePinId}/edit`}
+                  href={`${baseUrl}/${duplicatePinId}/edit${
+                    embed ? '?embed=1' : ''
+                  }`}
                   class="underline hover:text-red-800 dark:hover:text-red-200"
                 >
                   Edit instead?

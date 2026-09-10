@@ -285,4 +285,25 @@ describe('GET /api/internal/check-url — baseUrl', () => {
 
     expect(body).toContain('href="/pins/pin-9/edit"')
   })
+
+  // Asked from the extension's popup window, the link has to stay in the
+  // popup rather than opening the full site.
+  it('keeps the link in the popup when embed=1', async () => {
+    const body = await duplicateFragment('?url=https://example.test/a&embed=1')
+
+    expect(body).toContain('href="/pins/pin-9/edit?embed=1"')
+  })
+
+  // Same rule as the pages: the literal 1, or nothing. The value lands in the
+  // same raw HTML string as baseUrl, so it is never interpolated.
+  it.each([['yes'], ['0'], ['1" onclick="alert(1)']])(
+    'ignores an embed of %s',
+    async embed => {
+      const body = await duplicateFragment(
+        `?url=https://example.test/a&embed=${encodeURIComponent(embed)}`
+      )
+
+      expect(body).toContain('href="/pins/pin-9/edit"')
+    }
+  )
 })
