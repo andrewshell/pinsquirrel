@@ -7,3 +7,7 @@ apps/hono/src/static/styles.css
 apps/hono/src/static/htmx.min.js
 apps/admin/src/static/styles.css
 apps/admin/keys/
+# release-please rewrites the version here with JSON.stringify, which expands
+# every array onto its own lines; prettier collapses short ones back. The two
+# disagree on every release, so the file is left to the bot.
+apps/chrome-extension/manifest.json
