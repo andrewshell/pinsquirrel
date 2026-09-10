@@ -119,7 +119,7 @@ install prompt. The checked-in `manifest.json` keeps it for load-unpacked work.
 ## Package for the Chrome Web Store
 
 ```bash
-pnpm --filter @pinsquirrel/chrome-extension package
+pnpm extension:package
 ```
 
 Runs a production build and zips the contents of `dist/` into
