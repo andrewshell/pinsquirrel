@@ -2,7 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { Hono } from 'hono'
 import { RateLimiter } from './rate-limiter'
 import {
+  apiV1Limiter,
   getClientIp,
+  mcpLimiter,
   rateLimitByClientId,
   rateLimitByIp,
   signinRateLimitKey,
@@ -276,5 +278,32 @@ describe('rateLimitByClientId', () => {
       body: JSON.stringify({ client_id: 'a' }),
     })
     expect(res.status).toBe(200)
+  })
+})
+
+describe('the two protected-resource budgets', () => {
+  const key = 'budget-comparison'
+
+  afterEach(() => {
+    mcpLimiter.reset(key)
+    apiV1Limiter.reset(key)
+  })
+
+  // Retagging is one update_pin per pin plus the reads around it, so an MCP
+  // session is legitimately far chattier than a REST client working the same
+  // collection. Keying /mcp by client instead is not on the table: the limiter
+  // runs before auth, where there is no client to key on. Written as a
+  // comparison rather than a number so retuning either budget does not have to
+  // come here first.
+  it('lets an MCP session outlast a REST client on the same address', () => {
+    let spent = 0
+    while (!apiV1Limiter.isLimited(key)) {
+      apiV1Limiter.hit(key)
+      spent++
+    }
+
+    for (let i = 0; i < spent; i++) mcpLimiter.hit(key)
+
+    expect(mcpLimiter.isLimited(key)).toBe(false)
   })
 })
