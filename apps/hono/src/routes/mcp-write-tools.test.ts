@@ -107,6 +107,60 @@ describe('mcp write tools', () => {
     return body.result as ToolResult
   }
 
+  // One case over the whole catalogue, because a tool a client cannot see is
+  // a tool that does not exist, and the annotations are what a client uses to
+  // decide whether to confirm before calling.
+  describe('tools/list', () => {
+    it('advertises the reads and the writes, annotated', async () => {
+      granted(FULL)
+
+      const res = await app.request('/mcp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          Authorization: 'Bearer pso_ok',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      })
+      const body = (await res.json()) as {
+        result: {
+          tools: {
+            name: string
+            description?: string
+            annotations?: Record<string, boolean>
+          }[]
+        }
+      }
+      const byName = new Map(body.result.tools.map(t => [t.name, t]))
+
+      expect([...byName.keys()].sort()).toEqual([
+        'create_pin',
+        'delete_pin',
+        'delete_tag',
+        'get_pin',
+        'list_pins',
+        'list_tags',
+        'merge_tags',
+        'update_pin',
+      ])
+      expect(byName.get('list_pins')?.annotations?.readOnlyHint).toBe(true)
+      // Retagging is a re-send-safe operation, and it destroys nothing: the
+      // tags it drops off a pin are the caller's own instruction.
+      expect(byName.get('update_pin')?.annotations?.idempotentHint).toBe(true)
+      expect(byName.get('update_pin')?.annotations?.destructiveHint).toBe(
+        undefined
+      )
+      for (const name of ['delete_pin', 'delete_tag', 'merge_tags']) {
+        expect(byName.get(name)?.annotations?.destructiveHint).toBe(true)
+      }
+      // The description is the only documentation the model reads, so the two
+      // things it must not guess at are in it.
+      expect(byName.get('update_pin')?.description).toContain('REPLACES')
+      expect(byName.get('merge_tags')?.description).toContain('list_tags')
+    })
+  })
+
   describe('update_pin', () => {
     // The scope is the whole point of Phase 8. A read-only connection reaching
     // a service here would mean the guard is decorative.
