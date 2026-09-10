@@ -20,6 +20,18 @@ function safeBaseUrl(value: string | null): string {
   return value && /^(\/[A-Za-z0-9_-]+)+$/.test(value) ? value : '/pins'
 }
 
+/**
+ * The same notice asked from the extension's popup window has to keep the
+ * "Edit instead?" link inside the popup.
+ *
+ * Only the literal `1` turns it on, as on the pages, and the answer is the
+ * literal query string rather than anything derived from the input — the
+ * caller's value never reaches the HTML.
+ */
+function safeEmbedQuery(value: string | null): string {
+  return value === '1' ? '?embed=1' : ''
+}
+
 const apiInternal = new Hono()
 
 // Apply auth middleware to all API routes
@@ -80,8 +92,9 @@ apiInternal.get('/check-url', async c => {
     // swap. Answering with a script instead would need a CSP exception.
     if (isDuplicate) {
       const baseUrl = safeBaseUrl(url.searchParams.get('baseUrl'))
+      const embed = safeEmbedQuery(url.searchParams.get('embed'))
       return c.html(
-        `<p class="text-sm text-destructive font-medium" data-url-duplicate>This URL is already saved. <a href="${baseUrl}/${existingPin.id}/edit" class="underline hover:text-destructive/80">Edit instead?</a></p>`
+        `<p class="text-sm text-destructive font-medium" data-url-duplicate>This URL is already saved. <a href="${baseUrl}/${existingPin.id}/edit${embed}" class="underline hover:text-destructive/80">Edit instead?</a></p>`
       )
     }
     return c.html('')

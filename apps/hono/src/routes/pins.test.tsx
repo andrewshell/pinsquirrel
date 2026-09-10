@@ -336,6 +336,17 @@ describe('pins routes', () => {
       expect(none).toContain('Back to Pins')
     })
 
+    it('asks the check-url probe to carry embed too', async () => {
+      // The probe answers with its own "Edit instead?" link, so it has to know
+      // it is being asked from inside the popup.
+      const embedded = await (await app.request('/pins/new?embed=1')).text()
+      const plain = await (await app.request('/pins/new')).text()
+
+      expect(embedded).toContain('hx-params="url,exclude,baseUrl,embed"')
+      expect(embedded).toContain('&quot;embed&quot;:&quot;1&quot;')
+      expect(plain).not.toContain('&quot;embed&quot;')
+    })
+
     it('carries embed through the form on a hidden field', async () => {
       const embedded = await (await app.request('/pins/new?embed=1')).text()
       const plain = await (await app.request('/pins/new')).text()
@@ -552,6 +563,45 @@ describe('pins routes', () => {
 
       expect(html).not.toContain('<html')
       expect(html).toContain('name="embed"')
+    })
+
+    it('keeps an embedded duplicate notice inside the popup', async () => {
+      svc.createPin.mockRejectedValue(
+        new DuplicatePinError('https://x.test/a', {
+          id: 'pin-existing',
+          createdAt: new Date('2024-01-01'),
+        })
+      )
+
+      const res = await app.request(
+        '/pins/new',
+        formBody({ url: 'https://x.test/a', title: 'T', embed: '1' })
+      )
+
+      expect(await res.text()).toContain(
+        'href="/pins/pin-existing/edit?embed=1"'
+      )
+    })
+
+    it('keeps the duplicate notice inside the popup on the HTMX fragment too', async () => {
+      svc.createPin.mockRejectedValue(
+        new DuplicatePinError('https://x.test/a', {
+          id: 'pin-existing',
+          createdAt: new Date('2024-01-01'),
+        })
+      )
+
+      const res = await app.request('/pins/new', {
+        ...formBody({ url: 'https://x.test/a', title: 'T', embed: '1' }),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'HX-Request': 'true',
+        },
+      })
+      const html = await res.text()
+
+      expect(html).not.toContain('<html')
+      expect(html).toContain('href="/pins/pin-existing/edit?embed=1"')
     })
 
     it('reports an unexpected failure as a 500 without losing the form', async () => {
