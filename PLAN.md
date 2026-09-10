@@ -177,27 +177,29 @@ login page, the same as the bookmarklet.
 
 ### 9b. Extension
 
-- [ ] Manifest: drop `default_popup` from the action, add `options_page`, add `activeTab`.
+- [x] Manifest: drop `default_popup` from the action, add `options_page`, add `activeTab`.
       `chrome.action.onClicked` only fires when the action has no popup, and the click is the
       gesture that grants `activeTab`, which is enough to read the current tab's URL and
       title. Not `tabs`, which is a standing permission over every tab. No `scripting`: the
       meta-description and selection prefill stay bookmarklet features until they are missed
-- [ ] Options page: the current popup UI (connect, tag list, Sync Now, disconnect) moves to
+- [x] Options page: the current popup UI (connect, tag list, Sync Now, disconnect) moves to
       the options page nearly unchanged — `popup.html` and `src/popup/*` relocate, reached by
       right-clicking the acorn → Options or from `chrome://extensions`. Settings are visited
       rarely once tags are chosen; pinning is the everyday action and gets the single click
-- [ ] Worker: on `action.onClicked` (the event carries the tab, no query needed), build
+- [x] Worker: on `action.onClicked` (the event carries the tab, no query needed), build
       `${baseUrl}/pins/new?url&title&embed=1`, open it with
       `chrome.windows.create({ type: 'popup', width, height })`, and remember the window id. A
       `tabs.onUpdated` listener watches that window for the saved page's URL, closes the window
       with `chrome.windows.remove`, and triggers a bookmark sync, so a pin tagged with a
-      selected tag reaches the bookmarks bar without waiting for the hour
-- [ ] `commands`: a pin-this-page command with `suggested_key` Alt+D — the convention the
+      selected tag reaches the bookmarks bar without waiting for the hour. The window id goes
+      to `chrome.storage.local`, not to a variable in the worker: MV3 unloads the worker after
+      about thirty seconds idle, and the save comes whenever the user is done with the form
+- [x] `commands`: a pin-this-page command with `suggested_key` Alt+D — the convention the
       Delicious extension set and the Pinboard shortcut extensions kept, chosen because Chrome
       reserves Ctrl/Cmd+D for its own bookmark (a user who wants it anyway can rebind at
       `chrome://extensions/shortcuts`). A command grants `activeTab` like an action click, and
       the handler is the same worker path
-- [ ] Tests, the same way as before: the options page driven in happy-dom (the popup tests,
+- [x] Tests, the same way as before: the options page driven in happy-dom (the popup tests,
       relocated), the worker with `stubChrome`. `chrome-mock.ts` grows `action.onClicked`,
       `tabs.onUpdated`, `windows.create` and `windows.remove`
 
@@ -293,16 +295,19 @@ manifest's `host_permissions`, and the session cookie is only `Secure` in produc
 
 1. `pnpm db:up`, `pnpm dev`, and sign in to the app in the same Chrome profile —
    `/oauth/authorize` is behind `requireAuth()`.
-2. Type `http://localhost:8100` into the popup: an origin, no path, which is all `parseBaseUrl`
-   accepts. Connect. The popup vanishes as the consent window opens — expected; reopen it to see
-   the result, and watch the flow in the service worker's DevTools, not the popup's.
+2. Right-click the acorn → **Options** and type `http://localhost:8100`: an origin, no path,
+   which is all `parseBaseUrl` accepts. Connect, and watch the flow in the service worker's
+   DevTools, not the page's — the worker is what runs it.
 3. The redirect URI is `https://<extension-id>.chromiumapp.org/`, which needs nothing on the
    server. The DCR `client_id` is derived from the metadata, so one extension dedups to one
    `oauth_clients` row — but Chrome derives an unpacked extension's ID from its directory path,
    so a second checkout is a second row, and `/oauth/register` allows ten per IP per hour.
 4. Tick tags, Sync Now, and check the bookmarks bar for a "PinSquirrel" folder. Revoke from
-   `/profile` and confirm the popup comes back on Connect with a notice rather than failing
-   silently.
+   `/profile` and confirm the options page comes back on Connect with a notice rather than
+   failing silently.
+5. Click the acorn on any page — or press Alt+D — and check that the pin form opens in a small
+   window, that saving closes it, and that a pin on a selected tag turns up in the bookmarks
+   bar without a Sync Now.
 
 ---
 
