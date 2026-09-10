@@ -7,6 +7,8 @@ import {
   pinDeleteInputSchema,
   pinUpdateInputSchema,
   tagListInputSchema,
+  tagMergeInputSchema,
+  tagDeleteInputSchema,
   pinFilterFromInput,
   type PinCreateInput,
   type PinListInput,
@@ -205,6 +207,65 @@ export function createMcpServer(): McpServer {
         await pinService.deletePublicPin(ac, id)
         return {
           content: [{ type: 'text' as const, text: `Deleted pin ${id}.` }],
+        }
+      } catch (err) {
+        return mapDomainErrorToMcp(err)
+      }
+    }
+  )
+
+  server.registerTool(
+    'merge_tags',
+    {
+      title: 'Merge Tags',
+      description:
+        'Fold one or more tags into another. Every pin carrying a source tag ' +
+        'gets the target tag, and the source tags are deleted. This is the ' +
+        'way to consolidate: take the tag IDs from list_tags (not the names), ' +
+        'and do not name the target among the sources. Requires the ' +
+        'tags:write scope.',
+      inputSchema: tagMergeInputSchema.shape,
+      annotations: { destructiveHint: true },
+    },
+    async ({ sourceTagIds, targetTagId }, extra) => {
+      try {
+        requireScope(extra, 'tags:write')
+        const user = getUserFromExtra(extra)
+        const ac = new AccessControl(user)
+        await tagService.mergeTags(ac, sourceTagIds, targetTagId)
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: `Merged ${sourceTagIds.length} tag(s) into ${targetTagId}.`,
+            },
+          ],
+        }
+      } catch (err) {
+        return mapDomainErrorToMcp(err)
+      }
+    }
+  )
+
+  server.registerTool(
+    'delete_tag',
+    {
+      title: 'Delete Tag',
+      description:
+        'Delete a tag, by ID as returned by list_tags. The pins keep their ' +
+        'other tags. Rarely needed while retagging: a tag left with no pins ' +
+        'is deleted automatically. Requires the tags:write scope.',
+      inputSchema: tagDeleteInputSchema.shape,
+      annotations: { destructiveHint: true },
+    },
+    async ({ id }, extra) => {
+      try {
+        requireScope(extra, 'tags:write')
+        const user = getUserFromExtra(extra)
+        const ac = new AccessControl(user)
+        await tagService.deleteTag(ac, id)
+        return {
+          content: [{ type: 'text' as const, text: `Deleted tag ${id}.` }],
         }
       } catch (err) {
         return mapDomainErrorToMcp(err)

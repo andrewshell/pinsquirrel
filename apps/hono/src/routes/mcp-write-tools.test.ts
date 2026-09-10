@@ -3,6 +3,8 @@ import { Hono } from 'hono'
 import {
   DuplicatePinError,
   PinNotFoundError,
+  UnauthorizedTagAccessError,
+  ValidationError,
   type User,
 } from '@pinsquirrel/domain'
 
@@ -10,6 +12,8 @@ const mockVerifyAccessToken = vi.fn()
 const mockUpdatePublicPin = vi.fn()
 const mockCreatePin = vi.fn()
 const mockDeletePublicPin = vi.fn()
+const mockMergeTags = vi.fn()
+const mockDeleteTag = vi.fn()
 
 /**
  * The write tools, driven the way a client drives them: JSON-RPC in over
@@ -39,6 +43,8 @@ vi.mock('../lib/services', () => ({
   tagService: {
     getUserTags: vi.fn(),
     getUserTagsWithCount: vi.fn(),
+    mergeTags: (...args: unknown[]) => mockMergeTags(...args) as unknown,
+    deleteTag: (...args: unknown[]) => mockDeleteTag(...args) as unknown,
   },
 }))
 
@@ -235,6 +241,106 @@ describe('mcp write tools', () => {
 
       expect(result.isError).toBe(true)
       expect(result.content[0].text).toBe('Pin not found')
+    })
+  })
+
+  // Merging is the consolidation primitive the retagging job ends on, and it
+  // deletes the sources, so it sits behind the scope that names that:
+  // tags:write, not pins:write.
+  describe('merge_tags', () => {
+    it('refuses a connection that was not granted tags:write', async () => {
+      granted(READ_ONLY)
+
+      const result = await callTool('merge_tags', {
+        sourceTagIds: ['tag-1', 'tag-2'],
+        targetTagId: 'tag-3',
+      })
+
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('tags:write')
+      expect(mockMergeTags).not.toHaveBeenCalled()
+    })
+
+    it('is not unlocked by pins:write alone', async () => {
+      granted(['pins:read', 'tags:read', 'pins:write'])
+
+      const result = await callTool('merge_tags', {
+        sourceTagIds: ['tag-1'],
+        targetTagId: 'tag-3',
+      })
+
+      expect(result.isError).toBe(true)
+      expect(mockMergeTags).not.toHaveBeenCalled()
+    })
+
+    it('merges the sources into the target', async () => {
+      granted(FULL)
+      mockMergeTags.mockResolvedValue(undefined)
+
+      const result = await callTool('merge_tags', {
+        sourceTagIds: ['tag-1', 'tag-2'],
+        targetTagId: 'tag-3',
+      })
+
+      expect(result.isError).toBeFalsy()
+      expect(mockMergeTags).toHaveBeenCalledWith(
+        expect.anything(),
+        ['tag-1', 'tag-2'],
+        'tag-3'
+      )
+    })
+
+    // The service refuses a merge into one of its own sources, and the tool
+    // has to pass that on as something the model can correct.
+    it('reports a rejected merge without leaking internals', async () => {
+      granted(FULL)
+      mockMergeTags.mockRejectedValue(
+        new ValidationError({
+          destinationTagId: [
+            'Destination tag cannot be one of the source tags.',
+          ],
+        })
+      )
+
+      const result = await callTool('merge_tags', {
+        sourceTagIds: ['tag-1'],
+        targetTagId: 'tag-1',
+      })
+
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toBe('Invalid request')
+    })
+  })
+
+  describe('delete_tag', () => {
+    it('refuses a connection that was not granted tags:write', async () => {
+      granted(READ_ONLY)
+
+      const result = await callTool('delete_tag', { id: 'tag-1' })
+
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('tags:write')
+      expect(mockDeleteTag).not.toHaveBeenCalled()
+    })
+
+    it('deletes the tag', async () => {
+      granted(FULL)
+      mockDeleteTag.mockResolvedValue(undefined)
+
+      const result = await callTool('delete_tag', { id: 'tag-1' })
+
+      expect(result.isError).toBeFalsy()
+      expect(mockDeleteTag).toHaveBeenCalledWith(expect.anything(), 'tag-1')
+    })
+
+    it("reports another user's tag as not found", async () => {
+      granted(FULL)
+      mockDeleteTag.mockRejectedValue(new UnauthorizedTagAccessError('tag-1'))
+
+      const result = await callTool('delete_tag', { id: 'tag-1' })
+
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toBe('Tag not found')
     })
   })
 })
