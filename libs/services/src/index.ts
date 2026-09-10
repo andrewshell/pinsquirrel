@@ -10,7 +10,7 @@ export {
   EmailNotConfiguredError,
 } from './services/null-email.js'
 export { MetadataService } from './services/metadata.js'
-export { PinService } from './services/pin.js'
+export { PinService, type UpdatePublicPinData } from './services/pin.js'
 export {
   PinboardService,
   InvalidPinboardExportError,
@@ -39,6 +39,21 @@ export {
   type PinListInput,
   type TagListInput,
 } from './validation/pin-query.js'
+
+// Write-operation schemas (MCP tool inputs; see the file's own note on why
+// the descriptions matter)
+export {
+  pinCreateInputSchema,
+  pinDeleteInputSchema,
+  pinUpdateInputSchema,
+  tagDeleteInputSchema,
+  tagMergeInputSchema,
+  type PinCreateInput,
+  type PinDeleteInput,
+  type PinUpdateInput,
+  type TagDeleteInput,
+  type TagMergeInput,
+} from './validation/pin-write.js'
 
 // String-coercion query schemas (for HTTP query string inputs)
 export {
