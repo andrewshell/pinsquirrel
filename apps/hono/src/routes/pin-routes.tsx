@@ -414,7 +414,12 @@ export function createPinRoutes({
     const ac = new AccessControl(user)
 
     const url = new URL(c.req.url)
-    const returnParams = url.search.replace(/^\?/, '')
+    const embed = isEmbedRequest(c)
+    // The flag travels on the hidden field, never in `returnParams`: those
+    // become the form action's query, which POST /:id/edit reads back as the
+    // list filters to return to.
+    url.searchParams.delete('embed')
+    const returnParams = url.searchParams.toString()
 
     try {
       const [pin, userTags] = await Promise.all([
@@ -431,6 +436,7 @@ export function createPinRoutes({
           returnParams={returnParams}
           baseUrl={baseUrl}
           privateMode={privateMode}
+          embed={embed}
         />
       )
     } catch (error) {

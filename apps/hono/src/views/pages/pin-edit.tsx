@@ -1,6 +1,7 @@
 import type { FC } from 'hono/jsx'
 import type { Pin, User } from '@pinsquirrel/domain'
 import { DefaultLayout } from '../layouts/default'
+import { EmbedLayout } from '../layouts/embed'
 import { Card, CardHeader, CardTitle, CardContent } from '@pinsquirrel/ui'
 import { FlashMessage } from '../components/FlashMessage'
 import { PinForm } from '../components/PinForm'
@@ -24,6 +25,8 @@ interface PinEditPageProps {
   returnParams?: string
   baseUrl?: string
   privateMode?: boolean
+  /** Render for the extension popup: no chrome, no way out of the dialog. */
+  embed?: boolean
 }
 
 export const PinEditPage: FC<PinEditPageProps> = ({
@@ -42,6 +45,7 @@ export const PinEditPage: FC<PinEditPageProps> = ({
   returnParams = '',
   baseUrl = '/pins',
   privateMode = false,
+  embed = false,
 }) => {
   // Use form values if provided (after validation error), otherwise use pin values
   const formUrl = url ?? pin.url
@@ -56,23 +60,8 @@ export const PinEditPage: FC<PinEditPageProps> = ({
     ? `${baseUrl}/${pin.id}/edit?${returnParams}`
     : `${baseUrl}/${pin.id}/edit`
 
-  return (
-    <DefaultLayout
-      title="Edit Pin"
-      user={user}
-      width="form"
-      privateMode={privateMode}
-    >
-      {/* Back link */}
-      <div class="mb-6">
-        <a
-          href={backUrl}
-          class="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-        >
-          ← Back to Pins
-        </a>
-      </div>
-
+  const content = (
+    <>
       {/* Flash message */}
       {flash && (
         <FlashMessage
@@ -104,9 +93,39 @@ export const PinEditPage: FC<PinEditPageProps> = ({
             errors={errors}
             duplicatePinId={duplicatePinId}
             createdAt={pin.createdAt}
+            embed={embed}
           />
         </CardContent>
       </Card>
+    </>
+  )
+
+  if (embed) {
+    return (
+      <EmbedLayout title="Edit Pin" privateMode={privateMode}>
+        {content}
+      </EmbedLayout>
+    )
+  }
+
+  return (
+    <DefaultLayout
+      title="Edit Pin"
+      user={user}
+      width="form"
+      privateMode={privateMode}
+    >
+      {/* Back link */}
+      <div class="mb-6">
+        <a
+          href={backUrl}
+          class="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+        >
+          ← Back to Pins
+        </a>
+      </div>
+
+      {content}
     </DefaultLayout>
   )
 }
