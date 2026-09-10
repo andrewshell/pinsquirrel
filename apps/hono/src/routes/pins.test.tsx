@@ -301,6 +301,36 @@ describe('pins routes', () => {
 
       expect(svc.findByUrl).not.toHaveBeenCalled()
     })
+
+    it('drops the site chrome when embed=1', async () => {
+      const res = await app.request('/pins/new?embed=1')
+      const html = await res.text()
+
+      expect(res.status).toBe(200)
+      expect(html).toContain('name="url"')
+      expect(html).not.toContain('<header')
+      expect(html).not.toContain('<footer')
+      // Following it would navigate the popup onto the full site.
+      expect(html).not.toContain('Back to Pins')
+    })
+
+    it('keeps the chrome for any other value of embed', async () => {
+      const other = await (await app.request('/pins/new?embed=yes')).text()
+      const none = await (await app.request('/pins/new')).text()
+
+      expect(other).toContain('<header')
+      expect(other).toContain('Back to Pins')
+      expect(none).toContain('<header')
+      expect(none).toContain('Back to Pins')
+    })
+
+    it('carries embed through the form on a hidden field', async () => {
+      const embedded = await (await app.request('/pins/new?embed=1')).text()
+      const plain = await (await app.request('/pins/new')).text()
+
+      expect(embedded).toContain('name="embed"')
+      expect(plain).not.toContain('name="embed"')
+    })
   })
 
   describe('POST /new — create', () => {
