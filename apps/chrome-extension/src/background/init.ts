@@ -92,6 +92,26 @@ async function isConnected(): Promise<boolean> {
   return stored.baseUrl !== undefined && stored.refreshToken !== undefined
 }
 
+/** How large the pin window opens, in CSS pixels. */
+const PIN_WINDOW_WIDTH = 520
+const PIN_WINDOW_HEIGHT = 680
+
+/**
+ * The pin form for a tab, as a URL on the connected server.
+ *
+ * `embed=1` is what trims the page to the card, so the window reads as a
+ * dialog rather than as the site in miniature (9a). `url` and `title` prefill
+ * the form the way the bookmarklet does; either is left out when the tab has
+ * no answer for it, because `?title=undefined` would prefill the word.
+ */
+function pinFormUrl(baseUrl: string, tab: chrome.tabs.Tab): string {
+  const params = new URLSearchParams()
+  if (tab.url !== undefined) params.set('url', tab.url)
+  if (tab.title !== undefined) params.set('title', tab.title)
+  params.set('embed', '1')
+  return `${baseUrl}/pins/new?${params.toString()}`
+}
+
 /**
  * Wire the service worker up to the events that start a sync.
  *
@@ -169,8 +189,46 @@ export function initBackground(deps: BackgroundDeps): void {
     })
   }
 
+  /**
+   * Open the site's own pin form on `tab`, in a window of its own.
+   *
+   * A popup window rather than the site framed in extension UI: the session
+   * cookie is `SameSite=Lax` and the site sends `X-Frame-Options: SAMEORIGIN`,
+   * so a frame on a `chrome-extension://` page arrives logged out. A popup
+   * window is a top-level first-party navigation, so the cookie flows and
+   * nothing about the site's headers has to change (Decision 22).
+   *
+   * With no server stored there is nothing to pin to, so the click goes to the
+   * options page instead of opening a window on nowhere.
+   */
+  async function pinTab(tab: chrome.tabs.Tab): Promise<void> {
+    const baseUrl = await storage.get('baseUrl')
+    if (baseUrl === undefined) {
+      await chrome.runtime.openOptionsPage()
+      return
+    }
+
+    const window = await chrome.windows.create({
+      url: pinFormUrl(baseUrl, tab),
+      type: 'popup',
+      width: PIN_WINDOW_WIDTH,
+      height: PIN_WINDOW_HEIGHT,
+    })
+    // A second click while a pin window is open opens a second window and
+    // remembers the newer one. The older window is then no longer watched -
+    // it stays open on its own form, which is what a user who asked for two
+    // pin windows asked for.
+    if (window?.id !== undefined) {
+      await storage.set({ pinWindowId: window.id })
+    }
+  }
+
   chrome.runtime.onInstalled.addListener(() => {
     void ensureAlarm()
+  })
+
+  chrome.action.onClicked.addListener(tab => {
+    void pinTab(tab)
   })
 
   chrome.runtime.onStartup.addListener(() => {

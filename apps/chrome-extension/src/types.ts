@@ -35,6 +35,15 @@ export interface ExtensionStorage {
   /** Why the last sync failed, or absent if it did not (Phase 5e). */
   lastSyncError: string
   /**
+   * The window the pin form was opened in (Phase 9b), while it is open.
+   *
+   * In storage rather than in a variable in the worker: MV3 unloads the worker
+   * after about thirty seconds idle, and the user may take minutes over the
+   * form. A window id held in memory would be gone by the time the save
+   * arrived, and nothing would close the window.
+   */
+  pinWindowId?: number
+  /**
    * Dynamically registered `client_id`s, keyed by the base URL they were
    * registered with, so connecting a second time reuses the first
    * registration instead of posting to `/oauth/register` again.
