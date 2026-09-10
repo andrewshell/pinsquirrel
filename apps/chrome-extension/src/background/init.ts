@@ -274,6 +274,15 @@ export function initBackground(deps: BackgroundDeps): void {
    *
    * Every other update is somebody else's tab: another window entirely, or the
    * form still being filled in.
+   *
+   * This reads a URL out of `tabs.onUpdated`, which Chrome redacts unless the
+   * extension holds a host permission for that page or the `tabs` permission.
+   * `activeTab` does not cover it: that is granted for the tab the user
+   * clicked on, and this is the pin window's own tab. So closing the window
+   * rests on `host_permissions` in the manifest - a server outside that list
+   * opens the form and is never heard from again, leaving the window open and
+   * the post-pin sync unrun. The mock hands the URL over unconditionally, so
+   * no test in this package can catch that; the manifest is the only guard.
    */
   async function onPinWindowUpdated(
     changeInfo: chrome.tabs.OnUpdatedInfo,

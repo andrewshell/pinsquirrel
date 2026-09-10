@@ -31,6 +31,14 @@ selected tag reaches the bookmarks bar without waiting for the hour. The page ca
 close itself — a page that was not script-opened may not — so it only says the pin
 was saved.
 
+Closing the window needs the server to be covered by `host_permissions` in
+`manifest.json`. Chrome redacts the URL in `tabs.onUpdated` unless the extension has
+a host permission for that page, and `activeTab` does not help — it is granted for
+the tab the user clicked on, not for the pin window's own tab. Against a server
+outside that list the form opens and pins fine, but the window stays open and no
+sync follows the pin. Adding a self-hosted origin means adding it to
+`host_permissions`.
+
 The window id lives in `chrome.storage.local`, not in a variable in the worker: MV3
 unloads the worker after about thirty seconds idle, and the save comes whenever the
 user is done. Clicking again while a window is open opens a second one and watches
