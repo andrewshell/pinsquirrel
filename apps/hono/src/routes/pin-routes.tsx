@@ -158,6 +158,17 @@ function takeViewSize(c: Context): {
   return { viewSize, searchParams: url.searchParams.toString() }
 }
 
+/**
+ * Is this request being rendered inside the extension's popup window?
+ *
+ * Presentation only, and only the literal `1` turns it on: anything else is
+ * the ordinary page, so nothing changes for a user who happens to have an
+ * `embed` param on a link.
+ */
+function isEmbedRequest(c: Context): boolean {
+  return new URL(c.req.url).searchParams.get('embed') === '1'
+}
+
 export function createPinRoutes({
   baseUrl,
   privateMode = false,
@@ -226,6 +237,7 @@ export function createPinRoutes({
     const sessionManager = getSessionManager(c)
     const user = getAuthUser(c)
     const ac = new AccessControl(user)
+    const embed = isEmbedRequest(c)
 
     // Bookmarklet integration, public list only: the private form is reached
     // deliberately from inside the app, never with a prefilled URL, so it does
@@ -265,6 +277,7 @@ export function createPinRoutes({
         isPrivate={privateMode}
         baseUrl={baseUrl}
         privateMode={privateMode}
+        embed={embed}
       />
     )
   })
