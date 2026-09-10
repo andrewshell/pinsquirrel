@@ -693,6 +693,69 @@ describe('PinService', () => {
     })
   })
 
+  // The public-only write half of `getPublicPin`. The MCP tools are a
+  // public-pins-only surface, and the rule that keeps them there lives here
+  // rather than in the tool: a transport that re-decides it is how the REST
+  // API once listed private pins.
+  describe('updatePublicPin', () => {
+    it('reports a private pin as missing and writes nothing', async () => {
+      mockPinRepository.findById.mockResolvedValue({
+        ...mockPin,
+        isPrivate: true,
+      })
+
+      await expect(
+        pinService.updatePublicPin(createMockAccessControl(mockUser), {
+          id: 'pin-123',
+          userId: 'user-123',
+          tagNames: ['rust'],
+        })
+      ).rejects.toThrow(PinNotFoundError)
+      expect(mockPinRepository.update).not.toHaveBeenCalled()
+    })
+
+    it("reports another user's pin as missing and writes nothing", async () => {
+      mockPinRepository.findById.mockResolvedValue({
+        ...mockPin,
+        userId: 'other-user',
+      })
+
+      await expect(
+        pinService.updatePublicPin(createMockAccessControl(mockUser), {
+          id: 'pin-123',
+          userId: 'user-123',
+          tagNames: ['rust'],
+        })
+      ).rejects.toThrow(PinNotFoundError)
+      expect(mockPinRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('updates a public pin, leaving the fields it was not given alone', async () => {
+      mockPinRepository.findById.mockResolvedValue(mockPin)
+      mockPinRepository.update.mockResolvedValue({
+        ...mockPin,
+        tagNames: ['rust'],
+      })
+
+      const result = await pinService.updatePublicPin(
+        createMockAccessControl(mockUser),
+        { id: 'pin-123', userId: 'user-123', tagNames: ['rust'] }
+      )
+
+      expect(result.tagNames).toEqual(['rust'])
+      expect(mockPinRepository.update).toHaveBeenCalledWith({
+        id: 'pin-123',
+        userId: 'user-123',
+        url: 'https://example.com',
+        title: 'Example',
+        description: 'Description',
+        readLater: false,
+        isPrivate: false,
+        tagNames: ['rust'],
+      })
+    })
+  })
+
   describe('isPrivate', () => {
     it('should create a pin with isPrivate true', async () => {
       mockPinRepository.findByUserIdAndUrl.mockResolvedValue(null)

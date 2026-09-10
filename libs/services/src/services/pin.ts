@@ -21,6 +21,17 @@ import {
 import { createPinDataSchema, updatePinDataSchema } from '../validation/pin.js'
 import { validationErrorFromZod } from '../validation/zod-error.js'
 
+/**
+ * What a public-only caller may change on a pin.
+ *
+ * Everything `UpdatePinData` carries except `isPrivate`, and every field but
+ * the identifiers optional: an MCP client retagging a pin sends `tagNames` and
+ * nothing else. `isPrivate` is absent rather than ignored, so there is no
+ * field for a caller to send in hope.
+ */
+export type UpdatePublicPinData = Pick<UpdatePinData, 'id' | 'userId'> &
+  Partial<Omit<UpdatePinData, 'id' | 'userId' | 'isPrivate'>>
+
 export class PinService {
   constructor(
     private readonly pinRepository: PinRepository,
@@ -241,6 +252,46 @@ export class PinService {
       throw new PinNotFoundError(pinId)
     }
     return pin
+  }
+
+  /**
+   * Change a pin over a public-only surface.
+   *
+   * The write half of `getPublicPin`, and the reason it exists: the MCP tools
+   * expose public pins only, so a private pin must be as unreachable to a
+   * write as it is to a read. Resolving through `getPublicPin` is what makes
+   * that true - a private, foreign or missing pin all come back as
+   * `PinNotFoundError` before anything is written.
+   *
+   * The rule lives here rather than in the tool because a transport deciding
+   * for itself which pins it may touch is how the REST API once listed private
+   * pins. `isPrivate` is not in the input, so a caller cannot flip a pin out
+   * of the surface it is allowed to see; the resolved pin's value is carried
+   * through unchanged.
+   *
+   * Omitted fields keep the resolved pin's values, and `tagNames` replaces
+   * rather than appends, exactly as `updatePin` does.
+   */
+  async updatePublicPin(
+    ac: AccessControl,
+    input: UpdatePublicPinData
+  ): Promise<Pin> {
+    const pin = await this.getPublicPin(ac, input.id)
+
+    return this.updatePin(ac, {
+      id: pin.id,
+      // The resolved pin's owner, not the caller's claim: `getPublicPin` has
+      // already established they are the same, and taking it from the pin
+      // means a mismatched `userId` cannot reach the duplicate-URL lookup.
+      userId: pin.userId,
+      url: input.url ?? pin.url,
+      title: input.title ?? pin.title,
+      description:
+        input.description !== undefined ? input.description : pin.description,
+      readLater: input.readLater ?? pin.readLater,
+      isPrivate: pin.isPrivate,
+      tagNames: input.tagNames ?? pin.tagNames,
+    })
   }
 
   async getUserPins(ac: AccessControl): Promise<Pin[]> {
