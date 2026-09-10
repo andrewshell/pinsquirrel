@@ -70,7 +70,12 @@ export interface RuntimeEventsStub {
 export interface WindowsStub {
   /** Every `chrome.windows.create` call, in order. */
   created: chrome.windows.CreateData[]
-  /** Every window id handed to `chrome.windows.remove`, in order. */
+  /**
+   * Every window id handed to `chrome.windows.remove`, in order - including a
+   * repeat, which is recorded and *then* rejected. A test asserting how many
+   * times the worker tried to close one window needs to see the try, not just
+   * the outcome.
+   */
   removed: number[]
 }
 
@@ -488,8 +493,13 @@ export function stubChrome(
         return Promise.resolve(window)
       },
       remove: (windowId: number) => {
+        const gone = windows.removed.includes(windowId)
         windows.removed.push(windowId)
-        return Promise.resolve()
+        // Chrome rejects a second removal of the same window, which is what a
+        // worker firing twice on one navigation runs into.
+        return gone
+          ? Promise.reject(new Error(`No window with id: ${windowId}.`))
+          : Promise.resolve()
       },
     },
     alarms: {

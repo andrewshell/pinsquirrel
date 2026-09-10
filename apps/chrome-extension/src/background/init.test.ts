@@ -604,6 +604,63 @@ describe('initBackground: the pin window reaching the saved page', () => {
   })
 })
 
+/**
+ * Collect the unhandled rejections raised while `work` runs.
+ *
+ * A `void somePromise()` that rejects is invisible to an assertion on what the
+ * worker did - the worker carries on and the test passes - so the rejection
+ * itself has to be what is asserted on.
+ */
+async function unhandledRejectionsDuring(
+  work: () => Promise<void>
+): Promise<unknown[]> {
+  const caught: unknown[] = []
+  const onUnhandled = (reason: unknown) => caught.push(reason)
+  process.on('unhandledRejection', onUnhandled)
+  try {
+    await work()
+    // An unhandled rejection is reported a turn after it is raised.
+    await flush()
+  } finally {
+    process.off('unhandledRejection', onUnhandled)
+  }
+  return caught
+}
+
+describe('initBackground: one navigation, two tab updates', () => {
+  /**
+   * Chrome reports a navigation twice: `{ status: 'loading', url }` when it
+   * starts and `{ status: 'complete' }` with the URL on the tab when it
+   * finishes. `onPinWindowUpdated` matches both by design - either one alone
+   * has to be enough - so the saved page, which is tiny, can deliver the
+   * second before the first has finished its storage and window round trips.
+   */
+  it('closes the window once and syncs once', async () => {
+    const chrome = stubChrome(PINNING)
+    const runSync = vi.fn(() => Promise.resolve())
+    initBackground(deps({ runSync }))
+
+    const unhandled = await unhandledRejectionsDuring(async () => {
+      chrome.tabs.onUpdated.fire(
+        7,
+        { status: 'loading', url: SAVED_URL },
+        tab({ windowId: PIN_WINDOW_ID, url: SAVED_URL })
+      )
+      chrome.tabs.onUpdated.fire(
+        7,
+        { status: 'complete' },
+        tab({ windowId: PIN_WINDOW_ID, url: SAVED_URL })
+      )
+      await flush()
+    })
+
+    expect(chrome.windows.removed).toEqual([PIN_WINDOW_ID])
+    expect(runSync).toHaveBeenCalledTimes(1)
+    expect(unhandled).toEqual([])
+    expect(chrome.local.items.pinWindowId).toBeUndefined()
+  })
+})
+
 describe('initBackground: the pin-page keyboard shortcut', () => {
   it('takes the same path as a click on the acorn', async () => {
     const chrome = stubChrome(CONNECTED)
