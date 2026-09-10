@@ -29,6 +29,14 @@ interface PinFormProps {
   userTags: string[]
   errors?: Record<string, string[]>
   createdAt?: Date
+  /**
+   * Rendered in the extension's popup window.
+   *
+   * The flag has to live on the form, not just the page: this component is
+   * returned on its own as the HTMX fragment when a submit is rejected, so
+   * without the hidden field a second failed submit would forget it.
+   */
+  embed?: boolean
 }
 
 export const PinForm: FC<PinFormProps> = ({
@@ -46,6 +54,7 @@ export const PinForm: FC<PinFormProps> = ({
   userTags,
   errors,
   createdAt,
+  embed = false,
 }) => {
   // Format created date if provided
   const createdDate = createdAt
@@ -68,6 +77,8 @@ export const PinForm: FC<PinFormProps> = ({
         novalidate
         data-metadata-fetch
       >
+        {embed && <input type="hidden" name="embed" value="1" />}
+
         {/* Form-level errors */}
         {errors?._form && <ErrorMessage message={errors._form.join('. ')} />}
 

@@ -6,7 +6,8 @@ import { BaseLayout } from './base'
 
 type ContentWidth = 'wide' | 'narrow' | 'form'
 
-const widthClasses: Record<ContentWidth, string> = {
+/** Shared with `EmbedLayout`, so a page is the same width in either. */
+export const widthClasses: Record<ContentWidth, string> = {
   wide: 'max-w-7xl', // Default for main content pages
   narrow: 'max-w-4xl', // Profile, settings pages
   form: 'max-w-2xl', // Form-focused pages
