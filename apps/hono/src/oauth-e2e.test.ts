@@ -589,6 +589,119 @@ describe('audience binding', () => {
   })
 })
 
+/**
+ * The scope, end to end: two connections for the same user against the same
+ * server, differing only in what the consent screen granted.
+ *
+ * This is the test Phase 8 left open on purpose. `mcp/scopes.test.ts` proves
+ * `requireScope` throws, and `routes/mcp-write-tools.test.ts` proves a tool
+ * calls it - but neither can show that the scope a real token carries is the
+ * one the guard reads, because in both the token is a fixture. Here the scope
+ * travels the whole way: authorization request, consent, token endpoint,
+ * `AuthInfo`, tool. A write that got through on a read-only grant would mean
+ * every scope on the consent screen is decoration.
+ */
+describe('write scopes', () => {
+  const WRITE_SCOPES = 'pins:read tags:read pins:write tags:write'
+  let writeTokens: TokenResponse
+  let createdPinId: string
+
+  /** A tool result's pin tags, sorted so the assertion does not depend on order. */
+  function tagsOf(text: string): string[] {
+    return [...(JSON.parse(text) as { tagNames: string[] }).tagNames].sort()
+  }
+
+  async function callWriteTool(
+    token: string,
+    name: string,
+    args: Record<string, unknown>
+  ): Promise<{ isError?: boolean; content: { text: string }[] }> {
+    await mcpHandshake(token)
+    const res = await mcpRequest(token, {
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'tools/call',
+      params: { name, arguments: args },
+    })
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      result?: { isError?: boolean; content: { text: string }[] }
+      error?: unknown
+    }
+    expect(body.error).toBeUndefined()
+    return body.result!
+  }
+
+  it('refuses update_pin on a grant that is only read scopes', async () => {
+    // The connection made at the top of this file, which asked for the two
+    // reads and nothing else.
+    const result = await callWriteTool(mcpTokens.access_token, 'update_pin', {
+      id: 'any-pin-id',
+      tagNames: ['rust'],
+    })
+
+    expect(result.isError).toBe(true)
+    // Named, because a scope the connection was never granted is the one
+    // failure retrying cannot fix - the client has to re-authorize.
+    expect(result.content[0].text).toContain('pins:write')
+  })
+
+  it('creates a pin once the user has approved pins:write', async () => {
+    writeTokens = await connect({ resource: mcpResource, scope: WRITE_SCOPES })
+    expect(writeTokens.scope).toBe(WRITE_SCOPES)
+
+    const result = await callWriteTool(writeTokens.access_token, 'create_pin', {
+      url: 'https://example.com/phase-10',
+      title: 'Phase 10',
+      tagNames: ['scratch'],
+    })
+
+    expect(result.isError).toBeFalsy()
+    const pin = JSON.parse(result.content[0].text) as {
+      id: string
+      tagNames: string[]
+      isPrivate: boolean
+    }
+    expect(pin.tagNames).toEqual(['scratch'])
+    // Nothing in the input could have asked for anything else.
+    expect(pin.isPrivate).toBe(false)
+
+    createdPinId = pin.id
+  })
+
+  it('retags that pin, replacing its tags rather than adding to them', async () => {
+    const result = await callWriteTool(writeTokens.access_token, 'update_pin', {
+      id: createdPinId,
+      tagNames: ['rust', 'systems'],
+    })
+
+    expect(result.isError).toBeFalsy()
+    // Sorted because the repository returns a pin's tags in no promised
+    // order, and this case is about which tags the pin has, not their order.
+    expect(tagsOf(result.content[0].text)).toEqual(['rust', 'systems'])
+
+    // And the read half agrees, which is the whole point of a write tool.
+    const read = await callWriteTool(writeTokens.access_token, 'get_pin', {
+      id: createdPinId,
+    })
+    expect(tagsOf(read.content[0].text)).toEqual(['rust', 'systems'])
+  })
+
+  it('deletes it again', async () => {
+    const result = await callWriteTool(writeTokens.access_token, 'delete_pin', {
+      id: createdPinId,
+    })
+    expect(result.isError).toBeFalsy()
+
+    const gone = await callWriteTool(writeTokens.access_token, 'get_pin', {
+      id: createdPinId,
+    })
+    expect(gone.isError).toBe(true)
+    expect(gone.content[0].text).toBe('Pin not found')
+  })
+})
+
 describe('refresh rotation', () => {
   let rotated: TokenResponse
 
