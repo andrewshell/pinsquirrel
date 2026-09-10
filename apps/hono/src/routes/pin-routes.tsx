@@ -26,6 +26,7 @@ import { getString, parsePinForm } from '../lib/form'
 import { getAuthUser, getSessionManager } from '../middleware/session'
 import { PinCard, PinDeleteConfirm } from '../views/components/PinCard'
 import { PinForm } from '../views/components/PinForm'
+import { EmbedSavedPage } from '../views/pages/embed-saved'
 import { PinDeletePage } from '../views/pages/pin-delete'
 import { PinEditPage } from '../views/pages/pin-edit'
 import { PinNewPage } from '../views/pages/pin-new'
@@ -403,6 +404,19 @@ export function createPinRoutes({
       }
       return c.html(<PinNewPage {...pageProps} errors={errors} />, 500)
     }
+  })
+
+  // GET /embed/saved — where a save inside the extension's popup lands.
+  // Registered ahead of the `/:id/*` routes so the id patterns never see it.
+  routes.get('/embed/saved', c => {
+    const sessionManager = getSessionManager(c)
+
+    return c.html(
+      <EmbedSavedPage
+        flash={sessionManager.getFlash()}
+        privateMode={privateMode}
+      />
+    )
   })
 
   // GET /:id/edit — pin edit form
