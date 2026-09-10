@@ -756,6 +756,44 @@ describe('PinService', () => {
     })
   })
 
+  describe('deletePublicPin', () => {
+    it('reports a private pin as missing and deletes nothing', async () => {
+      mockPinRepository.findById.mockResolvedValue({
+        ...mockPin,
+        isPrivate: true,
+      })
+
+      await expect(
+        pinService.deletePublicPin(createMockAccessControl(mockUser), 'pin-123')
+      ).rejects.toThrow(PinNotFoundError)
+      expect(mockPinRepository.delete).not.toHaveBeenCalled()
+    })
+
+    it("reports another user's pin as missing and deletes nothing", async () => {
+      mockPinRepository.findById.mockResolvedValue({
+        ...mockPin,
+        userId: 'other-user',
+      })
+
+      await expect(
+        pinService.deletePublicPin(createMockAccessControl(mockUser), 'pin-123')
+      ).rejects.toThrow(PinNotFoundError)
+      expect(mockPinRepository.delete).not.toHaveBeenCalled()
+    })
+
+    it('deletes a public pin', async () => {
+      mockPinRepository.findById.mockResolvedValue(mockPin)
+      mockPinRepository.delete.mockResolvedValue(true)
+
+      await pinService.deletePublicPin(
+        createMockAccessControl(mockUser),
+        'pin-123'
+      )
+
+      expect(mockPinRepository.delete).toHaveBeenCalledWith('pin-123')
+    })
+  })
+
   describe('isPrivate', () => {
     it('should create a pin with isPrivate true', async () => {
       mockPinRepository.findByUserIdAndUrl.mockResolvedValue(null)

@@ -294,6 +294,18 @@ export class PinService {
     })
   }
 
+  /**
+   * Delete a pin over a public-only surface.
+   *
+   * Resolved the same way as `updatePublicPin`, and for the same reason: a
+   * private pin the caller cannot see must not be one it can destroy.
+   */
+  async deletePublicPin(ac: AccessControl, pinId: string): Promise<void> {
+    const pin = await this.getPublicPin(ac, pinId)
+
+    await this.deletePin(ac, pin.id)
+  }
+
   async getUserPins(ac: AccessControl): Promise<Pin[]> {
     if (!ac.user) {
       throw new UnauthorizedPinAccessError(
