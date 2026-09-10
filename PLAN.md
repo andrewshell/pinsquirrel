@@ -160,19 +160,20 @@ login page, the same as the bookmarklet.
 
 ### 9a. Site: embed mode
 
-- [ ] `embed=1` on `/pins/new` and `/pins/:id/edit` renders the same content in a minimal
+- [x] `embed=1` on `/pins/new` and `/pins/:id/edit` renders the same content in a minimal
       layout — the card and the flash, no header, nav or footer. Any other value, or none, is
       the full page: nothing changes for the site's own users
-- [ ] The flag must survive the round trips. A hidden field carries it through the POST so a
+- [x] The flag must survive the round trips. A hidden field carries it through the POST so a
       validation error re-renders in embed mode, and the `findByUrl` dedup redirect in
       `routes/pin-routes.tsx` appends it — which is how "already pinned" becomes the site's
       real edit form in the same window instead of a link out
-- [ ] Success in embed mode redirects to a stable confirmation page — `/pins/embed/saved`,
+- [x] Success in embed mode redirects to a stable confirmation page — `/pins/embed/saved`,
       embed layout, "Pin saved" — instead of to `/pins`. Stable URL because the extension
       worker matches on it to close the window (9b); the page only says so, since a page that
-      was not script-opened cannot reliably `window.close()` itself. The edit form's save (and
-      its delete) redirect the same way when the flag rides along, so no path inside the
-      dialog dead-ends on the full site
+      was not script-opened cannot reliably `window.close()` itself. The edit form's save
+      redirects the same way when the flag rides along, so no path inside the dialog
+      dead-ends on the full site. Delete stays out of embed mode: the edit form has no delete
+      path, so nothing inside the dialog can reach one
 
 ### 9b. Extension
 
