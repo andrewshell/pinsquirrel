@@ -3,12 +3,15 @@ import { AccessControl, type User } from '@pinsquirrel/domain'
 import {
   pinListInputSchema,
   pinGetInputSchema,
+  pinUpdateInputSchema,
   tagListInputSchema,
   pinFilterFromInput,
   type PinListInput,
+  type PinUpdateInput,
 } from '@pinsquirrel/services'
 import { pinService, tagService } from '../lib/services.js'
 import { mapDomainErrorToMcp } from './errors.js'
+import { requireScope } from './scopes.js'
 
 function getUserFromExtra(extra: {
   authInfo?: { extra?: Record<string, unknown> }
@@ -101,6 +104,41 @@ export function createMcpServer(): McpServer {
           : await tagService.getUserTags(ac, user.id)
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(tags) }],
+        }
+      } catch (err) {
+        return mapDomainErrorToMcp(err)
+      }
+    }
+  )
+
+  server.registerTool(
+    'update_pin',
+    {
+      title: 'Update Pin',
+      description:
+        'Update a bookmark. This is the retagging tool: tagNames REPLACES ' +
+        "the pin's tags rather than adding to them, and any field you omit " +
+        'is left unchanged. A tag that ends up with no pins is deleted ' +
+        'automatically, so moving a pin off a one-pin tag needs no ' +
+        'delete_tag call afterwards. Requires the pins:write scope.',
+      inputSchema: pinUpdateInputSchema.shape,
+      // Idempotent because sending the same fields again lands the pin in the
+      // same state. Not destructive: nothing here removes a pin, and the tags
+      // it drops are the caller's own instruction.
+      annotations: { idempotentHint: true },
+    },
+    async (args, extra) => {
+      try {
+        requireScope(extra, 'pins:write')
+        const user = getUserFromExtra(extra)
+        const ac = new AccessControl(user)
+        const input = args as PinUpdateInput
+        const pin = await pinService.updatePublicPin(ac, {
+          ...input,
+          userId: user.id,
+        })
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(pin) }],
         }
       } catch (err) {
         return mapDomainErrorToMcp(err)
