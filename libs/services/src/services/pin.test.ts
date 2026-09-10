@@ -799,6 +799,32 @@ describe('PinService', () => {
       expect(mockPinRepository.update).not.toHaveBeenCalled()
     })
 
+    // The owner comes from the resolved pin, not from the caller's claim.
+    // `updatePin` builds the row it writes from the pin it looked up either
+    // way, so the difference shows up in one place only: the duplicate-URL
+    // lookup, which is asked under a user id. Handed a foreign one, it would
+    // go looking through someone else's pins for a collision - and answer
+    // this caller with whether it found one.
+    it('looks for a URL collision under the pin owner, not the userId it was handed', async () => {
+      mockPinRepository.findById.mockResolvedValue(mockPin)
+      mockPinRepository.findByUserIdAndUrl.mockResolvedValue(null)
+      mockPinRepository.update.mockResolvedValue(mockPin)
+
+      await pinService.updatePublicPin(createMockAccessControl(mockUser), {
+        id: 'pin-123',
+        userId: 'someone-else',
+        url: 'https://moved.example.com',
+      })
+
+      expect(mockPinRepository.findByUserIdAndUrl).toHaveBeenCalledWith(
+        'user-123',
+        'https://moved.example.com'
+      )
+      expect(mockPinRepository.update).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-123' })
+      )
+    })
+
     it('updates a public pin, leaving the fields it was not given alone', async () => {
       mockPinRepository.findById.mockResolvedValue(mockPin)
       mockPinRepository.update.mockResolvedValue({
