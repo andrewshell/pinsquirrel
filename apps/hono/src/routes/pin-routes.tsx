@@ -457,12 +457,15 @@ export function createPinRoutes({
 
     const requestUrl = new URL(c.req.url)
     const returnParams = requestUrl.search.replace(/^\?/, '')
-    const redirectTarget = returnParams ? `${baseUrl}?${returnParams}` : baseUrl
     const editAction = `${baseUrl}/${pinId}/edit${
       returnParams ? `?${returnParams}` : ''
     }`
+    const listTarget = returnParams ? `${baseUrl}?${returnParams}` : baseUrl
 
     const formData = await c.req.parseBody()
+    const embed = getString(formData.embed) === '1'
+    // In the popup there is no list to go back to, only the window to close.
+    const redirectTarget = embed ? embedSavedUrl(baseUrl) : listTarget
     const {
       url: pinUrl,
       title,
@@ -521,12 +524,14 @@ export function createPinRoutes({
         tags: tagsInput,
         userTags: userTagNames,
         createdAt: pin.createdAt,
+        embed,
       }
 
       const pageProps = {
         user,
         pin,
         userTags: userTagNames,
+        embed,
         url: pinUrl,
         title,
         description: description || '',
