@@ -471,3 +471,17 @@ describe('initBackground: pinning the current page', () => {
     expect(chrome.local.items.pinWindowId).toBe(100)
   })
 })
+
+describe('initBackground: pinning with nowhere to pin to', () => {
+  it('sends the user to the options page instead of opening a window', async () => {
+    const chrome = stubChrome()
+    initBackground(deps())
+
+    chrome.action.onClicked.fire(tab())
+    await flush()
+
+    expect(chrome.openOptionsPage).toHaveBeenCalledTimes(1)
+    expect(chrome.windows.created).toEqual([])
+    expect(chrome.local.items.pinWindowId).toBeUndefined()
+  })
+})
