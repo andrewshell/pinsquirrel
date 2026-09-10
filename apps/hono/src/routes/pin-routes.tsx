@@ -22,7 +22,7 @@ import {
   DEFAULT_PAGE_SIZE,
 } from '@pinsquirrel/domain'
 import { pinService, tagService } from '../lib/services'
-import { parsePinForm } from '../lib/form'
+import { getString, parsePinForm } from '../lib/form'
 import { getAuthUser, getSessionManager } from '../middleware/session'
 import { PinCard, PinDeleteConfirm } from '../views/components/PinCard'
 import { PinForm } from '../views/components/PinForm'
@@ -169,6 +169,17 @@ function isEmbedRequest(c: Context): boolean {
   return new URL(c.req.url).searchParams.get('embed') === '1'
 }
 
+/**
+ * Where a save lands in embed mode.
+ *
+ * The extension's worker matches on this URL to close the popup window, so it
+ * has to stay stable — it is part of the contract with the extension, not just
+ * a route.
+ */
+function embedSavedUrl(baseUrl: string): string {
+  return `${baseUrl}/embed/saved`
+}
+
 export function createPinRoutes({
   baseUrl,
   privateMode = false,
@@ -307,6 +318,11 @@ export function createPinRoutes({
     // ignored. (The edit route below deliberately does honour it.)
     const isPrivate = privateMode ? true : submittedIsPrivate
 
+    // The flag rides the form body, not the URL: this is where a resubmit from
+    // inside the popup says it is still in the popup.
+    const embed = getString(formData.embed) === '1'
+    const successTarget = embed ? embedSavedUrl(baseUrl) : baseUrl
+
     const userTags = await tagService.getUserTags(ac, user.id)
 
     try {
@@ -327,10 +343,10 @@ export function createPinRoutes({
           : 'Pin created successfully!'
       )
       if (c.req.header('HX-Request')) {
-        c.header('HX-Redirect', baseUrl)
+        c.header('HX-Redirect', successTarget)
         return c.body(null)
       }
-      return c.redirect(baseUrl)
+      return c.redirect(successTarget)
     } catch (error) {
       const isHtmx = !!c.req.header('HX-Request')
       const userTagNames = userTags.map(t => t.name)
@@ -345,11 +361,13 @@ export function createPinRoutes({
         readLater,
         tags: tagsInput,
         userTags: userTagNames,
+        embed,
       }
 
       const pageProps = {
         user,
         userTags: userTagNames,
+        embed,
         url: pinUrl,
         title,
         description: description || '',
