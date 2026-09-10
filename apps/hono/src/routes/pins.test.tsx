@@ -302,6 +302,18 @@ describe('pins routes', () => {
       expect(svc.findByUrl).not.toHaveBeenCalled()
     })
 
+    it('keeps embed on the dedup redirect so the edit form opens in the popup', async () => {
+      svc.findByUrl.mockResolvedValue(makePin({ id: 'pin-42' }))
+
+      const embedded = await app.request(
+        '/pins/new?url=https%3A%2F%2Fx.test%2Fa&embed=1'
+      )
+      const plain = await app.request('/pins/new?url=https%3A%2F%2Fx.test%2Fa')
+
+      expect(embedded.headers.get('Location')).toBe('/pins/pin-42/edit?embed=1')
+      expect(plain.headers.get('Location')).toBe('/pins/pin-42/edit')
+    })
+
     it('drops the site chrome when embed=1', async () => {
       const res = await app.request('/pins/new?embed=1')
       const html = await res.text()
