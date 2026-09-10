@@ -649,6 +649,44 @@ describe('pins routes', () => {
       expect(res.headers.get('Location')).toBe('/pins?tag=foo&page=2')
     })
 
+    it('sends a successful embed submit to the confirmation page', async () => {
+      const res = await app.request(
+        '/pins/pin-1/edit',
+        formBody({ url: 'https://x.test/b', title: 'Updated', embed: '1' })
+      )
+
+      expect(res.status).toBe(302)
+      expect(res.headers.get('Location')).toBe('/pins/embed/saved')
+    })
+
+    it('sends an HTMX embed submit to the confirmation page too', async () => {
+      const res = await app.request('/pins/pin-1/edit', {
+        ...formBody({ url: 'https://x.test/b', title: 'Updated', embed: '1' }),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'HX-Request': 'true',
+        },
+      })
+
+      expect(res.headers.get('HX-Redirect')).toBe('/pins/embed/saved')
+    })
+
+    it('re-renders a rejected embed submit in the embed layout, flag intact', async () => {
+      svc.updatePin.mockRejectedValue(
+        new ValidationError({ url: ['Must be a valid URL'] })
+      )
+
+      const res = await app.request(
+        '/pins/pin-1/edit',
+        formBody({ url: 'nope', title: 'Updated', embed: '1' })
+      )
+      const html = await res.text()
+
+      expect(html).toContain('Must be a valid URL')
+      expect(html).not.toContain('<header')
+      expect(html).toContain('name="embed"')
+    })
+
     it('takes userId from the existing pin, not the session', async () => {
       svc.getPin.mockResolvedValue(makePin({ userId: 'owner-9' }))
 
