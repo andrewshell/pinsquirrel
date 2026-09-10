@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
-import { DuplicatePinError, type User } from '@pinsquirrel/domain'
+import {
+  DuplicatePinError,
+  PinNotFoundError,
+  type User,
+} from '@pinsquirrel/domain'
 
 const mockVerifyAccessToken = vi.fn()
 const mockUpdatePublicPin = vi.fn()
 const mockCreatePin = vi.fn()
+const mockDeletePublicPin = vi.fn()
 
 /**
  * The write tools, driven the way a client drives them: JSON-RPC in over
@@ -28,6 +33,8 @@ vi.mock('../lib/services', () => ({
     updatePublicPin: (...args: unknown[]) =>
       mockUpdatePublicPin(...args) as unknown,
     createPin: (...args: unknown[]) => mockCreatePin(...args) as unknown,
+    deletePublicPin: (...args: unknown[]) =>
+      mockDeletePublicPin(...args) as unknown,
   },
   tagService: {
     getUserTags: vi.fn(),
@@ -191,6 +198,43 @@ describe('mcp write tools', () => {
       expect(result.isError).toBe(true)
       expect(result.content[0].text).toContain('pin-1')
       expect(result.content[0].text).toContain('update_pin')
+    })
+  })
+
+  describe('delete_pin', () => {
+    it('refuses a connection that was not granted pins:write', async () => {
+      granted(READ_ONLY)
+
+      const result = await callTool('delete_pin', { id: 'pin-1' })
+
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toContain('pins:write')
+      expect(mockDeletePublicPin).not.toHaveBeenCalled()
+    })
+
+    it('deletes through the public-only service method', async () => {
+      granted(FULL)
+      mockDeletePublicPin.mockResolvedValue(undefined)
+
+      const result = await callTool('delete_pin', { id: 'pin-1' })
+
+      expect(result.isError).toBeFalsy()
+      expect(mockDeletePublicPin).toHaveBeenCalledWith(
+        expect.anything(),
+        'pin-1'
+      )
+    })
+
+    // The service reports a private, foreign or missing pin the same way, and
+    // the tool must not turn that into a stack trace.
+    it('reports a pin it may not touch as not found', async () => {
+      granted(FULL)
+      mockDeletePublicPin.mockRejectedValue(new PinNotFoundError('pin-1'))
+
+      const result = await callTool('delete_pin', { id: 'pin-1' })
+
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toBe('Pin not found')
     })
   })
 })
