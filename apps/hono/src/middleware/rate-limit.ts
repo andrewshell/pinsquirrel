@@ -117,9 +117,18 @@ export const oauthTokenClientLimiter = new RateLimiter({
  * Both are authenticated, so this is about abuse and runaway clients rather
  * than brute force - there is no credential to guess here, and an agent
  * working through a large collection is legitimately chatty.
+ *
+ * `/mcp` gets four times the REST budget - four requests a second - because
+ * bulk over MCP is the agent looping: retagging a library is one `update_pin`
+ * per pin plus the reads around it, and at 300 per five minutes a few hundred
+ * pins stalls halfway through. Keying it by client rather than raising it is
+ * not available: `rateLimitByIp(mcpLimiter)` runs in front of the auth
+ * middleware, so there is no client id yet, and moving it behind auth would
+ * mean an unauthenticated flood costs nothing. One IP here is one user's
+ * agent, which is the bucket that matters.
  */
 export const mcpLimiter = new RateLimiter({
-  maxAttempts: 300,
+  maxAttempts: 1200,
   windowMs: 5 * 60 * 1000,
 })
 
