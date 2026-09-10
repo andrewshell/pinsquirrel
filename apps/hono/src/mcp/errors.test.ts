@@ -43,19 +43,50 @@ describe('mapDomainErrorToMcp', () => {
     expect(textOf(foreign)).toBe('Tag not found')
   })
 
-  // The duplicate is the caller's own pin, so naming it leaks nothing the
-  // caller could not list, and it turns a dead end into the next call.
+  // The duplicate is a pin the caller can already list over this surface, so
+  // naming it leaks nothing and turns a dead end into the next call.
   it('names the existing pin on a duplicate URL and says what to call instead', () => {
     const result = mapDomainErrorToMcp(
       new DuplicatePinError('https://example.com', {
         id: 'pin-123',
         createdAt: new Date('2024-01-01'),
+        isPrivate: false,
       })
     )
 
     expect(result.isError).toBe(true)
     expect(textOf(result)).toContain('pin-123')
     expect(textOf(result)).toContain('update_pin')
+  })
+
+  // The duplicate lookup is scoped to the user, not to what this surface may
+  // see, so the collision can be a private pin - one that get_pin, update_pin
+  // and delete_pin all report as missing. Naming its id here would hand back
+  // an identifier for a pin the caller is otherwise told does not exist.
+  it('withholds the id when the colliding pin is private', () => {
+    const result = mapDomainErrorToMcp(
+      new DuplicatePinError('https://example.com', {
+        id: 'pin-123',
+        createdAt: new Date('2024-01-01'),
+        isPrivate: true,
+      })
+    )
+
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).not.toContain('pin-123')
+    expect(textOf(result)).toContain('already exists')
+    expect(textOf(result)).toContain('update_pin')
+  })
+
+  // Fails closed: an error thrown without the flag is one whose collision we
+  // cannot classify, and an unclassified pin is treated as unnameable.
+  it('withholds the id when the error does not say', () => {
+    const result = mapDomainErrorToMcp(
+      new DuplicatePinError('https://example.com')
+    )
+
+    expect(textOf(result)).toContain('already exists')
+    expect(textOf(result)).not.toContain('id:')
   })
 
   // A scope refusal is the one failure an agent must not retry its way out of,

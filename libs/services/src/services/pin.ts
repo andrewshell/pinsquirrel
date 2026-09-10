@@ -85,6 +85,7 @@ export class PinService {
       throw new DuplicatePinError(input.url, {
         id: existingPin.id,
         createdAt: existingPin.createdAt,
+        isPrivate: existingPin.isPrivate,
       })
     }
 
@@ -135,6 +136,7 @@ export class PinService {
         throw new DuplicatePinError(updateFields.url, {
           id: duplicatePin.id,
           createdAt: duplicatePin.createdAt,
+          isPrivate: duplicatePin.isPrivate,
         })
       }
     }

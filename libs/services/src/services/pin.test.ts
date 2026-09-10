@@ -136,6 +136,49 @@ describe('PinService', () => {
       ).rejects.toThrow(DuplicatePinError)
     })
 
+    // The duplicate lookup is scoped to the user but not to what a
+    // public-only caller may see, so a private pin can collide with a create
+    // over MCP. Whoever formats the error has to be able to tell which, or it
+    // names an id that every other tool on that surface reports as missing.
+    it('says on the error whether the colliding pin is private', async () => {
+      mockPinRepository.findByUserIdAndUrl.mockResolvedValue({
+        ...mockPin,
+        isPrivate: true,
+      })
+
+      await expect(
+        pinService.createPin(createMockAccessControl(mockUser), {
+          userId: mockUser.id,
+          url: 'https://example.com',
+          title: 'Example',
+          description: null,
+          readLater: false,
+          isPrivate: false,
+          tagNames: [],
+        })
+      ).rejects.toMatchObject({
+        existingPin: { id: 'pin-123', isPrivate: true },
+      })
+    })
+
+    it('says so when the colliding pin is public', async () => {
+      mockPinRepository.findByUserIdAndUrl.mockResolvedValue(mockPin)
+
+      await expect(
+        pinService.createPin(createMockAccessControl(mockUser), {
+          userId: mockUser.id,
+          url: 'https://example.com',
+          title: 'Example',
+          description: null,
+          readLater: false,
+          isPrivate: false,
+          tagNames: [],
+        })
+      ).rejects.toMatchObject({
+        existingPin: { id: 'pin-123', isPrivate: false },
+      })
+    })
+
     it('should throw validation error for invalid URL', async () => {
       await expect(
         pinService.createPin(createMockAccessControl(mockUser), {
@@ -320,6 +363,32 @@ describe('PinService', () => {
           tagNames: ['javascript'],
         })
       ).rejects.toThrow(DuplicatePinError)
+    })
+
+    // Same reason as the create path: an update that moves a pin onto a URL
+    // the user holds privately collides with a pin the caller may not see.
+    it('says on the error whether the colliding pin is private', async () => {
+      mockPinRepository.findById.mockResolvedValue(mockPin)
+      mockPinRepository.findByUserIdAndUrl.mockResolvedValue({
+        ...mockPin,
+        id: 'pin-456',
+        isPrivate: true,
+      })
+
+      await expect(
+        pinService.updatePin(createMockAccessControl(mockUser), {
+          id: 'pin-123',
+          userId: 'user-123',
+          url: 'https://existing.com',
+          title: 'Example',
+          description: 'Description',
+          readLater: false,
+          isPrivate: false,
+          tagNames: ['javascript'],
+        })
+      ).rejects.toMatchObject({
+        existingPin: { id: 'pin-456', isPrivate: true },
+      })
     })
 
     it('should allow updating URL to same current URL', async () => {

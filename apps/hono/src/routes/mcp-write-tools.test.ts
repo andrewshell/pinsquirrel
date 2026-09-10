@@ -247,6 +247,7 @@ describe('mcp write tools', () => {
         new DuplicatePinError('https://example.com', {
           id: 'pin-1',
           createdAt: new Date('2024-01-01'),
+          isPrivate: false,
         })
       )
 
@@ -258,6 +259,30 @@ describe('mcp write tools', () => {
       expect(result.isError).toBe(true)
       expect(result.content[0].text).toContain('pin-1')
       expect(result.content[0].text).toContain('update_pin')
+    })
+
+    // The duplicate lookup is user-scoped, not public-scoped, so the pin in
+    // the way can be one every other tool here calls missing. The collision
+    // is still reported - the URL was the caller's own input, and a silent
+    // failure would loop the agent - but the id is not.
+    it('withholds the id when the URL is held as a private pin', async () => {
+      granted(FULL)
+      mockCreatePin.mockRejectedValue(
+        new DuplicatePinError('https://example.com', {
+          id: 'pin-1',
+          createdAt: new Date('2024-01-01'),
+          isPrivate: true,
+        })
+      )
+
+      const result = await callTool('create_pin', {
+        url: 'https://example.com',
+        title: 'Example',
+      })
+
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).not.toContain('pin-1')
+      expect(result.content[0].text).toContain('already exists')
     })
   })
 

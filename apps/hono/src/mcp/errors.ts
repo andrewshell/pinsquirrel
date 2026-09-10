@@ -25,15 +25,22 @@ export function mapDomainErrorToMcp(err: unknown) {
     // succeed until the user re-authorizes.
     message = err.message
   } else if (err instanceof DuplicatePinError) {
-    // The other exception to withholding detail, and the same reasoning: the
-    // pin this collides with is the caller's own — `createPin` looks for a
-    // duplicate only under the caller's user id — so the id is one it could
-    // have listed anyway, and it is what turns a call that can never succeed
-    // into the next call the agent should make.
-    message = err.existingPin
-      ? `A pin with this URL already exists (id: ${err.existingPin.id}). ` +
-        `Use update_pin to change it.`
-      : 'A pin with this URL already exists. Use update_pin to change it.'
+    // The collision is always reported: the URL was the caller's own input,
+    // and a silent failure or a fake success sends the agent round in circles
+    // on a call that can never succeed.
+    //
+    // The id is a separate question. The duplicate lookup is scoped to the
+    // user but not to what this surface may see, so the pin in the way can be
+    // a private one — and `get_pin`, `update_pin` and `delete_pin` all report
+    // a private pin as missing. Naming it here would hand back an identifier
+    // for a pin the caller is told everywhere else does not exist. So the id
+    // travels only when the collision is a pin this surface can also read.
+    // Absent means unknown, and unknown is treated as unnameable.
+    message =
+      err.existingPin && err.existingPin.isPrivate === false
+        ? `A pin with this URL already exists (id: ${err.existingPin.id}). ` +
+          `Use update_pin to change it.`
+        : 'A pin with this URL already exists. Use update_pin to change it.'
   } else if (err instanceof ValidationError) {
     message = 'Invalid request'
   } else if (
