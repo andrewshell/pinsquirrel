@@ -695,3 +695,36 @@ describe('initBackground: the pin-page keyboard shortcut', () => {
     expect(chrome.windows.created).toEqual([])
   })
 })
+
+describe('initBackground: the pin window closed without saving', () => {
+  it('forgets a window the user shut on their way past', async () => {
+    const chrome = stubChrome(PINNING)
+    initBackground(deps())
+
+    chrome.windows.onRemoved.fire(PIN_WINDOW_ID)
+    await flush()
+
+    expect(chrome.local.items.pinWindowId).toBeUndefined()
+  })
+
+  it('does not sync, because nothing was pinned', async () => {
+    const chrome = stubChrome(PINNING)
+    const runSync = vi.fn(() => Promise.resolve())
+    initBackground(deps({ runSync }))
+
+    chrome.windows.onRemoved.fire(PIN_WINDOW_ID)
+    await flush()
+
+    expect(runSync).not.toHaveBeenCalled()
+  })
+
+  it('leaves the pin window alone when some other window closes', async () => {
+    const chrome = stubChrome(PINNING)
+    initBackground(deps())
+
+    chrome.windows.onRemoved.fire(42)
+    await flush()
+
+    expect(chrome.local.items.pinWindowId).toBe(PIN_WINDOW_ID)
+  })
+})

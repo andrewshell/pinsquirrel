@@ -263,6 +263,12 @@ export function initBackground(deps: BackgroundDeps): void {
     }
   }
 
+  /** Drop the remembered window id, if `windowId` is the one remembered. */
+  async function forgetPinWindow(windowId: number): Promise<void> {
+    if ((await storage.get('pinWindowId')) !== windowId) return
+    await storage.remove(['pinWindowId'])
+  }
+
   /**
    * The pin window has navigated: close it if the pin has been saved.
    *
@@ -319,6 +325,17 @@ export function initBackground(deps: BackgroundDeps): void {
 
   chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
     void onPinWindowUpdated(changeInfo, tab)
+  })
+
+  chrome.windows.onRemoved.addListener(windowId => {
+    // A window closed with the form still on screen: the user changed their
+    // mind, or saved and Chrome beat the worker to it. Either way the id in
+    // storage now names a window that is gone, and `pinWindowId` outlives the
+    // browser - so without this a stale id would sit there until the next pin,
+    // and the first update in a window Chrome happened to number the same
+    // would be read as that pin being saved. Nothing to sync: a window shut
+    // this way saved nothing, and one that did save has already synced.
+    void forgetPinWindow(windowId)
   })
 
   chrome.runtime.onStartup.addListener(() => {
