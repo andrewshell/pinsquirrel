@@ -227,6 +227,43 @@ export function initBackground(deps: BackgroundDeps): void {
   }
 
   /**
+   * The pin window a close is already running for.
+   *
+   * Chrome reports one navigation twice - `{ status: 'loading', url }` and
+   * then `{ status: 'complete' }` with the URL on the tab - and the saved page
+   * is small enough that the second arrives while the first is still awaiting
+   * storage. Both are past their read of `pinWindowId` by then, so clearing
+   * the key cannot stop the one already in flight; this can.
+   */
+  let closingWindowId: number | undefined
+
+  /**
+   * Shut the pin window, forget it, and sync - once per window.
+   *
+   * The order matters: `pinWindowId` is cleared *before* the window goes, so
+   * an update whose storage read lands after this point finds no pin window
+   * and stops. That and `closingWindowId` cover the two halves of the same
+   * race - the update that has not read yet, and the one that already has.
+   */
+  async function closePinWindow(windowId: number): Promise<void> {
+    if (closingWindowId === windowId) return
+    closingWindowId = windowId
+    try {
+      await storage.remove(['pinWindowId'])
+      try {
+        await chrome.windows.remove(windowId)
+      } catch {
+        // The window is already gone - closed by hand, or by a duplicate that
+        // got past both guards. Gone is the outcome this was asking for, and
+        // rethrowing would only be an unhandled rejection in the worker.
+      }
+      await syncQuietly('pin')
+    } finally {
+      closingWindowId = undefined
+    }
+  }
+
+  /**
    * The pin window has navigated: close it if the pin has been saved.
    *
    * `/pins/embed/saved` is the stable confirmation the embed form redirects to
@@ -252,9 +289,7 @@ export function initBackground(deps: BackgroundDeps): void {
     if (url === undefined) return
     if (!url.startsWith(`${stored.baseUrl}/pins/embed/saved`)) return
 
-    await chrome.windows.remove(stored.pinWindowId)
-    await storage.remove(['pinWindowId'])
-    await syncQuietly('pin')
+    await closePinWindow(stored.pinWindowId)
   }
 
   chrome.runtime.onInstalled.addListener(() => {
