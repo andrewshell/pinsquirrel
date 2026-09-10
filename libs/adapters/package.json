@@ -24,9 +24,9 @@
     "undici": "^8.10.2"
   },
   "devDependencies": {
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.4.1",
     "@vitest/coverage-v8": "^5.0.0",
-    "eslint": "^10.9.1",
+    "eslint": "^10.10.0",
     "prettier": "^3.9.6",
     "typescript": "^6.0.3",
     "vitest": "^5.0.0"
