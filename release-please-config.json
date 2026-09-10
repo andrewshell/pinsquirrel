@@ -14,16 +14,6 @@
         },
         {
           "type": "json",
-          "path": "apps/chrome-extension/manifest.json",
-          "jsonpath": "$.version"
-        },
-        {
-          "type": "json",
-          "path": "apps/chrome-extension/package.json",
-          "jsonpath": "$.version"
-        },
-        {
-          "type": "json",
           "path": "apps/hono/package.json",
           "jsonpath": "$.version"
         },
@@ -60,6 +50,21 @@
         {
           "type": "json",
           "path": "libs/ui/package.json",
+          "jsonpath": "$.version"
+        }
+      ],
+      "exclude-paths": ["apps/chrome-extension"]
+    },
+    "apps/chrome-extension": {
+      "release-type": "node",
+      "component": "chrome-extension",
+      "changelog-path": "CHANGELOG.md",
+      "include-component-in-tag": true,
+      "include-v-in-tag": true,
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "manifest.json",
           "jsonpath": "$.version"
         }
       ]
