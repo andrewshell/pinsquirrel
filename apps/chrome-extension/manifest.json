@@ -1,10 +1,19 @@
 {
   "manifest_version": 3,
   "name": "PinSquirrel",
-  "version": "3.5.3",
+  "version": "3.6.0",
   "description": "Sync your PinSquirrel bookmarks into Chrome's bookmark bar.",
-  "permissions": ["bookmarks", "storage", "alarms", "identity", "activeTab"],
-  "host_permissions": ["https://pinsquirrel.com/*", "http://localhost:8100/*"],
+  "permissions": [
+    "bookmarks",
+    "storage",
+    "alarms",
+    "identity",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://pinsquirrel.com/*",
+    "http://localhost:8100/*"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -20,7 +29,9 @@
   },
   "commands": {
     "pin-page": {
-      "suggested_key": { "default": "Alt+D" },
+      "suggested_key": {
+        "default": "Alt+D"
+      },
       "description": "Pin this page"
     }
   },

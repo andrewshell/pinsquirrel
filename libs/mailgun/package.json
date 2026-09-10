@@ -1,6 +1,6 @@
 {
   "name": "@pinsquirrel/mailgun",
-  "version": "3.5.3",
+  "version": "3.6.0",
   "description": "Mailgun email service implementation for PinSquirrel",
   "type": "module",
   "main": "./src/index.ts",
