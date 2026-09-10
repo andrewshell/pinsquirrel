@@ -92,6 +92,9 @@ async function isConnected(): Promise<boolean> {
   return stored.baseUrl !== undefined && stored.refreshToken !== undefined
 }
 
+/** The keyboard shortcut's name, as `commands` in the manifest declares it. */
+const PIN_COMMAND = 'pin-page'
+
 /** How large the pin window opens, in CSS pixels. */
 const PIN_WINDOW_WIDTH = 520
 const PIN_WINDOW_HEIGHT = 680
@@ -259,6 +262,14 @@ export function initBackground(deps: BackgroundDeps): void {
   })
 
   chrome.action.onClicked.addListener(tab => {
+    void pinTab(tab)
+  })
+
+  chrome.commands.onCommand.addListener((command, tab) => {
+    // A command grants `activeTab` exactly as a click on the action does, so
+    // the tab arrives with its URL and title readable and the path is the
+    // same one. Chrome sends no tab for a command fired with no active tab.
+    if (command !== PIN_COMMAND || tab === undefined) return
     void pinTab(tab)
   })
 
