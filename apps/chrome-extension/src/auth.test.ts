@@ -2,19 +2,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   authorizedFetch,
   buildAuthorizationUrl,
-  connect,
+  completeConnect,
   disconnect,
   getAccessToken,
   OAuthProtocolError,
   ReauthorizationRequiredError,
   readAuthorizationRedirect,
+  startConnect,
 } from './auth.ts'
 import type { OAuthEndpoints } from './oauth-metadata.ts'
 import { pkceChallengeFor } from './pkce.ts'
-import { STUB_REDIRECT_URL } from './test/chrome-mock.ts'
 import { jsonResponse } from './test/fetch-mock.ts'
 import {
   BASE_URL as SERVER_BASE_URL,
+  CALLBACK_URL,
   oauthErrorResponse,
   REGISTERED_CLIENT_ID,
   RESOURCE,
@@ -114,38 +115,75 @@ describe('readAuthorizationRedirect', () => {
   })
 })
 
-describe('connect', () => {
-  it('registers, gets consent, and stores the tokens the exchange returned', async () => {
+describe('startConnect', () => {
+  it('registers at the site callback and hands back the consent URL', async () => {
     const server = stubOAuthServer()
 
-    await connect(SERVER_BASE_URL)
+    const url = new URL(await startConnect(SERVER_BASE_URL))
 
-    // Registered as a public client at the callback Chrome minted for it.
+    // Registered as a public client at a page on the server itself: the
+    // consent screen runs in an ordinary tab, and the worker reads the code
+    // off that page's URL. No extension-owned callback is involved.
     expect(server.registrations).toEqual([
       {
         client_name: 'PinSquirrel Chrome Extension',
-        redirect_uris: [STUB_REDIRECT_URL],
+        redirect_uris: [CALLBACK_URL],
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
         token_endpoint_auth_method: 'none',
       },
     ])
-
-    expect(server.chrome.launchWebAuthFlow).toHaveBeenCalledWith(
-      expect.objectContaining({ interactive: true })
+    expect(`${url.origin}${url.pathname}`).toBe(
+      `${SERVER_BASE_URL}/oauth/authorize`
     )
+    expect(url.searchParams.get('client_id')).toBe(REGISTERED_CLIENT_ID)
+    expect(url.searchParams.get('redirect_uri')).toBe(CALLBACK_URL)
+  })
 
+  it('remembers the half-open flow, because the worker may be unloaded before the answer', async () => {
+    const server = stubOAuthServer()
+
+    const url = new URL(await startConnect(SERVER_BASE_URL))
+
+    expect(server.chrome.local.items.pendingConnect).toMatchObject({
+      baseUrl: SERVER_BASE_URL,
+      clientId: REGISTERED_CLIENT_ID,
+      redirectUri: CALLBACK_URL,
+      state: url.searchParams.get('state'),
+      verifier: expect.any(String) as string,
+    })
+  })
+
+  it('reuses a cached registration rather than registering again', async () => {
+    const server = stubOAuthServer({
+      registeredClients: { [SERVER_BASE_URL]: 'dcr_cached' },
+    })
+
+    const url = new URL(await startConnect(SERVER_BASE_URL))
+
+    expect(server.registrations).toEqual([])
+    expect(url.searchParams.get('client_id')).toBe('dcr_cached')
+  })
+})
+
+describe('completeConnect', () => {
+  it('spends the code the callback carries and stores the tokens', async () => {
+    const server = stubOAuthServer()
+    const url = await startConnect(SERVER_BASE_URL)
+
+    const outcome = await completeConnect(server.consent(url))
+
+    expect(outcome).toEqual({ status: 'connected' })
     expect(server.tokenRequests).toEqual([
       {
         grant_type: 'authorization_code',
         code: 'code-1',
-        redirect_uri: STUB_REDIRECT_URL,
+        redirect_uri: CALLBACK_URL,
         client_id: REGISTERED_CLIENT_ID,
         code_verifier: expect.any(String) as string,
         resource: RESOURCE,
       },
     ])
-
     expect(server.chrome.local.items).toMatchObject({
       baseUrl: SERVER_BASE_URL,
       clientId: REGISTERED_CLIENT_ID,
@@ -153,12 +191,14 @@ describe('connect', () => {
       refreshToken: 'refresh-1',
       expiresAt: expect.any(Number) as number,
     })
+    expect(server.chrome.local.items.pendingConnect).toBeUndefined()
   })
 
   it('proves it started the flow: the verifier it sends hashes to the challenge it sent', async () => {
     const server = stubOAuthServer()
+    const url = await startConnect(SERVER_BASE_URL)
 
-    await connect(SERVER_BASE_URL)
+    await completeConnect(server.consent(url))
 
     const challenge =
       server.authorizations[0].searchParams.get('code_challenge')
@@ -167,18 +207,7 @@ describe('connect', () => {
     expect(challenge).toBe(await pkceChallengeFor(verifier))
   })
 
-  it('reuses a cached registration rather than registering again', async () => {
-    const server = stubOAuthServer({
-      registeredClients: { [SERVER_BASE_URL]: 'dcr_cached' },
-    })
-
-    await connect(SERVER_BASE_URL)
-
-    expect(server.registrations).toEqual([])
-    expect(server.tokenRequests[0].client_id).toBe('dcr_cached')
-  })
-
-  it('re-registers and starts over when the server has forgotten the cached client', async () => {
+  it('re-registers and asks for a fresh consent when the server has forgotten the cached client', async () => {
     const server = stubOAuthServer({
       registeredClients: { [SERVER_BASE_URL]: 'dcr_stale' },
     })
@@ -187,15 +216,64 @@ describe('connect', () => {
         ? oauthErrorResponse('invalid_client', 401)
         : tokenResponse()
     )
+    const first = await startConnect(SERVER_BASE_URL)
 
-    await connect(SERVER_BASE_URL)
+    const outcome = await completeConnect(server.consent(first))
 
+    // The code was spent on the way in, so the only way on is a new consent
+    // against a fresh registration - handed back as a URL for the worker to
+    // send the same tab to.
+    expect(outcome).toMatchObject({ status: 'restart' })
     expect(server.registrations).toHaveLength(1)
-    expect(server.authorizations).toHaveLength(2)
+    const second = (outcome as { url: string }).url
+    expect(new URL(second).searchParams.get('client_id')).toBe(
+      REGISTERED_CLIENT_ID
+    )
+
+    await expect(completeConnect(server.consent(second))).resolves.toEqual({
+      status: 'connected',
+    })
     expect(server.chrome.local.items).toMatchObject({
       clientId: REGISTERED_CLIENT_ID,
       registeredClients: { [SERVER_BASE_URL]: REGISTERED_CLIENT_ID },
     })
+  })
+
+  it('refuses a callback when no flow was started', async () => {
+    stubOAuthServer()
+
+    await expect(
+      completeConnect(`${CALLBACK_URL}?code=abc&state=nope`)
+    ).rejects.toThrow(/no connection/i)
+  })
+
+  it('drops the half-open flow when consent was refused', async () => {
+    const server = stubOAuthServer()
+    const url = await startConnect(SERVER_BASE_URL)
+
+    let thrown: unknown
+    try {
+      await completeConnect(server.consent(url, 'access_denied'))
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toBeInstanceOf(OAuthProtocolError)
+    expect((thrown as OAuthProtocolError).code).toBe('access_denied')
+    expect(server.chrome.local.items.pendingConnect).toBeUndefined()
+    expect(server.tokenRequests).toEqual([])
+  })
+
+  it('keeps waiting when a callback carries a state it did not send', async () => {
+    const server = stubOAuthServer()
+    await startConnect(SERVER_BASE_URL)
+
+    await expect(
+      completeConnect(`${CALLBACK_URL}?code=abc&state=forged`)
+    ).rejects.toThrow(/state/i)
+
+    // Somebody else's redirect is no reason to forget the one still open.
+    expect(server.chrome.local.items.pendingConnect).toBeDefined()
   })
 })
 

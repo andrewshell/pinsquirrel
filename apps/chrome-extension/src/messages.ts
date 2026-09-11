@@ -16,15 +16,13 @@ export interface SyncRequest {
 }
 
 /**
- * "Connect to this server", meaning the whole OAuth flow.
+ * "Connect to this server": open the consent screen in a tab.
  *
- * The page cannot run this itself. `chrome.identity.launchWebAuthFlow` opens
- * a window, and when this UI was the action popup Chrome destroyed it the
- * moment that window took focus - taking the half-finished flow with it, after
- * the server had already issued the tokens. The user was left with a live
- * grant on their profile, no tokens in storage, and a popup that reopened on
- * Connect. So the page asks the worker, which outlives it, and reads the
- * tokens out of storage next time it opens.
+ * The page cannot run this itself. The flow ends in a tab the worker watches,
+ * and the answer can come minutes later - after the page has been closed, and
+ * after the worker that opened the tab has been unloaded. So the page asks the
+ * worker, which is woken again by the tab's navigation, and reads the tokens
+ * out of storage next time it opens.
  */
 export interface ConnectRequest {
   type: 'connect'
@@ -36,6 +34,19 @@ export interface ConnectRequest {
 export type ExtensionMessage = SyncRequest | ConnectRequest
 
 /**
+ * The worker's word that the consent tab has answered, sent to whoever is
+ * listening - the options page, if it is still open.
+ *
+ * Sent rather than answered: the `ConnectRequest` was answered when the tab
+ * opened, and this is what came of it. Nothing rests on it arriving; the
+ * tokens are in storage first, and a page that opens later reads them there.
+ */
+export interface ConnectFinished {
+  type: 'connect-finished'
+  result: ConnectResponse
+}
+
+/**
  * What the worker answers a `SyncRequest` with.
  *
  * A failure travels as a value rather than a rejection: an exception thrown
@@ -45,7 +56,9 @@ export type ExtensionMessage = SyncRequest | ConnectRequest
 export type SyncResponse = { ok: true } | { ok: false; error: string }
 
 /**
- * What the worker answers a `ConnectRequest` with.
+ * What the worker answers a `ConnectRequest` with - `ok` meaning the consent
+ * tab is open, not that the user is connected - and what a `ConnectFinished`
+ * carries once the tab has answered.
  *
  * `reauthorizationRequired` is how the one failure the options page renders
  * differently survives the trip: `ReauthorizationRequiredError` is a class, and
@@ -83,6 +96,15 @@ export function isSyncResponse(value: unknown): value is SyncResponse {
   return value.ok === false && typeof value.error === 'string'
 }
 
+/** For the options page: is this untyped message the worker's word that the tab answered? */
+export function isConnectFinished(value: unknown): value is ConnectFinished {
+  return (
+    isRecord(value) &&
+    value.type === 'connect-finished' &&
+    isConnectResponse(value.result)
+  )
+}
+
 /** For the options page: did the worker answer in the shape it promised? */
 export function isConnectResponse(value: unknown): value is ConnectResponse {
   if (!isRecord(value)) return false
@@ -106,17 +128,50 @@ export async function requestSync(): Promise<SyncResponse> {
 }
 
 /**
- * Ask the service worker to run the OAuth flow against `baseUrl`.
+ * Ask the service worker to open the consent screen for `baseUrl`.
  *
- * Answers the same way `requestSync` does - but the answer is not what the
- * connection rests on: the worker owns the flow, and the page reads what it
- * stored on its next open. As the action popup the answer arrived nowhere at
- * all, because the consent window closed the page waiting for it.
+ * Answers the same way `requestSync` does, and `ok` means only that the tab
+ * is open. What came of it arrives later through `onConnectFinished`, if the
+ * page is still there to hear it; either way the worker has stored the tokens
+ * before saying so, and a page that opens later reads them from storage.
  */
 export async function requestConnect(
   baseUrl: string
 ): Promise<ConnectResponse> {
   return send({ type: 'connect', baseUrl }, isConnectResponse, 'connect')
+}
+
+/**
+ * For the options page: hear the worker say the consent tab has answered.
+ *
+ * Messages from anything else on the channel are not for this listener and
+ * are left alone, including the page's own requests echoing past.
+ */
+export function onConnectFinished(
+  listener: (result: ConnectResponse) => void
+): void {
+  chrome.runtime.onMessage.addListener((message: unknown) => {
+    if (isConnectFinished(message)) listener(message.result)
+    return false
+  })
+}
+
+/**
+ * For the worker: tell the options page the consent tab has answered.
+ *
+ * A page that is not open rejects the send with "Receiving end does not
+ * exist", which is nothing to act on - the tokens are already in storage,
+ * and the page reads them there next time. So the rejection is swallowed.
+ */
+export async function notifyConnectFinished(
+  result: ConnectResponse
+): Promise<void> {
+  const message: ConnectFinished = { type: 'connect-finished', result }
+  try {
+    await chrome.runtime.sendMessage(message)
+  } catch {
+    // Nobody listening. See above.
+  }
 }
 
 /** One round trip to the worker, with both of its non-answers as failures. */

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ReauthorizationRequiredError } from '../auth.ts'
+import type { ConnectResponse } from '../messages.ts'
 import { stubChrome, type ChromeStub } from '../test/chrome-mock.ts'
 import { loadOptionsDocument } from '../test/options-dom.ts'
 import type { TagWithCount } from '../types.ts'
@@ -39,6 +40,11 @@ interface Harness {
   disconnect: ReturnType<typeof vi.fn>
   getTags: ReturnType<typeof vi.fn>
   requestSync: ReturnType<typeof vi.fn>
+  /**
+   * The worker saying the consent tab has answered, as the test plays it:
+   * calls whatever the page registered through `onConnectFinished`.
+   */
+  tabAnswered(result: ConnectResponse): Promise<void>
 }
 
 function harness(overrides: Partial<OptionsDeps> = {}): Harness {
@@ -46,10 +52,14 @@ function harness(overrides: Partial<OptionsDeps> = {}): Harness {
   const disconnect = vi.fn(() => Promise.resolve())
   const getTags = vi.fn(() => Promise.resolve(TAGS))
   const requestSync = vi.fn(() => Promise.resolve({ ok: true as const }))
+  const finishedListeners: ((result: ConnectResponse) => void)[] = []
 
   const deps: OptionsDeps = {
     document: doc,
     requestConnect,
+    onConnectFinished: listener => {
+      finishedListeners.push(listener)
+    },
     disconnect,
     createApiClient: () => ({ getTags }),
     requestSync,
@@ -57,7 +67,17 @@ function harness(overrides: Partial<OptionsDeps> = {}): Harness {
     ...overrides,
   }
 
-  return { deps, requestConnect, disconnect, getTags, requestSync }
+  return {
+    deps,
+    requestConnect,
+    disconnect,
+    getTags,
+    requestSync,
+    tabAnswered: result => {
+      for (const listener of finishedListeners) listener(result)
+      return flush()
+    },
+  }
 }
 
 /** Let the click handlers' promises settle. */
@@ -131,7 +151,7 @@ describe('initOptions, with no connection stored', () => {
     expect(settingsShown()).toBe(true)
   })
 
-  it('asks the worker to connect, and shows the tag list if it survives', async () => {
+  it('asks the worker to open the consent tab, and says to finish there', async () => {
     const { deps, requestConnect } = harness()
     await initOptions(deps)
 
@@ -139,17 +159,39 @@ describe('initOptions, with no connection stored', () => {
     await click('#connect')
 
     expect(requestConnect).toHaveBeenCalledWith('https://pinsquirrel.com')
-    expect(mainShown()).toBe(true)
-    expect(settingsShown()).toBe(false)
-    expect(checkboxes().map(box => box.value)).toEqual(['t1', 't2'])
+    // The tab is open; the user is not connected yet. The page waits where
+    // it is, with the button usable again in case the tab was lost.
+    expect(settingsShown()).toBe(true)
+    expect(mainShown()).toBe(false)
+    expect(status()).toMatch(/tab/i)
+    expect(element<HTMLButtonElement>('#connect').disabled).toBe(false)
   })
 
-  it('stays on the settings view when the worker reports a failed flow', async () => {
+  it('shows the tag list once the worker says the tab answered', async () => {
+    const h = harness()
+    await initOptions(h.deps)
+    element<HTMLInputElement>('#base-url').value = 'https://pinsquirrel.com/'
+    await click('#connect')
+
+    // The worker stores the tokens before it says anything.
+    Object.assign(chrome.local.items, CONNECTED)
+    await h.tabAnswered({ ok: true })
+
+    expect(mainShown()).toBe(true)
+    expect(settingsShown()).toBe(false)
+    expect(status()).toBe('')
+    expect(checkboxes().map(box => box.value)).toEqual(['t1', 't2'])
+    expect(element('#connected-to').textContent).toContain(
+      'https://pinsquirrel.com'
+    )
+  })
+
+  it('stays on the settings view when the tab could not be opened', async () => {
     const { deps } = harness({
       requestConnect: vi.fn(() =>
         Promise.resolve({
           ok: false as const,
-          error: 'The user closed the window',
+          error: 'Discovery failed',
         })
       ),
     })
@@ -157,43 +199,47 @@ describe('initOptions, with no connection stored', () => {
     await click('#connect')
 
     expect(settingsShown()).toBe(true)
-    expect(status()).toContain('The user closed the window')
+    expect(status()).toContain('Discovery failed')
   })
 
-  it('asks to reconnect when the worker says the grant is gone', async () => {
-    const { deps } = harness({
-      requestConnect: vi.fn(() =>
-        Promise.resolve({
-          ok: false as const,
-          error: 'invalid_grant',
-          reauthorizationRequired: true,
-        })
-      ),
-    })
-    await initOptions(deps)
+  it('stays on the settings view, saying why, when the tab answered with a refusal', async () => {
+    const h = harness()
+    await initOptions(h.deps)
     await click('#connect')
+
+    await h.tabAnswered({ ok: false, error: 'stubbed access_denied' })
+
+    expect(settingsShown()).toBe(true)
+    expect(status()).toContain('stubbed access_denied')
+  })
+
+  it('asks to reconnect when the tab says the grant is gone', async () => {
+    const h = harness()
+    await initOptions(h.deps)
+    await click('#connect')
+
+    await h.tabAnswered({
+      ok: false,
+      error: 'invalid_grant',
+      reauthorizationRequired: true,
+    })
 
     expect(settingsShown()).toBe(true)
     expect(element('#reconnect-notice').hidden).toBe(false)
   })
 
   /**
-   * The bug this arrangement exists for: as the action popup, Chrome
-   * destroyed this page when the consent window took focus, so the flow
-   * finished with nobody listening. An options tab survives that, but the
-   * worker still owns the flow, so the page has to read the result out of
-   * storage on its next open rather than wait for an answer.
+   * The page that asked may be gone by the time the tab answers - the user
+   * closed it, or Chrome did. The worker still owns the flow and stores the
+   * tokens, so the page has to read the result out of storage on its next
+   * open rather than depend on hearing the answer.
    */
   it('opens on the main view when the worker connected after it closed', async () => {
-    const torndown = harness({
-      requestConnect: vi.fn(() => {
-        Object.assign(chrome.local.items, CONNECTED)
-        // Never answers - stands for the page that asked being gone.
-        return new Promise<never>(() => {})
-      }),
-    })
+    const torndown = harness()
     await initOptions(torndown.deps)
     await click('#connect')
+    // The tab answers to a page that is no longer there.
+    Object.assign(chrome.local.items, CONNECTED)
 
     doc = loadOptionsDocument()
     await initOptions(harness().deps)

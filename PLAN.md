@@ -310,12 +310,13 @@ manifest's `host_permissions`, and the session cookie is only `Secure` in produc
 1. `pnpm db:up`, `pnpm dev`, and sign in to the app in the same Chrome profile —
    `/oauth/authorize` is behind `requireAuth()`.
 2. Right-click the acorn → **Options** and type `http://localhost:8100`: an origin, no path,
-   which is all `parseBaseUrl` accepts. Connect, and watch the flow in the service worker's
-   DevTools, not the page's — the worker is what runs it.
-3. The redirect URI is `https://agcifhddbnanmlmancpchljklflfnbif.chromiumapp.org/`, which
-   needs nothing on the server. The DCR `client_id` is derived from the metadata, so one
-   extension dedups to one `oauth_clients` row, and the manifest's `key` fixes the ID, so a
-   second checkout is the same row. `/oauth/register` allows ten per IP per hour.
+   which is all `parseBaseUrl` accepts. Connect opens the consent screen in a new tab; approve
+   it there, and the tab closes itself. Watch the flow in the service worker's DevTools, not
+   the page's — the worker is what runs it, in two halves around the tab.
+3. The redirect URI is `http://localhost:8100/oauth/extension/callback`, a page on the server
+   that needs no session. The DCR `client_id` is derived from the metadata, so one extension
+   dedups to one `oauth_clients` row, and the manifest's `key` fixes the ID, so a second
+   checkout is the same row. `/oauth/register` allows ten per IP per hour.
 4. Tick tags, Sync Now, and check the bookmarks bar for a "PinSquirrel" folder. Revoke from
    `/profile` and confirm the options page comes back on Connect with a notice rather than
    failing silently.
@@ -405,11 +406,11 @@ manifest's `host_permissions`, and the session cookie is only `Secure` in produc
     distinction can be expressed. The cost is one extra metadata document and passing the
     expected resource into the auth middleware rather than hardcoding it.
 
-17. **The Chrome extension authenticates via `chrome.identity.launchWebAuthFlow`.** Chrome mints an extension-owned callback at
-    `https://<extension-id>.chromiumapp.org/`, so it is an ordinary authorization-code + PKCE
-    flow against a fixed HTTPS redirect URI, with no loopback-port matching and no secret stored
-    in the extension. Requires the `identity` permission in the manifest, `offline_access` so the
-    service worker can refresh unattended, and tokens in `chrome.storage.local`. Never
+17. **The Chrome extension authenticates with authorization code + PKCE, as a public client.**
+    Originally through `chrome.identity.launchWebAuthFlow` and its extension-owned callback;
+    superseded by decision 26, which moves the consent screen to an ordinary tab. What stands:
+    no loopback-port matching, no secret in the extension, `offline_access` so the service
+    worker can refresh unattended, and tokens in `chrome.storage.local`. Never
     `chrome.storage.sync`, which replicates across machines and is not a secret store.
 18. **The issuer comes from `BASE_URL`.** The `issuer`, the `resource`
     identifiers, the `iss` parameter and the audience check all have to agree on one string that
@@ -489,6 +490,20 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     mode. The Chrome Web Store is not part of the plan — a store review is a gate that can
     stay shut indefinitely, and the site's waitlist already decides who can use the thing.
     The manifest's `key` pins the extension ID so every install is one OAuth client.
+
+26. **The extension's consent screen is an ordinary tab, and the redirect URI is a page on the
+    server.** `chrome.identity.launchWebAuthFlow` opens a window no other extension may touch,
+    so 1Password showed its icon there and could not fill anything, and the user had to type a
+    password to connect a bookmarking extension. The worker now opens `/oauth/authorize` with
+    `chrome.tabs.create`, the redirect URI is `<baseUrl>/oauth/extension/callback` (the server
+    only accepts `https` redirect URIs, so a `chrome-extension://` one was never an option),
+    and the worker reads the code off the tab's URL through `tabs.onUpdated` — the same
+    mechanism, and the same `host_permissions` dependency, as closing the pin window. A user
+    already signed in on the site goes straight to consent, which is most of the point. The
+    flow is two calls with storage between them (`startConnect`, `completeConnect`), because
+    the worker that opens the tab is unloaded before the user has read the screen. The
+    `identity` permission is gone from the manifest. Security is unchanged: PKCE and `state`
+    bind the answer to the question, not the window it arrived in.
 
 ## Reference
 

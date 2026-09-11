@@ -4,22 +4,16 @@ import { vi } from 'vitest'
  * A stand-in for the `chrome` global, for the extension code that talks to it.
  *
  * Only the surface this extension actually uses is here: `storage.local`,
- * `storage.sync` (present so a test can prove nothing writes to it), the two
- * `identity` calls the OAuth flow makes, the `bookmarks` calls the sync makes,
- * the `runtime`, `alarms`, `action`, `commands` and `tabs` events the service
- * worker listens on, and the `windows` calls and event the pin flow uses.
+ * `storage.sync` (present so a test can prove nothing writes to it), the
+ * `bookmarks` calls the sync makes, the `runtime`, `alarms`, `action`,
+ * `commands` and `tabs` events the service worker listens on, the `tabs` calls
+ * the connect flow opens and closes its consent tab with, and the `windows`
+ * calls and event the pin flow uses.
  * Anything else is left off on purpose - a test that reaches for it should
  * fail loudly rather than get an empty object back.
  *
  * `vi.unstubAllGlobals()` in an `afterEach` is what undoes it.
  */
-
-/** `chrome.identity.launchWebAuthFlow`, in its promise form. */
-export type LaunchWebAuthFlowMock = ReturnType<
-  typeof vi.fn<
-    (details: chrome.identity.WebAuthFlowDetails) => Promise<string | undefined>
-  >
->
 
 /** An in-memory `chrome.storage` area, and the record a test can read. */
 export interface StubbedStorageArea {
@@ -81,6 +75,25 @@ export interface WindowsStub {
   onRemoved: EventStub<[number]>
 }
 
+/**
+ * An in-memory `chrome.tabs`: the consent tabs the connect flow opened,
+ * navigated and closed, plus the two events the worker listens on.
+ *
+ * `create` answers a tab with an id, because the worker keeps that id to
+ * recognise the tab a `tabs.onUpdated` came from. Ids start at 500 so a test
+ * cannot mistake one for a window id.
+ */
+export interface TabsStub {
+  /** Every `chrome.tabs.create` call, in order. */
+  created: chrome.tabs.CreateProperties[]
+  /** Every `chrome.tabs.update` call, in order. */
+  updated: { tabId: number; properties: chrome.tabs.UpdateProperties }[]
+  /** Every tab id handed to `chrome.tabs.remove`, in order. */
+  removed: number[]
+  onUpdated: EventStub<[number, chrome.tabs.OnUpdatedInfo, chrome.tabs.Tab]>
+  onRemoved: EventStub<[number, chrome.tabs.OnRemovedInfo]>
+}
+
 /** An in-memory `chrome.alarms`: what exists, and what asked for it. */
 export interface AlarmsStub {
   /** Every `chrome.alarms.create` call, in order. */
@@ -96,9 +109,6 @@ export interface AlarmsStub {
 export interface ChromeStub {
   local: StubbedStorageArea
   sync: StubbedStorageArea
-  /** Resolves to the redirect URL Chrome would land on. Set per flow. */
-  launchWebAuthFlow: LaunchWebAuthFlowMock
-  getRedirectURL: ReturnType<typeof vi.fn<() => string>>
   /** What the service worker answers the options page with. Set per test. */
   sendMessage: SendMessageMock
   /** The bookmark tree the sync reads and writes. */
@@ -115,10 +125,11 @@ export interface ChromeStub {
   commands: {
     onCommand: EventStub<[string, chrome.tabs.Tab | undefined]>
   }
-  /** How the worker hears that the pin window has navigated. */
-  tabs: {
-    onUpdated: EventStub<[number, chrome.tabs.OnUpdatedInfo, chrome.tabs.Tab]>
-  }
+  /**
+   * The tabs the connect flow opens for consent, and how the worker hears
+   * that a tab - the pin window's or the consent one - has navigated or gone.
+   */
+  tabs: TabsStub
   /** The pin window, for a test to see opened and closed, and to close. */
   windows: WindowsStub
 }
@@ -382,12 +393,6 @@ function bookmarksApi(stub: BookmarksStub) {
   }
 }
 
-/**
- * The extension's own callback URL, as Chrome mints it. Tests that assert a
- * `redirect_uri` compare against this.
- */
-export const STUB_REDIRECT_URL = 'https://extensionid.chromiumapp.org/'
-
 /** Install the stub on `globalThis.chrome` and hand back its innards. */
 export function stubChrome(
   initialLocal: Record<string, unknown> = {}
@@ -412,6 +417,15 @@ export function stubChrome(
   const onCommand = eventStub<[string, chrome.tabs.Tab | undefined]>()
   const onUpdated =
     eventStub<[number, chrome.tabs.OnUpdatedInfo, chrome.tabs.Tab]>()
+  const onTabRemoved = eventStub<[number, chrome.tabs.OnRemovedInfo]>()
+  const tabs: TabsStub = {
+    created: [],
+    updated: [],
+    removed: [],
+    onUpdated,
+    onRemoved: onTabRemoved,
+  }
+  let nextTabId = 500
   const onRemoved = eventStub<[number]>()
   const windows: WindowsStub = { created: [], removed: [], onRemoved }
   let nextWindowId = 100
@@ -419,13 +433,6 @@ export function stubChrome(
   const stub: ChromeStub = {
     local: { items: { ...initialLocal } },
     sync: { items: {} },
-    launchWebAuthFlow:
-      vi.fn<
-        (
-          details: chrome.identity.WebAuthFlowDetails
-        ) => Promise<string | undefined>
-      >(),
-    getRedirectURL: vi.fn<() => string>(() => STUB_REDIRECT_URL),
     sendMessage: vi.fn<(message: unknown) => Promise<unknown>>(),
     // `bookmarksApi` fills these in over the tree it closes over.
     bookmarks: {
@@ -441,7 +448,7 @@ export function stubChrome(
     alarms,
     action: { onClicked },
     commands: { onCommand },
-    tabs: { onUpdated },
+    tabs,
     windows,
   }
 
@@ -449,10 +456,6 @@ export function stubChrome(
     storage: {
       local: storageArea(stub.local),
       sync: storageArea(stub.sync),
-    },
-    identity: {
-      launchWebAuthFlow: stub.launchWebAuthFlow,
-      getRedirectURL: stub.getRedirectURL,
     },
     runtime: {
       sendMessage: stub.sendMessage,
@@ -463,7 +466,44 @@ export function stubChrome(
     },
     action: { onClicked },
     commands: { onCommand },
-    tabs: { onUpdated },
+    tabs: {
+      onUpdated,
+      onRemoved: onTabRemoved,
+      create: (properties: chrome.tabs.CreateProperties) => {
+        tabs.created.push(properties)
+        const id = nextTabId++
+        const tab: chrome.tabs.Tab = {
+          id,
+          index: 0,
+          windowId: 1,
+          ...(typeof properties.url === 'string'
+            ? { url: properties.url }
+            : {}),
+          active: true,
+          pinned: false,
+          highlighted: true,
+          selected: true,
+          incognito: false,
+          discarded: false,
+          frozen: false,
+          autoDiscardable: true,
+          groupId: -1,
+          lastAccessed: Date.now(),
+        }
+        return Promise.resolve(tab)
+      },
+      update: (tabId: number, properties: chrome.tabs.UpdateProperties) => {
+        tabs.updated.push({ tabId, properties })
+        return Promise.resolve(undefined)
+      },
+      remove: (tabId: number) => {
+        const gone = tabs.removed.includes(tabId)
+        tabs.removed.push(tabId)
+        return gone
+          ? Promise.reject(new Error(`No tab with id: ${tabId}.`))
+          : Promise.resolve()
+      },
+    },
     windows: {
       create: (data: chrome.windows.CreateData) => {
         windows.created.push(data)

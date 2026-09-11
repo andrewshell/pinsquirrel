@@ -7,19 +7,20 @@
  * none of them. Keeping the entry point this thin is what lets the tests
  * import the wiring without waking a service worker on import.
  *
- * `connect` is deliberately not among them: it opens a window, and when this
- * page was the action popup Chrome destroyed it the moment that window took
- * focus. The flow has run in the service worker ever since, which is still
- * where it belongs - a flow that outlives the page that asked for it.
+ * The OAuth flow is deliberately not among them: it ends in a tab the worker
+ * watches, and the answer can come after this page is gone. It runs in the
+ * service worker, which is where a flow that outlives the page that asked for
+ * it belongs.
  */
 import { PinSquirrelApiClient } from './api-client.ts'
 import { authorizedFetch, disconnect } from './auth.ts'
-import { requestConnect, requestSync } from './messages.ts'
+import { onConnectFinished, requestConnect, requestSync } from './messages.ts'
 import { initOptions } from './options/init.ts'
 
 void initOptions({
   document,
   requestConnect,
+  onConnectFinished,
   disconnect,
   createApiClient: baseUrl =>
     new PinSquirrelApiClient({ baseUrl, fetch: authorizedFetch }),
