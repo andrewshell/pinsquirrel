@@ -156,6 +156,17 @@ describe('oauth authorize routes', () => {
       expect(body).not.toContain('abc123')
     })
 
+    it('renders without the chrome for embed=1, like every other page', async () => {
+      const res = await app.request(
+        '/oauth/extension/callback?code=abc123&state=s1&embed=1'
+      )
+
+      const html = await res.text()
+      expect(html).toContain('Extension connected')
+      expect(html).not.toContain('<header')
+      expect(html).not.toContain('<footer')
+    })
+
     it("shows the server's error when consent was refused", async () => {
       const res = await app.request(
         '/oauth/extension/callback?error=access_denied&error_description=You+said+no&state=s1'

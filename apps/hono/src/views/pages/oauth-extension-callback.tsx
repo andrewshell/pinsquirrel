@@ -19,14 +19,15 @@ interface OAuthExtensionCallbackPageProps {
   user: User | null
   /** The RFC 6749 error the server redirected with, if consent failed. */
   error?: { code: string; description: string }
+  embed?: boolean
 }
 
 export const OAuthExtensionCallbackPage: FC<
   OAuthExtensionCallbackPageProps
-> = ({ user, error }) => {
+> = ({ user, error, embed = false }) => {
   const title = error ? 'Extension not connected' : 'Extension connected'
   return (
-    <DefaultLayout title={title} user={user} width="form">
+    <DefaultLayout title={title} user={user} width="form" embed={embed}>
       <h1 class="sr-only">{title}</h1>
       <Card>
         <CardHeader>
