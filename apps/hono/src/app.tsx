@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { csrf } from 'hono/csrf'
 import { HTTPException } from 'hono/http-exception'
+import { isEmbedRequest } from './lib/embed'
 import { logger, safeError } from './lib/logger.js'
 
 import { NotFoundPage } from './views/pages/not-found'
@@ -110,7 +111,11 @@ app.get('/', async c => {
   }
 
   return c.html(
-    <DefaultLayout title="Hoard your links like winter is coming" user={null}>
+    <DefaultLayout
+      title="Hoard your links like winter is coming"
+      user={null}
+      embed={isEmbedRequest(c)}
+    >
       <HomePage />
     </DefaultLayout>
   )

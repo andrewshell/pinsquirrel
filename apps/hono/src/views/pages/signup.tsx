@@ -1,6 +1,7 @@
 import type { FC } from 'hono/jsx'
 import { DefaultLayout } from '../layouts/default'
 import { SuccessMessage, ErrorMessage } from '../components/FlashMessage'
+import { withEmbed } from '../../lib/embed'
 
 interface SignUpPageProps {
   errors?: Record<string, string[]>
@@ -9,6 +10,7 @@ interface SignUpPageProps {
   success?: boolean
   message?: string
   showResendLink?: boolean
+  embed?: boolean
 }
 
 export const SignUpPage: FC<SignUpPageProps> = ({
@@ -18,9 +20,10 @@ export const SignUpPage: FC<SignUpPageProps> = ({
   success = false,
   message,
   showResendLink = false,
+  embed = false,
 }) => {
   return (
-    <DefaultLayout title="Request Early Access" user={null}>
+    <DefaultLayout title="Request Early Access" user={null} embed={embed}>
       <div class="flex flex-col items-center justify-center px-4 py-16">
         <div class="w-full max-w-md">
           {/* Header */}
@@ -33,7 +36,7 @@ export const SignUpPage: FC<SignUpPageProps> = ({
             <p class="mt-2 text-muted-foreground">
               Already in?{' '}
               <a
-                href="/signin"
+                href={withEmbed('/signin', embed)}
                 class="text-primary hover:underline font-medium"
               >
                 welcome back, hoarder
@@ -59,7 +62,7 @@ export const SignUpPage: FC<SignUpPageProps> = ({
                 </p>
                 {showResendLink && (
                   <a
-                    href="/forgot-password"
+                    href={withEmbed('/forgot-password', embed)}
                     class="block w-full px-4 py-2 mb-4 text-center bg-primary text-primary-foreground font-medium
                            border-2 border-foreground neobrutalism-shadow
                            hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
@@ -70,7 +73,7 @@ export const SignUpPage: FC<SignUpPageProps> = ({
                   </a>
                 )}
                 <a
-                  href="/signin"
+                  href={withEmbed('/signin', embed)}
                   class="block w-full px-4 py-2 text-center bg-secondary text-secondary-foreground font-medium
                          border-2 border-foreground neobrutalism-shadow
                          hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
@@ -91,6 +94,7 @@ export const SignUpPage: FC<SignUpPageProps> = ({
                   class="space-y-4"
                   novalidate
                 >
+                  {embed && <input type="hidden" name="embed" value="1" />}
                   {/* Form-level errors */}
                   {errors?._form && (
                     <ErrorMessage message={errors._form.join('. ')} />

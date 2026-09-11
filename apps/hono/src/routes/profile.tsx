@@ -7,6 +7,7 @@ import {
   ValidationError,
 } from '@pinsquirrel/domain'
 import { accountService, authService, oauthService } from '../lib/services'
+import { isEmbedRequest, withEmbed } from '../lib/embed'
 import { getString } from '../lib/form'
 import {
   getAuthUser,
@@ -30,7 +31,14 @@ profile.get('/', async c => {
 
   const grants = await oauthService.listGrants(new AccessControl(user), user.id)
 
-  return c.html(<ProfilePage user={user} flash={flash} grants={grants} />)
+  return c.html(
+    <ProfilePage
+      user={user}
+      flash={flash}
+      grants={grants}
+      embed={isEmbedRequest(c)}
+    />
+  )
 })
 
 // POST /profile - Handle form submissions
@@ -42,6 +50,8 @@ profile.post('/', async c => {
   const formData = await c.req.parseBody()
 
   const intent = getString(formData['intent'])
+  const embed = getString(formData['embed']) === '1'
+  const back = withEmbed('/profile', embed)
 
   try {
     if (intent === 'update-email') {
@@ -53,7 +63,7 @@ profile.post('/', async c => {
       })
 
       sessionManager.setFlash('success', 'Email updated successfully!')
-      return c.redirect('/profile')
+      return c.redirect(back)
     }
 
     // Revoking takes the whole grant family, access token and refresh token
@@ -64,7 +74,7 @@ profile.post('/', async c => {
       await oauthService.revokeGrant(new AccessControl(user), tokenId)
 
       sessionManager.setFlash('success', 'Application access revoked!')
-      return c.redirect('/profile')
+      return c.redirect(back)
     }
 
     if (intent === 'change-password') {
@@ -78,12 +88,16 @@ profile.post('/', async c => {
       })
 
       sessionManager.setFlash('success', 'Password changed successfully!')
-      return c.redirect('/profile')
+      return c.redirect(back)
     }
 
     // Invalid intent
     return c.html(
-      <ProfilePage user={user} errors={{ _form: ['Invalid action'] }} />,
+      <ProfilePage
+        user={user}
+        errors={{ _form: ['Invalid action'] }}
+        embed={embed}
+      />,
       400
     )
   } catch (error) {
@@ -94,23 +108,27 @@ profile.post('/', async c => {
       user.id
     )
 
-    if (error instanceof ValidationError) {
-      return c.html(
-        <ProfilePage user={user} grants={grants} errors={error.fields} />,
-        400
+    const rerender = (errors: Record<string, string[]>, status: 400 | 500) =>
+      c.html(
+        <ProfilePage
+          user={user}
+          grants={grants}
+          errors={errors}
+          embed={embed}
+        />,
+        status
       )
+
+    if (error instanceof ValidationError) {
+      return rerender(error.fields, 400)
     }
 
     // A grant that is gone, or one that was never this user's. Either way the
     // form is stale rather than the server broken, and saying which it was
     // would tell somebody whether a token id exists.
     if (error instanceof OAuthError) {
-      return c.html(
-        <ProfilePage
-          user={user}
-          grants={grants}
-          errors={{ _form: ['That application access is no longer active.'] }}
-        />,
+      return rerender(
+        { _form: ['That application access is no longer active.'] },
         400
       )
     }
@@ -119,34 +137,19 @@ profile.post('/', async c => {
     // reaches us as a thrown error rather than a validation failure. It is
     // still a rejected form, not a server fault.
     if (error instanceof UserAlreadyExistsError) {
-      return c.html(
-        <ProfilePage
-          user={user}
-          grants={grants}
-          errors={{ email: ['That email address is already in use'] }}
-        />,
-        400
-      )
+      return rerender({ email: ['That email address is already in use'] }, 400)
     }
 
     if (error instanceof InvalidCredentialsError) {
-      return c.html(
-        <ProfilePage
-          user={user}
-          grants={grants}
-          errors={{ currentPassword: ['Current password is incorrect'] }}
-        />,
+      return rerender(
+        { currentPassword: ['Current password is incorrect'] },
         400
       )
     }
 
     // Generic error
-    return c.html(
-      <ProfilePage
-        user={user}
-        grants={grants}
-        errors={{ _form: ['An unexpected error occurred. Please try again.'] }}
-      />,
+    return rerender(
+      { _form: ['An unexpected error occurred. Please try again.'] },
       500
     )
   }

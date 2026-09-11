@@ -21,6 +21,7 @@ interface PinsPageProps {
   flash?: { type: FlashType; message: string } | null
   baseUrl?: string
   privateMode?: boolean
+  embed?: boolean
 }
 
 export const PinsPage: FC<PinsPageProps> = ({
@@ -39,6 +40,7 @@ export const PinsPage: FC<PinsPageProps> = ({
   flash,
   baseUrl = '/pins',
   privateMode = false,
+  embed = false,
 }) => {
   return (
     <DefaultLayout
@@ -46,6 +48,7 @@ export const PinsPage: FC<PinsPageProps> = ({
       user={user}
       currentPath={baseUrl}
       privateMode={privateMode}
+      embed={embed}
     >
       {/* Flash message */}
       {flash && (

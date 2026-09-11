@@ -113,6 +113,78 @@ describe('private routes', () => {
       expect(svc.getUserPinsWithPagination).not.toHaveBeenCalled()
     })
 
+    it('keeps the unlock page in embed mode and remembers where to go back to', async () => {
+      session.isPrivateUnlocked.mockReturnValue(false)
+
+      const res = await app.request(
+        '/private/pins/new?url=https%3A%2F%2Fx.test&embed=1'
+      )
+
+      expect(res.status).toBe(302)
+      expect(res.headers.get('Location')).toBe(
+        '/private/unlock?redirectTo=%2Fprivate%2Fpins%2Fnew%3Furl%3Dhttps%253A%252F%252Fx.test%26embed%3D1&embed=1'
+      )
+    })
+
+    it('renders the unlock form without the chrome in embed mode, carrying redirectTo', async () => {
+      session.isPrivateUnlocked.mockReturnValue(false)
+
+      const res = await app.request(
+        '/private/unlock?redirectTo=%2Fprivate%2Fpins%2Fnew%3Fembed%3D1&embed=1'
+      )
+      const html = await res.text()
+
+      expect(res.status).toBe(200)
+      expect(html).toContain('name="password"')
+      expect(html).not.toContain('<header')
+      expect(html).not.toContain('<footer')
+      expect(html).not.toContain('Back to Pins')
+      expect(html).toContain('name="embed" value="1"')
+      expect(html).toContain(
+        'name="redirectTo" value="/private/pins/new?embed=1"'
+      )
+    })
+
+    it('goes back to the embedded page after an unlock that carried redirectTo', async () => {
+      svc.login.mockResolvedValue(testUser)
+
+      const res = await app.request(
+        '/private/unlock',
+        formBody({
+          password: 'correct-horse',
+          redirectTo: '/private/pins/new?embed=1',
+          embed: '1',
+        })
+      )
+
+      expect(res.headers.get('Location')).toBe('/private/pins/new?embed=1')
+    })
+
+    it('refuses an off-site redirectTo after unlock', async () => {
+      svc.login.mockResolvedValue(testUser)
+
+      const res = await app.request(
+        '/private/unlock',
+        formBody({ password: 'correct-horse', redirectTo: '//evil.test/x' })
+      )
+
+      expect(res.headers.get('Location')).toBe('/private/pins')
+    })
+
+    it('re-renders a wrong password in embed mode when the form said so', async () => {
+      svc.login.mockRejectedValue(new InvalidCredentialsError())
+
+      const res = await app.request(
+        '/private/unlock',
+        formBody({ password: 'wrong', embed: '1' })
+      )
+      const html = await res.text()
+
+      expect(html).toContain('Invalid password')
+      expect(html).not.toContain('<header')
+      expect(html).toContain('name="embed" value="1"')
+    })
+
     // Sub-routes need their own assertions, not just the list. Verified by
     // mutation: deleting `use('/pins/*', requirePrivateUnlock())` while only
     // the list was covered went undetected — every pin detail route would have

@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@pinsquirrel/ui'
+import { withEmbed } from '../../lib/embed'
 import { DefaultLayout } from '../layouts/default'
 
 interface PinDeletePageProps {
@@ -16,6 +17,7 @@ interface PinDeletePageProps {
   pin: Pin
   baseUrl?: string
   privateMode?: boolean
+  embed?: boolean
 }
 
 export const PinDeletePage: FC<PinDeletePageProps> = ({
@@ -23,6 +25,7 @@ export const PinDeletePage: FC<PinDeletePageProps> = ({
   pin,
   baseUrl = '/pins',
   privateMode = false,
+  embed = false,
 }) => {
   return (
     <DefaultLayout
@@ -30,6 +33,7 @@ export const PinDeletePage: FC<PinDeletePageProps> = ({
       user={user}
       width="form"
       privateMode={privateMode}
+      embed={embed}
     >
       <h1 class="sr-only">Delete Pin</h1>
       <Card>
@@ -47,7 +51,11 @@ export const PinDeletePage: FC<PinDeletePageProps> = ({
         </CardContent>
 
         <CardFooter class="gap-4">
-          <Button href={baseUrl} variant="outline" class="flex-1">
+          <Button
+            href={withEmbed(baseUrl, embed)}
+            variant="outline"
+            class="flex-1"
+          >
             Cancel
           </Button>
           <form
@@ -55,6 +63,7 @@ export const PinDeletePage: FC<PinDeletePageProps> = ({
             action={`${baseUrl}/${pin.id}/delete`}
             class="flex-1"
           >
+            {embed && <input type="hidden" name="embed" value="1" />}
             <Button type="submit" variant="destructive" class="w-full">
               Delete Pin
             </Button>

@@ -19,6 +19,15 @@ interface DefaultLayoutProps {
   currentPath?: string
   width?: ContentWidth
   privateMode?: boolean
+  /**
+   * Render without the chrome, for the extension's popup window.
+   *
+   * No Header and no Footer: the window is a dialog, and a nav link inside it
+   * would navigate the popup onto the full site with no way back. The width is
+   * always the form width, because that is what the popup is sized for. See
+   * `lib/embed.ts` for how the flag travels.
+   */
+  embed?: boolean
 }
 
 export const DefaultLayout: FC<PropsWithChildren<DefaultLayoutProps>> = ({
@@ -28,16 +37,23 @@ export const DefaultLayout: FC<PropsWithChildren<DefaultLayoutProps>> = ({
   currentPath,
   width = 'wide',
   privateMode = false,
+  embed = false,
 }) => {
-  const containerClass = `${widthClasses[width]} mx-auto px-4 py-6`
+  const containerClass = `${widthClasses[embed ? 'form' : width]} mx-auto px-4 py-6`
 
   return (
     <BaseLayout title={title} privateMode={privateMode}>
-      <Header user={user} currentPath={currentPath} privateMode={privateMode} />
+      {!embed && (
+        <Header
+          user={user}
+          currentPath={currentPath}
+          privateMode={privateMode}
+        />
+      )}
       <main class="flex-1">
         <div class={containerClass}>{children}</div>
       </main>
-      <Footer />
+      {!embed && <Footer />}
     </BaseLayout>
   )
 }

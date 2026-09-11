@@ -7,6 +7,7 @@ import {
 import { ArrowLeftIcon } from '../components/icons'
 import { TagSelectDropdown } from '../components/TagSelectDropdown'
 import { DefaultLayout } from '../layouts/default'
+import { withEmbed } from '../../lib/embed'
 
 interface TagMergePageProps {
   user: User
@@ -15,6 +16,7 @@ interface TagMergePageProps {
   errors?: Record<string, string[]>
   selectedSourceTags?: string[]
   selectedDestinationTag?: string
+  embed?: boolean
 }
 
 export function TagMergePage({
@@ -24,6 +26,7 @@ export function TagMergePage({
   errors,
   selectedSourceTags = [],
   selectedDestinationTag = '',
+  embed = false,
 }: TagMergePageProps) {
   // Fall back to any field the service reported: mergeTags keys its errors by
   // input name (sourceTagIds / destinationTagId), not by the _form convention.
@@ -35,6 +38,7 @@ export function TagMergePage({
       user={user}
       currentPath="/tags/merge"
       width="narrow"
+      embed={embed}
     >
       {/* Flash message */}
       {flash && (
@@ -48,7 +52,7 @@ export function TagMergePage({
       {/* Back link */}
       <div class="mb-6">
         <a
-          href="/tags"
+          href={withEmbed('/tags', embed)}
           class="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeftIcon />
@@ -95,6 +99,7 @@ export function TagMergePage({
           </div>
         ) : (
           <form method="post" action="/tags/merge">
+            {embed && <input type="hidden" name="embed" value="1" />}
             {/* Form error */}
             {formError && <ErrorMessage message={formError} className="mb-6" />}
 

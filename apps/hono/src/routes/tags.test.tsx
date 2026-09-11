@@ -120,6 +120,58 @@ describe('tag merge routes', () => {
     })
   })
 
+  describe('embed mode', () => {
+    beforeEach(() => {
+      pins.getUserPinsWithPagination.mockResolvedValue({
+        pins: [],
+        pagination: Pagination.fromTotalCount(0),
+      })
+      // Two tags: the merge form only renders once there is something to merge.
+      repo.findByUserIdWithPinCount.mockResolvedValue([
+        tagWithCount('tag-a', 'alpha', 3),
+        tagWithCount('tag-b', 'beta', 2),
+      ])
+    })
+
+    it('renders the tag cloud without the chrome for ?embed=1', async () => {
+      const html = await (await app.request('/tags?embed=1')).text()
+
+      expect(html).toContain('alpha')
+      expect(html).not.toContain('<header')
+      expect(html).not.toContain('<footer')
+    })
+
+    it('renders the merge form without the chrome, carrying the flag', async () => {
+      const html = await (await app.request('/tags/merge?embed=1')).text()
+
+      expect(html).toContain('alpha')
+      expect(html).not.toContain('<header')
+      expect(html).toContain('name="embed" value="1"')
+    })
+
+    it('re-renders a rejected merge in embed when the form said so', async () => {
+      const html = await (
+        await postMerge({ destinationTagId: 'tag-c', embed: '1' })
+      ).text()
+
+      expect(html).toContain('Please select at least one source tag.')
+      expect(html).not.toContain('<header')
+      expect(html).toContain('name="embed" value="1"')
+    })
+
+    it('keeps the tag cloud in embed after an embedded merge', async () => {
+      repo.mergeTags.mockResolvedValue(undefined)
+
+      const res = await postMerge({
+        sourceTagIds: 'tag-a,tag-b',
+        destinationTagId: 'tag-c',
+        embed: '1',
+      })
+
+      expect(res.headers.get('Location')).toBe('/tags?embed=1')
+    })
+  })
+
   describe('GET /tags/merge', () => {
     it('lists only tags that have pins', async () => {
       repo.findByUserIdWithPinCount.mockResolvedValue([

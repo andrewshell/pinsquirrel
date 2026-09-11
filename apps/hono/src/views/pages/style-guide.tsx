@@ -26,6 +26,7 @@ import { FilterHeader } from '../components/FilterHeader'
 
 interface StyleGuidePageProps {
   user: User | null
+  embed?: boolean
 }
 
 // Section wrapper: labels each sample with its source for scanner traceability
@@ -78,9 +79,12 @@ const buttonVariants = [
 ] as const
 const buttonSizes = ['sm', 'default', 'lg', 'icon'] as const
 
-export const StyleGuidePage: FC<StyleGuidePageProps> = ({ user }) => {
+export const StyleGuidePage: FC<StyleGuidePageProps> = ({
+  user,
+  embed = false,
+}) => {
   return (
-    <DefaultLayout title="Style Guide" user={user} width="wide">
+    <DefaultLayout title="Style Guide" user={user} width="wide" embed={embed}>
       {/* Dark-mode toggle for running accessibility scans against both themes */}
       <div class="mb-6 flex items-center gap-4">
         <Button

@@ -87,6 +87,14 @@ describe('pins routes', () => {
       expect(filter).toMatchObject({ isPrivate: false })
     })
 
+    it('drops the site chrome when embed=1', async () => {
+      const html = await (await app.request('/pins?embed=1')).text()
+
+      expect(html).toContain('Example Pin')
+      expect(html).not.toContain('<header')
+      expect(html).not.toContain('<footer')
+    })
+
     it('uses a fixed page size of 25', async () => {
       await app.request('/pins')
 
@@ -1085,6 +1093,32 @@ describe('pins routes', () => {
       expect(svc.deletePin).toHaveBeenCalledWith(expect.anything(), 'pin-1')
       expect(res.status).toBe(302)
       expect(res.headers.get('Location')).toBe('/pins')
+    })
+
+    it('renders the confirmation without the chrome in embed, cancel and all', async () => {
+      svc.getPin.mockResolvedValue(makePin())
+
+      const html = await (
+        await app.request('/pins/pin-1/delete?embed=1')
+      ).text()
+
+      expect(html).toContain('Example Pin')
+      expect(html).not.toContain('<header')
+      expect(html).not.toContain('<footer')
+      expect(html).toContain('href="/pins?embed=1"')
+      expect(html).toContain('name="embed" value="1"')
+    })
+
+    it('keeps the list in embed after a delete the embedded form posted', async () => {
+      svc.getPin.mockResolvedValue(makePin())
+      svc.deletePin.mockResolvedValue(true)
+
+      const res = await app.request(
+        '/pins/pin-1/delete',
+        formBody({ embed: '1' })
+      )
+
+      expect(res.headers.get('Location')).toBe('/pins?embed=1')
     })
   })
 

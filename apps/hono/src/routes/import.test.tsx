@@ -107,6 +107,30 @@ describe('import routes', () => {
       expect(res.status).toBe(200)
       expect(await res.text()).toContain('form')
     })
+
+    it('renders without the chrome for ?embed=1, the form carrying the flag', async () => {
+      const html = await (await app.request('/import?embed=1')).text()
+
+      expect(html).toContain('name="file"')
+      expect(html).not.toContain('<header')
+      expect(html).not.toContain('<footer')
+      expect(html).toContain('name="embed" value="1"')
+    })
+  })
+
+  describe('embed mode on POST', () => {
+    it('re-renders a rejected upload in embed when the form said so', async () => {
+      const body = new FormData()
+      body.append('embed', '1')
+
+      const html = await (
+        await app.request('/import', { method: 'POST', body })
+      ).text()
+
+      expect(html).toContain('Please select a file to import')
+      expect(html).not.toContain('<header')
+      expect(html).toContain('name="embed" value="1"')
+    })
   })
 
   describe('validation gates', () => {

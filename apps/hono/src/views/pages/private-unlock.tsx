@@ -15,22 +15,29 @@ import { ErrorMessage } from '../components/FlashMessage'
 interface PrivateUnlockPageProps {
   user: User
   error?: string
+  /** Where to go once unlocked, when the gate remembered a page. */
+  redirectTo?: string
+  embed?: boolean
 }
 
 export const PrivateUnlockPage: FC<PrivateUnlockPageProps> = ({
   user,
   error,
+  redirectTo,
+  embed = false,
 }) => {
   return (
-    <DefaultLayout title="Private Pins" user={user} width="form">
-      <div class="mb-6">
-        <a
-          href="/pins"
-          class="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-        >
-          &larr; Back to Pins
-        </a>
-      </div>
+    <DefaultLayout title="Private Pins" user={user} width="form" embed={embed}>
+      {!embed && (
+        <div class="mb-6">
+          <a
+            href="/pins"
+            class="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+          >
+            &larr; Back to Pins
+          </a>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -44,6 +51,10 @@ export const PrivateUnlockPage: FC<PrivateUnlockPageProps> = ({
           {error && <ErrorMessage message={error} />}
 
           <form method="post" action="/private/unlock" class="space-y-4">
+            {redirectTo && (
+              <input type="hidden" name="redirectTo" value={redirectTo} />
+            )}
+            {embed && <input type="hidden" name="embed" value="1" />}
             <div class="space-y-2">
               <Label for="password">Password</Label>
               <Input

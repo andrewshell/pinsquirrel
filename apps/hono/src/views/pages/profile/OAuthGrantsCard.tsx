@@ -6,6 +6,8 @@ import { formatDate } from './format-date'
 
 type OAuthGrantsCardProps = {
   grants?: OAuthGrant[]
+  /** Carried on a hidden field so a rejected revoke comes back in embed. */
+  embed?: boolean
 }
 
 /**
@@ -18,7 +20,10 @@ type OAuthGrantsCardProps = {
  *
  * No inline script (CSP). A list and a form need none.
  */
-export const OAuthGrantsCard: FC<OAuthGrantsCardProps> = ({ grants }) => (
+export const OAuthGrantsCard: FC<OAuthGrantsCardProps> = ({
+  grants,
+  embed = false,
+}) => (
   <Card>
     <CardHeader>
       <CardTitle>Connected Applications</CardTitle>
@@ -52,6 +57,7 @@ export const OAuthGrantsCard: FC<OAuthGrantsCardProps> = ({ grants }) => (
               <form method="post" action="/profile">
                 <input type="hidden" name="intent" value="revoke-oauth-grant" />
                 <input type="hidden" name="tokenId" value={grant.tokenId} />
+                {embed && <input type="hidden" name="embed" value="1" />}
                 <button
                   type="submit"
                   class="px-3 py-1 text-sm font-bold border-2 border-foreground bg-destructive text-white neobrutalism-shadow hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"

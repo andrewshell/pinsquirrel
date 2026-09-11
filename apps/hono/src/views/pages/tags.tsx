@@ -4,6 +4,7 @@ import { FlashMessage as FlashMessageComponent } from '../components/FlashMessag
 import type { FlashMessage } from '../../middleware/session'
 import { Button } from '@pinsquirrel/ui'
 import { MergeIcon } from '../components/icons'
+import { withEmbed } from '../../lib/embed'
 
 export type TagFilterType = 'all' | 'toread'
 
@@ -13,6 +14,7 @@ interface TagsPageProps {
   currentFilter: TagFilterType
   untaggedPinsCount: number
   flash?: FlashMessage | null
+  embed?: boolean
 }
 
 function getFontSizeClass(pinCount: number, pinCounts: number[]): string {
@@ -82,6 +84,7 @@ export function TagsPage({
   currentFilter,
   untaggedPinsCount,
   flash,
+  embed = false,
 }: TagsPageProps) {
   // Sort tags alphabetically by name
   const sortedTags = [...tags].sort((a, b) =>
@@ -92,7 +95,13 @@ export function TagsPage({
   const pinCounts = tags.map(tag => tag.pinCount)
 
   return (
-    <DefaultLayout title="Tags" user={user} currentPath="/tags" width="narrow">
+    <DefaultLayout
+      title="Tags"
+      user={user}
+      currentPath="/tags"
+      width="narrow"
+      embed={embed}
+    >
       {/* Flash message */}
       {flash && (
         <FlashMessageComponent
@@ -110,14 +119,14 @@ export function TagsPage({
         {/* Filter buttons */}
         <div class="flex gap-2">
           <Button
-            href="/tags"
+            href={withEmbed('/tags', embed)}
             variant={currentFilter === 'all' ? 'default' : 'secondary'}
             size="sm"
           >
             All
           </Button>
           <Button
-            href="/tags?unread=true"
+            href={withEmbed('/tags?unread=true', embed)}
             variant={currentFilter === 'toread' ? 'default' : 'secondary'}
             size="sm"
           >
@@ -127,7 +136,11 @@ export function TagsPage({
 
         {/* Merge button - only show if more than 1 tag */}
         {tags.length > 1 && (
-          <Button href="/tags/merge" variant="secondary" size="sm">
+          <Button
+            href={withEmbed('/tags/merge', embed)}
+            variant="secondary"
+            size="sm"
+          >
             <MergeIcon />
             Merge Tags
           </Button>

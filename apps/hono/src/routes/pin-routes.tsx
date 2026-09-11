@@ -22,6 +22,7 @@ import {
   DEFAULT_PAGE_SIZE,
 } from '@pinsquirrel/domain'
 import { pinService, tagService } from '../lib/services'
+import { isEmbedRequest, withEmbed } from '../lib/embed'
 import { getString, parsePinForm } from '../lib/form'
 import { getAuthUser, getSessionManager } from '../middleware/session'
 import { PinCard, PinDeleteConfirm } from '../views/components/PinCard'
@@ -160,17 +161,6 @@ function takeViewSize(c: Context): {
 }
 
 /**
- * Is this request being rendered inside the extension's popup window?
- *
- * Presentation only, and only the literal `1` turns it on: anything else is
- * the ordinary page, so nothing changes for a user who happens to have an
- * `embed` param on a link.
- */
-function isEmbedRequest(c: Context): boolean {
-  return new URL(c.req.url).searchParams.get('embed') === '1'
-}
-
-/**
  * Where a save lands in embed mode.
  *
  * The extension's worker matches on this URL to close the popup window, so it
@@ -240,6 +230,7 @@ export function createPinRoutes({
         user={user}
         flash={sessionManager.getFlash()}
         privateMode={privateMode}
+        embed={isEmbedRequest(c)}
       />
     )
   })
@@ -745,6 +736,7 @@ export function createPinRoutes({
           pin={pin}
           baseUrl={baseUrl}
           privateMode={privateMode}
+          embed={isEmbedRequest(c)}
         />
       )
     } catch (error) {
@@ -762,12 +754,14 @@ export function createPinRoutes({
 
     const pinId = c.req.param('id')
     const ac = new AccessControl(user)
+    const formData = await c.req.parseBody()
+    const embed = getString(formData.embed) === '1'
 
     try {
       await pinService.deletePin(ac, pinId)
 
       sessionManager.setFlash('success', 'Pin deleted successfully!')
-      return c.redirect(baseUrl)
+      return c.redirect(withEmbed(baseUrl, embed))
     } catch (error) {
       if (isMissingPin(error)) {
         return c.text('Pin not found', 404)
