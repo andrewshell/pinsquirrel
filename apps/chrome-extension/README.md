@@ -162,7 +162,9 @@ Every `chrome-extension-vX.Y.Z` release on GitHub carries the store zip as an
 asset; the `extension-zip` job in `.github/workflows/release-please.yml` builds
 and attaches it. To install one:
 
-1. Download the zip from the release page.
+1. Download `pinsquirrel-chrome-extension-<version>.zip` from the newest
+   `chrome-extension-v*` entry on the
+   [releases page](https://github.com/andrewshell/pinsquirrel/releases).
 2. Open `chrome://extensions` and turn on **Developer mode**.
 3. Drag the zip onto the page. Chrome unpacks it and loads it; there is no need
    to unzip first.

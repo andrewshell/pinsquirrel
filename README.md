@@ -97,7 +97,8 @@ pnpm --filter @pinsquirrel/database test:coverage
 ```
 ├── apps/
 │   ├── hono/                   # Hono + HTMX application
-│   └── admin/                  # Local operator console (not deployed)
+│   ├── admin/                  # Local operator console (not deployed)
+│   └── chrome-extension/       # Chrome extension: pin the page, sync tags to bookmarks
 ├── libs/
 │   ├── services/               # Business logic services and validation
 │   ├── database/               # Database layer with Drizzle ORM
@@ -184,8 +185,23 @@ pnpm docker:build-push
 - **Quality gates**: All checks must pass before considering work complete
 - **Inter-package dependencies**: Use `workspace:*` protocol in package.json
 
+## Chrome Extension
+
+The extension pins the current page and mirrors chosen tags into Chrome's bookmarks bar. It
+is not on the Chrome Web Store. Each `chrome-extension-v*` entry on the
+[releases page](https://github.com/andrewshell/pinsquirrel/releases) carries a zip; download
+it, turn on **Developer mode** at `chrome://extensions`, and drag the zip onto the page. See
+[apps/chrome-extension/README.md](./apps/chrome-extension/README.md) for the details.
+
+```bash
+pnpm extension:package   # build the same zip locally into apps/chrome-extension/release/
+```
+
+---
+
 ## Documentation
 
 - [CLAUDE.md](./CLAUDE.md) - Detailed development workflow and codebase architecture
 - [DEPLOYMENT.md](./DEPLOYMENT.md) - Production deployment with Docker and migrations
 - [STYLE.md](./STYLE.md) - Neo Brutalism UI design system and component patterns
+- [apps/chrome-extension/README.md](./apps/chrome-extension/README.md) - Chrome extension: install, build, and how it works
