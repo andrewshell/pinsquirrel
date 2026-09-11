@@ -1,8 +1,4 @@
-import {
-  STUB_REDIRECT_URL,
-  stubChrome,
-  type ChromeStub,
-} from './chrome-mock.ts'
+import { stubChrome, type ChromeStub } from './chrome-mock.ts'
 import { jsonResponse, stubFetch, type StubbedFetch } from './fetch-mock.ts'
 
 /**
@@ -17,6 +13,8 @@ import { jsonResponse, stubFetch, type StubbedFetch } from './fetch-mock.ts'
 export const BASE_URL = 'https://pinsquirrel.com'
 export const RESOURCE = `${BASE_URL}/api/v1`
 export const REGISTERED_CLIENT_ID = 'dcr_registered'
+/** The redirect URI the extension registers: a page on the server itself. */
+export const CALLBACK_URL = `${BASE_URL}/oauth/extension/callback`
 
 /** One form-encoded request, as the route handler saw it. */
 export type PostedForm = Record<string, string>
@@ -30,8 +28,14 @@ export interface OAuthServerStub {
   tokenRequests: PostedForm[]
   /** Every form posted to `/oauth/revoke`, in order. */
   revocations: PostedForm[]
-  /** Every authorization URL `launchWebAuthFlow` was asked to open. */
+  /** Every authorization URL the user was sent to consent at. */
   authorizations: URL[]
+  /**
+   * The user consents at `authorizationUrl` and the server sends the browser
+   * back to the callback with a code - or, with `error`, with a refusal.
+   * Answers the URL the consent tab lands on, for `completeConnect`.
+   */
+  consent(authorizationUrl: string, error?: string): string
   /** Replace what `/oauth/token` answers with, for the next call onwards. */
   answerTokenWith(handler: (form: PostedForm) => Response): void
 }
@@ -108,18 +112,6 @@ export function stubOAuthServer(
     },
   })
 
-  // Chrome opens the consent page, the user approves, and the server sends the
-  // browser back to the extension's callback with a code.
-  chrome.launchWebAuthFlow.mockImplementation(details => {
-    const url = new URL(details.url)
-    authorizations.push(url)
-    const back = new URL(STUB_REDIRECT_URL)
-    back.searchParams.set('code', `code-${authorizations.length}`)
-    back.searchParams.set('state', url.searchParams.get('state') ?? '')
-    back.searchParams.set('iss', BASE_URL)
-    return Promise.resolve(back.toString())
-  })
-
   return {
     chrome,
     fetched,
@@ -127,6 +119,20 @@ export function stubOAuthServer(
     tokenRequests,
     revocations,
     authorizations,
+    consent: (authorizationUrl, error) => {
+      const url = new URL(authorizationUrl)
+      authorizations.push(url)
+      const back = new URL(CALLBACK_URL)
+      if (error) {
+        back.searchParams.set('error', error)
+        back.searchParams.set('error_description', `stubbed ${error}`)
+      } else {
+        back.searchParams.set('code', `code-${authorizations.length}`)
+      }
+      back.searchParams.set('state', url.searchParams.get('state') ?? '')
+      back.searchParams.set('iss', BASE_URL)
+      return back.toString()
+    },
     answerTokenWith: handler => {
       tokenHandler = handler
     },

@@ -8,6 +8,29 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+/** Where `startConnect` sends the user to consent. */
+const CONSENT_URL = 'https://pinsquirrel.com/oauth/authorize?client_id=dcr_1'
+
+/** The flow `startConnect` leaves in storage while the tab is open. */
+const PENDING = {
+  baseUrl: 'https://pinsquirrel.com',
+  clientId: 'dcr_1',
+  redirectUri: 'https://pinsquirrel.com/oauth/extension/callback',
+  state: 's1',
+  verifier: 'v1',
+  endpoints: {
+    resource: 'https://pinsquirrel.com/api/v1',
+    issuer: 'https://pinsquirrel.com',
+    authorizationEndpoint: 'https://pinsquirrel.com/oauth/authorize',
+    tokenEndpoint: 'https://pinsquirrel.com/oauth/token',
+    registrationEndpoint: 'https://pinsquirrel.com/oauth/register',
+    revocationEndpoint: 'https://pinsquirrel.com/oauth/revoke',
+  },
+}
+
+/** The URL the consent tab lands on once the user approves. */
+const CALLBACK_URL = `${PENDING.redirectUri}?code=c1&state=s1`
+
 /** Storage as it looks once the user has connected. */
 const CONNECTED = {
   baseUrl: 'https://pinsquirrel.com',
@@ -32,7 +55,11 @@ function recordingLogger() {
 function deps(overrides: Partial<BackgroundDeps> = {}): BackgroundDeps {
   return {
     runSync: vi.fn(() => Promise.resolve()),
-    connect: vi.fn(() => Promise.resolve()),
+    startConnect: vi.fn(() => Promise.resolve(CONSENT_URL)),
+    completeConnect: vi.fn(() =>
+      Promise.resolve({ status: 'connected' as const })
+    ),
+    cancelConnect: vi.fn(() => Promise.resolve()),
     logger: recordingLogger(),
     ...overrides,
   }
@@ -306,11 +333,34 @@ describe('initBackground: the periodic sync alarm', () => {
 /** The connect request, as the options page sends it. */
 const CONNECT_REQUEST = { type: 'connect', baseUrl: 'https://pinsquirrel.com' }
 
+/** The id the mock hands the first tab the worker creates. */
+const CONSENT_TAB_ID = 500
+
+/** The consent tab has navigated to `url`, as Chrome reports it. */
+function consentTabNavigated(
+  url: string,
+  tabId = CONSENT_TAB_ID
+): [number, chrome.tabs.OnUpdatedInfo, chrome.tabs.Tab] {
+  return [tabId, { status: 'loading', url }, tab({ id: tabId, url })]
+}
+
+/** Every `connect-finished` the worker sent to the options page. */
+function finished(chrome: ChromeStub): unknown[] {
+  return chrome.sendMessage.mock.calls
+    .map(([message]) => message)
+    .filter(
+      message =>
+        typeof message === 'object' &&
+        message !== null &&
+        (message as { type?: unknown }).type === 'connect-finished'
+    )
+}
+
 describe("initBackground: the options page's connect request", () => {
-  it('runs the OAuth flow against the server the options page named', async () => {
+  it('opens the consent screen in a tab and answers once it is open', async () => {
     const chrome = stubChrome()
-    const connect = vi.fn(() => Promise.resolve())
-    initBackground(deps({ connect }))
+    const startConnect = vi.fn(() => Promise.resolve(CONSENT_URL))
+    initBackground(deps({ startConnect }))
 
     const { kept, sendResponse } = deliver(chrome, CONNECT_REQUEST)
 
@@ -318,42 +368,29 @@ describe("initBackground: the options page's connect request", () => {
     await vi.waitFor(() => {
       expect(sendResponse).toHaveBeenCalledWith({ ok: true })
     })
-    expect(connect).toHaveBeenCalledWith('https://pinsquirrel.com')
+    expect(startConnect).toHaveBeenCalledWith('https://pinsquirrel.com')
+    // An ordinary tab, not `launchWebAuthFlow`'s window: that window forbids
+    // other extensions, so a password manager could not sign the user in.
+    expect(chrome.tabs.created).toEqual([{ url: CONSENT_URL }])
+    expect(chrome.local.items.connectTabId).toBe(CONSENT_TAB_ID)
   })
 
-  it('answers a failed flow with the reason, rather than rejecting', async () => {
+  it('answers a flow that could not start with the reason, rather than rejecting', async () => {
     const chrome = stubChrome()
-    const connect = vi.fn(() =>
-      Promise.reject(new Error('The user closed the window'))
+    const startConnect = vi.fn(() =>
+      Promise.reject(new Error('Discovery failed'))
     )
-    initBackground(deps({ connect }))
+    initBackground(deps({ startConnect }))
 
     const { sendResponse } = deliver(chrome, CONNECT_REQUEST)
 
     await vi.waitFor(() => {
       expect(sendResponse).toHaveBeenCalledWith({
         ok: false,
-        error: 'The user closed the window',
+        error: 'Discovery failed',
       })
     })
-  })
-
-  it('flags a dead grant, which does not survive the channel as a class', async () => {
-    const chrome = stubChrome()
-    const connect = vi.fn(() =>
-      Promise.reject(new ReauthorizationRequiredError('invalid_grant'))
-    )
-    initBackground(deps({ connect }))
-
-    const { sendResponse } = deliver(chrome, CONNECT_REQUEST)
-
-    await vi.waitFor(() => {
-      expect(sendResponse).toHaveBeenCalledWith({
-        ok: false,
-        error: 'invalid_grant',
-        reauthorizationRequired: true,
-      })
-    })
+    expect(chrome.tabs.created).toEqual([])
   })
 
   it('does not sync when the options page asked to connect', async () => {
@@ -366,38 +403,213 @@ describe("initBackground: the options page's connect request", () => {
 
     expect(runSync).not.toHaveBeenCalled()
   })
+
+  it('opens a second tab for a second Connect and watches the newer one', async () => {
+    const chrome = stubChrome()
+    initBackground(deps())
+
+    deliver(chrome, CONNECT_REQUEST)
+    deliver(chrome, CONNECT_REQUEST)
+    await flush()
+
+    expect(chrome.tabs.created).toHaveLength(2)
+    expect(chrome.local.items.connectTabId).toBe(CONSENT_TAB_ID + 1)
+  })
 })
 
-describe('initBackground: one connect at a time', () => {
-  it('joins the flow already running instead of opening a second window', async () => {
-    const chrome = stubChrome()
-    const running = deferred()
-    const connect = vi.fn(() => running.promise)
-    initBackground(deps({ connect }))
+describe('initBackground: the consent tab answering', () => {
+  /** Storage as the worker that opened the tab left it - possibly long gone. */
+  const WAITING = { pendingConnect: PENDING, connectTabId: CONSENT_TAB_ID }
 
-    const first = deliver(chrome, CONNECT_REQUEST)
-    const second = deliver(chrome, CONNECT_REQUEST)
+  it('finishes the flow, closes the tab, and tells the options page', async () => {
+    const chrome = stubChrome(WAITING)
+    const completeConnect = vi.fn(() =>
+      Promise.resolve({ status: 'connected' as const })
+    )
+    initBackground(deps({ completeConnect }))
 
-    expect(connect).toHaveBeenCalledTimes(1)
-    running.resolve()
-    await vi.waitFor(() => {
-      expect(first.sendResponse).toHaveBeenCalledWith({ ok: true })
-      expect(second.sendResponse).toHaveBeenCalledWith({ ok: true })
-    })
+    chrome.tabs.onUpdated.fire(...consentTabNavigated(CALLBACK_URL))
+    await flush()
+
+    expect(completeConnect).toHaveBeenCalledWith(CALLBACK_URL)
+    expect(chrome.tabs.removed).toEqual([CONSENT_TAB_ID])
+    expect(chrome.local.items.connectTabId).toBeUndefined()
+    expect(finished(chrome)).toEqual([
+      { type: 'connect-finished', result: { ok: true } },
+    ])
   })
 
-  it('starts a fresh flow once the last one has finished', async () => {
+  it('ignores navigation in a tab that is not the consent tab', async () => {
+    const chrome = stubChrome(WAITING)
+    const completeConnect = vi.fn(() =>
+      Promise.resolve({ status: 'connected' as const })
+    )
+    initBackground(deps({ completeConnect }))
+
+    chrome.tabs.onUpdated.fire(...consentTabNavigated(CALLBACK_URL, 999))
+    await flush()
+
+    expect(completeConnect).not.toHaveBeenCalled()
+    expect(chrome.tabs.removed).toEqual([])
+  })
+
+  it('ignores the consent tab until it reaches the callback', async () => {
+    const chrome = stubChrome(WAITING)
+    const completeConnect = vi.fn(() =>
+      Promise.resolve({ status: 'connected' as const })
+    )
+    initBackground(deps({ completeConnect }))
+
+    chrome.tabs.onUpdated.fire(...consentTabNavigated(CONSENT_URL))
+    chrome.tabs.onUpdated.fire(
+      ...consentTabNavigated('https://pinsquirrel.com/signin?redirectTo=x')
+    )
+    await flush()
+
+    expect(completeConnect).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when no flow is waiting', async () => {
     const chrome = stubChrome()
-    const connect = vi.fn(() => Promise.resolve())
-    initBackground(deps({ connect }))
+    const completeConnect = vi.fn(() =>
+      Promise.resolve({ status: 'connected' as const })
+    )
+    initBackground(deps({ completeConnect }))
 
-    const first = deliver(chrome, CONNECT_REQUEST)
-    await vi.waitFor(() => {
-      expect(first.sendResponse).toHaveBeenCalledWith({ ok: true })
+    chrome.tabs.onUpdated.fire(...consentTabNavigated(CALLBACK_URL))
+    await flush()
+
+    expect(completeConnect).not.toHaveBeenCalled()
+  })
+
+  it('finishes once, though Chrome reports one navigation twice', async () => {
+    const chrome = stubChrome(WAITING)
+    const completeConnect = vi.fn(() =>
+      Promise.resolve({ status: 'connected' as const })
+    )
+    initBackground(deps({ completeConnect }))
+
+    chrome.tabs.onUpdated.fire(...consentTabNavigated(CALLBACK_URL))
+    chrome.tabs.onUpdated.fire(
+      CONSENT_TAB_ID,
+      { status: 'complete' },
+      tab({ id: CONSENT_TAB_ID, url: CALLBACK_URL })
+    )
+    await flush()
+
+    expect(completeConnect).toHaveBeenCalledTimes(1)
+    expect(chrome.tabs.removed).toEqual([CONSENT_TAB_ID])
+  })
+
+  it('sends the same tab to a fresh consent when the registration was stale', async () => {
+    const chrome = stubChrome(WAITING)
+    const again = `${CONSENT_URL}&attempt=2`
+    const completeConnect = vi.fn(() =>
+      Promise.resolve({ status: 'restart' as const, url: again })
+    )
+    initBackground(deps({ completeConnect }))
+
+    chrome.tabs.onUpdated.fire(...consentTabNavigated(CALLBACK_URL))
+    await flush()
+
+    expect(chrome.tabs.updated).toEqual([
+      { tabId: CONSENT_TAB_ID, properties: { url: again } },
+    ])
+    expect(chrome.tabs.removed).toEqual([])
+    expect(chrome.local.items.connectTabId).toBe(CONSENT_TAB_ID)
+    expect(finished(chrome)).toEqual([])
+  })
+
+  it('leaves the tab open, showing the reason, when the flow fails', async () => {
+    const chrome = stubChrome(WAITING)
+    const completeConnect = vi.fn(() =>
+      Promise.reject(new Error('stubbed access_denied'))
+    )
+    initBackground(deps({ completeConnect }))
+
+    chrome.tabs.onUpdated.fire(...consentTabNavigated(CALLBACK_URL))
+    await flush()
+
+    expect(chrome.tabs.removed).toEqual([])
+    expect(chrome.local.items.connectTabId).toBeUndefined()
+    expect(finished(chrome)).toEqual([
+      {
+        type: 'connect-finished',
+        result: { ok: false, error: 'stubbed access_denied' },
+      },
+    ])
+  })
+
+  it('flags a dead grant, which does not survive the channel as a class', async () => {
+    const chrome = stubChrome(WAITING)
+    const completeConnect = vi.fn(() =>
+      Promise.reject(new ReauthorizationRequiredError('invalid_grant'))
+    )
+    initBackground(deps({ completeConnect }))
+
+    chrome.tabs.onUpdated.fire(...consentTabNavigated(CALLBACK_URL))
+    await flush()
+
+    expect(finished(chrome)).toEqual([
+      {
+        type: 'connect-finished',
+        result: {
+          ok: false,
+          error: 'invalid_grant',
+          reauthorizationRequired: true,
+        },
+      },
+    ])
+  })
+
+  it('still finishes when nobody is listening for the answer', async () => {
+    const chrome = stubChrome(WAITING)
+    chrome.sendMessage.mockRejectedValue(
+      new Error('Could not establish connection. Receiving end does not exist.')
+    )
+    initBackground(deps())
+
+    chrome.tabs.onUpdated.fire(...consentTabNavigated(CALLBACK_URL))
+    await flush()
+
+    expect(chrome.tabs.removed).toEqual([CONSENT_TAB_ID])
+    expect(chrome.local.items.connectTabId).toBeUndefined()
+  })
+
+  it('forgets the flow when the consent tab is closed unanswered', async () => {
+    const chrome = stubChrome(WAITING)
+    const cancelConnect = vi.fn(() => Promise.resolve())
+    initBackground(deps({ cancelConnect }))
+
+    chrome.tabs.onRemoved.fire(CONSENT_TAB_ID, {
+      windowId: 1,
+      isWindowClosing: false,
     })
-    deliver(chrome, CONNECT_REQUEST)
+    await flush()
 
-    expect(connect).toHaveBeenCalledTimes(2)
+    expect(cancelConnect).toHaveBeenCalledTimes(1)
+    expect(chrome.local.items.connectTabId).toBeUndefined()
+    expect(finished(chrome)).toEqual([
+      {
+        type: 'connect-finished',
+        result: {
+          ok: false,
+          error: 'The sign-in tab was closed before connecting',
+        },
+      },
+    ])
+  })
+
+  it('leaves the flow alone when some other tab is closed', async () => {
+    const chrome = stubChrome(WAITING)
+    const cancelConnect = vi.fn(() => Promise.resolve())
+    initBackground(deps({ cancelConnect }))
+
+    chrome.tabs.onRemoved.fire(999, { windowId: 1, isWindowClosing: false })
+    await flush()
+
+    expect(cancelConnect).not.toHaveBeenCalled()
+    expect(chrome.local.items.connectTabId).toBe(CONSENT_TAB_ID)
   })
 })
 

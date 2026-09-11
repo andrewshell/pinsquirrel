@@ -1,14 +1,24 @@
 import { discoverEndpoints, type OAuthEndpoints } from './oauth-metadata.ts'
 import { createPkcePair, randomUrlSafeToken } from './pkce.ts'
 import * as storage from './storage.ts'
-import type { StoredTokens } from './types.ts'
+import type { PendingConnect, StoredTokens } from './types.ts'
 
 /**
  * The extension's OAuth 2.1 client.
  *
- * Authorization code with PKCE against a fixed HTTPS callback Chrome mints for
- * the extension (Decision 17), so there is no secret here and no loopback port
- * to match.
+ * Authorization code with PKCE, with the consent screen in an ordinary browser
+ * tab and a page on the server itself as the redirect URI
+ * (`/oauth/extension/callback`). Chrome's `launchWebAuthFlow` window was the
+ * first design (Decision 17); it forbids other extensions, so a password
+ * manager could not fill the sign-in form inside it. The worker watches the
+ * tab instead and reads the code off the callback URL, which needs the host
+ * permission the pin flow already relies on. There is no secret here and no
+ * loopback port to match.
+ *
+ * The flow is two calls with a tab in between - `startConnect` and
+ * `completeConnect` - rather than one, because the worker that opens the tab
+ * is not the worker that hears the answer: MV3 unloads it while the user reads
+ * the consent screen, so everything the second half needs is in storage.
  *
  * ## Why dynamic registration rather than CIMD
  *
@@ -278,94 +288,150 @@ async function forgetClientId(baseUrl: string): Promise<void> {
   await storage.set({ registeredClients: cached })
 }
 
+/** The page on the server the consent screen sends the browser back to. */
+export const EXTENSION_CALLBACK_PATH = '/oauth/extension/callback' as const
+
+/** The redirect URI registered for `baseUrl`: the callback page on it. */
+export function extensionRedirectUri(baseUrl: string): string {
+  return `${normalizeBaseUrl(baseUrl)}${EXTENSION_CALLBACK_PATH}`
+}
+
+/** What `completeConnect` answers when it did not simply finish. */
+export type ConnectOutcome =
+  | { status: 'connected' }
+  /**
+   * The exchange failed with `invalid_client`: the cached registration is one
+   * the server has forgotten, and the code is spent. A fresh registration has
+   * been made and this is the consent URL for it, for the worker to send the
+   * same tab to.
+   */
+  | { status: 'restart'; url: string }
+
 /**
- * One consent round trip: open the flow, come back with a code, spend it.
+ * Start a connection to `baseUrl`: discover, register, and build the consent
+ * URL for the worker to open in a tab.
  *
- * Every value that binds the two halves together - the verifier, the state,
- * the redirect URI - is created here and never leaves the call, so two
- * concurrent connects cannot pick up each other's.
+ * Everything the other half needs - verifier, state, client, endpoints - is
+ * written to storage as `pendingConnect` before the URL is handed back, so an
+ * answer that arrives after the worker has been unloaded still finds it. A
+ * second start overwrites the first: the newer tab is the one being watched.
  */
-async function authorizeAndExchange(input: {
+export async function startConnect(baseUrl: string): Promise<string> {
+  const origin = normalizeBaseUrl(baseUrl)
+  const endpoints = await discoverEndpoints(origin)
+  const redirectUri = extensionRedirectUri(origin)
+  const clientId = await resolveClientId(origin, endpoints, redirectUri)
+  return beginAuthorization({
+    baseUrl: origin,
+    endpoints,
+    clientId,
+    redirectUri,
+  })
+}
+
+async function beginAuthorization(pending: {
   baseUrl: string
   endpoints: OAuthEndpoints
   clientId: string
   redirectUri: string
-}): Promise<StoredTokens> {
+}): Promise<string> {
   const { verifier, challenge } = await createPkcePair()
   const state = randomUrlSafeToken()
 
-  const redirect = await chrome.identity.launchWebAuthFlow({
-    url: buildAuthorizationUrl({
-      endpoints: input.endpoints,
-      clientId: input.clientId,
-      redirectUri: input.redirectUri,
-      challenge,
-      state,
-    }),
-    // The user has to see the consent screen and sign in if they are not
-    // already, so there is no non-interactive form of this.
-    interactive: true,
+  await storage.set({
+    pendingConnect: { ...pending, state, verifier },
   })
 
-  if (!redirect) {
-    throw new Error('The authorization window closed without a redirect')
-  }
-
-  const code = readAuthorizationRedirect(redirect, {
+  return buildAuthorizationUrl({
+    endpoints: pending.endpoints,
+    clientId: pending.clientId,
+    redirectUri: pending.redirectUri,
+    challenge,
     state,
-    issuer: input.endpoints.issuer,
-  })
-
-  const body = await postTokenRequest(input.endpoints.tokenEndpoint, {
-    grant_type: 'authorization_code',
-    code,
-    redirect_uri: input.redirectUri,
-    client_id: input.clientId,
-    code_verifier: verifier,
-    resource: input.endpoints.resource,
-  })
-
-  return tokensFrom(body, {
-    baseUrl: input.baseUrl,
-    clientId: input.clientId,
   })
 }
 
 /**
- * Connect the extension to a PinSquirrel server: discover, register, get the
- * user's consent, and store what comes back.
+ * Finish the connection the consent tab landed on `redirectUrl` for: check it
+ * is the answer to the flow in storage, spend the code, store the tokens.
  *
- * A cached registration the server has since forgotten answers the exchange
- * with `invalid_client`. That is recoverable, but only by starting over - the
- * code was spent on the way in - so the cache is dropped and the whole flow
- * runs once more against a fresh registration.
+ * A redirect carrying a state this flow did not send is refused and the flow
+ * is left open - it is somebody else's, or a stale tab, and neither is a
+ * reason to forget the one still waiting. Every other failure closes the
+ * flow: a refusal, a bad token response, and `invalid_client`, which is the
+ * one recoverable case and comes back as a `restart` rather than an error.
  */
-export async function connect(baseUrl: string): Promise<void> {
-  const origin = normalizeBaseUrl(baseUrl)
-  const endpoints = await discoverEndpoints(origin)
-  const redirectUri = chrome.identity.getRedirectURL()
-
-  const attempt = async (clientId: string) =>
-    authorizeAndExchange({ baseUrl: origin, endpoints, clientId, redirectUri })
-
-  let tokens: StoredTokens
-  try {
-    tokens = await attempt(
-      await resolveClientId(origin, endpoints, redirectUri)
-    )
-  } catch (error) {
-    if (!(
-      error instanceof OAuthProtocolError && error.code === 'invalid_client'
-    )) {
-      throw error
-    }
-    await forgetClientId(origin)
-    tokens = await attempt(
-      await resolveClientId(origin, endpoints, redirectUri)
-    )
+export async function completeConnect(
+  redirectUrl: string
+): Promise<ConnectOutcome> {
+  const pending = await storage.get('pendingConnect')
+  if (pending === undefined) {
+    throw new Error('No connection is in progress')
   }
 
-  await storage.set(tokens)
+  let code: string
+  try {
+    code = readAuthorizationRedirect(redirectUrl, {
+      state: pending.state,
+      issuer: pending.endpoints.issuer,
+    })
+  } catch (error) {
+    // A refusal is the server's answer to this flow, so the flow is over. A
+    // wrong state is not an answer to this flow at all, so it stays open.
+    if (error instanceof OAuthProtocolError) {
+      await storage.remove(['pendingConnect'])
+    }
+    throw error
+  }
+
+  try {
+    const tokens = await exchangeCode(pending, code)
+    await storage.set(tokens)
+    await storage.remove(['pendingConnect'])
+    return { status: 'connected' }
+  } catch (error) {
+    if (
+      error instanceof OAuthProtocolError &&
+      error.code === 'invalid_client'
+    ) {
+      await forgetClientId(pending.baseUrl)
+      const clientId = await resolveClientId(
+        pending.baseUrl,
+        pending.endpoints,
+        pending.redirectUri
+      )
+      return {
+        status: 'restart',
+        url: await beginAuthorization({ ...pending, clientId }),
+      }
+    }
+    await storage.remove(['pendingConnect'])
+    throw error
+  }
+}
+
+/** Forget a flow that will never be answered: its tab was closed. */
+export async function cancelConnect(): Promise<void> {
+  await storage.remove(['pendingConnect'])
+}
+
+async function exchangeCode(
+  pending: PendingConnect,
+  code: string
+): Promise<StoredTokens> {
+  const body = await postTokenRequest(pending.endpoints.tokenEndpoint, {
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: pending.redirectUri,
+    client_id: pending.clientId,
+    code_verifier: pending.verifier,
+    resource: pending.endpoints.resource,
+  })
+
+  return tokensFrom(body, {
+    baseUrl: pending.baseUrl,
+    clientId: pending.clientId,
+  })
 }
 
 /**

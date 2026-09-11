@@ -47,23 +47,38 @@ the newer.
 ## Where the OAuth flow runs
 
 In the service worker, not the options page — even though the options page is what
-has the Connect button.
+has the Connect button — and in an ordinary browser tab, not a window of Chrome's.
 
-`chrome.identity.launchWebAuthFlow` opens a window, and Chrome destroys the action
-popup the moment that window takes focus. This UI _was_ the action popup, so a flow
-started in it died mid-exchange: the server issued the tokens and there was nothing
-left alive to store them, so `chrome.storage.local` held only `registeredClients`,
-the user had a live grant on their profile, and the popup reopened on Connect every
-time.
+Connect used to run through `chrome.identity.launchWebAuthFlow`. That opens a window
+no other extension may touch, so a password manager showed its icon in it and could
+not fill anything. So the worker now opens the consent screen with `chrome.tabs.create`
+and the redirect URI is a page on the server itself, `/oauth/extension/callback`. In a
+tab the user's own tools work, and a user already signed in on the site goes straight
+to the consent screen.
 
-So the page sends a `ConnectRequest` and the worker runs `connect()`. An options tab
-survives losing focus and usually does hear the `ConnectResponse`, but nothing rests
-on that: the tokens are in storage by the time the flow finishes, and `initOptions`
-opens on the main view next time the page is opened. That is what made the flow
-survivable when nothing was listening at all, and it is why the worker still owns it.
+The flow is two halves with a tab in between. The page sends a `ConnectRequest`; the
+worker's `startConnect` discovers, registers, writes everything the exchange will need
+to `pendingConnect` in storage, and opens the tab. The answer is `ConnectResponse`
+`{ ok: true }`, meaning the tab is open. The worker that opened the tab is usually
+gone by the time the user has read the consent screen — MV3 unloads it after about
+thirty seconds idle — so the second half starts from storage: `tabs.onUpdated` wakes
+a fresh worker, it sees the remembered `connectTabId` land on the callback URL, and
+`completeConnect` spends the code, stores the tokens, and closes the tab. Then it
+sends a `ConnectFinished` to whoever is listening. Nothing rests on that arriving:
+the tokens are in storage first, and `initOptions` opens on the main view next time
+the page is opened.
 
-Disconnect stays in the page: it opens no window, so there was never anything to
-tear the page down part-way through.
+Seeing the callback URL needs the server to be covered by `host_permissions`, for the
+same reason the pin window does (below). Against a server outside that list the
+consent screen opens and the answer is never seen, so Connect hangs on "finish in the
+tab". A self-hosted origin means adding it to the manifest.
+
+A refusal leaves the tab open: the callback page is saying what went wrong. A closed
+tab abandons the flow. A stale registration — the server answering the exchange with
+`invalid_client` — re-registers and sends the same tab to a fresh consent screen,
+because the code was spent on the way in.
+
+Disconnect stays in the page: it opens no tab, so there was never anything to outlive.
 
 ## When it syncs
 
@@ -199,25 +214,25 @@ same for every checkout and survives removing and re-adding the extension.
 
 ## Layout
 
-| Path                          | What it is                                                                    |
-| ----------------------------- | ----------------------------------------------------------------------------- |
-| `manifest.json`               | Manifest V3: permissions, service worker, options page, `pin-page`            |
-| `options.html`                | Options markup and styles; no inline scripts (extension CSP)                  |
-| `src/background.ts`           | Service worker entry point: hands `initBackground` its real dependencies      |
-| `src/background/init.ts`      | The worker itself: startup, the alarm, pinning, and the page's requests       |
-| `src/options.ts`              | Options entry point: hands `initOptions` its real dependencies                |
-| `src/options/`                | The page itself — `init.ts` wiring, `render.ts` and `format.ts` pure          |
-| `src/messages.ts`             | The options page ↔ service worker message contract                            |
-| `src/auth.ts`                 | OAuth client: connect, refresh, `authorizedFetch`, disconnect                 |
-| `src/api-client.ts`           | `/api/v1` reads over `authorizedFetch`                                        |
-| `src/bookmark-sync.ts`        | Tags to bookmark folders: `syncAll`, and `runSync` for the worker             |
-| `src/storage.ts`              | The only module that names `chrome.storage.local`                             |
-| `scripts/build.ts`            | esbuild bundle + asset copy                                                   |
-| `scripts/package.ts`          | Zips `dist/` into `release/` for the store                                    |
-| `scripts/manifest-assets.ts`  | Derives the copy list from the manifest                                       |
-| `scripts/manifest-release.ts` | The shipped manifest and the zip's name                                       |
-| `icons/`                      | `acorn.svg` is the source; 48 and 128 are rendered from it, 16 is the favicon |
-| `scripts/render-icons.swift`  | Renders the SVG to the 48 and 128 PNGs: `swift scripts/render-icons.swift`    |
+| Path                          | What it is                                                                             |
+| ----------------------------- | -------------------------------------------------------------------------------------- |
+| `manifest.json`               | Manifest V3: permissions, service worker, options page, `pin-page`                     |
+| `options.html`                | Options markup and styles; no inline scripts (extension CSP)                           |
+| `src/background.ts`           | Service worker entry point: hands `initBackground` its real dependencies               |
+| `src/background/init.ts`      | The worker itself: startup, the alarm, pinning, and the page's requests                |
+| `src/options.ts`              | Options entry point: hands `initOptions` its real dependencies                         |
+| `src/options/`                | The page itself — `init.ts` wiring, `render.ts` and `format.ts` pure                   |
+| `src/messages.ts`             | The options page ↔ service worker message contract, both ways                          |
+| `src/auth.ts`                 | OAuth client: `startConnect`/`completeConnect`, refresh, `authorizedFetch`, disconnect |
+| `src/api-client.ts`           | `/api/v1` reads over `authorizedFetch`                                                 |
+| `src/bookmark-sync.ts`        | Tags to bookmark folders: `syncAll`, and `runSync` for the worker                      |
+| `src/storage.ts`              | The only module that names `chrome.storage.local`                                      |
+| `scripts/build.ts`            | esbuild bundle + asset copy                                                            |
+| `scripts/package.ts`          | Zips `dist/` into `release/` for the store                                             |
+| `scripts/manifest-assets.ts`  | Derives the copy list from the manifest                                                |
+| `scripts/manifest-release.ts` | The shipped manifest and the zip's name                                                |
+| `icons/`                      | `acorn.svg` is the source; 48 and 128 are rendered from it, 16 is the favicon          |
+| `scripts/render-icons.swift`  | Renders the SVG to the 48 and 128 PNGs: `swift scripts/render-icons.swift`             |
 
 `tsconfig.json` covers `src` and `scripts` as one project. `types` carries
 `chrome` (the extension APIs), `node` (for the build script) and

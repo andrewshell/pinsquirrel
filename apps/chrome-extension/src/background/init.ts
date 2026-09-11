@@ -1,7 +1,8 @@
-import { ReauthorizationRequiredError } from '../auth.ts'
+import { ReauthorizationRequiredError, type ConnectOutcome } from '../auth.ts'
 import {
   isConnectRequest,
   isSyncRequest,
+  notifyConnectFinished,
   type ConnectResponse,
   type SyncResponse,
 } from '../messages.ts'
@@ -35,19 +36,24 @@ export interface BackgroundDeps {
   /** A full sync of stored selection over the stored connection. */
   runSync(): Promise<void>
   /**
-   * The whole OAuth flow against `baseUrl`, ending with tokens in storage.
+   * The first half of connecting to `baseUrl`: discover, register, and hand
+   * back the consent URL for the worker to open in a tab.
    *
-   * This runs here rather than in the page that asked for it because
-   * `chrome.identity.launchWebAuthFlow` opens a window, and Chrome destroyed
-   * the action popup - which is what that UI was - the moment that window took
-   * focus. The flow died mid-exchange: the server had issued the tokens and
-   * nothing was left alive to store them, so the user got a grant on their
-   * profile and a popup that still asked them to connect. The UI is an options
-   * tab now and survives that, but the worker outliving it is still what makes
-   * this safe: it does not matter here whether the page is gone before this
-   * returns.
+   * The flow lives here rather than in the page that asked for it because it
+   * ends in a tab the worker watches, and the answer can come minutes later -
+   * after the page is closed, and after the worker that opened the tab has
+   * been unloaded. `startConnect` leaves everything the second half needs in
+   * storage, which is what makes that survivable.
    */
-  connect(baseUrl: string): Promise<void>
+  startConnect(baseUrl: string): Promise<string>
+  /**
+   * The second half: the consent tab has landed on the callback URL, so spend
+   * the code and store the tokens. A `restart` means the registration was
+   * stale and a fresh consent URL is to be opened in the same tab.
+   */
+  completeConnect(redirectUrl: string): Promise<ConnectOutcome>
+  /** Forget a flow whose tab was closed before it answered. */
+  cancelConnect(): Promise<void>
   logger: BackgroundLogger
 }
 
@@ -55,12 +61,10 @@ export interface BackgroundDeps {
  * Wrap `work` so that only one run of it exists at a time.
  *
  * Two syncs at once means two runs reconciling the same bookmark folders
- * against two reads of the same tags; two connects means two consent windows
- * for one server. Everything that asks for one while it is running joins the
- * run already in flight instead, including a connect naming a different server
- * - the options page only ever offers one at a time, and its button is disabled for
- * the duration. Every caller has to attach its own handler: the shared promise
- * rejects once and is handed to each of them.
+ * against two reads of the same tags. Everything that asks for one while it
+ * is running joins the run already in flight instead. Every caller has to
+ * attach its own handler: the shared promise rejects once and is handed to
+ * each of them.
  */
 function singleFlight<Args extends unknown[]>(
   work: (...args: Args) => Promise<void>
@@ -124,7 +128,6 @@ function pinFormUrl(baseUrl: string, tab: chrome.tabs.Tab): string {
  */
 export function initBackground(deps: BackgroundDeps): void {
   const sync = singleFlight(() => deps.runSync())
-  const connect = singleFlight((baseUrl: string) => deps.connect(baseUrl))
 
   /**
    * A sync nobody is watching: on browser startup, or on the alarm.
@@ -155,25 +158,126 @@ export function initBackground(deps: BackgroundDeps): void {
     }
   }
 
+  /** A failure, in the shape that crosses the message channel. */
+  function failureOf(error: unknown): ConnectResponse {
+    const failure = { ok: false as const, error: messageOf(error) }
+    return error instanceof ReauthorizationRequiredError
+      ? { ...failure, reauthorizationRequired: true }
+      : failure
+  }
+
   /**
-   * A connect the options page asked for, with its outcome as a value.
+   * Open the consent screen for `baseUrl` in a tab, and say that it is open.
    *
-   * It may well be that nobody is left to hear it: as the action popup, the
-   * consent window took focus, Chrome tore the page down, and `sendResponse`
-   * landed nowhere. That was fine - `connect` has written the tokens to
-   * storage by then, and the page reads them on its next open - and it stays
-   * fine now that an options tab usually does survive to hear the answer.
+   * An ordinary tab rather than `chrome.identity.launchWebAuthFlow`: that API
+   * opens a window no other extension may touch, so a password manager could
+   * not fill the sign-in form inside it. In a tab the user's own tools work,
+   * and a user already signed in on the site goes straight to consent.
+   *
+   * A second Connect while a tab is open opens a second tab and remembers the
+   * newer one, as a second pin click does. The older tab is then no longer
+   * watched; its flow has been overwritten in storage, so an answer from it
+   * would carry the wrong state and be refused.
    */
-  async function connectForOptions(baseUrl: string): Promise<ConnectResponse> {
+  async function openConsentTab(baseUrl: string): Promise<ConnectResponse> {
     try {
-      await connect(baseUrl)
+      const url = await deps.startConnect(baseUrl)
+      const tab = await chrome.tabs.create({ url })
+      if (tab.id !== undefined) {
+        await storage.set({ connectTabId: tab.id })
+      }
       return { ok: true }
     } catch (error) {
-      const failure = { ok: false as const, error: messageOf(error) }
-      return error instanceof ReauthorizationRequiredError
-        ? { ...failure, reauthorizationRequired: true }
-        : failure
+      return failureOf(error)
     }
+  }
+
+  /**
+   * The consent tab an answer is already being handled for.
+   *
+   * The same double report as the pin window: Chrome sends `{ status:
+   * 'loading', url }` and then `{ status: 'complete' }` with the URL on the
+   * tab, and both can be past their storage read before either clears
+   * `connectTabId`. The code is single-use, so the second must not spend it.
+   */
+  let finishingTabId: number | undefined
+
+  /**
+   * The consent tab has landed on the callback: finish the flow.
+   *
+   * On success the tab is closed and the options page told; the tokens are in
+   * storage before either, so a page that is not open loses nothing. On
+   * failure the tab stays open - the callback page is saying what went wrong,
+   * and closing it would take the explanation with it. A `restart` sends the
+   * same tab to the fresh consent URL and keeps watching it.
+   */
+  async function finishConnect(tabId: number, url: string): Promise<void> {
+    if (finishingTabId === tabId) return
+    finishingTabId = tabId
+    try {
+      let outcome: ConnectOutcome
+      try {
+        outcome = await deps.completeConnect(url)
+      } catch (error) {
+        await storage.remove(['connectTabId'])
+        await notifyConnectFinished(failureOf(error))
+        return
+      }
+
+      if (outcome.status === 'restart') {
+        await chrome.tabs.update(tabId, { url: outcome.url })
+        return
+      }
+
+      await storage.remove(['connectTabId'])
+      try {
+        await chrome.tabs.remove(tabId)
+      } catch {
+        // Already closed, by the user or by a duplicate. Closed is the point.
+      }
+      await notifyConnectFinished({ ok: true })
+    } finally {
+      finishingTabId = undefined
+    }
+  }
+
+  /**
+   * A tab has navigated: is it the consent tab, and has it reached the
+   * callback?
+   *
+   * Same caveat as the pin window below: the URL is only there because the
+   * manifest holds a host permission for the server. Against a server outside
+   * that list the consent screen opens and the answer is never seen.
+   */
+  async function onConsentTabUpdated(
+    tabId: number,
+    changeInfo: chrome.tabs.OnUpdatedInfo,
+    tab: chrome.tabs.Tab
+  ): Promise<void> {
+    const stored = await storage.getMany(['connectTabId', 'pendingConnect'])
+    if (
+      stored.connectTabId === undefined ||
+      stored.pendingConnect === undefined
+    )
+      return
+    if (tabId !== stored.connectTabId) return
+
+    const url = changeInfo.url ?? tab.url
+    if (url === undefined) return
+    if (!url.startsWith(stored.pendingConnect.redirectUri)) return
+
+    await finishConnect(tabId, url)
+  }
+
+  /** The consent tab was closed before it answered: the flow is abandoned. */
+  async function onConsentTabClosed(tabId: number): Promise<void> {
+    if ((await storage.get('connectTabId')) !== tabId) return
+    await storage.remove(['connectTabId'])
+    await deps.cancelConnect()
+    await notifyConnectFinished({
+      ok: false,
+      error: 'The sign-in tab was closed before connecting',
+    })
   }
 
   /**
@@ -323,8 +427,13 @@ export function initBackground(deps: BackgroundDeps): void {
     void pinTab(tab)
   })
 
-  chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     void onPinWindowUpdated(changeInfo, tab)
+    void onConsentTabUpdated(tabId, changeInfo, tab)
+  })
+
+  chrome.tabs.onRemoved.addListener(tabId => {
+    void onConsentTabClosed(tabId)
   })
 
   chrome.windows.onRemoved.addListener(windowId => {
@@ -356,7 +465,7 @@ export function initBackground(deps: BackgroundDeps): void {
     }
 
     if (isConnectRequest(message)) {
-      void connectForOptions(message.baseUrl).then(sendResponse)
+      void openConsentTab(message.baseUrl).then(sendResponse)
       return true
     }
 

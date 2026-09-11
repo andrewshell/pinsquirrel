@@ -32,17 +32,18 @@ export interface OptionsApiClient {
 export interface OptionsDeps {
   document: Document
   /**
-   * Ask the service worker to run the OAuth flow; it does not run here.
+   * Ask the service worker to open the consent screen in a tab; the flow does
+   * not run here.
    *
-   * `chrome.identity.launchWebAuthFlow` opens a window, and when this page
-   * was the action popup Chrome destroyed it the moment that window took
-   * focus - so a flow started here died half-finished, after the server had
-   * issued the tokens and before anything could store them. What the user saw
-   * was a grant on their profile and a page that still asked them to connect.
-   * An options tab survives losing focus, but the worker is still the right
-   * owner of a flow whose result has to land whether this page is open or not.
+   * The answer comes back minutes later, from a tab the worker is watching,
+   * and it has to land whether this page is still open or not. So the worker
+   * owns the flow, `ok` here means only that the tab is open, and what came of
+   * it arrives through `onConnectFinished` - or, if this page is gone by then,
+   * is read out of storage on its next open.
    */
   requestConnect(baseUrl: string): Promise<ConnectResponse>
+  /** Hear the worker say the consent tab has answered. */
+  onConnectFinished(listener: (result: ConnectResponse) => void): void
   disconnect(): Promise<void>
   createApiClient(baseUrl: string): OptionsApiClient
   requestSync(): Promise<SyncResponse>
@@ -270,27 +271,44 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
       return
     }
 
-    setStatus('Waiting for you to approve the extension...')
+    setStatus('Opening PinSquirrel...')
     await whileBusy(ui.connectButton, async () => {
       try {
-        // As the action popup this usually never returned: the consent
-        // window took focus and Chrome destroyed the page mid-await, leaving
-        // the flow to finish in the worker. An options tab survives that, so
-        // the answer normally does arrive - but the worker still owns the
-        // flow, so everything below has to cope with never hearing back.
         const response = await deps.requestConnect(origin)
         if (!response.ok) {
           if (response.reauthorizationRequired) askToReconnect()
           else setStatus(response.error)
           return
         }
-        baseUrl = origin
-        setStatus('')
-        await showMain()
+        // The tab is open and the rest happens there. The button comes back
+        // with the status, so a user who lost the tab can open another.
+        setStatus('Finish connecting in the tab that just opened.')
       } catch (error) {
         report(error)
       }
     })
+  }
+
+  /**
+   * The consent tab has answered.
+   *
+   * The server the tokens are for is read back out of storage rather than
+   * remembered from the click: the worker wrote it there before saying
+   * anything, and this page may not be the one that clicked.
+   */
+  async function onConnectFinished(result: ConnectResponse): Promise<void> {
+    if (!result.ok) {
+      if (result.reauthorizationRequired) askToReconnect()
+      else setStatus(result.error)
+      return
+    }
+    try {
+      baseUrl = await storage.get('baseUrl')
+      setStatus('')
+      await showMain()
+    } catch (error) {
+      report(error)
+    }
   }
 
   /**
@@ -346,6 +364,7 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
   }
 
   ui.connectButton.addEventListener('click', () => void onConnect())
+  deps.onConnectFinished(result => void onConnectFinished(result))
   ui.syncButton.addEventListener('click', () => void onSyncNow())
   ui.disconnectButton.addEventListener('click', () => void onDisconnect())
   // One delegated listener, because the boxes themselves are replaced on

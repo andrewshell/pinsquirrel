@@ -2,9 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   isConnectRequest,
   isSyncRequest,
+  notifyConnectFinished,
+  onConnectFinished,
   requestConnect,
   requestSync,
   SYNC_REQUEST,
+  type ConnectResponse,
 } from './messages.ts'
 import { stubChrome } from './test/chrome-mock.ts'
 
@@ -137,5 +140,48 @@ describe('isConnectRequest', () => {
 
     expect(isSyncRequest(connect)).toBe(false)
     expect(isConnectRequest(SYNC_REQUEST)).toBe(false)
+  })
+})
+
+describe('the worker telling the page the consent tab answered', () => {
+  it('reaches a listener the page registered, and nothing else does', () => {
+    const chrome = stubChrome()
+    const heard: ConnectResponse[] = []
+    onConnectFinished(result => heard.push(result))
+
+    chrome.runtime.onMessage.fire(
+      { type: 'connect-finished', result: { ok: true } },
+      {},
+      () => {}
+    )
+    chrome.runtime.onMessage.fire(SYNC_REQUEST, {}, () => {})
+    chrome.runtime.onMessage.fire(
+      { type: 'connect-finished', result: { nonsense: true } },
+      {},
+      () => {}
+    )
+
+    expect(heard).toEqual([{ ok: true }])
+  })
+
+  it('sends the result as a connect-finished message', async () => {
+    const chrome = stubChrome()
+    chrome.sendMessage.mockResolvedValue(undefined)
+
+    await notifyConnectFinished({ ok: false, error: 'refused' })
+
+    expect(chrome.sendMessage).toHaveBeenCalledWith({
+      type: 'connect-finished',
+      result: { ok: false, error: 'refused' },
+    })
+  })
+
+  it('does not mind that nobody is listening', async () => {
+    const chrome = stubChrome()
+    chrome.sendMessage.mockRejectedValue(
+      new Error('Could not establish connection. Receiving end does not exist.')
+    )
+
+    await expect(notifyConnectFinished({ ok: true })).resolves.toBeUndefined()
   })
 })

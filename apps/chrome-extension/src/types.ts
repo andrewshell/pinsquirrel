@@ -49,6 +49,38 @@ export interface ExtensionStorage {
    * registration instead of posting to `/oauth/register` again.
    */
   registeredClients: Record<string, string>
+  /**
+   * The consent flow that is half-way through: opened in a tab, not yet
+   * answered. Everything the exchange will need is here, because the worker
+   * that opened the tab is not the worker that hears the answer - MV3 unloads
+   * it while the user reads the consent screen.
+   */
+  pendingConnect: PendingConnect
+  /** The tab the consent screen is open in, while it is open. */
+  connectTabId: number
+}
+
+/**
+ * One OAuth flow between the consent tab opening and the code coming back.
+ *
+ * The verifier and state are the two halves that bind the answer to the
+ * question: the state proves the redirect is the one this flow asked for, the
+ * verifier proves to the server that this is the client that asked.
+ */
+export interface PendingConnect {
+  baseUrl: string
+  clientId: string
+  redirectUri: string
+  state: string
+  verifier: string
+  endpoints: {
+    resource: string
+    issuer: string
+    authorizationEndpoint: string
+    tokenEndpoint: string
+    registrationEndpoint: string
+    revocationEndpoint: string
+  }
 }
 
 /** A key `chrome.storage.local` holds for this extension. */

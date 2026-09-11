@@ -8,7 +8,6 @@
     "bookmarks",
     "storage",
     "alarms",
-    "identity",
     "activeTab"
   ],
   "host_permissions": [
