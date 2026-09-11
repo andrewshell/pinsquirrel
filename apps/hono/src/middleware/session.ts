@@ -26,6 +26,7 @@ import type { Context, MiddlewareHandler } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import type { Session, User } from '@pinsquirrel/domain'
 import { sessionRepository, userRepository } from '../lib/db'
+import { isEmbedRequest, withEmbed } from '../lib/embed'
 
 // Session configuration
 const SESSION_COOKIE_NAME = '__session'
@@ -300,7 +301,10 @@ export function requireAuth(redirectTo = '/signin'): MiddlewareHandler {
         (currentPath !== '/'
           ? `?redirectTo=${encodeURIComponent(currentPath)}`
           : '')
-      return c.redirect(redirectUrl)
+      // The sign-in page renders in the same layout the request asked for.
+      // `redirectTo` already carries the original query, so after sign-in the
+      // user lands back in embed without this; this is for the sign-in page.
+      return c.redirect(withEmbed(redirectUrl, isEmbedRequest(c)))
     }
 
     // Checked before getUser() so an anonymous request never touches the
