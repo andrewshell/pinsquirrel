@@ -1,7 +1,7 @@
 {
   "name": "@pinsquirrel/admin",
   "private": true,
-  "version": "3.8.0",
+  "version": "3.9.0",
   "type": "module",
   "scripts": {
     "dev": "concurrently --kill-others \"tsx watch src/index.ts\" \"pnpm css:watch\"",
