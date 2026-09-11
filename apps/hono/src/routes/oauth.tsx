@@ -133,6 +133,7 @@ oauth.get('/extension/callback', async c => {
   return c.html(
     <OAuthExtensionCallbackPage
       user={user}
+      embed={isEmbedRequest(c)}
       {...(error
         ? {
             error: {
