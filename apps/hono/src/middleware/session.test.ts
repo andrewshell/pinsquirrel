@@ -361,6 +361,33 @@ describe('requireAuth Middleware', () => {
     expect(res.headers.get('location')).toBe('/signin?redirectTo=%2Fprotected')
   })
 
+  it('keeps the sign-in page in embed mode when the request was', async () => {
+    app.get('/protected', requireAuth(), c => {
+      return c.json({ protected: true })
+    })
+
+    const res = await app.request('/protected?embed=1')
+
+    expect(res.status).toBe(302)
+    // The redirectTo carries the original query, so after sign-in the user
+    // lands back in embed; the trailing embed=1 is for the sign-in page itself.
+    expect(res.headers.get('location')).toBe(
+      '/signin?redirectTo=%2Fprotected%3Fembed%3D1&embed=1'
+    )
+  })
+
+  it('does not put a page into embed mode for any other embed value', async () => {
+    app.get('/protected', requireAuth(), c => {
+      return c.json({ protected: true })
+    })
+
+    const res = await app.request('/protected?embed=yes')
+
+    expect(res.headers.get('location')).toBe(
+      '/signin?redirectTo=%2Fprotected%3Fembed%3Dyes'
+    )
+  })
+
   it('allows access when authenticated', async () => {
     const mockSession = {
       id: 'session-123',

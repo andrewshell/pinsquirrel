@@ -22,6 +22,7 @@ import {
   DEFAULT_PAGE_SIZE,
 } from '@pinsquirrel/domain'
 import { pinService, tagService } from '../lib/services'
+import { isEmbedRequest } from '../lib/embed'
 import { getString, parsePinForm } from '../lib/form'
 import { getAuthUser, getSessionManager } from '../middleware/session'
 import { PinCard, PinDeleteConfirm } from '../views/components/PinCard'
@@ -157,17 +158,6 @@ function takeViewSize(c: Context): {
     'expanded' | 'compact'
   url.searchParams.delete('view')
   return { viewSize, searchParams: url.searchParams.toString() }
-}
-
-/**
- * Is this request being rendered inside the extension's popup window?
- *
- * Presentation only, and only the literal `1` turns it on: anything else is
- * the ordinary page, so nothing changes for a user who happens to have an
- * `embed` param on a link.
- */
-function isEmbedRequest(c: Context): boolean {
-  return new URL(c.req.url).searchParams.get('embed') === '1'
 }
 
 /**

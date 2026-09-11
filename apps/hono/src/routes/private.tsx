@@ -1,6 +1,9 @@
 import { Hono } from 'hono'
 import { ValidationError, InvalidCredentialsError } from '@pinsquirrel/domain'
 import { authService } from '../lib/services'
+import { isEmbedRequest } from '../lib/embed'
+import { getString } from '../lib/form'
+import { safeRedirect } from '../lib/safe-redirect'
 import {
   getAuthUser,
   getSessionManager,
@@ -28,7 +31,22 @@ privateRouter.get('/unlock', async c => {
     return c.redirect(BASE_URL)
   }
 
-  return c.html(<PrivateUnlockPage user={user} />)
+  // Where the gate sent us from, if it said. Checked here as well as on the
+  // POST so the hidden field never carries a URL that would be refused later.
+  const url = new URL(c.req.url)
+  const redirectTo = safeRedirect(
+    url.searchParams.get('redirectTo') ?? undefined,
+    c.req.url,
+    ''
+  )
+
+  return c.html(
+    <PrivateUnlockPage
+      user={user}
+      redirectTo={redirectTo || undefined}
+      embed={isEmbedRequest(c)}
+    />
+  )
 })
 
 // POST /private/unlock — Verify password and unlock
@@ -39,15 +57,25 @@ privateRouter.post('/unlock', async c => {
   const formData = await c.req.parseBody()
   const password =
     typeof formData.password === 'string' ? formData.password : ''
+  const redirectTo = getString(formData.redirectTo) || undefined
+  const embed = getString(formData.embed) === '1'
+
+  const rerender = (error: string, status?: 429) =>
+    c.html(
+      <PrivateUnlockPage
+        user={user}
+        error={error}
+        redirectTo={redirectTo}
+        embed={embed}
+      />,
+      status
+    )
 
   // This checks the account password on every POST, so unlimited it is a
   // password-guessing oracle for anyone who has got hold of the session.
   if (privateUnlockLimiter.isLimited(user.id)) {
-    return c.html(
-      <PrivateUnlockPage
-        user={user}
-        error="Too many failed attempts. Please try again in 15 minutes."
-      />,
+    return rerender(
+      'Too many failed attempts. Please try again in 15 minutes.',
       429
     )
   }
@@ -56,7 +84,7 @@ privateRouter.post('/unlock', async c => {
     await authService.login({ username: user.username, password })
     privateUnlockLimiter.reset(user.id)
     sessionManager.unlockPrivateMode()
-    return c.redirect(BASE_URL)
+    return c.redirect(safeRedirect(redirectTo, c.req.url, BASE_URL))
   } catch (error) {
     if (
       error instanceof InvalidCredentialsError ||
@@ -67,7 +95,7 @@ privateRouter.post('/unlock', async c => {
       if (error instanceof InvalidCredentialsError) {
         privateUnlockLimiter.hit(user.id)
       }
-      return c.html(<PrivateUnlockPage user={user} error="Invalid password." />)
+      return rerender('Invalid password.')
     }
     throw error
   }
