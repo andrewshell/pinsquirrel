@@ -5,9 +5,14 @@ import { AccessControl, OAuthError, ValidationError } from '@pinsquirrel/domain'
 import { oauthService } from '../lib/services.js'
 import { describeValidationError } from '../lib/oauth-error.js'
 import { getString } from '../lib/form'
-import { getAuthUser, requireAuth } from '../middleware/session'
+import {
+  getAuthUser,
+  getSessionManager,
+  requireAuth,
+} from '../middleware/session'
 import { OAuthConsentPage } from '../views/pages/oauth-consent'
 import { OAuthErrorPage } from '../views/pages/oauth-error'
+import { OAuthExtensionCallbackPage } from '../views/pages/oauth-extension-callback'
 
 /**
  * The browser-facing half of OAuth: `/oauth/authorize` and its consent screen.
@@ -96,6 +101,43 @@ function renderRequestError(c: Context, user: User | null, error: unknown) {
 }
 
 const oauth = new Hono()
+
+/**
+ * The Chrome extension's redirect URI: where the consent screen sends the
+ * browser back to, in an ordinary tab the extension's worker is watching.
+ *
+ * Registered ahead of `requireAuth()` because it must not need a session: the
+ * worker reads the code off the tab's URL and closes the tab, and a sign-in
+ * redirect in between would carry the code somewhere the worker is not
+ * looking. The path is part of the contract with the extension - it registers
+ * exactly this URL - so it has to stay stable.
+ *
+ * The page only tells the person what happened. The code is the extension's
+ * to spend and is never read here.
+ */
+oauth.get('/extension/callback', async c => {
+  const sessionManager = getSessionManager(c)
+  const user = sessionManager.isAuthenticated()
+    ? await sessionManager.getUser()
+    : null
+  const error = c.req.query('error')
+
+  return c.html(
+    <OAuthExtensionCallbackPage
+      user={user}
+      {...(error
+        ? {
+            error: {
+              code: error,
+              description:
+                c.req.query('error_description') ??
+                `The server answered ${error}`,
+            },
+          }
+        : {})}
+    />
+  )
+})
 
 oauth.use('*', requireAuth())
 

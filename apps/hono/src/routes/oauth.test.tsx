@@ -135,6 +135,40 @@ describe('oauth authorize routes', () => {
     })
   })
 
+  /**
+   * Where the Chrome extension's authorization lands. The extension's worker
+   * reads the code off this URL and closes the tab; the page itself only tells
+   * the person what happened, and it must not need a session - the tab is
+   * closed before they could sign in to see it.
+   */
+  describe('GET /oauth/extension/callback', () => {
+    it('says the extension is connected, with nobody signed in', async () => {
+      const res = await app.request(
+        '/oauth/extension/callback?code=abc123&state=s1&iss=https%3A%2F%2Fpinsquirrel.com'
+      )
+
+      expect(res.status).toBe(200)
+      const body = await res.text()
+      expect(body).toContain('Extension connected')
+      expect(body).toContain('close this tab')
+      // The code is the extension's to spend; the page has no business
+      // echoing it.
+      expect(body).not.toContain('abc123')
+    })
+
+    it("shows the server's error when consent was refused", async () => {
+      const res = await app.request(
+        '/oauth/extension/callback?error=access_denied&error_description=You+said+no&state=s1'
+      )
+
+      expect(res.status).toBe(200)
+      const body = await res.text()
+      expect(body).toContain('Extension not connected')
+      expect(body).toContain('You said no')
+      expect(body).toContain('access_denied')
+    })
+  })
+
   describe('GET /oauth/authorize', () => {
     beforeEach(signedIn)
 
