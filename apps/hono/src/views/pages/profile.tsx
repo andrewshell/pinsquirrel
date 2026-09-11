@@ -14,19 +14,27 @@ interface ProfilePageProps {
   flash?: FlashMessage | null
   errors?: Record<string, string[]>
   grants?: OAuthGrant[]
+  embed?: boolean
 }
 
 /**
  * The profile page is a stack of independent cards, one per file under
  * `profile/`. Adding or removing a card is a one-file change plus a line here.
  */
-export function ProfilePage({ user, flash, errors, grants }: ProfilePageProps) {
+export function ProfilePage({
+  user,
+  flash,
+  errors,
+  grants,
+  embed = false,
+}: ProfilePageProps) {
   return (
     <DefaultLayout
       title="Profile"
       user={user}
       currentPath="/profile"
       width="narrow"
+      embed={embed}
     >
       {/* Flash message */}
       {flash && (
@@ -47,9 +55,9 @@ export function ProfilePage({ user, flash, errors, grants }: ProfilePageProps) {
 
       <div class="space-y-6">
         <AccountCard user={user} />
-        <EmailForm errors={errors} />
-        <PasswordForm user={user} errors={errors} />
-        <OAuthGrantsCard grants={grants} />
+        <EmailForm errors={errors} embed={embed} />
+        <PasswordForm user={user} errors={errors} embed={embed} />
+        <OAuthGrantsCard grants={grants} embed={embed} />
         <BookmarkletCard />
       </div>
     </DefaultLayout>

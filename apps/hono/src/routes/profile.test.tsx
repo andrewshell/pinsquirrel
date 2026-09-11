@@ -106,6 +106,48 @@ describe('profile routes', () => {
     return res.text()
   }
 
+  describe('embed mode', () => {
+    it('renders the profile without the chrome for ?embed=1, forms carrying the flag', async () => {
+      const html = await (await app.request('/profile?embed=1')).text()
+
+      expect(html).toContain('Claude Code')
+      expect(html).not.toContain('<header')
+      expect(html).not.toContain('<footer')
+      expect(html).toContain('name="embed" value="1"')
+    })
+
+    it('re-renders a rejected form in embed when it said so', async () => {
+      // Once: clearAllMocks in beforeEach clears calls, not implementations.
+      svc.updateEmail.mockRejectedValueOnce(
+        new ValidationError({ email: ['Invalid email address'] })
+      )
+
+      const html = await (
+        await app.request(
+          '/profile',
+          formBody({ intent: 'update-email', email: 'nope', embed: '1' })
+        )
+      ).text()
+
+      expect(html).toContain('Invalid email address')
+      expect(html).not.toContain('<header')
+      expect(html).toContain('name="embed" value="1"')
+    })
+
+    it('comes back to the profile in embed after an embedded update', async () => {
+      const res = await app.request(
+        '/profile',
+        formBody({
+          intent: 'update-email',
+          email: 'new@example.com',
+          embed: '1',
+        })
+      )
+
+      expect(res.headers.get('location')).toBe('/profile?embed=1')
+    })
+  })
+
   describe('POST / — update-email', () => {
     it('still lists the connected applications once the email has been updated', async () => {
       const res = await app.request(

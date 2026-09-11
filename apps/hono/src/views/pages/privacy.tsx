@@ -4,13 +4,14 @@ import { DefaultLayout } from '../layouts/default'
 
 interface PrivacyPageProps {
   user: User | null
+  embed?: boolean
 }
 
-export const PrivacyPage: FC<PrivacyPageProps> = ({ user }) => {
+export const PrivacyPage: FC<PrivacyPageProps> = ({ user, embed = false }) => {
   const today = new Date().toLocaleDateString()
 
   return (
-    <DefaultLayout title="Privacy Policy" user={user}>
+    <DefaultLayout title="Privacy Policy" user={user} embed={embed}>
       <div class="bg-background">
         <div class="container mx-auto px-4 py-16">
           <div class="max-w-4xl mx-auto">

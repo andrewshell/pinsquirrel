@@ -10,10 +10,12 @@ import {
 
 type EmailFormProps = {
   errors?: Record<string, string[]>
+  /** Carried on a hidden field so a rejected form comes back in embed. */
+  embed?: boolean
 }
 
 /** Posts `intent=update-email` back to /profile. */
-export const EmailForm: FC<EmailFormProps> = ({ errors }) => {
+export const EmailForm: FC<EmailFormProps> = ({ errors, embed = false }) => {
   const formError = errors?._form?.[0]
 
   return (
@@ -24,6 +26,7 @@ export const EmailForm: FC<EmailFormProps> = ({ errors }) => {
       <CardContent>
         <form method="post" action="/profile" class="space-y-4">
           <input type="hidden" name="intent" value="update-email" />
+          {embed && <input type="hidden" name="embed" value="1" />}
 
           {formError && <ErrorMessage message={formError} />}
 

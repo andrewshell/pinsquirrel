@@ -35,6 +35,8 @@ interface OAuthConsentPageProps {
   resource: string
   /** The authorization request, echoed back as hidden fields. */
   params: Record<string, string>
+  /** Presentation only; travels on its own hidden field, not in `params`. */
+  embed?: boolean
 }
 
 /** What a scope means, in the terms the user granting it thinks in. */
@@ -57,8 +59,14 @@ export const OAuthConsentPage: FC<OAuthConsentPageProps> = ({
   scopes,
   resource,
   params,
+  embed = false,
 }) => (
-  <DefaultLayout title="Authorize application" user={user} width="form">
+  <DefaultLayout
+    title="Authorize application"
+    user={user}
+    width="form"
+    embed={embed}
+  >
     <Card>
       <CardHeader>
         <CardTitle>Authorize {clientLabel}</CardTitle>
@@ -116,6 +124,7 @@ export const OAuthConsentPage: FC<OAuthConsentPageProps> = ({
           {Object.entries(params).map(([name, value]) => (
             <input type="hidden" name={name} value={value} />
           ))}
+          {embed && <input type="hidden" name="embed" value="1" />}
           <Button type="submit" name="decision" value="approve">
             Approve
           </Button>
