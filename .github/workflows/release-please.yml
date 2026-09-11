@@ -12,9 +12,37 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      extension_released: ${{ steps.release.outputs['apps/chrome-extension--release_created'] }}
+      extension_tag: ${{ steps.release.outputs['apps/chrome-extension--tag_name'] }}
     steps:
       - uses: googleapis/release-please-action@v5
+        id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  # Attaches the store zip to the extension's GitHub release, so the release
+  # page is where users download it from. This runs as a job here rather than
+  # on a `release: published` trigger because releases created with
+  # GITHUB_TOKEN do not fire other workflows.
+  extension-zip:
+    needs: release-please
+    if: needs.release-please.outputs.extension_released == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.extension_tag }}
+      - uses: pnpm/action-setup@v6.0.10
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm extension:package
+      - run: gh release upload "$TAG" apps/chrome-extension/release/*.zip --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release-please.outputs.extension_tag }}

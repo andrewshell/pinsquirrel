@@ -156,6 +156,27 @@ an in-memory alarm registry and a `windows` that records what was opened and clo
 That is how the service worker is driven without a browser to wake it: the test is
 the browser.
 
+## Install from a GitHub release
+
+Every `chrome-extension-vX.Y.Z` release on GitHub carries the store zip as an
+asset; the `extension-zip` job in `.github/workflows/release-please.yml` builds
+and attaches it. To install one:
+
+1. Download the zip from the release page.
+2. Open `chrome://extensions` and turn on **Developer mode**.
+3. Drag the zip onto the page. Chrome unpacks it and loads it; there is no need
+   to unzip first.
+4. Right-click the acorn → **Options** to connect and pick tags.
+
+Chrome does not update a developer-mode extension, so a new release means
+downloading the zip again and dropping it on the page. Settings and the
+connection survive, because the extension ID is fixed: `manifest.json` carries a
+`key`, the public half of an RSA key pair, and Chrome derives the ID from it
+rather than from the install path. Every install, unpacked or from a zip, is
+`agcifhddbnanmlmancpchljklflfnbif`, so they all share one OAuth client on the
+server and the redirect URI never changes. The private half lives outside the
+repo and is only needed to sign a `.crx`, which nothing here does.
+
 ## Load unpacked
 
 1. Build, so `dist/` exists.
@@ -170,9 +191,9 @@ the browser.
 6. After a rebuild, hit the reload arrow on the extension's card. Chrome does
    not watch `dist/`.
 
-Note the extension ID Chrome assigns: the OAuth redirect URI is
-`https://<extension-id>.chromiumapp.org/`, and it changes if the extension is
-removed and re-added.
+The extension ID is fixed by the manifest's `key` (see above), so the OAuth
+redirect URI `https://agcifhddbnanmlmancpchljklflfnbif.chromiumapp.org/` is the
+same for every checkout and survives removing and re-adding the extension.
 
 ## Layout
 

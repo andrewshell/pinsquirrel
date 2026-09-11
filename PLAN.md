@@ -312,10 +312,10 @@ manifest's `host_permissions`, and the session cookie is only `Secure` in produc
 2. Right-click the acorn → **Options** and type `http://localhost:8100`: an origin, no path,
    which is all `parseBaseUrl` accepts. Connect, and watch the flow in the service worker's
    DevTools, not the page's — the worker is what runs it.
-3. The redirect URI is `https://<extension-id>.chromiumapp.org/`, which needs nothing on the
-   server. The DCR `client_id` is derived from the metadata, so one extension dedups to one
-   `oauth_clients` row — but Chrome derives an unpacked extension's ID from its directory path,
-   so a second checkout is a second row, and `/oauth/register` allows ten per IP per hour.
+3. The redirect URI is `https://agcifhddbnanmlmancpchljklflfnbif.chromiumapp.org/`, which
+   needs nothing on the server. The DCR `client_id` is derived from the metadata, so one
+   extension dedups to one `oauth_clients` row, and the manifest's `key` fixes the ID, so a
+   second checkout is the same row. `/oauth/register` allows ten per IP per hour.
 4. Tick tags, Sync Now, and check the bookmarks bar for a "PinSquirrel" folder. Revoke from
    `/profile` and confirm the options page comes back on Connect with a notice rather than
    failing silently.
@@ -483,7 +483,12 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     the code moving was noise for users and a review for nothing. The extension's first solo
     release is 1.0.0, which is what the store sees first, set with a `Release-As` footer on
     the commit that reset its version; the site carries on from 3.6.0. `pnpm extension:package`
-    names the zip after the manifest, so the store upload and the tag agree.
+    names the zip after the manifest, so the store upload and the tag agree. Distribution is
+    the GitHub release itself: the `extension-zip` job attaches the zip to each
+    `chrome-extension-v*` release, and users drop it on `chrome://extensions` in developer
+    mode. The Chrome Web Store is not part of the plan — a store review is a gate that can
+    stay shut indefinitely, and the site's waitlist already decides who can use the thing.
+    The manifest's `key` pins the extension ID so every install is one OAuth client.
 
 ## Reference
 
