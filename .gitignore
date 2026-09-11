@@ -27,3 +27,6 @@ apps/admin/src/static/styles.css
 
 # Chrome Web Store upload zips
 apps/chrome-extension/release/
+
+# Subagent worktrees
+.claude/worktrees/
