@@ -9,6 +9,7 @@ import {
   ResetTokenExpiredError,
 } from '@pinsquirrel/domain'
 import { accountService, authService } from '../lib/services'
+import { isEmbedRequest, withEmbed } from '../lib/embed'
 import { getString } from '../lib/form'
 import { logger, safeError } from '../lib/logger.js'
 import { safeRedirect } from '../lib/safe-redirect'
@@ -52,6 +53,7 @@ auth.get('/signin', async c => {
       showResetSuccess={showResetSuccess}
       redirectTo={redirectTo}
       flash={flash}
+      embed={isEmbedRequest(c)}
     />
   )
 })
@@ -65,6 +67,7 @@ auth.post('/signin', async c => {
   const password = getString(formData.password)
   const keepSignedIn = formData.keepSignedIn === 'true'
   const redirectTo = getString(formData.redirectTo) || undefined
+  const embed = getString(formData.embed) === '1'
 
   // Two keys, two attacks. The IP:username key stops guessing at one account;
   // the IP-only key stops one address spraying a password across many
@@ -85,6 +88,7 @@ auth.post('/signin', async c => {
         }}
         redirectTo={redirectTo}
         username={username}
+        embed={embed}
       />,
       429
     )
@@ -101,8 +105,11 @@ auth.post('/signin', async c => {
     // Create session
     await sessionManager.create(user.id, keepSignedIn)
 
-    // Use redirectTo from the form when it stays on this origin
-    return c.redirect(safeRedirect(redirectTo, c.req.url, '/pins'))
+    // Use redirectTo from the form when it stays on this origin. With nowhere
+    // to go back to, an embedded sign-in stays embedded.
+    return c.redirect(
+      safeRedirect(redirectTo, c.req.url, withEmbed('/pins', embed))
+    )
   } catch (error) {
     let errors: Record<string, string[]>
 
@@ -131,6 +138,7 @@ auth.post('/signin', async c => {
         redirectTo={redirectTo}
         username={username}
         keepSignedIn={keepSignedIn}
+        embed={embed}
       />,
       error instanceof MissingRoleError ||
         error instanceof AccessNotGrantedError
@@ -149,7 +157,7 @@ auth.get('/signup', c => {
     return c.redirect('/pins')
   }
 
-  return c.html(<SignUpPage />)
+  return c.html(<SignUpPage embed={isEmbedRequest(c)} />)
 })
 
 // POST /signup - Process sign-up form
@@ -164,6 +172,7 @@ auth.post(
 
     const username = getString(formData.username)
     const email = getString(formData.email)
+    const embed = getString(formData.embed) === '1'
 
     // Build the reset URL for password verification email
     const url = new URL(c.req.url)
@@ -186,6 +195,7 @@ auth.post(
             success={true}
             message="You're on the waitlist, but we had trouble sending your confirmation email."
             showResendLink={true}
+            embed={embed}
           />
         )
       }
@@ -195,6 +205,7 @@ auth.post(
         <SignUpPage
           success={true}
           message="Check your email to confirm your spot on the early-access waitlist."
+          embed={embed}
         />
       )
     } catch (error) {
@@ -209,7 +220,12 @@ auth.post(
       }
 
       return c.html(
-        <SignUpPage errors={errors} username={username} email={email} />,
+        <SignUpPage
+          errors={errors}
+          username={username}
+          email={email}
+          embed={embed}
+        />,
         400
       )
     }
@@ -225,7 +241,7 @@ auth.get('/forgot-password', c => {
     return c.redirect('/pins')
   }
 
-  return c.html(<ForgotPasswordPage />)
+  return c.html(<ForgotPasswordPage embed={isEmbedRequest(c)} />)
 })
 
 // POST /forgot-password - Process forgot password form
@@ -245,6 +261,7 @@ auth.post(
 
     const formData = await c.req.parseBody()
     const email = getString(formData.email)
+    const embed = getString(formData.embed) === '1'
 
     // Build the reset URL
     const url = new URL(c.req.url)
@@ -258,11 +275,15 @@ auth.post(
       })
 
       // Always show success message to avoid revealing whether email exists
-      return c.html(<ForgotPasswordPage success={true} />)
+      return c.html(<ForgotPasswordPage success={true} embed={embed} />)
     } catch (error) {
       if (error instanceof ValidationError) {
         return c.html(
-          <ForgotPasswordPage errors={error.fields} email={email} />,
+          <ForgotPasswordPage
+            errors={error.fields}
+            email={email}
+            embed={embed}
+          />,
           400
         )
       }
@@ -275,6 +296,7 @@ auth.post(
         <ForgotPasswordPage
           errors={{ _form: ['An error occurred. Please try again later.'] }}
           email={email}
+          embed={embed}
         />,
         500
       )
@@ -296,13 +318,15 @@ auth.get('/reset-password/:token', async c => {
     return c.redirect('/forgot-password')
   }
 
+  const embed = isEmbedRequest(c)
+
   // Validate the token
   const isValidToken = await accountService.validateResetToken(token)
   if (!isValidToken) {
-    return c.html(<ResetPasswordPage invalidToken={true} />)
+    return c.html(<ResetPasswordPage invalidToken={true} embed={embed} />)
   }
 
-  return c.html(<ResetPasswordPage token={token} />)
+  return c.html(<ResetPasswordPage token={token} embed={embed} />)
 })
 
 // POST /reset-password/:token - Process reset password form
@@ -315,6 +339,7 @@ auth.post('/reset-password/:token', async c => {
   const formData = await c.req.parseBody()
   const newPassword = getString(formData.newPassword)
   const confirmPassword = getString(formData.confirmPassword)
+  const embed = getString(formData.embed) === '1'
 
   // Check password confirmation
   if (newPassword !== confirmPassword) {
@@ -322,6 +347,7 @@ auth.post('/reset-password/:token', async c => {
       <ResetPasswordPage
         token={token}
         errors={{ confirmPassword: ['Passwords do not match'] }}
+        embed={embed}
       />,
       400
     )
@@ -335,11 +361,11 @@ auth.post('/reset-password/:token', async c => {
     })
 
     // Redirect to signin with success message
-    return c.redirect('/signin?reset=success')
+    return c.redirect(withEmbed('/signin?reset=success', embed))
   } catch (error) {
     if (error instanceof ValidationError) {
       return c.html(
-        <ResetPasswordPage token={token} errors={error.fields} />,
+        <ResetPasswordPage token={token} errors={error.fields} embed={embed} />,
         400
       )
     }
@@ -348,7 +374,7 @@ auth.post('/reset-password/:token', async c => {
       error instanceof InvalidResetTokenError ||
       error instanceof ResetTokenExpiredError
     ) {
-      return c.html(<ResetPasswordPage invalidToken={true} />)
+      return c.html(<ResetPasswordPage invalidToken={true} embed={embed} />)
     }
 
     return c.html(
@@ -359,6 +385,7 @@ auth.post('/reset-password/:token', async c => {
             'An error occurred. Please try again or request a new reset link.',
           ],
         }}
+        embed={embed}
       />,
       500
     )

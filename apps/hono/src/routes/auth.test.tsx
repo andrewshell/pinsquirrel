@@ -692,4 +692,161 @@ describe('auth routes', () => {
       expect(html).toContain('/tags')
     })
   })
+
+  // The extension's popup can land on any of these: a signed-out user pinning
+  // a page hits sign-in, and the links between the auth pages have to keep the
+  // popup in embed or the site's chrome appears in a 520px window.
+  describe('embed mode', () => {
+    it.each([
+      ['/signin', 'name="username"'],
+      ['/signup', 'name="email"'],
+      ['/forgot-password', 'name="email"'],
+    ])('renders %s without the chrome for ?embed=1', async (path, field) => {
+      const html = await (await app.request(`${path}?embed=1`)).text()
+
+      expect(html).toContain(field)
+      expect(html).not.toContain('<header')
+      expect(html).not.toContain('<footer')
+      expect(html).toContain('name="embed" value="1"')
+    })
+
+    it('renders the reset form without the chrome for ?embed=1', async () => {
+      auth.validateResetToken.mockResolvedValue(true)
+
+      const html = await (
+        await app.request('/reset-password/tok-1?embed=1')
+      ).text()
+
+      expect(html).toContain('name="newPassword"')
+      expect(html).not.toContain('<header')
+      expect(html).toContain('name="embed" value="1"')
+    })
+
+    it('keeps the chrome and no hidden field without the flag', async () => {
+      const html = await (await app.request('/signin')).text()
+
+      expect(html).toContain('<header')
+      expect(html).not.toContain('name="embed"')
+    })
+
+    it('links between the auth pages with embed on', async () => {
+      const signin = await (await app.request('/signin?embed=1')).text()
+      const signup = await (await app.request('/signup?embed=1')).text()
+      const forgot = await (
+        await app.request('/forgot-password?embed=1')
+      ).text()
+
+      expect(signin).toContain('href="/signup?embed=1"')
+      expect(signin).toContain('href="/forgot-password?embed=1"')
+      expect(signup).toContain('href="/signin?embed=1"')
+      expect(forgot).toContain('href="/signin?embed=1"')
+    })
+
+    it('links plainly without the flag', async () => {
+      const signin = await (await app.request('/signin')).text()
+
+      expect(signin).toContain('href="/signup"')
+      expect(signin).toContain('href="/forgot-password"')
+    })
+
+    it('re-renders a failed sign-in in embed when the form said so', async () => {
+      auth.login.mockRejectedValue(new InvalidCredentialsError())
+
+      const res = await app.request(
+        '/signin',
+        form({ username: 'u', password: 'p', embed: '1' })
+      )
+      const html = await res.text()
+
+      expect(res.status).toBe(400)
+      expect(html).toContain('Invalid username or password')
+      expect(html).not.toContain('<header')
+      expect(html).toContain('name="embed" value="1"')
+    })
+
+    it('sends an embedded sign-in with nowhere to go to the pins in embed', async () => {
+      auth.login.mockResolvedValue({ id: 'user-1' })
+      session.create.mockResolvedValue(undefined)
+
+      const res = await app.request(
+        '/signin',
+        form({ username: 'u', password: 'p', embed: '1' })
+      )
+
+      expect(res.headers.get('Location')).toBe('/pins?embed=1')
+    })
+
+    it('prefers redirectTo over the embed fallback', async () => {
+      auth.login.mockResolvedValue({ id: 'user-1' })
+      session.create.mockResolvedValue(undefined)
+
+      const res = await app.request(
+        '/signin',
+        form({
+          username: 'u',
+          password: 'p',
+          embed: '1',
+          redirectTo: '/pins/new?url=x&embed=1',
+        })
+      )
+
+      expect(res.headers.get('Location')).toBe('/pins/new?url=x&embed=1')
+    })
+
+    it('re-renders a failed sign-up in embed when the form said so', async () => {
+      auth.register.mockRejectedValue(new ValidationError({ email: ['bad'] }))
+
+      const html = await (
+        await app.request(
+          '/signup',
+          form({ username: 'u', email: 'x', embed: '1' })
+        )
+      ).text()
+
+      expect(html).not.toContain('<header')
+      expect(html).toContain('name="embed" value="1"')
+    })
+
+    it('renders the forgot-password success in embed when the form said so', async () => {
+      auth.requestPasswordReset.mockResolvedValue(undefined)
+
+      const html = await (
+        await app.request(
+          '/forgot-password',
+          form({ email: 'a@b.test', embed: '1' })
+        )
+      ).text()
+
+      expect(html).toContain('Check Your Email')
+      expect(html).not.toContain('<header')
+      expect(html).toContain('href="/signin?embed=1"')
+    })
+
+    it('sends a reset done in embed to the embedded sign-in', async () => {
+      auth.resetPassword.mockResolvedValue(undefined)
+
+      const res = await app.request(
+        '/reset-password/tok-1',
+        form({
+          newPassword: 'aaaaaaaa',
+          confirmPassword: 'aaaaaaaa',
+          embed: '1',
+        })
+      )
+
+      expect(res.headers.get('Location')).toBe('/signin?reset=success&embed=1')
+    })
+
+    it('re-renders a mismatched reset in embed when the form said so', async () => {
+      const html = await (
+        await app.request(
+          '/reset-password/tok-1',
+          form({ newPassword: 'aaaaaaaa', confirmPassword: 'b', embed: '1' })
+        )
+      ).text()
+
+      expect(html).toContain('Passwords do not match')
+      expect(html).not.toContain('<header')
+    })
+  })
 })

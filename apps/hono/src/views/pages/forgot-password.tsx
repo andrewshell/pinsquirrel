@@ -1,20 +1,23 @@
 import type { FC } from 'hono/jsx'
 import { DefaultLayout } from '../layouts/default'
 import { SuccessMessage, ErrorMessage } from '../components/FlashMessage'
+import { withEmbed } from '../../lib/embed'
 
 interface ForgotPasswordPageProps {
   errors?: Record<string, string[]>
   email?: string
   success?: boolean
+  embed?: boolean
 }
 
 export const ForgotPasswordPage: FC<ForgotPasswordPageProps> = ({
   errors,
   email = '',
   success = false,
+  embed = false,
 }) => {
   return (
-    <DefaultLayout title="Forgot Password" user={null}>
+    <DefaultLayout title="Forgot Password" user={null} embed={embed}>
       <div class="flex flex-col items-center justify-center px-4 py-16">
         <div class="w-full max-w-md">
           {/* Header */}
@@ -23,7 +26,7 @@ export const ForgotPasswordPage: FC<ForgotPasswordPageProps> = ({
             <p class="mt-2 text-muted-foreground">
               Remember it?{' '}
               <a
-                href="/signin"
+                href={withEmbed('/signin', embed)}
                 class="text-primary hover:underline font-medium"
               >
                 Sign in instead
@@ -48,7 +51,7 @@ export const ForgotPasswordPage: FC<ForgotPasswordPageProps> = ({
                   link. The link will expire in 15 minutes.
                 </p>
                 <a
-                  href="/signin"
+                  href={withEmbed('/signin', embed)}
                   class="block w-full px-4 py-2 text-center bg-secondary text-secondary-foreground font-medium
                          border-2 border-foreground neobrutalism-shadow
                          hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
@@ -73,6 +76,7 @@ export const ForgotPasswordPage: FC<ForgotPasswordPageProps> = ({
                   class="space-y-4"
                   novalidate
                 >
+                  {embed && <input type="hidden" name="embed" value="1" />}
                   {/* Form-level errors */}
                   {errors?._form && (
                     <ErrorMessage message={errors._form.join('. ')} />
