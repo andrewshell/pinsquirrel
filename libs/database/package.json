@@ -1,6 +1,6 @@
 {
   "name": "@pinsquirrel/database",
-  "version": "3.7.0",
+  "version": "3.8.0",
   "description": "Database layer with Drizzle ORM for PinSquirrel",
   "type": "module",
   "main": "./src/index.ts",

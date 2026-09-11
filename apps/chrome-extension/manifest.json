@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PinSquirrel",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwvxKqfxfYtmv8ZQhAqxGhp01zHMxQuZnFRR9GU1cgHF6gNSAw4EYrfZvj+CtZj/x4r82k7URwc1pClufFrnzFhtGUJ0WS3St/w7cR4ODg9gP4W6/+JFxqa3G2oC4DrDGdDXFxf1D2NUj20ljQId3Ol1oDppyJ3ONODXVLG9h9UWsR0liRpgzzz4+R7faWxtJ6sGXNcfZlkDJ3HhErfio8ApLsQzN5X0i3vPCph1DekNPtSdxiHPb/Bm0FycEt4V5B23o2wbsBihKIAk8GHchHlFUL5EzDhhupCC63Ufc+cD8/Ux4wb1Bxq9JefOXon+/9HhVWxdazksxMw9R8AFR4QIDAQAB",
   "description": "Sync your PinSquirrel bookmarks into Chrome's bookmark bar.",
   "permissions": [

@@ -1,6 +1,6 @@
 {
   "name": "@pinsquirrel/ui",
-  "version": "3.7.0",
+  "version": "3.8.0",
   "description": "Shared Neo Brutalism UI primitives and design tokens for PinSquirrel",
   "type": "module",
   "main": "./src/index.ts",
