@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.8.0](https://github.com/andrewshell/pinsquirrel/compare/v3.7.0...v3.8.0) (2026-09-11)
+
+
+### Features
+
+* **extension:** fix the extension ID and attach the zip to each release ([725e545](https://github.com/andrewshell/pinsquirrel/commit/725e545f9e4f80ff8875b300fbaa6658c40f2a97))
+
 ## [3.7.0](https://github.com/andrewshell/pinsquirrel/compare/v3.6.0...v3.7.0) (2026-09-10)
 
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.0](https://github.com/andrewshell/pinsquirrel/compare/chrome-extension-v1.0.0...chrome-extension-v1.1.0) (2026-09-11)
+
+
+### Features
+
+* **extension:** fix the extension ID and attach the zip to each release ([725e545](https://github.com/andrewshell/pinsquirrel/commit/725e545f9e4f80ff8875b300fbaa6658c40f2a97))
+
+
+### Bug Fixes
+
+* **extension:** render the 48 and 128 icons from vector art ([3a955c7](https://github.com/andrewshell/pinsquirrel/commit/3a955c77faea691e807ea204e372efe8bc31e86d))
+
 ## 1.0.0 (2026-09-10)
 
 
