@@ -6,6 +6,7 @@ import {
   ErrorMessage,
 } from '../components/FlashMessage'
 import type { FlashType } from '../../middleware/session'
+import { withEmbed } from '../../lib/embed'
 
 interface SignInPageProps {
   errors?: Record<string, string[]>
@@ -14,6 +15,7 @@ interface SignInPageProps {
   username?: string
   keepSignedIn?: boolean
   flash?: { type: FlashType; message: string } | null
+  embed?: boolean
 }
 
 export const SignInPage: FC<SignInPageProps> = ({
@@ -23,9 +25,10 @@ export const SignInPage: FC<SignInPageProps> = ({
   username = '',
   keepSignedIn = true,
   flash,
+  embed = false,
 }) => {
   return (
-    <DefaultLayout title="Sign In" user={null}>
+    <DefaultLayout title="Sign In" user={null} embed={embed}>
       <div class="flex flex-col items-center justify-center px-4 py-16">
         <div class="w-full max-w-md">
           {/* Header */}
@@ -34,7 +37,7 @@ export const SignInPage: FC<SignInPageProps> = ({
             <p class="mt-2 text-muted-foreground">
               Or{' '}
               <a
-                href="/signup"
+                href={withEmbed('/signup', embed)}
                 class="text-primary hover:underline font-medium"
               >
                 join the gang
@@ -68,6 +71,7 @@ export const SignInPage: FC<SignInPageProps> = ({
               {redirectTo && (
                 <input type="hidden" name="redirectTo" value={redirectTo} />
               )}
+              {embed && <input type="hidden" name="embed" value="1" />}
 
               {/* Form-level errors */}
               {errors?._form && (
@@ -104,7 +108,7 @@ export const SignInPage: FC<SignInPageProps> = ({
                     Password
                   </label>
                   <a
-                    href="/forgot-password"
+                    href={withEmbed('/forgot-password', embed)}
                     class="text-sm text-primary hover:underline"
                   >
                     Forgot password?
