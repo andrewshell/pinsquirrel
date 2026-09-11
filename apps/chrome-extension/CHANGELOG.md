@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/andrewshell/pinsquirrel/compare/chrome-extension-v1.1.0...chrome-extension-v1.2.0) (2026-09-11)
+
+
+### Features
+
+* **extension:** run the consent screen in an ordinary tab ([39b67b2](https://github.com/andrewshell/pinsquirrel/commit/39b67b2d534d3d8bde4d691e5471205d5980acea))
+
 ## [1.1.0](https://github.com/andrewshell/pinsquirrel/compare/chrome-extension-v1.0.0...chrome-extension-v1.1.0) (2026-09-11)
 
 

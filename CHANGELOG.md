@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.9.0](https://github.com/andrewshell/pinsquirrel/compare/v3.8.0...v3.9.0) (2026-09-11)
+
+
+### Features
+
+* **extension:** run the consent screen in an ordinary tab ([39b67b2](https://github.com/andrewshell/pinsquirrel/commit/39b67b2d534d3d8bde4d691e5471205d5980acea))
+* **hono:** add the extension's OAuth callback page ([798941b](https://github.com/andrewshell/pinsquirrel/commit/798941be34151ffaea6a39b06b8311e14fa0dca0))
+* **hono:** honour embed on every page ([a920c5f](https://github.com/andrewshell/pinsquirrel/commit/a920c5f6ec0c87577d9754d4b5485d190cf4ec11))
+* **hono:** honour embed on the extension callback page ([b1f9ef0](https://github.com/andrewshell/pinsquirrel/commit/b1f9ef0c17ff2caab7065808495b72985a1c7d5b))
+* **hono:** make embed a layout mode and keep it through sign-in and unlock ([bb0bb6f](https://github.com/andrewshell/pinsquirrel/commit/bb0bb6fc05eb1c8ed62e17a73e86528b061293f0))
+* **hono:** render the auth pages in embed and keep the popup on them ([73c5520](https://github.com/andrewshell/pinsquirrel/commit/73c5520bd2d435bbf7e8bfbeb9fba5e4ff4b2927))
+
 ## [3.8.0](https://github.com/andrewshell/pinsquirrel/compare/v3.7.0...v3.8.0) (2026-09-11)
 
 
