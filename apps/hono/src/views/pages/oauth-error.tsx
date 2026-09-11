@@ -19,14 +19,21 @@ interface OAuthErrorPageProps {
   /** The RFC 6749 code, shown so a developer can act on it. */
   error: string
   description: string
+  embed?: boolean
 }
 
 export const OAuthErrorPage: FC<OAuthErrorPageProps> = ({
   user,
   error,
   description,
+  embed = false,
 }) => (
-  <DefaultLayout title="Authorization failed" user={user} width="form">
+  <DefaultLayout
+    title="Authorization failed"
+    user={user}
+    width="form"
+    embed={embed}
+  >
     <Card>
       <CardHeader>
         <CardTitle>Authorization failed</CardTitle>

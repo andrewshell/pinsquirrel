@@ -22,7 +22,7 @@ import {
   DEFAULT_PAGE_SIZE,
 } from '@pinsquirrel/domain'
 import { pinService, tagService } from '../lib/services'
-import { isEmbedRequest } from '../lib/embed'
+import { isEmbedRequest, withEmbed } from '../lib/embed'
 import { getString, parsePinForm } from '../lib/form'
 import { getAuthUser, getSessionManager } from '../middleware/session'
 import { PinCard, PinDeleteConfirm } from '../views/components/PinCard'
@@ -230,6 +230,7 @@ export function createPinRoutes({
         user={user}
         flash={sessionManager.getFlash()}
         privateMode={privateMode}
+        embed={isEmbedRequest(c)}
       />
     )
   })
@@ -735,6 +736,7 @@ export function createPinRoutes({
           pin={pin}
           baseUrl={baseUrl}
           privateMode={privateMode}
+          embed={isEmbedRequest(c)}
         />
       )
     } catch (error) {
@@ -752,12 +754,14 @@ export function createPinRoutes({
 
     const pinId = c.req.param('id')
     const ac = new AccessControl(user)
+    const formData = await c.req.parseBody()
+    const embed = getString(formData.embed) === '1'
 
     try {
       await pinService.deletePin(ac, pinId)
 
       sessionManager.setFlash('success', 'Pin deleted successfully!')
-      return c.redirect(baseUrl)
+      return c.redirect(withEmbed(baseUrl, embed))
     } catch (error) {
       if (isMissingPin(error)) {
         return c.text('Pin not found', 404)

@@ -242,6 +242,31 @@ describe('oauth authorize routes', () => {
       expect(res.status).toBe(400)
       expect(await res.text()).toContain('code_challenge_method')
     })
+
+    it('renders the consent screen without the chrome for embed=1', async () => {
+      mockResolveAuthorizationRequest.mockResolvedValue(RESOLVED)
+
+      const html = await (await get(`${AUTHORIZE_URL}&embed=1`)).text()
+
+      expect(html).toContain('Claude Code')
+      expect(html).not.toContain('<header')
+      expect(html).not.toContain('<footer')
+      // The flag is not an OAuth parameter and must not be echoed as one.
+      expect(mockResolveAuthorizationRequest).toHaveBeenCalledWith(
+        REQUEST_PARAMS
+      )
+    })
+
+    it('renders a request error without the chrome for embed=1', async () => {
+      mockResolveAuthorizationRequest.mockRejectedValue(
+        new OAuthInvalidRequestError('redirect_uri does not match')
+      )
+
+      const html = await (await get(`${AUTHORIZE_URL}&embed=1`)).text()
+
+      expect(html).toContain('redirect_uri does not match')
+      expect(html).not.toContain('<header')
+    })
   })
 
   describe('POST /oauth/authorize', () => {

@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { AccessControl, ValidationError } from '@pinsquirrel/domain'
 import { pinService, tagService } from '../lib/services'
+import { isEmbedRequest, withEmbed } from '../lib/embed'
 import { getString } from '../lib/form'
 import {
   getAuthUser,
@@ -62,6 +63,7 @@ tags.get('/', async c => {
       currentFilter={currentFilter}
       untaggedPinsCount={untaggedResult.pagination.totalCount}
       flash={flash}
+      embed={isEmbedRequest(c)}
     />
   )
 })
@@ -82,7 +84,14 @@ tags.get('/merge', async c => {
   // Get flash message if any
   const flash = sessionManager.getFlash()
 
-  return c.html(<TagMergePage user={user} tags={tagsWithPins} flash={flash} />)
+  return c.html(
+    <TagMergePage
+      user={user}
+      tags={tagsWithPins}
+      flash={flash}
+      embed={isEmbedRequest(c)}
+    />
+  )
 })
 
 // POST /tags/merge - Perform tag merge
@@ -108,6 +117,7 @@ tags.post('/merge', async c => {
   }
 
   const destinationTagId = getString(formData['destinationTagId'])
+  const embed = getString(formData['embed']) === '1'
 
   // Fetch tags for re-rendering on error
   const userTags = await tagService.getUserTagsWithCount(ac, user.id)
@@ -121,6 +131,7 @@ tags.post('/merge', async c => {
         errors={errors}
         selectedSourceTags={sourceTagIds}
         selectedDestinationTag={destinationTagId}
+        embed={embed}
       />,
       status
     )
@@ -130,7 +141,7 @@ tags.post('/merge', async c => {
     await tagService.mergeTags(ac, sourceTagIds, destinationTagId)
 
     sessionManager.setFlash('success', 'Tags merged successfully!')
-    return c.redirect('/tags')
+    return c.redirect(withEmbed('/tags', embed))
   } catch (error) {
     if (error instanceof ValidationError) {
       return reject(error.fields)

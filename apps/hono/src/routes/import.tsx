@@ -6,6 +6,8 @@ import {
   type InvalidPinboardExportReason,
 } from '@pinsquirrel/services'
 import { pinboardService } from '../lib/services'
+import { isEmbedRequest, withEmbed } from '../lib/embed'
+import { getString } from '../lib/form'
 import {
   getAuthUser,
   getSessionManager,
@@ -48,7 +50,9 @@ importRoute.get('/', async c => {
 
   const flash = sessionManager.getFlash()
 
-  return c.html(<ImportPage user={user} flash={flash} />)
+  return c.html(
+    <ImportPage user={user} flash={flash} embed={isEmbedRequest(c)} />
+  )
 })
 
 // POST /import - Process import
@@ -58,11 +62,17 @@ importRoute.post('/', async c => {
 
   const ac = new AccessControl(user)
 
+  // Read off the form below; a body that fails to parse renders the plain page.
+  let embed = false
   const fail = (message: string, status: 200 | 500 = 200) =>
-    c.html(<ImportPage user={user} errors={{ _form: [message] }} />, status)
+    c.html(
+      <ImportPage user={user} errors={{ _form: [message] }} embed={embed} />,
+      status
+    )
 
   try {
     const formData = await c.req.parseBody()
+    embed = getString(formData.embed) === '1'
     const file = formData.file
 
     if (!file || !(file instanceof File)) {
@@ -112,7 +122,7 @@ importRoute.post('/', async c => {
       'success',
       summarise(result.imported, result.skipped, result.tagNames.size)
     )
-    return c.redirect('/pins')
+    return c.redirect(withEmbed('/pins', embed))
   } catch (error) {
     logger.error(
       { userId: user.id, err: safeError(error) },

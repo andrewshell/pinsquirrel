@@ -4,6 +4,7 @@ import type { User } from '@pinsquirrel/domain'
 import { AccessControl, OAuthError, ValidationError } from '@pinsquirrel/domain'
 import { oauthService } from '../lib/services.js'
 import { describeValidationError } from '../lib/oauth-error.js'
+import { isEmbedRequest } from '../lib/embed'
 import { getString } from '../lib/form'
 import { getAuthUser, requireAuth } from '../middleware/session'
 import { OAuthConsentPage } from '../views/pages/oauth-consent'
@@ -71,13 +72,19 @@ function redirectHost(redirectUri: string): string {
  * client. Redirecting an error to an unvalidated URI is how an open
  * redirector gets built.
  */
-function renderRequestError(c: Context, user: User | null, error: unknown) {
+function renderRequestError(
+  c: Context,
+  user: User | null,
+  error: unknown,
+  embed: boolean
+) {
   if (error instanceof OAuthError) {
     return c.html(
       <OAuthErrorPage
         user={user}
         error={error.code}
         description={error.message}
+        embed={embed}
       />,
       400
     )
@@ -88,6 +95,7 @@ function renderRequestError(c: Context, user: User | null, error: unknown) {
         user={user}
         error="invalid_request"
         description={describeValidationError(error)}
+        embed={embed}
       />,
       400
     )
@@ -102,6 +110,9 @@ oauth.use('*', requireAuth())
 oauth.get('/authorize', async c => {
   const user = getAuthUser(c)
   const params = authorizationParams(c.req.query())
+  // Presentation only, and kept apart from `params`: it is not part of the
+  // authorization request and must not be echoed back as one.
+  const embed = isEmbedRequest(c)
 
   try {
     const resolved = await oauthService.resolveAuthorizationRequest(params)
@@ -117,10 +128,11 @@ oauth.get('/authorize', async c => {
         scopes={resolved.scopes}
         resource={resolved.resource}
         params={params}
+        embed={embed}
       />
     )
   } catch (error) {
-    return renderRequestError(c, user, error)
+    return renderRequestError(c, user, error, embed)
   }
 })
 
@@ -131,6 +143,7 @@ oauth.post('/authorize', async c => {
   // Anything that is not the approve button is a refusal. A malformed or
   // absent decision must never read as consent.
   const approved = getString(formData['decision']) === 'approve'
+  const embed = getString(formData['embed']) === '1'
 
   let outcome
   try {
@@ -140,7 +153,7 @@ oauth.post('/authorize', async c => {
       approved,
     })
   } catch (error) {
-    return renderRequestError(c, user, error)
+    return renderRequestError(c, user, error, embed)
   }
 
   const location = new URL(outcome.redirectUri)

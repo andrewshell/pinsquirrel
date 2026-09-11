@@ -3,6 +3,7 @@ import type { User } from '@pinsquirrel/domain'
 import { DefaultLayout } from '../layouts/default'
 import { FlashMessage as FlashMessageComponent } from '../components/FlashMessage'
 import type { FlashMessage } from '../../middleware/session'
+import { withEmbed } from '../../lib/embed'
 
 interface ImportPageProps {
   user: User
@@ -10,6 +11,7 @@ interface ImportPageProps {
   errors?: Record<string, string[]>
   success?: boolean
   message?: string
+  embed?: boolean
 }
 
 export const ImportPage: FC<ImportPageProps> = ({
@@ -18,15 +20,21 @@ export const ImportPage: FC<ImportPageProps> = ({
   errors,
   success,
   message,
+  embed = false,
 }) => {
   const formError = errors?._form?.[0]
 
   return (
-    <DefaultLayout title="Import Bookmarks" user={user} currentPath="/import">
+    <DefaultLayout
+      title="Import Bookmarks"
+      user={user}
+      currentPath="/import"
+      embed={embed}
+    >
       <div class="container max-w-4xl mx-auto px-4 py-8">
         <div class="mb-6">
           <a
-            href="/pins"
+            href={withEmbed('/pins', embed)}
             class="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <svg
@@ -131,6 +139,7 @@ export const ImportPage: FC<ImportPageProps> = ({
             )}
 
             <form method="post" enctype="multipart/form-data" class="space-y-4">
+              {embed && <input type="hidden" name="embed" value="1" />}
               <div class="space-y-2">
                 <label for="file" class="block font-medium text-foreground">
                   Pinboard Export File

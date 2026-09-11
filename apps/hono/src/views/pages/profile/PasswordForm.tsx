@@ -11,10 +11,16 @@ import {
 type PasswordFormProps = {
   user: User
   errors?: Record<string, string[]>
+  /** Carried on a hidden field so a rejected form comes back in embed. */
+  embed?: boolean
 }
 
 /** Posts `intent=change-password` back to /profile. */
-export const PasswordForm: FC<PasswordFormProps> = ({ user, errors }) => (
+export const PasswordForm: FC<PasswordFormProps> = ({
+  user,
+  errors,
+  embed = false,
+}) => (
   <Card>
     <CardHeader>
       <CardTitle>Change Password</CardTitle>
@@ -22,6 +28,7 @@ export const PasswordForm: FC<PasswordFormProps> = ({ user, errors }) => (
     <CardContent>
       <form method="post" action="/profile" class="space-y-4">
         <input type="hidden" name="intent" value="change-password" />
+        {embed && <input type="hidden" name="embed" value="1" />}
         <input
           type="hidden"
           name="username"

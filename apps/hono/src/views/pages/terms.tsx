@@ -4,13 +4,14 @@ import { DefaultLayout } from '../layouts/default'
 
 interface TermsPageProps {
   user: User | null
+  embed?: boolean
 }
 
-export const TermsPage: FC<TermsPageProps> = ({ user }) => {
+export const TermsPage: FC<TermsPageProps> = ({ user, embed = false }) => {
   const today = new Date().toLocaleDateString()
 
   return (
-    <DefaultLayout title="Terms of Use" user={user}>
+    <DefaultLayout title="Terms of Use" user={user} embed={embed}>
       <div class="bg-background">
         <div class="container mx-auto px-4 py-16">
           <div class="max-w-4xl mx-auto">
