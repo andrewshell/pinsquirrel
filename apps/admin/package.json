@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3",
-    "@types/node": "^26.4.1",
+    "@types/node": "^26.5.1",
     "@vitest/coverage-v8": "^5.0.0",
     "concurrently": "^10.0.5",
     "eslint": "^10.10.0",
