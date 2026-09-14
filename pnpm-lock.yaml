@@ -150,16 +150,16 @@ importers:
     dependencies:
       '@hono/mcp':
         specifier: ^0.3.2
-        version: 0.3.2(@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.5.4))(hono-rate-limiter@0.5.3(hono@4.13.7))(hono@4.13.7)(zod@4.5.4)
+        version: 0.3.2(@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.6.2))(hono-rate-limiter@0.5.3(hono@4.13.7))(hono@4.13.7)(zod@4.6.2)
       '@hono/node-server':
         specifier: '>=2.0.5'
         version: 2.1.1(hono@4.13.7)
       '@hono/zod-openapi':
         specifier: ^1.6.3
-        version: 1.6.3(hono@4.13.7)(zod@4.5.4)
+        version: 1.6.3(hono@4.13.7)(zod@4.6.2)
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
-        version: 1.30.0(supports-color@10.2.2)(zod@4.5.4)
+        version: 1.30.0(supports-color@10.2.2)(zod@4.6.2)
       '@pinsquirrel/adapters':
         specifier: workspace:*
         version: link:../../libs/adapters
@@ -192,7 +192,7 @@ importers:
         version: 17.4.2
       drizzle-orm:
         specifier: 1.0.0-rc.5-169397b
-        version: 1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.3(@types/node@26.4.1))(pg@8.16.3)(zod@4.5.4)
+        version: 1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.4(@types/node@26.4.1))(pg@8.16.3)(zod@4.6.2)
       hono:
         specifier: ^4.13.7
         version: 4.13.7
@@ -200,8 +200,8 @@ importers:
         specifier: ^14.0.1
         version: 14.0.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       mysql2:
-        specifier: ^3.24.3
-        version: 3.24.3(@types/node@26.4.1)
+        specifier: ^3.24.4
+        version: 3.24.4(@types/node@26.4.1)
       pino:
         specifier: ^10.3.1
         version: 10.3.1
@@ -212,8 +212,8 @@ importers:
         specifier: '>=8.9.0'
         version: 8.10.2
       zod:
-        specifier: ^4.5.4
-        version: 4.5.4
+        specifier: ^4.6.2
+        version: 4.6.2
     devDependencies:
       '@tailwindcss/cli':
         specifier: ^4.3.3
@@ -317,10 +317,10 @@ importers:
         version: 1.0.0-rc.5-ab785fc
       drizzle-orm:
         specifier: 1.0.0-rc.5-169397b
-        version: 1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.3(@types/node@26.4.1))(pg@8.16.3)(zod@4.5.4)
+        version: 1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.4(@types/node@26.4.1))(pg@8.16.3)(zod@4.6.2)
       mysql2:
-        specifier: ^3.24.3
-        version: 3.24.3(@types/node@26.4.1)
+        specifier: ^3.24.4
+        version: 3.24.4(@types/node@26.4.1)
     devDependencies:
       '@types/node':
         specifier: ^26.4.1
@@ -397,13 +397,13 @@ importers:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
-        version: 1.30.0(supports-color@10.2.2)(zod@4.5.4)
+        version: 1.30.0(supports-color@10.2.2)(zod@4.6.2)
       '@pinsquirrel/domain':
         specifier: workspace:*
         version: link:../domain
       zod:
-        specifier: ^4.5.4
-        version: 4.5.4
+        specifier: ^4.6.2
+        version: 4.6.2
     devDependencies:
       '@types/node':
         specifier: ^26.4.1
@@ -2591,8 +2591,8 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
-  mysql2@3.24.3:
-    resolution: {integrity: sha512-OKfWHkMAg9v06neq8FmSyhbxPQKABN9PAW5G9/bDTXzJBO5xXtkKL0V27vju7HQWk9UD4Od5BZsvCtBTB1CPEw==}
+  mysql2@3.24.4:
+    resolution: {integrity: sha512-A2olluVlj0mvgyIRRISMEzXc51m+21mRtcMVjJyIpt2GG98+XrC9m9HzsqcMsX2LcnfccJvY5NB22g8fENBnOA==}
     engines: {node: '>= 8.0'}
     peerDependencies:
       '@types/node': '>= 8'
@@ -3304,15 +3304,15 @@ packages:
     peerDependencies:
       zod: ^3.25.28 || ^4
 
-  zod@4.5.4:
-    resolution: {integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==}
+  zod@4.6.2:
+    resolution: {integrity: sha512-lh5RCAGFa1Cm2hjtNwLQhSs/AsqdWnTQaBER9fEwN/88pSh7KOtJavtBx/0VlkN/uFd61SwYmljLMDAsHlvzBQ==}
 
 snapshots:
 
-  '@asteasolutions/zod-to-openapi@9.1.0(zod@4.5.4)':
+  '@asteasolutions/zod-to-openapi@9.1.0(zod@4.6.2)':
     dependencies:
       openapi3-ts: 4.6.1
-      zod: 4.5.4
+      zod: 4.6.2
 
   '@babel/helper-string-parser@7.29.7': {}
 
@@ -3533,30 +3533,30 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@hono/mcp@0.3.2(@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.5.4))(hono-rate-limiter@0.5.3(hono@4.13.7))(hono@4.13.7)(zod@4.5.4)':
+  '@hono/mcp@0.3.2(@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.6.2))(hono-rate-limiter@0.5.3(hono@4.13.7))(hono@4.13.7)(zod@4.6.2)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.30.0(supports-color@10.2.2)(zod@4.5.4)
+      '@modelcontextprotocol/sdk': 1.30.0(supports-color@10.2.2)(zod@4.6.2)
       hono: 4.13.7
       hono-rate-limiter: 0.5.3(hono@4.13.7)
       pkce-challenge: 5.0.1
-      zod: 4.5.4
+      zod: 4.6.2
 
   '@hono/node-server@2.1.1(hono@4.13.7)':
     dependencies:
       hono: 4.13.7
 
-  '@hono/zod-openapi@1.6.3(hono@4.13.7)(zod@4.5.4)':
+  '@hono/zod-openapi@1.6.3(hono@4.13.7)(zod@4.6.2)':
     dependencies:
-      '@asteasolutions/zod-to-openapi': 9.1.0(zod@4.5.4)
-      '@hono/zod-validator': 0.9.1(hono@4.13.7)(zod@4.5.4)
+      '@asteasolutions/zod-to-openapi': 9.1.0(zod@4.6.2)
+      '@hono/zod-validator': 0.9.1(hono@4.13.7)(zod@4.6.2)
       hono: 4.13.7
       openapi3-ts: 4.6.1
-      zod: 4.5.4
+      zod: 4.6.2
 
-  '@hono/zod-validator@0.9.1(hono@4.13.7)(zod@4.5.4)':
+  '@hono/zod-validator@0.9.1(hono@4.13.7)(zod@4.6.2)':
     dependencies:
       hono: 4.13.7
-      zod: 4.5.4
+      zod: 4.6.2
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -3607,7 +3607,7 @@ snapshots:
 
   '@mixmark-io/domino@2.2.0': {}
 
-  '@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.5.4)':
+  '@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.6.2)':
     dependencies:
       '@hono/node-server': 2.1.1(hono@4.13.7)
       ajv: 8.18.0
@@ -3624,8 +3624,8 @@ snapshots:
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 4.5.4
-      zod-to-json-schema: 3.25.2(zod@4.5.4)
+      zod: 4.6.2
+      zod-to-json-schema: 3.25.2(zod@4.6.2)
     transitivePeerDependencies:
       - supports-color
 
@@ -3837,7 +3837,7 @@ snapshots:
       '@scalar/helpers': 0.11.3
       nanoid: 5.1.16
       type-fest: 5.9.0
-      zod: 4.5.4
+      zod: 4.6.2
 
   '@scalar/validation@0.6.3': {}
 
@@ -4354,12 +4354,12 @@ snapshots:
       get-tsconfig: 4.13.7
       jiti: 2.7.0
 
-  drizzle-orm@1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.3(@types/node@26.4.1))(pg@8.16.3)(zod@4.5.4):
+  drizzle-orm@1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.4(@types/node@26.4.1))(pg@8.16.3)(zod@4.6.2):
     optionalDependencies:
       '@types/pg': 8.15.5
-      mysql2: 3.24.3(@types/node@26.4.1)
+      mysql2: 3.24.4(@types/node@26.4.1)
       pg: 8.16.3
-      zod: 4.5.4
+      zod: 4.6.2
 
   dunder-proto@1.0.1:
     dependencies:
@@ -5017,7 +5017,7 @@ snapshots:
 
   ms@2.1.3: {}
 
-  mysql2@3.24.3(@types/node@26.4.1):
+  mysql2@3.24.4(@types/node@26.4.1):
     dependencies:
       '@types/node': 26.4.1
       aws-ssl-profiles: 1.1.2
@@ -5687,8 +5687,8 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod-to-json-schema@3.25.2(zod@4.5.4):
+  zod-to-json-schema@3.25.2(zod@4.6.2):
     dependencies:
-      zod: 4.5.4
+      zod: 4.6.2
 
-  zod@4.5.4: {}
+  zod@4.6.2: {}
