@@ -1,6 +1,7 @@
 import type { Context, MiddlewareHandler } from 'hono'
 import { getConnInfo } from '@hono/node-server/conninfo'
 import { RateLimiter } from './rate-limiter'
+import { expectsJsonError } from '../lib/error-response.js'
 
 // getConnInfo reaches into c.env.incoming.socket, which only exists when the
 // request came through the Node server. Under app.request() in tests, and in
@@ -137,6 +138,28 @@ export const apiV1Limiter = new RateLimiter({
   windowMs: 5 * 60 * 1000,
 })
 
+/**
+ * One refusal, in whichever language the caller reads.
+ *
+ * The OAuth endpoints and `/mcp` are spoken to by programs that parse every
+ * body as JSON, and a text/plain 429 breaks them exactly the way an HTML 404
+ * breaks discovery - `lib/error-response` has the full account. There is no
+ * registered OAuth error code meaning "later", so `too_many_requests` is a
+ * plain description rather than a claim to be one.
+ */
+function refuse(c: Context, message: string, retryAfterMs: number) {
+  c.header('Retry-After', String(Math.ceil(retryAfterMs / 1000)))
+
+  if (expectsJsonError(c.req.path)) {
+    return c.json(
+      { error: 'too_many_requests', error_description: message },
+      429
+    )
+  }
+
+  return c.text(message, 429)
+}
+
 export function rateLimitByIp(
   limiter: RateLimiter,
   message = 'Too many requests. Please try again later.'
@@ -145,8 +168,7 @@ export function rateLimitByIp(
     const ip = getClientIp(c)
     const result = limiter.hit(ip)
     if (result.limited) {
-      c.header('Retry-After', String(Math.ceil(result.retryAfterMs / 1000)))
-      return c.text(message, 429)
+      return refuse(c, message, result.retryAfterMs)
     }
     await next()
   }
@@ -185,8 +207,7 @@ export function rateLimitByClientId(
     if (clientId) {
       const result = limiter.hit(clientId)
       if (result.limited) {
-        c.header('Retry-After', String(Math.ceil(result.retryAfterMs / 1000)))
-        return c.text(message, 429)
+        return refuse(c, message, result.retryAfterMs)
       }
     }
 

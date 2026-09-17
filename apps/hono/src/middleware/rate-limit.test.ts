@@ -152,6 +152,38 @@ describe('rateLimitByIp', () => {
     expect(res.headers.get('Retry-After')).toBeTruthy()
   })
 
+  /**
+   * A refusal has to be readable by whoever is being refused. The OAuth and MCP
+   * endpoints are spoken to by programs that parse every body as JSON, so a
+   * text/plain 429 fails them the same way an HTML 404 does - and worse, mid
+   * connection rather than during discovery. The browser routes behind this
+   * limiter keep the plain text they always had.
+   */
+  it('refuses a program in JSON', async () => {
+    const machine = new Hono()
+    machine.post(
+      '/oauth/register',
+      rateLimitByIp(limiter, 'Rate limited.'),
+      c => c.text('ok')
+    )
+    const headers = { 'x-forwarded-for': '1.2.3.4' }
+    await machine.request('/oauth/register', { method: 'POST', headers })
+    await machine.request('/oauth/register', { method: 'POST', headers })
+
+    const res = await machine.request('/oauth/register', {
+      method: 'POST',
+      headers,
+    })
+
+    expect(res.status).toBe(429)
+    expect(res.headers.get('content-type')).toContain('application/json')
+    expect(await res.json()).toEqual({
+      error: 'too_many_requests',
+      error_description: 'Rate limited.',
+    })
+    expect(res.headers.get('Retry-After')).toBeTruthy()
+  })
+
   it('allows different IPs independently', async () => {
     await app.request('/test', {
       method: 'POST',

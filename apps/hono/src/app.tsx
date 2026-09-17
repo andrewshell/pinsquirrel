@@ -1,12 +1,9 @@
 import { Hono } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { csrf } from 'hono/csrf'
-import { HTTPException } from 'hono/http-exception'
 import { isEmbedRequest } from './lib/embed'
-import { logger, safeError } from './lib/logger.js'
+import { logger } from './lib/logger.js'
 
-import { NotFoundPage } from './views/pages/not-found'
-import { ServerErrorPage } from './views/pages/server-error'
 import { HomePage } from './views/pages/home'
 import { DefaultLayout } from './views/layouts/default'
 import { getSessionManager } from './middleware/session'
@@ -29,6 +26,7 @@ import { oauthTokenRoutes } from './routes/oauth-token'
 import { oauthRegisterRoutes } from './routes/oauth-register'
 import { seoRoutes } from './routes/seo'
 import { oauthConfig } from './lib/config'
+import { notFoundResponse, serverErrorResponse } from './lib/error-response'
 import { markdownNegotiation } from './middleware/markdown-negotiation'
 import { sessionMiddleware } from './middleware/session'
 import { securityHeaders } from './middleware/security-headers'
@@ -121,42 +119,10 @@ app.get('/', async c => {
   )
 })
 
-// 404 Not Found handler
-app.notFound(c => {
-  return c.html(<NotFoundPage />, 404)
-})
+// 404 Not Found handler. A program gets JSON and a browser gets the page;
+// `lib/error-response` documents why the difference matters.
+app.notFound(notFoundResponse)
 
-// Detect MySQL/network errors coming from mysql2 (possibly nested in `cause`)
-function isDatabaseConnectionError(err: unknown): boolean {
-  const dbCodes = new Set([
-    'ECONNREFUSED',
-    'ENOTFOUND',
-    'ETIMEDOUT',
-    'PROTOCOL_CONNECTION_LOST',
-    'ER_ACCESS_DENIED_ERROR',
-    'ER_BAD_DB_ERROR',
-  ])
-  const visited = new Set<unknown>()
-  let cur: unknown = err
-  while (cur && typeof cur === 'object' && !visited.has(cur)) {
-    visited.add(cur)
-    const code = (cur as { code?: unknown }).code
-    if (typeof code === 'string' && dbCodes.has(code)) return true
-    cur = (cur as { cause?: unknown }).cause
-  }
-  return false
-}
-
-// Error handler for 500 errors
-app.onError((err, c) => {
-  if (err instanceof HTTPException) {
-    return err.getResponse()
-  }
-  logger.error({ err: safeError(err) }, 'Unhandled server error')
-  const message = isDatabaseConnectionError(err)
-    ? 'Unable to connect to the database. If you are running locally, make sure Docker is running and start the database with `pnpm db:up`.'
-    : 'Something went wrong. Please try again later.'
-  return c.html(<ServerErrorPage message={message} />, 500)
-})
+app.onError(serverErrorResponse)
 
 export { app }
