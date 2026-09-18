@@ -377,3 +377,91 @@ This is an automated email. Please do not reply to this message.
 
   return { html, text }
 }
+
+export function createAccessGrantedTemplate(
+  username: string,
+  signinUrl: string
+): {
+  html: string
+  text: string
+} {
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Your PinSquirrel access is ready</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f9f9f9;
+            padding: 30px;
+            border-radius: 8px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .footer {
+            margin-top: 30px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>You're In</h1>
+        </div>
+
+        <p>Hi ${escapeHtml(username)},</p>
+
+        <p>Thanks for waiting. Your spot on the PinSquirrel early-access waitlist has come up, and your account is ready to use.</p>
+
+        <p style="text-align: center;">
+            <a href="${escapeHtml(signinUrl)}" class="button">Sign In</a>
+        </p>
+
+        <p>Sign in with the username and password you chose when you confirmed your email.</p>
+
+        <div class="footer">
+            <p>Best regards,<br>Andrew from PinSquirrel</p>
+        </div>
+    </div>
+</body>
+</html>`.trim()
+
+  const text = `
+You're In
+
+Hi ${username},
+
+Thanks for waiting. Your spot on the PinSquirrel early-access waitlist has come up, and your account is ready to use.
+
+Sign in: ${signinUrl}
+
+Sign in with the username and password you chose when you confirmed your email.
+
+Best regards,
+Andrew from PinSquirrel
+`.trim()
+
+  return { html, text }
+}

@@ -12,6 +12,11 @@ export interface AdminEnvironment {
   label: string
   databaseUrl: string
   /**
+   * Where this environment's site is served, with no trailing slash — the
+   * sign-in link in the access-granted email is built from it.
+   */
+  siteUrl: string
+  /**
    * Where this environment's sealed-email private key lives.
    *
    * Optional, because sealing is: a server running without EMAIL_PUBLIC_KEY
@@ -78,6 +83,21 @@ function parseMailgun(value: unknown, context: string): MailgunSettings {
   }
 }
 
+/** An http(s) URL, trimmed of trailing slashes so paths can be appended. */
+function requireSiteUrl(obj: Record<string, unknown>, context: string): string {
+  const value = requireString(obj, 'siteUrl', context)
+  let protocol: string
+  try {
+    protocol = new URL(value).protocol
+  } catch {
+    invalid(`${context} has an invalid "siteUrl"`)
+  }
+  if (protocol !== 'http:' && protocol !== 'https:') {
+    invalid(`${context} has an invalid "siteUrl"`)
+  }
+  return value.replace(/\/+$/, '')
+}
+
 function parseEnvironment(value: unknown, index: number): AdminEnvironment {
   const context = `environment[${index}]`
   const obj = asRecord(value, context)
@@ -88,6 +108,7 @@ function parseEnvironment(value: unknown, index: number): AdminEnvironment {
     name,
     label,
     databaseUrl: requireString(obj, 'databaseUrl', context),
+    siteUrl: requireSiteUrl(obj, context),
     privateKeyPath: optionalString(obj, 'privateKeyPath', context),
     mailgun: parseMailgun(obj.mailgun, context),
   }

@@ -5,6 +5,7 @@ const env = {
   name: 'dev',
   label: 'Development',
   databaseUrl: 'mysql://localhost:3306/pinsquirrel',
+  siteUrl: 'https://pinsquirrel.example',
   privateKeyPath: './keys/dev.json',
   mailgun: {
     apiKey: 'key-x',
@@ -80,6 +81,42 @@ describe('parseConfig', () => {
       environments: [{ ...env, mailgun: { apiKey: 'k' } }],
     })
     expect(() => parseConfig(bad)).toThrow('Invalid admin config')
+  })
+
+  // The sign-in link in the access-granted email is built from it, and a
+  // console cannot work out a site's public address from a database URL.
+  it('reads the site URL each environment is served from', () => {
+    expect(parseConfig(valid).environments[0].siteUrl).toBe(
+      'https://pinsquirrel.example'
+    )
+  })
+
+  it('drops a trailing slash so paths can be appended to the site URL', () => {
+    const slashed = JSON.stringify({
+      sessionSecret: 's',
+      environments: [{ ...env, siteUrl: 'https://pinsquirrel.example/' }],
+    })
+    expect(parseConfig(slashed).environments[0].siteUrl).toBe(
+      'https://pinsquirrel.example'
+    )
+  })
+
+  it('rejects an environment with no site URL', () => {
+    const bad = JSON.stringify({
+      sessionSecret: 's',
+      environments: [{ ...env, siteUrl: undefined }],
+    })
+    expect(() => parseConfig(bad)).toThrow('Invalid admin config')
+  })
+
+  it('rejects a site URL that is not http or https', () => {
+    for (const siteUrl of ['pinsquirrel.example', 'javascript:alert(1)']) {
+      const bad = JSON.stringify({
+        sessionSecret: 's',
+        environments: [{ ...env, siteUrl }],
+      })
+      expect(() => parseConfig(bad)).toThrow('Invalid admin config')
+    }
   })
 
   it('rejects duplicate environment names', () => {

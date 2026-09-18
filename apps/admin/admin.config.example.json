@@ -5,6 +5,7 @@
       "name": "dev",
       "label": "Development",
       "databaseUrl": "mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel",
+      "siteUrl": "http://localhost:8100",
       "mailgun": {
         "apiKey": "key-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
         "domain": "mg.example.com",
@@ -16,6 +17,7 @@
       "name": "prod",
       "label": "Production",
       "databaseUrl": "mysql://user:pass@your-managed-host:3306/pinsquirrel",
+      "siteUrl": "https://pinsquirrel.com",
       "privateKeyPath": "./keys/prod-email-key.json",
       "mailgun": {
         "apiKey": "key-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",

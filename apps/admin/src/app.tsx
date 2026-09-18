@@ -167,6 +167,31 @@ async function loadWaitlist(
   return rows
 }
 
+/**
+ * A user's sealed address opened with the session's key, or why it cannot be.
+ *
+ * The reason finishes the sentence "No email was sent: …", so every mail this
+ * console sends to one person explains a skip the same way.
+ */
+async function openAddress(
+  user: User,
+  viewer: Viewer
+): Promise<{ email: string } | { reason: string }> {
+  if (!user.emailEncrypted) {
+    return { reason: 'there is no address on file.' }
+  }
+  if (!viewer.privateKey) {
+    return { reason: 'this environment has no decryption key.' }
+  }
+  try {
+    return {
+      email: await openSealedEmail(user.emailEncrypted, viewer.privateKey),
+    }
+  } catch {
+    return { reason: 'their address could not be decrypted.' }
+  }
+}
+
 interface UserRow {
   id: string
   username: string
@@ -702,8 +727,9 @@ export function createApp(config: AdminConfig): Hono {
     return renderUsers(c, gate.env, gate.viewer.username)
   })
 
-  // Admit one person from the waitlist. Replaces the grant-access script, which
-  // could only be run from a dev checkout pointed at the target database.
+  // Admit one person from the waitlist, and tell them. Replaces the
+  // grant-access script, which could only be run from a dev checkout pointed
+  // at the target database.
   app.post('/grant-access', async c => {
     const gate = await requireSession(c)
     if ('redirect' in gate) return gate.redirect
@@ -722,12 +748,10 @@ export function createApp(config: AdminConfig): Hono {
       )
     }
 
+    let updated: User
     try {
       const ac = await adminAccessControl(env, viewer.username)
-      const updated = await getRuntime(env).authService.grantAccess(ac, userId)
-      return renderWaitlist(c, env, viewer, {
-        notice: `Granted access to ${updated.username}.`,
-      })
+      updated = await getRuntime(env).authService.grantAccess(ac, userId)
     } catch (error) {
       if (error instanceof UserNotFoundError) {
         return renderWaitlist(c, env, viewer, { error: GONE }, 404)
@@ -746,6 +770,34 @@ export function createApp(config: AdminConfig): Hono {
         500
       )
     }
+
+    // From here on access has been granted whatever happens to the email, so
+    // a mail failure is reported beside the grant rather than instead of it.
+    const granted = `Granted access to ${updated.username}`
+    const address = await openAddress(updated, viewer)
+    if ('reason' in address) {
+      return renderWaitlist(c, env, viewer, {
+        notice: `${granted}. No email was sent: ${address.reason}`,
+      })
+    }
+
+    try {
+      await new MailgunEmailService(env.mailgun).sendAccessGrantedEmail(
+        address.email,
+        updated.username,
+        `${env.siteUrl}/signin`
+      )
+    } catch (error) {
+      console.error(`[admin] access email failed for "${env.name}":`, error)
+      return renderWaitlist(c, env, viewer, {
+        notice: `${granted}.`,
+        error: `The access email to ${address.email} could not be sent. You can message them from the Users page.`,
+      })
+    }
+
+    return renderWaitlist(c, env, viewer, {
+      notice: `${granted} and emailed ${address.email}.`,
+    })
   })
 
   /**

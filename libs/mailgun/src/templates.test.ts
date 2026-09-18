@@ -4,6 +4,7 @@ import {
   createSignupNotificationEmailTemplate,
   createEmailAlreadyRegisteredTemplate,
   createUsernameTakenTemplate,
+  createAccessGrantedTemplate,
 } from './templates.js'
 
 // A value carrying every character that changes meaning in an HTML body or
@@ -82,5 +83,22 @@ describe('createUsernameTakenTemplate', () => {
 
     expect(text).toContain(`"${HOSTILE}" is already taken`)
     expect(text).toContain(`Sign up: ${HOSTILE}`)
+  })
+})
+
+describe('createAccessGrantedTemplate', () => {
+  it('escapes the username and the sign-in URL', () => {
+    const { html } = createAccessGrantedTemplate(HOSTILE, HOSTILE)
+
+    expect(html).not.toContain('<script>')
+    expect(html).toContain('Hi &quot;&gt;&lt;script&gt;')
+    expect(html).toContain('href="&quot;&gt;&lt;script&gt;')
+  })
+
+  it('leaves the plain-text body alone', () => {
+    const { text } = createAccessGrantedTemplate(HOSTILE, HOSTILE)
+
+    expect(text).toContain(`Hi ${HOSTILE},`)
+    expect(text).toContain(`Sign in: ${HOSTILE}`)
   })
 })
