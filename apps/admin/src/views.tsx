@@ -15,7 +15,7 @@ import {
   ProfileDropdown,
   Textarea,
 } from '@pinsquirrel/ui'
-import { CheckIcon, CloseIcon, TrashIcon } from './icons.js'
+import { CheckIcon, CloseIcon, MailIcon, TrashIcon } from './icons.js'
 
 /* The console renders with the shared Neo Brutalism primitives and its own
    Tailwind build (`pnpm --filter @pinsquirrel/admin css:build`), so the tokens
@@ -240,10 +240,32 @@ type UserRow = {
   username: string
   roles: string[]
   isSelf: boolean
+  /** Whether this console can open the user's address to write to them. */
+  canMessage: boolean
 }
 
 // The shared icon size is a fit for a form, not a table row.
 const rowButtonClasses = 'h-9 w-9'
+
+/**
+ * The link to write to one user. A link rather than a form: it only opens the
+ * message page, which looks the user up again before anything is sent.
+ */
+const MessageLink: FC<{ id: string; username: string }> = ({
+  id,
+  username,
+}) => (
+  <Button
+    href={`/message?userId=${encodeURIComponent(id)}`}
+    size="icon"
+    variant="outline"
+    class={rowButtonClasses}
+    aria-label={`Message ${username}`}
+    title={`Message ${username}`}
+  >
+    <MailIcon />
+  </Button>
+)
 
 const RoleValue: FC<{ has: boolean }> = ({ has }) => (
   <span class={has ? okClasses : 'text-muted-foreground'}>
@@ -299,7 +321,14 @@ const UserRows: FC<{ roles: RoleColumn[]; row: UserRow }> = ({
             <RoleValue has={row.roles.includes(role.name)} />
           </td>
         ))}
-        <td class={`${tdClasses} text-right`}>
+        <td class={`${tdClasses} text-right whitespace-nowrap`}>
+          {row.canMessage ? (
+            <>
+              <MessageLink id={row.id} username={row.username} />{' '}
+            </>
+          ) : (
+            ''
+          )}
           <form
             method="post"
             action="/users/delete"
@@ -474,10 +503,23 @@ export const WaitlistPage: FC<{
                   <td class={`${tdClasses} text-muted-foreground`}>
                     {r.joinedAt}
                   </td>
-                  <td class={tdClasses}>
+                  <td class={`${tdClasses} text-right whitespace-nowrap`}>
+                    {/* Only a row whose address was opened: the others read
+                        "(locked)" or "(decrypt failed)", with nowhere to send. */}
+                    {canCompose && r.email.includes('@') ? (
+                      <>
+                        <MessageLink id={r.id} username={r.username} />{' '}
+                      </>
+                    ) : (
+                      ''
+                    )}
                     {/* Granting flips the user to Active, so the row drops off
                         the next render — the list is queried by Waitlist status. */}
-                    <form method="post" action="/grant-access">
+                    <form
+                      method="post"
+                      action="/grant-access"
+                      class="inline-block"
+                    >
                       <input type="hidden" name="userId" value={r.id} />
                       <Button type="submit" size="sm">
                         Grant access
@@ -536,6 +578,63 @@ export const ComposePage: FC<{
             />
           </div>
           <Button type="submit">Send to {recipientCount}</Button>
+        </form>
+      </CardContent>
+    </Card>
+  </Layout>
+)
+
+/**
+ * Write to one user, from the Waitlist or the Users page.
+ *
+ * `section` is the page it was opened from, which stays lit in the header and
+ * is where Cancel goes back to. The address is shown so the operator can see
+ * who they are writing to, but the form posts only the user id: the route
+ * looks the address up again rather than trusting one from the browser.
+ */
+export const MessagePage: FC<{
+  envLabel: string
+  username: string
+  section: '/waitlist' | '/users'
+  recipient: { id: string; username: string; email: string }
+  error?: string
+  subject?: string
+  body?: string
+}> = ({ envLabel, username, section, recipient, error, subject, body }) => (
+  <Layout
+    title={`Message ${recipient.username}`}
+    header={<AdminHeader username={username} currentPath={section} />}
+  >
+    <h1 class="text-3xl font-bold">Message {recipient.username}</h1>
+    <p class="text-muted-foreground text-sm mt-2">
+      {envLabel} — to {recipient.email}
+    </p>
+    <Card class="mt-7">
+      <CardContent class="space-y-4">
+        {error ? <Alert variant="destructive">{error}</Alert> : ''}
+        <form method="post" action="/message" class="space-y-4">
+          <input type="hidden" name="userId" value={recipient.id} />
+          <div class="space-y-2">
+            <Label for="subject">Subject</Label>
+            <Input id="subject" name="subject" value={subject ?? ''} required />
+          </div>
+          <div class="space-y-2">
+            <Label for="body">Message (plain text)</Label>
+            <Textarea
+              id="body"
+              name="body"
+              value={body ?? ''}
+              rows={10}
+              class="min-h-[200px] resize-y"
+              required
+            />
+          </div>
+          <div class="flex gap-3">
+            <Button type="submit">Send to {recipient.username}</Button>
+            <Button variant="outline" href={section}>
+              Cancel
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>

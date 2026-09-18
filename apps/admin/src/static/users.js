@@ -45,8 +45,9 @@ document.addEventListener('click', e => {
   }
 
   const display = e.target.closest('tr[data-user-row]')
-  // A click on the delete form is its own action, not a request to edit.
-  if (!display || e.target.closest('form')) return
+  // A click on the delete form or the message link is its own action, not a
+  // request to edit.
+  if (!display || e.target.closest('form, a')) return
 
   // One row open at a time: opening a second would leave a half-edited first
   // whose unsaved dropdowns look saved.

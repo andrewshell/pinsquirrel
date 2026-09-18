@@ -46,6 +46,7 @@ import { loginLimiter } from './rate-limit.js'
 
 const userService = {
   getUserByUsername: vi.fn(),
+  getUserById: vi.fn(),
   listByStatus: vi.fn(),
   hasAdmin: vi.fn(),
 }
@@ -284,6 +285,7 @@ beforeEach(() => {
   mailer.sendBulk.mockResolvedValue([])
   mailer.sendPlainText.mockResolvedValue(undefined)
   mailer.sendAccessGrantedEmail.mockResolvedValue(undefined)
+  userService.getUserById.mockResolvedValue(makeUser())
 })
 
 describe('POST /login', () => {
@@ -1508,6 +1510,35 @@ describe('GET /users', () => {
     expect(body).toContain(`data-user-edit="${activeUser.id}"`)
     expect(body).toContain('action="/users/update"')
     expect(body).toContain('action="/users/delete"')
+    expect(body).toContain(`href="/message?userId=${activeUser.id}"`)
+  })
+
+  // Mail goes to a decrypted address. With no key, or no sealed address to
+  // decrypt, the row offers nothing to write with.
+  it('offers a message only where there is an address to open', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockResolvedValue([
+      activeUser,
+      makeUser({
+        id: 'user-3',
+        username: 'carol',
+        status: UserStatus.Active,
+        emailEncrypted: null,
+      }),
+    ])
+
+    const body = await (
+      await app.request('/users', { headers: { Cookie: cookie } })
+    ).text()
+
+    expect(body).toContain('/message?userId=user-2')
+    expect(body).not.toContain('/message?userId=user-3')
+
+    const keyless = await signInKeyless()
+    const locked = await (
+      await app.request('/users', { headers: { Cookie: keyless } })
+    ).text()
+    expect(locked).not.toContain('/message?userId=')
   })
 
   // The signed-in admin's own row is the one the service will refuse, so the
@@ -1739,6 +1770,208 @@ describe('POST /grant-access', () => {
     expect(res.status).toBe(302)
     expect(res.headers.get('location')).toBe('/login')
     expect(authService.grantAccess).not.toHaveBeenCalled()
+  })
+})
+
+describe('GET /message', () => {
+  it('opens a message addressed to the user', async () => {
+    const cookie = await signIn()
+
+    const res = await app.request('/message?userId=user-1', {
+      headers: { Cookie: cookie },
+    })
+    const body = await res.text()
+
+    expect(res.status).toBe(200)
+    expect(body).toContain('Message alice')
+    expect(body).toContain('person@example.com')
+    expect(crypto.openSealedEmail).toHaveBeenCalledWith('sealed', privateKey)
+  })
+
+  // The lookup is Admin-gated inside UserService, so the app hands it the
+  // signed-in account's AccessControl rather than deciding the rule here.
+  it('looks the user up as the signed-in admin', async () => {
+    const cookie = await signIn()
+
+    await app.request('/message?userId=user-1', {
+      headers: { Cookie: cookie },
+    })
+
+    expect(userService.getUserById).toHaveBeenCalledWith(
+      new AccessControl(adminUser),
+      'user-1'
+    )
+  })
+
+  it('keeps the section the user is listed in lit', async () => {
+    const cookie = await signIn()
+    userService.getUserById.mockResolvedValue(
+      makeUser({ status: UserStatus.Active })
+    )
+
+    const body = await (
+      await app.request('/message?userId=user-1', {
+        headers: { Cookie: cookie },
+      })
+    ).text()
+
+    expect(body).toMatch(/href="\/users"[^>]*aria-current="page"/)
+  })
+
+  it('returns 404 for a user who is gone', async () => {
+    const cookie = await signIn()
+    userService.getUserById.mockRejectedValue(new UserNotFoundError('ghost'))
+
+    const res = await app.request('/message?userId=ghost', {
+      headers: { Cookie: cookie },
+    })
+
+    expect(res.status).toBe(404)
+    expect(await res.text()).toContain('no longer exists')
+  })
+
+  it('explains why it cannot write to someone with no address to open', async () => {
+    const cookie = await signInKeyless()
+
+    const res = await app.request('/message?userId=user-1', {
+      headers: { Cookie: cookie },
+    })
+    const body = await res.text()
+
+    expect(res.status).toBe(400)
+    expect(body).toContain(
+      'No email can be sent to alice: this environment has no decryption key.'
+    )
+    expect(body).not.toContain('action="/message"')
+  })
+
+  it('redirects to /login when unauthenticated', async () => {
+    const res = await app.request('/message?userId=user-1')
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/login')
+  })
+})
+
+describe('POST /message', () => {
+  // The form carries only a user id; the address is re-read and decrypted
+  // here, so one smuggled into the post goes nowhere.
+  it('sends the message to the address read from the database', async () => {
+    const cookie = await signIn()
+
+    const res = await app.request(
+      '/message',
+      form(
+        {
+          userId: 'user-1',
+          subject: 'Welcome',
+          body: 'Glad you are here',
+          to: 'attacker@example.com',
+        },
+        cookie
+      )
+    )
+
+    expect(res.status).toBe(200)
+    expect(mailer.sendPlainText).toHaveBeenCalledWith(
+      'person@example.com',
+      'Welcome',
+      'Glad you are here'
+    )
+    expect(await res.text()).toContain(
+      'Sent “Welcome” to alice (person@example.com).'
+    )
+  })
+
+  it('reports a sent message on the page the user is listed on', async () => {
+    const cookie = await signIn()
+    userService.getUserById.mockResolvedValue(
+      makeUser({ status: UserStatus.Active })
+    )
+
+    const body = await (
+      await app.request(
+        '/message',
+        form({ userId: 'user-1', subject: 'Hi', body: 'Hello' }, cookie)
+      )
+    ).text()
+
+    expect(body).toContain('Users · ')
+    expect(userService.listByStatus).toHaveBeenCalledWith(
+      new AccessControl(adminUser),
+      UserStatus.Active
+    )
+  })
+
+  it.each([
+    ['no subject', { subject: '', body: 'Hello' }],
+    ['no message', { subject: 'Hi', body: '   ' }],
+  ])('hands back a draft with %s without sending', async (_l, fields) => {
+    const cookie = await signIn()
+
+    const res = await app.request(
+      '/message',
+      form({ userId: 'user-1', ...fields }, cookie)
+    )
+    const body = await res.text()
+
+    expect(res.status).toBe(400)
+    expect(body).toContain('Subject and message are both required')
+    expect(body).toContain('Message alice')
+    expect(mailer.sendPlainText).not.toHaveBeenCalled()
+  })
+
+  it('keeps the draft when the provider is unreachable', async () => {
+    const cookie = await signIn()
+    mailer.sendPlainText.mockRejectedValue(new Error('mailgun 503'))
+
+    const res = await app.request(
+      '/message',
+      form({ userId: 'user-1', subject: 'Welcome', body: 'Glad' }, cookie)
+    )
+    const body = await res.text()
+
+    expect(res.status).toBe(500)
+    expect(body).toContain('reach the email provider')
+    expect(body).toContain('value="Welcome"')
+    expect(body).not.toContain('mailgun 503')
+  })
+
+  it('returns 404 for a user who is gone', async () => {
+    const cookie = await signIn()
+    userService.getUserById.mockRejectedValue(new UserNotFoundError('ghost'))
+
+    const res = await app.request(
+      '/message',
+      form({ userId: 'ghost', subject: 'Hi', body: 'Hello' }, cookie)
+    )
+
+    expect(res.status).toBe(404)
+    expect(mailer.sendPlainText).not.toHaveBeenCalled()
+  })
+
+  it('refuses to send where the address cannot be opened', async () => {
+    const cookie = await signInKeyless()
+
+    const res = await app.request(
+      '/message',
+      form({ userId: 'user-1', subject: 'Hi', body: 'Hello' }, cookie)
+    )
+
+    expect(res.status).toBe(400)
+    expect(await res.text()).toContain('No email can be sent to alice')
+    expect(mailer.sendPlainText).not.toHaveBeenCalled()
+  })
+
+  it('redirects to /login when unauthenticated', async () => {
+    const res = await app.request('/message', {
+      method: 'POST',
+      body: new URLSearchParams({ userId: 'user-1', subject: 'Hi', body: 'x' }),
+    })
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/login')
+    expect(mailer.sendPlainText).not.toHaveBeenCalled()
   })
 })
 

@@ -1,5 +1,10 @@
 import type { AccessControl, User, UserRepository } from '@pinsquirrel/domain'
-import { MissingRoleError, Role, UserStatus } from '@pinsquirrel/domain'
+import {
+  MissingRoleError,
+  Role,
+  UserNotFoundError,
+  UserStatus,
+} from '@pinsquirrel/domain'
 
 export class UserService {
   constructor(private readonly userRepository: UserRepository) {}
@@ -18,6 +23,24 @@ export class UserService {
     }
 
     return this.userRepository.findByStatus(status)
+  }
+
+  /**
+   * One user, whatever their lifecycle state.
+   *
+   * Admin-only for the same reason as listByStatus: the admin console opens
+   * the sealed address on the result to write to that person.
+   */
+  async getUserById(ac: AccessControl, id: string): Promise<User> {
+    if (!ac.hasRole(Role.Admin)) {
+      throw new MissingRoleError()
+    }
+
+    const user = await this.userRepository.findById(id)
+    if (!user) {
+      throw new UserNotFoundError(id)
+    }
+    return user
   }
 
   /**

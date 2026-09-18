@@ -1,8 +1,6 @@
 /**
- * Tests for UserService.listByStatus and UserService.hasAdmin.
- *
- * UserService had no tests; these cover the methods added for the admin
- * waitlist page and its bootstrap gate. getUserByUsername remains uncovered.
+ * Tests for the UserService methods the admin console uses: listByStatus,
+ * getUserById and hasAdmin. getUserByUsername remains uncovered.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createMockUserRepository } from '../test-utils.js'
@@ -12,6 +10,7 @@ import {
   AccessControl,
   MissingRoleError,
   Role,
+  UserNotFoundError,
   UserStatus,
 } from '@pinsquirrel/domain'
 
@@ -84,6 +83,38 @@ describe('UserService.listByStatus', () => {
     await service.listByStatus(new AccessControl(admin), UserStatus.Unverified)
 
     expect(mockRepo.findByStatus).toHaveBeenCalledWith(UserStatus.Unverified)
+  })
+})
+
+describe('UserService.getUserById', () => {
+  it('returns the user for an admin', async () => {
+    const target = makeUser({ id: 'target-1' })
+    vi.mocked(mockRepo.findById).mockResolvedValue(target)
+
+    const result = await service.getUserById(
+      new AccessControl(admin),
+      'target-1'
+    )
+
+    expect(mockRepo.findById).toHaveBeenCalledWith('target-1')
+    expect(result).toEqual(target)
+  })
+
+  // The admin console reads the sealed address off the result to write to
+  // that person, so the lookup carries the same gate as listByStatus.
+  it('refuses a caller without the Admin role', async () => {
+    await expect(
+      service.getUserById(new AccessControl(plainUser), 'target-1')
+    ).rejects.toBeInstanceOf(MissingRoleError)
+    expect(mockRepo.findById).not.toHaveBeenCalled()
+  })
+
+  it('throws UserNotFoundError for an id that matches nobody', async () => {
+    vi.mocked(mockRepo.findById).mockResolvedValue(null)
+
+    await expect(
+      service.getUserById(new AccessControl(admin), 'gone')
+    ).rejects.toBeInstanceOf(UserNotFoundError)
   })
 })
 
