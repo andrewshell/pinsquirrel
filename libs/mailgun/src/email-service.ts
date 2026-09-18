@@ -6,6 +6,7 @@ import {
   createSignupNotificationEmailTemplate,
   createEmailAlreadyRegisteredTemplate,
   createUsernameTakenTemplate,
+  createAccessGrantedTemplate,
 } from './templates.js'
 import type { MailgunConfig, SendResult } from './types.js'
 import { REQUEST_TIMEOUT_MS, withRetry } from './retry.js'
@@ -45,8 +46,8 @@ export class MailgunEmailService implements EmailService {
        * Retry transient failures with backoff. Off for the transactional
        * mails, which are sent inside a user's request/response cycle where
        * three attempts would hold the response open for a second and a half;
-       * on for the operator console's bulk send, where nobody is waiting and
-       * a dropped announcement cannot be resent selectively.
+       * on for the operator console's sends, where only the operator is
+       * waiting and a dropped message cannot be resent selectively.
        */
       retry?: boolean
     }
@@ -211,6 +212,30 @@ export class MailgunEmailService implements EmailService {
       'PinSquirrel Username Unavailable',
       createUsernameTakenTemplate(username, signupUrl),
       { description: 'username-taken email' }
+    )
+  }
+
+  /**
+   * Tell a user they are off the waitlist. Sent by the operator console, which
+   * is the only place their sealed address can be opened, so it retries like
+   * the console's other sends.
+   */
+  async sendAccessGrantedEmail(
+    email: string,
+    username: string,
+    signinUrl: string
+  ): Promise<void> {
+    if (!email || !username || !signinUrl) {
+      throw new EmailSendError(
+        'Invalid email parameters: email, username, and signinUrl are required'
+      )
+    }
+
+    await this.send(
+      email,
+      'Your PinSquirrel access is ready',
+      createAccessGrantedTemplate(username, signinUrl),
+      { description: 'access-granted email', retry: true }
     )
   }
 }

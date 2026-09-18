@@ -142,8 +142,13 @@ An environment's `privateKeyPath` is optional and pairs with the server's
 `EMAIL_PUBLIC_KEY`: give it the private half of that key, or omit it for an
 environment that seals no emails — as the example's `dev` entry does. Omitting
 it means the console signs straight in with no unlock step, shows `(locked)`
-for any address that _was_ sealed, and does not offer to mail the waitlist,
-which needs decrypted addresses.
+for any address that _was_ sealed, and sends no mail at all — the waitlist
+message, per-user messages and the access-granted email all need decrypted
+addresses.
+
+Every environment also needs a `siteUrl`: the address its site is served from,
+such as `https://pinsquirrel.com`. The access-granted email sent on **Grant
+access** links to `<siteUrl>/signin`.
 
 ### Prerequisites
 

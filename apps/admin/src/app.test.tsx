@@ -67,7 +67,12 @@ vi.mock('./runtime.js', () => ({
 // The shared Mailgun service is stubbed at the class, so these tests still
 // observe the send without a network call. `configuredWith` records the config
 // the app built the client from, which used to be sendBulk's first argument.
-const mailer = { sendBulk: vi.fn(), configuredWith: vi.fn() }
+const mailer = {
+  sendBulk: vi.fn(),
+  sendPlainText: vi.fn(),
+  sendAccessGrantedEmail: vi.fn(),
+  configuredWith: vi.fn(),
+}
 
 vi.mock('@pinsquirrel/mailgun', () => ({
   MailgunEmailService: class {
@@ -76,6 +81,12 @@ vi.mock('@pinsquirrel/mailgun', () => ({
     }
     sendBulk(...args: unknown[]) {
       return mailer.sendBulk(...args) as unknown
+    }
+    sendPlainText(...args: unknown[]) {
+      return mailer.sendPlainText(...args) as unknown
+    }
+    sendAccessGrantedEmail(...args: unknown[]) {
+      return mailer.sendAccessGrantedEmail(...args) as unknown
     }
   },
 }))
@@ -130,6 +141,7 @@ function makeConfig(env: Partial<AdminEnvironment> = {}): AdminConfig {
         name: 'test',
         label: 'Test Env',
         databaseUrl: 'mysql://user:pass@localhost:3306/test',
+        siteUrl: 'https://test.example',
         privateKeyPath: rawKeyPath,
         mailgun,
         ...env,
@@ -138,6 +150,7 @@ function makeConfig(env: Partial<AdminEnvironment> = {}): AdminConfig {
         name: 'keyless',
         label: 'Keyless Env',
         databaseUrl: 'mysql://user:pass@localhost:3306/keyless',
+        siteUrl: 'https://keyless.example',
         mailgun,
       },
     ],
@@ -269,6 +282,8 @@ beforeEach(() => {
   authService.bootstrapAdmin.mockRejectedValue(new AdminAlreadyExistsError())
   crypto.openSealedEmail.mockResolvedValue('person@example.com')
   mailer.sendBulk.mockResolvedValue([])
+  mailer.sendPlainText.mockResolvedValue(undefined)
+  mailer.sendAccessGrantedEmail.mockResolvedValue(undefined)
 })
 
 describe('POST /login', () => {
@@ -784,6 +799,25 @@ describe('keyless environment', () => {
 
     expect(res.status).toBe(200)
     expect(await res.text()).toContain('Granted access to alice')
+  })
+
+  // The grant still goes through; the page says why nobody was told, so the
+  // operator knows to tell them some other way.
+  it('says no access email went out, having no key to open the address', async () => {
+    const cookie = await signInKeyless()
+    authService.grantAccess.mockResolvedValue(
+      makeUser({ status: UserStatus.Active })
+    )
+
+    const res = await app.request(
+      '/grant-access',
+      form({ userId: 'user-1' }, cookie)
+    )
+
+    expect(await res.text()).toContain(
+      'No email was sent: this environment has no decryption key.'
+    )
+    expect(mailer.sendAccessGrantedEmail).not.toHaveBeenCalled()
   })
 })
 
@@ -1568,6 +1602,88 @@ describe('POST /grant-access', () => {
       'user-1'
     )
     expect(await res.text()).toContain('Granted access to alice')
+  })
+
+  // The sealed address is opened here, with the session's key, because this
+  // console is the only place it can be — the server never could.
+  it('emails the user that they are in, with a link to sign in', async () => {
+    const cookie = await signIn()
+    authService.grantAccess.mockResolvedValue(
+      makeUser({ status: UserStatus.Active })
+    )
+
+    const res = await app.request(
+      '/grant-access',
+      form({ userId: 'user-1' }, cookie)
+    )
+
+    expect(crypto.openSealedEmail).toHaveBeenCalledWith('sealed', privateKey)
+    expect(mailer.sendAccessGrantedEmail).toHaveBeenCalledWith(
+      'person@example.com',
+      'alice',
+      'https://test.example/signin'
+    )
+    expect(await res.text()).toContain(
+      'Granted access to alice and emailed person@example.com.'
+    )
+  })
+
+  // Access is the thing that was asked for, and it happened. A failed email
+  // is reported beside it rather than as a failed grant, which the operator
+  // would try again.
+  it('keeps the grant when the access email fails, and says so', async () => {
+    const cookie = await signIn()
+    authService.grantAccess.mockResolvedValue(
+      makeUser({ status: UserStatus.Active })
+    )
+    mailer.sendAccessGrantedEmail.mockRejectedValue(new Error('mailgun 503'))
+
+    const res = await app.request(
+      '/grant-access',
+      form({ userId: 'user-1' }, cookie)
+    )
+    const body = await res.text()
+
+    expect(res.status).toBe(200)
+    expect(body).toContain('Granted access to alice.')
+    expect(body).toContain(
+      'The access email to person@example.com could not be sent.'
+    )
+  })
+
+  it('says no access email went out when there is no address on file', async () => {
+    const cookie = await signIn()
+    authService.grantAccess.mockResolvedValue(
+      makeUser({ status: UserStatus.Active, emailEncrypted: null })
+    )
+
+    const res = await app.request(
+      '/grant-access',
+      form({ userId: 'user-1' }, cookie)
+    )
+
+    expect(await res.text()).toContain(
+      'No email was sent: there is no address on file.'
+    )
+    expect(mailer.sendAccessGrantedEmail).not.toHaveBeenCalled()
+  })
+
+  it('says no access email went out when the address cannot be opened', async () => {
+    const cookie = await signIn()
+    authService.grantAccess.mockResolvedValue(
+      makeUser({ status: UserStatus.Active })
+    )
+    crypto.openSealedEmail.mockRejectedValue(new Error('wrong key'))
+
+    const res = await app.request(
+      '/grant-access',
+      form({ userId: 'user-1' }, cookie)
+    )
+
+    expect(await res.text()).toContain(
+      'No email was sent: their address could not be decrypted.'
+    )
+    expect(mailer.sendAccessGrantedEmail).not.toHaveBeenCalled()
   })
 
   it('returns 404 when the target was deleted before the grant', async () => {

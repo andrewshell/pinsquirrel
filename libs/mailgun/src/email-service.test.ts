@@ -457,4 +457,58 @@ describe('MailgunEmailService', () => {
       expect(domainCall).toBe(mockConfig.domain)
     })
   })
+
+  describe('sendAccessGrantedEmail', () => {
+    beforeEach(() => {
+      mockCreateMessage.mockResolvedValue({ id: '<id@example.com>' })
+    })
+
+    it('tells the user they can sign in, and where', async () => {
+      await emailService.sendAccessGrantedEmail(
+        'alice@example.com',
+        'alice',
+        'https://pinsquirrel.com/signin'
+      )
+
+      expect(mockCreateMessage).toHaveBeenCalledWith(
+        mockConfig.domain,
+        expect.objectContaining({
+          from: `${mockConfig.fromName} <${mockConfig.fromEmail}>`,
+          to: ['alice@example.com'],
+          subject: 'Your PinSquirrel access is ready',
+          html: expect.stringContaining('https://pinsquirrel.com/signin'),
+          text: expect.stringContaining('https://pinsquirrel.com/signin'),
+        })
+      )
+    })
+
+    it('refuses to send without an address, username or sign-in URL', async () => {
+      const url = 'https://pinsquirrel.com/signin'
+      await expect(
+        emailService.sendAccessGrantedEmail('', 'alice', url)
+      ).rejects.toThrow(EmailSendError)
+      await expect(
+        emailService.sendAccessGrantedEmail('alice@example.com', '', url)
+      ).rejects.toThrow(EmailSendError)
+      await expect(
+        emailService.sendAccessGrantedEmail('alice@example.com', 'alice', '')
+      ).rejects.toThrow(EmailSendError)
+      expect(mockCreateMessage).not.toHaveBeenCalled()
+    })
+
+    it('wraps a provider failure in EmailSendError', async () => {
+      // A 4xx fails fast, so the assertion does not wait out the retry backoff.
+      mockCreateMessage.mockRejectedValue(
+        Object.assign(new Error('Forbidden'), { status: 403 })
+      )
+
+      await expect(
+        emailService.sendAccessGrantedEmail(
+          'alice@example.com',
+          'alice',
+          'https://pinsquirrel.com/signin'
+        )
+      ).rejects.toThrow('Failed to send access-granted email: Forbidden')
+    })
+  })
 })
