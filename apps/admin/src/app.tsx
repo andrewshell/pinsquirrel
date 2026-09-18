@@ -45,6 +45,7 @@ import {
   WaitlistPage,
   ComposePage,
   SentPage,
+  MessagePage,
 } from './views.js'
 import type { Context } from 'hono'
 
@@ -197,6 +198,7 @@ interface UserRow {
   username: string
   roles: string[]
   isSelf: boolean
+  canMessage: boolean
 }
 
 /**
@@ -230,6 +232,9 @@ async function loadUsers(
     // Marked by id rather than username so a rename mid-session cannot make
     // the console offer an admin the self-revoke the service would refuse.
     isSelf: user.id === ac.user?.id,
+    // requireSession only lets a keyed environment through once it is
+    // unlocked, so a key path here means the session holds the key.
+    canMessage: Boolean(env.privateKeyPath && user.emailEncrypted),
   }))
 }
 
@@ -303,6 +308,93 @@ async function renderWaitlist(
     />,
     code
   )
+}
+
+/**
+ * The page a user is listed on: where a message to them is opened from and
+ * where its outcome is reported. Anyone not on the waitlist is shown on Users,
+ * which is also the closer fit for an account the console does not list.
+ */
+function sectionOf(user: User): '/waitlist' | '/users' {
+  return user.status === UserStatus.Waitlist ? '/waitlist' : '/users'
+}
+
+function renderSection(
+  c: Context,
+  env: AdminEnvironment,
+  viewer: Viewer,
+  section: '/waitlist' | '/users',
+  outcome: { notice?: string; error?: string },
+  status: 200 | 400 | 404 | 500 = 200
+) {
+  return section === '/waitlist'
+    ? renderWaitlist(c, env, viewer, outcome, status)
+    : renderUsers(c, env, viewer.username, outcome, status)
+}
+
+/**
+ * The user a message is for, with their address opened — or the page to show
+ * instead when there is no one to write to.
+ */
+async function findRecipient(
+  c: Context,
+  env: AdminEnvironment,
+  viewer: Viewer,
+  userId: string
+): Promise<
+  | { user: User; email: string; section: '/waitlist' | '/users' }
+  | { response: Response | Promise<Response> }
+> {
+  if (!userId) {
+    return {
+      response: renderUsers(
+        c,
+        env,
+        viewer.username,
+        { error: 'No user was selected.' },
+        400
+      ),
+    }
+  }
+
+  let user: User
+  try {
+    const ac = await adminAccessControl(env, viewer.username)
+    user = await getRuntime(env).userService.getUserById(ac, userId)
+  } catch (error) {
+    if (error instanceof UserNotFoundError) {
+      return {
+        response: renderUsers(c, env, viewer.username, { error: GONE }, 404),
+      }
+    }
+    return {
+      response: renderUsers(
+        c,
+        env,
+        viewer.username,
+        { error: dbErrorMessage(env, error) },
+        500
+      ),
+    }
+  }
+
+  const section = sectionOf(user)
+  const address = await openAddress(user, viewer)
+  if ('reason' in address) {
+    return {
+      response: renderSection(
+        c,
+        env,
+        viewer,
+        section,
+        {
+          error: `No email can be sent to ${user.username}: ${address.reason}`,
+        },
+        400
+      ),
+    }
+  }
+  return { user, email: address.email, section }
 }
 
 /**
@@ -1058,6 +1150,82 @@ export function createApp(config: AdminConfig): Hono {
         500
       )
     }
+  })
+
+  // Write to one user. The query names the user; the address is looked up and
+  // opened here, and again on the post, so it never comes from the browser.
+  app.get('/message', async c => {
+    const gate = await requireSession(c)
+    if ('redirect' in gate) return gate.redirect
+
+    const { env, viewer } = gate
+    const found = await findRecipient(
+      c,
+      env,
+      viewer,
+      c.req.query('userId') ?? ''
+    )
+    if ('response' in found) return found.response
+
+    return c.html(
+      <MessagePage
+        envLabel={env.label}
+        username={viewer.username}
+        section={found.section}
+        recipient={{
+          id: found.user.id,
+          username: found.user.username,
+          email: found.email,
+        }}
+      />
+    )
+  })
+
+  app.post('/message', async c => {
+    const gate = await requireSession(c)
+    if ('redirect' in gate) return gate.redirect
+
+    const { env, viewer } = gate
+    const body = await c.req.parseBody()
+    const subject = field(body, 'subject').trim()
+    const messageBody = field(body, 'body').trim()
+
+    const found = await findRecipient(c, env, viewer, field(body, 'userId'))
+    if ('response' in found) return found.response
+
+    const { user, email, section } = found
+    const draft = (error: string, status: 400 | 500) =>
+      c.html(
+        <MessagePage
+          envLabel={env.label}
+          username={viewer.username}
+          section={section}
+          recipient={{ id: user.id, username: user.username, email }}
+          subject={subject}
+          body={messageBody}
+          error={error}
+        />,
+        status
+      )
+
+    if (!subject || !messageBody) {
+      return draft('Subject and message are both required.', 400)
+    }
+
+    try {
+      await new MailgunEmailService(env.mailgun).sendPlainText(
+        email,
+        subject,
+        messageBody
+      )
+    } catch (error) {
+      console.error(`[admin] message failed for "${env.name}":`, error)
+      return draft("Couldn't reach the email provider. Please try again.", 500)
+    }
+
+    return renderSection(c, env, viewer, section, {
+      notice: `Sent “${subject}” to ${user.username} (${email}).`,
+    })
   })
 
   app.post('/logout', async c => {

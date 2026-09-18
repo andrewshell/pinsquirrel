@@ -18,6 +18,7 @@ import {
   WaitlistPage,
   ComposePage,
   SentPage,
+  MessagePage,
 } from './views.js'
 
 /** Tokens only the shared Button's class list carries, checked independently
@@ -64,9 +65,27 @@ const pages = {
         { name: 'User', revokeHint: 'Revoking User suspends sign-in.' },
       ],
       rows: [
-        { id: 'u1', username: 'alice', roles: ['User'], isSelf: false },
-        { id: 'u2', username: 'root', roles: ['Admin'], isSelf: true },
-        { id: 'u3', username: 'carol', roles: [], isSelf: false },
+        {
+          id: 'u1',
+          username: 'alice',
+          roles: ['User'],
+          isSelf: false,
+          canMessage: true,
+        },
+        {
+          id: 'u2',
+          username: 'root',
+          roles: ['Admin'],
+          isSelf: true,
+          canMessage: true,
+        },
+        {
+          id: 'u3',
+          username: 'carol',
+          roles: [],
+          isSelf: false,
+          canMessage: false,
+        },
       ],
     }),
   WaitlistPage: () => WaitlistPage({ ...waitlistProps, canCompose: true }),
@@ -78,6 +97,13 @@ const pages = {
       username: 'root',
       results: [{ recipient: 'alice@example.com', ok: true }],
     }),
+  MessagePage: () =>
+    MessagePage({
+      envLabel: 'Test Env',
+      username: 'root',
+      section: '/users',
+      recipient: { id: 'u1', username: 'alice', email: 'alice@example.com' },
+    }),
 } as const
 
 /** The pages behind the session gate all carry the shared header. */
@@ -86,6 +112,7 @@ const signedInPages = [
   'WaitlistPage',
   'ComposePage',
   'SentPage',
+  'MessagePage',
 ] as const
 
 describe.each(Object.keys(pages) as (keyof typeof pages)[])('%s', name => {
@@ -235,6 +262,82 @@ describe('WaitlistPage', () => {
     expect(html).toContain('alice')
     expect(html).toContain('action="/grant-access"')
   })
+
+  it('offers to write to one person whose address it could open', async () => {
+    const html = await render(
+      WaitlistPage({ ...waitlistProps, canCompose: true }) as HtmlEscapedString
+    )
+
+    expect(html).toContain('href="/message?userId=u1"')
+  })
+
+  it('offers no per-person message where there is no address to write to', async () => {
+    const locked = await render(
+      WaitlistPage({ ...waitlistProps, canCompose: false }) as HtmlEscapedString
+    )
+    const unopened = await render(
+      WaitlistPage({
+        ...waitlistProps,
+        rows: [{ ...waitlistProps.rows[0], email: '(decrypt failed)' }],
+        canCompose: true,
+      }) as HtmlEscapedString
+    )
+
+    expect(locked).not.toContain('/message')
+    expect(unopened).not.toContain('/message')
+  })
+})
+
+describe('MessagePage', () => {
+  async function body(
+    props: Partial<Parameters<typeof MessagePage>[0]> = {}
+  ): Promise<string> {
+    return render(
+      MessagePage({
+        envLabel: 'Test Env',
+        username: 'root',
+        section: '/waitlist',
+        recipient: { id: 'u1', username: 'alice', email: 'alice@example.com' },
+        ...props,
+      }) as HtmlEscapedString
+    )
+  }
+
+  it('names who the message goes to', async () => {
+    const html = await body()
+
+    expect(html).toContain('Message alice')
+    expect(html).toContain('alice@example.com')
+  })
+
+  // The address is shown, never posted: the route re-reads it from the
+  // database, so the only recipient the form names is a user id.
+  it('posts the user id, not the address', async () => {
+    const html = await body()
+
+    expect(html).toContain('action="/message"')
+    expect(html).toContain('name="userId" value="u1"')
+    expect(html).not.toContain('value="alice@example.com"')
+  })
+
+  it('hands a failed draft back', async () => {
+    const html = await body({
+      subject: 'Welcome',
+      body: 'Glad you are here',
+      error: 'Could not send',
+    })
+
+    expect(html).toContain('value="Welcome"')
+    expect(html).toContain('Glad you are here')
+    expect(html).toContain('Could not send')
+  })
+
+  it('keeps the section it was opened from lit, and goes back to it', async () => {
+    const html = await body({ section: '/users' })
+
+    expect(html).toMatch(/href="\/users"[^>]*aria-current="page"/)
+    expect(html).toContain('Cancel')
+  })
 })
 
 describe('UsersPage', () => {
@@ -321,6 +424,15 @@ describe('UsersPage', () => {
     expect(edit).toMatch(
       /type="button"[^>]*data-edit-cancel|data-edit-cancel[^>]*type="button"/
     )
+  })
+
+  it('offers a message on the rows it can write to', async () => {
+    const html = await body()
+
+    expect(rowByAttr(html, 'data-user-row="u1"')).toContain(
+      'href="/message?userId=u1"'
+    )
+    expect(html).not.toContain('/message?userId=u3')
   })
 
   it('offers a delete on the display row, with a confirm', async () => {
