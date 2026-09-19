@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.10.0](https://github.com/andrewshell/pinsquirrel/compare/v3.9.0...v3.10.0) (2026-09-19)
+
+
+### Features
+
+* **admin:** email a user when they are granted access ([aca5c4f](https://github.com/andrewshell/pinsquirrel/commit/aca5c4f53398e3b6c3e2fd0f2f7300502ede3904))
+* **admin:** message one user from the Waitlist or Users page ([2c6962e](https://github.com/andrewshell/pinsquirrel/commit/2c6962e224a4a015249e4a416afa2f40600afa09))
+
+
+### Bug Fixes
+
+* **hono:** answer programs in JSON, not HTML ([4012fca](https://github.com/andrewshell/pinsquirrel/commit/4012fca76f3ad9bc41b6ab34f398e5ce3e29f3f6))
+
 ## [3.9.0](https://github.com/andrewshell/pinsquirrel/compare/v3.8.0...v3.9.0) (2026-09-11)
 
 
