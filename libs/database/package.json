@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@pinsquirrel/domain": "workspace:*",
-    "drizzle-kit": "1.0.0-rc.5-ab785fc",
+    "drizzle-kit": "1.0.0-rc.5-5935859",
     "drizzle-orm": "1.0.0-rc.5-5935859",
     "mysql2": "^3.24.4"
   },
