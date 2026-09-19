@@ -191,8 +191,8 @@ importers:
         specifier: ^17.4.2
         version: 17.4.2
       drizzle-orm:
-        specifier: 1.0.0-rc.5-169397b
-        version: 1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.4(@types/node@26.5.1))(pg@8.16.3)(zod@4.6.5)
+        specifier: 1.0.0-rc.5-5935859
+        version: 1.0.0-rc.5-5935859(@types/pg@8.15.5)(mysql2@3.24.4(@types/node@26.5.1))(pg@8.16.3)(zod@4.6.5)
       hono:
         specifier: ^4.13.8
         version: 4.13.8
@@ -316,8 +316,8 @@ importers:
         specifier: 1.0.0-rc.5-ab785fc
         version: 1.0.0-rc.5-ab785fc
       drizzle-orm:
-        specifier: 1.0.0-rc.5-169397b
-        version: 1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.4(@types/node@26.5.1))(pg@8.16.3)(zod@4.6.5)
+        specifier: 1.0.0-rc.5-5935859
+        version: 1.0.0-rc.5-5935859(@types/pg@8.15.5)(mysql2@3.24.4(@types/node@26.5.1))(pg@8.16.3)(zod@4.6.5)
       mysql2:
         specifier: ^3.24.4
         version: 3.24.4(@types/node@26.5.1)
@@ -1787,8 +1787,8 @@ packages:
     resolution: {integrity: sha512-TSg7sK1finOxdo48O9mDfyMY3lhi/aHCVIil5TFhthyq/H/89H/3nwX5V9Gdp7HYMUGFHyWJD5iowSn98l0elw==}
     hasBin: true
 
-  drizzle-orm@1.0.0-rc.5-169397b:
-    resolution: {integrity: sha512-xf5TudQhFplMMzjwgmMY5f64Sqbv4iwXxdTHBHqvLMt+SHyY8rAYhzNLQchEkDxiqMclTS/txPEOg5pdQy0Tcw==}
+  drizzle-orm@1.0.0-rc.5-5935859:
+    resolution: {integrity: sha512-PkVjyxhamD7IOVfpDMn3BmV9afyvj3eeLvIPind3NmPv+cfv6/jh6GN0fHP0zzgrprGx/jGE4mkE0ttRFlzHwA==}
     peerDependencies:
       '@aws-sdk/client-rds-data': '>=3'
       '@cloudflare/workers-types': '>=4'
@@ -4359,7 +4359,7 @@ snapshots:
       get-tsconfig: 4.13.7
       jiti: 2.7.0
 
-  drizzle-orm@1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.4(@types/node@26.5.1))(pg@8.16.3)(zod@4.6.5):
+  drizzle-orm@1.0.0-rc.5-5935859(@types/pg@8.15.5)(mysql2@3.24.4(@types/node@26.5.1))(pg@8.16.3)(zod@4.6.5):
     optionalDependencies:
       '@types/pg': 8.15.5
       mysql2: 3.24.4(@types/node@26.5.1)
