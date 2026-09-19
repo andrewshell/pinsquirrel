@@ -59,7 +59,7 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: '>=2.0.5'
-        version: 2.1.1(hono@4.13.7)
+        version: 2.1.1(hono@4.13.8)
       '@pinsquirrel/crypto':
         specifier: workspace:*
         version: link:../../libs/crypto
@@ -82,8 +82,8 @@ importers:
         specifier: ^17.4.2
         version: 17.4.2
       hono:
-        specifier: ^4.13.7
-        version: 4.13.7
+        specifier: ^4.13.8
+        version: 4.13.8
     devDependencies:
       '@tailwindcss/cli':
         specifier: ^4.3.3
@@ -150,16 +150,16 @@ importers:
     dependencies:
       '@hono/mcp':
         specifier: ^0.3.2
-        version: 0.3.2(@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.5.4))(hono-rate-limiter@0.5.3(hono@4.13.7))(hono@4.13.7)(zod@4.5.4)
+        version: 0.3.2(@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.6.5))(hono-rate-limiter@0.5.3(hono@4.13.8))(hono@4.13.8)(zod@4.6.5)
       '@hono/node-server':
         specifier: '>=2.0.5'
-        version: 2.1.1(hono@4.13.7)
+        version: 2.1.1(hono@4.13.8)
       '@hono/zod-openapi':
         specifier: ^1.6.3
-        version: 1.6.3(hono@4.13.7)(zod@4.5.4)
+        version: 1.6.3(hono@4.13.8)(zod@4.6.5)
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
-        version: 1.30.0(supports-color@10.2.2)(zod@4.5.4)
+        version: 1.30.0(supports-color@10.2.2)(zod@4.6.5)
       '@pinsquirrel/adapters':
         specifier: workspace:*
         version: link:../../libs/adapters
@@ -183,7 +183,7 @@ importers:
         version: link:../../libs/ui
       '@scalar/hono-api-reference':
         specifier: ^0.12.1
-        version: 0.12.1(hono@4.13.7)
+        version: 0.12.1(hono@4.13.8)
       cheerio:
         specifier: ^1.2.0
         version: 1.2.0
@@ -192,16 +192,16 @@ importers:
         version: 17.4.2
       drizzle-orm:
         specifier: 1.0.0-rc.5-169397b
-        version: 1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.3(@types/node@26.5.1))(pg@8.16.3)(zod@4.5.4)
+        version: 1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.4(@types/node@26.5.1))(pg@8.16.3)(zod@4.6.5)
       hono:
-        specifier: ^4.13.7
-        version: 4.13.7
+        specifier: ^4.13.8
+        version: 4.13.8
       mailgun.js:
         specifier: ^14.0.1
         version: 14.0.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       mysql2:
-        specifier: ^3.24.3
-        version: 3.24.3(@types/node@26.5.1)
+        specifier: ^3.24.4
+        version: 3.24.4(@types/node@26.5.1)
       pino:
         specifier: ^10.3.1
         version: 10.3.1
@@ -212,8 +212,8 @@ importers:
         specifier: '>=8.9.0'
         version: 8.10.2
       zod:
-        specifier: ^4.5.4
-        version: 4.5.4
+        specifier: ^4.6.5
+        version: 4.6.5
     devDependencies:
       '@tailwindcss/cli':
         specifier: ^4.3.3
@@ -317,10 +317,10 @@ importers:
         version: 1.0.0-rc.5-ab785fc
       drizzle-orm:
         specifier: 1.0.0-rc.5-169397b
-        version: 1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.3(@types/node@26.5.1))(pg@8.16.3)(zod@4.5.4)
+        version: 1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.4(@types/node@26.5.1))(pg@8.16.3)(zod@4.6.5)
       mysql2:
-        specifier: ^3.24.3
-        version: 3.24.3(@types/node@26.5.1)
+        specifier: ^3.24.4
+        version: 3.24.4(@types/node@26.5.1)
     devDependencies:
       '@types/node':
         specifier: ^26.5.1
@@ -397,13 +397,13 @@ importers:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
-        version: 1.30.0(supports-color@10.2.2)(zod@4.5.4)
+        version: 1.30.0(supports-color@10.2.2)(zod@4.6.5)
       '@pinsquirrel/domain':
         specifier: workspace:*
         version: link:../domain
       zod:
-        specifier: ^4.5.4
-        version: 4.5.4
+        specifier: ^4.6.5
+        version: 4.6.5
     devDependencies:
       '@types/node':
         specifier: ^26.5.1
@@ -427,8 +427,8 @@ importers:
   libs/ui:
     dependencies:
       hono:
-        specifier: ^4.13.7
-        version: 4.13.7
+        specifier: ^4.13.8
+        version: 4.13.8
     devDependencies:
       '@types/node':
         specifier: ^26.5.1
@@ -2239,8 +2239,8 @@ packages:
       unstorage:
         optional: true
 
-  hono@4.13.7:
-    resolution: {integrity: sha512-c8/gF9ac8Y78/agExVocyLevgR+JlpNB444Py0FSX8pJoPdYUfUzRcXtYEYGwt6l19qIlVZPN5Mfsw9jFShmQQ==}
+  hono@4.13.8:
+    resolution: {integrity: sha512-/Gng7NfoykZl2pjukW5Z6+8Yxm3BPRf86GTbQnt0SbySkvax4fyL4H3HhY1cCpBGmiW9XDRFzRV+CXK2W8QudQ==}
     engines: {node: '>=16.9.0'}
 
   hookified@1.15.1:
@@ -2591,8 +2591,8 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
-  mysql2@3.24.3:
-    resolution: {integrity: sha512-OKfWHkMAg9v06neq8FmSyhbxPQKABN9PAW5G9/bDTXzJBO5xXtkKL0V27vju7HQWk9UD4Od5BZsvCtBTB1CPEw==}
+  mysql2@3.24.4:
+    resolution: {integrity: sha512-A2olluVlj0mvgyIRRISMEzXc51m+21mRtcMVjJyIpt2GG98+XrC9m9HzsqcMsX2LcnfccJvY5NB22g8fENBnOA==}
     engines: {node: '>= 8.0'}
     peerDependencies:
       '@types/node': '>= 8'
@@ -2948,8 +2948,8 @@ packages:
     resolution: {integrity: sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==}
     engines: {node: '>= 10.x'}
 
-  sql-escaper@1.5.1:
-    resolution: {integrity: sha512-4toX5E1fQbBrpfXidaHnF0669nkAdETeIPTs2SUjxxD7RRIs9ICG4gtpmfc68JCEKehsdwLFqBu9VlQqZ1P1gg==}
+  sql-escaper@1.5.2:
+    resolution: {integrity: sha512-6CKD38c31SENivxOADeMNLdukOnUxUcflKtzVWzace7Riv1v7cAEym5Cx9Q7gYZ3ezIJI7ZpqecQq8cqNeSSFg==}
     engines: {bun: '>=1.0.0', deno: '>=2.0.0', node: '>=12.0.0'}
 
   stackback@0.0.2:
@@ -3309,15 +3309,15 @@ packages:
     peerDependencies:
       zod: ^3.25.28 || ^4
 
-  zod@4.5.4:
-    resolution: {integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==}
+  zod@4.6.5:
+    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
 
 snapshots:
 
-  '@asteasolutions/zod-to-openapi@9.1.0(zod@4.5.4)':
+  '@asteasolutions/zod-to-openapi@9.1.0(zod@4.6.5)':
     dependencies:
       openapi3-ts: 4.6.1
-      zod: 4.5.4
+      zod: 4.6.5
 
   '@babel/helper-string-parser@7.29.7': {}
 
@@ -3538,30 +3538,30 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@hono/mcp@0.3.2(@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.5.4))(hono-rate-limiter@0.5.3(hono@4.13.7))(hono@4.13.7)(zod@4.5.4)':
+  '@hono/mcp@0.3.2(@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.6.5))(hono-rate-limiter@0.5.3(hono@4.13.8))(hono@4.13.8)(zod@4.6.5)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.30.0(supports-color@10.2.2)(zod@4.5.4)
-      hono: 4.13.7
-      hono-rate-limiter: 0.5.3(hono@4.13.7)
+      '@modelcontextprotocol/sdk': 1.30.0(supports-color@10.2.2)(zod@4.6.5)
+      hono: 4.13.8
+      hono-rate-limiter: 0.5.3(hono@4.13.8)
       pkce-challenge: 5.0.1
-      zod: 4.5.4
+      zod: 4.6.5
 
-  '@hono/node-server@2.1.1(hono@4.13.7)':
+  '@hono/node-server@2.1.1(hono@4.13.8)':
     dependencies:
-      hono: 4.13.7
+      hono: 4.13.8
 
-  '@hono/zod-openapi@1.6.3(hono@4.13.7)(zod@4.5.4)':
+  '@hono/zod-openapi@1.6.3(hono@4.13.8)(zod@4.6.5)':
     dependencies:
-      '@asteasolutions/zod-to-openapi': 9.1.0(zod@4.5.4)
-      '@hono/zod-validator': 0.9.1(hono@4.13.7)(zod@4.5.4)
-      hono: 4.13.7
+      '@asteasolutions/zod-to-openapi': 9.1.0(zod@4.6.5)
+      '@hono/zod-validator': 0.9.1(hono@4.13.8)(zod@4.6.5)
+      hono: 4.13.8
       openapi3-ts: 4.6.1
-      zod: 4.5.4
+      zod: 4.6.5
 
-  '@hono/zod-validator@0.9.1(hono@4.13.7)(zod@4.5.4)':
+  '@hono/zod-validator@0.9.1(hono@4.13.8)(zod@4.6.5)':
     dependencies:
-      hono: 4.13.7
-      zod: 4.5.4
+      hono: 4.13.8
+      zod: 4.6.5
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -3612,9 +3612,9 @@ snapshots:
 
   '@mixmark-io/domino@2.2.0': {}
 
-  '@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.5.4)':
+  '@modelcontextprotocol/sdk@1.30.0(supports-color@10.2.2)(zod@4.6.5)':
     dependencies:
-      '@hono/node-server': 2.1.1(hono@4.13.7)
+      '@hono/node-server': 2.1.1(hono@4.13.8)
       ajv: 8.18.0
       ajv-formats: 3.0.1(ajv@8.18.0)
       content-type: 1.0.5
@@ -3624,13 +3624,13 @@ snapshots:
       eventsource-parser: 3.0.6
       express: 5.2.1(supports-color@10.2.2)
       express-rate-limit: 8.3.2(express@5.2.1(supports-color@10.2.2))
-      hono: 4.13.7
+      hono: 4.13.8
       jose: 6.2.2
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 4.5.4
-      zod-to-json-schema: 3.25.2(zod@4.5.4)
+      zod: 4.6.5
+      zod-to-json-schema: 3.25.2(zod@4.6.5)
     transitivePeerDependencies:
       - supports-color
 
@@ -3827,10 +3827,10 @@ snapshots:
 
   '@scalar/helpers@0.11.3': {}
 
-  '@scalar/hono-api-reference@0.12.1(hono@4.13.7)':
+  '@scalar/hono-api-reference@0.12.1(hono@4.13.8)':
     dependencies:
       '@scalar/client-side-rendering': 0.4.0
-      hono: 4.13.7
+      hono: 4.13.8
 
   '@scalar/schemas@0.9.0':
     dependencies:
@@ -3842,7 +3842,7 @@ snapshots:
       '@scalar/helpers': 0.11.3
       nanoid: 5.1.16
       type-fest: 5.9.0
-      zod: 4.5.4
+      zod: 4.6.5
 
   '@scalar/validation@0.6.3': {}
 
@@ -4359,12 +4359,12 @@ snapshots:
       get-tsconfig: 4.13.7
       jiti: 2.7.0
 
-  drizzle-orm@1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.3(@types/node@26.5.1))(pg@8.16.3)(zod@4.5.4):
+  drizzle-orm@1.0.0-rc.5-169397b(@types/pg@8.15.5)(mysql2@3.24.4(@types/node@26.5.1))(pg@8.16.3)(zod@4.6.5):
     optionalDependencies:
       '@types/pg': 8.15.5
-      mysql2: 3.24.3(@types/node@26.5.1)
+      mysql2: 3.24.4(@types/node@26.5.1)
       pg: 8.16.3
-      zod: 4.5.4
+      zod: 4.6.5
 
   dunder-proto@1.0.1:
     dependencies:
@@ -4744,11 +4744,11 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
-  hono-rate-limiter@0.5.3(hono@4.13.7):
+  hono-rate-limiter@0.5.3(hono@4.13.8):
     dependencies:
-      hono: 4.13.7
+      hono: 4.13.8
 
-  hono@4.13.7: {}
+  hono@4.13.8: {}
 
   hookified@1.15.1: {}
 
@@ -5022,7 +5022,7 @@ snapshots:
 
   ms@2.1.3: {}
 
-  mysql2@3.24.3(@types/node@26.5.1):
+  mysql2@3.24.4(@types/node@26.5.1):
     dependencies:
       '@types/node': 26.5.1
       aws-ssl-profiles: 1.1.2
@@ -5031,7 +5031,7 @@ snapshots:
       long: 5.3.2
       lru.min: 1.1.5
       named-placeholders: 1.1.6
-      sql-escaper: 1.5.1
+      sql-escaper: 1.5.2
 
   mz@2.7.0:
     dependencies:
@@ -5419,7 +5419,7 @@ snapshots:
 
   split2@4.2.0: {}
 
-  sql-escaper@1.5.1: {}
+  sql-escaper@1.5.2: {}
 
   stackback@0.0.2: {}
 
@@ -5695,8 +5695,8 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod-to-json-schema@3.25.2(zod@4.5.4):
+  zod-to-json-schema@3.25.2(zod@4.6.5):
     dependencies:
-      zod: 4.5.4
+      zod: 4.6.5
 
-  zod@4.5.4: {}
+  zod@4.6.5: {}
