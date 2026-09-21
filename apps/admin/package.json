@@ -25,7 +25,7 @@
     "@pinsquirrel/mailgun": "workspace:*",
     "@pinsquirrel/services": "workspace:*",
     "@pinsquirrel/ui": "workspace:*",
-    "dotenv": "^17.4.2",
+    "dotenv": "^18.0.0",
     "hono": "^4.13.8"
   },
   "devDependencies": {
