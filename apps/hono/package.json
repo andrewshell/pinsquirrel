@@ -30,7 +30,7 @@
     "@pinsquirrel/mailgun": "workspace:*",
     "@pinsquirrel/services": "workspace:*",
     "@pinsquirrel/ui": "workspace:*",
-    "@scalar/hono-api-reference": "^0.12.1",
+    "@scalar/hono-api-reference": "^0.12.2",
     "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "1.0.0-rc.5-5935859",
