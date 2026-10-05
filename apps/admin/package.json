@@ -18,7 +18,7 @@
     "css:watch": "tailwindcss -i ./src/styles/app.css -o ./src/static/styles.css --watch"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.1",
+    "@hono/node-server": "^2.1.3",
     "@pinsquirrel/crypto": "workspace:*",
     "@pinsquirrel/database": "workspace:*",
     "@pinsquirrel/domain": "workspace:*",
@@ -26,7 +26,7 @@
     "@pinsquirrel/services": "workspace:*",
     "@pinsquirrel/ui": "workspace:*",
     "dotenv": "^17.4.2",
-    "hono": "^4.13.8"
+    "hono": "^4.13.12"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3",
