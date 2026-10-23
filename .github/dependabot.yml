@@ -13,6 +13,11 @@ updates:
       interval: 'weekly'
     commit-message:
       prefix: 'fix(docker)'
+    # A Node major also moves engines, .nvmrc and CI's node-version, so it is
+    # done by hand rather than as an image-only bump.
+    ignore:
+      - dependency-name: 'node'
+        update-types: ['version-update:semver-major']
 
   # pnpm workspace: pnpm-lock.yaml at the root covers every package under
   # apps/* and libs/*, so a single root entry updates the whole monorepo.
