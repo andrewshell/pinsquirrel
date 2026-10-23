@@ -5,6 +5,15 @@ updates:
     schedule:
       interval: 'weekly'
 
+  # The Dockerfile pins an exact Node patch release so a rebuild can't
+  # silently ship a vulnerable runtime; this keeps that pin moving.
+  - package-ecosystem: 'docker'
+    directory: '/apps/hono'
+    schedule:
+      interval: 'weekly'
+    commit-message:
+      prefix: 'fix(docker)'
+
   # pnpm workspace: pnpm-lock.yaml at the root covers every package under
   # apps/* and libs/*, so a single root entry updates the whole monorepo.
   # Per-package directory entries would have no lockfile to resolve against.
