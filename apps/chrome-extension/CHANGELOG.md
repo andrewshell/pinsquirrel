@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/andrewshell/pinsquirrel/compare/chrome-extension-v1.2.0...chrome-extension-v1.2.1) (2026-10-23)
+
+
+### Bug Fixes
+
+* **deps:** resolve audit advisories ([8bc0271](https://github.com/andrewshell/pinsquirrel/commit/8bc027141154dceefaaac3e2b8d6486c4d38073a))
+
 ## [1.2.0](https://github.com/andrewshell/pinsquirrel/compare/chrome-extension-v1.1.0...chrome-extension-v1.2.0) (2026-09-11)
 
 
