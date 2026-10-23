@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.10.1](https://github.com/andrewshell/pinsquirrel/compare/v3.10.0...v3.10.1) (2026-10-23)
+
+
+### Bug Fixes
+
+* **deps:** resolve audit advisories ([8bc0271](https://github.com/andrewshell/pinsquirrel/commit/8bc027141154dceefaaac3e2b8d6486c4d38073a))
+* **docker:** pin Node to 24.22.1 for October 2026 security release ([144f1ea](https://github.com/andrewshell/pinsquirrel/commit/144f1ead87d49a90d1d187265068b5921019b73f))
+
 ## [3.10.0](https://github.com/andrewshell/pinsquirrel/compare/v3.9.0...v3.10.0) (2026-09-19)
 
 
