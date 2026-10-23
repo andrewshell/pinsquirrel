@@ -20,11 +20,11 @@
     "keygen": "tsx src/keygen.ts"
   },
   "devDependencies": {
-    "@types/node": "^26.5.1",
+    "@types/node": "^26.6.5",
     "@vitest/coverage-v8": "^5.0.5",
-    "eslint": "^10.10.0",
-    "prettier": "^3.9.6",
-    "tsx": "^4.23.13",
+    "eslint": "^10.13.0",
+    "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "vitest": "^5.0.5"
   },
