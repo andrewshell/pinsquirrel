@@ -26,19 +26,19 @@
     "@pinsquirrel/services": "workspace:*",
     "@pinsquirrel/ui": "workspace:*",
     "dotenv": "^17.4.2",
-    "hono": "^4.13.8"
+    "hono": "^4.13.13"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3",
     "@types/node": "^26.5.1",
-    "@vitest/coverage-v8": "^5.0.0",
-    "concurrently": "^10.0.5",
+    "@vitest/coverage-v8": "^5.0.5",
+    "concurrently": "^10.0.6",
     "eslint": "^10.10.0",
     "prettier": "^3.9.6",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.13",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.5"
   },
   "engines": {
     "node": ">=24.0.0"
