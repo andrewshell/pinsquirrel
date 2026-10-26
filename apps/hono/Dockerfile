@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7-labs
 # Build context should be the monorepo root
-FROM node:24.22.1-alpine AS base
+FROM node:26.12.1-alpine AS base
 RUN corepack enable
 WORKDIR /app
 
@@ -30,7 +30,7 @@ COPY --parents apps/hono/package.json libs/*/package.json ./
 RUN npm_config_ignore_scripts=true pnpm install --frozen-lockfile --prod
 
 # Final runtime image
-FROM node:24.22.1-alpine AS runtime
+FROM node:26.12.1-alpine AS runtime
 RUN corepack enable
 WORKDIR /app
 
