@@ -24,28 +24,34 @@ export class RateLimiter {
     this.cleanupTimer = setInterval(() => this.cleanup(), cleanupMs)
   }
 
+  /**
+   * Record an attempt if the key has budget left. A refused attempt is not
+   * recorded, so the lockout ends when the admitted attempts leave the window
+   * however many refusals arrive meanwhile, and a key never stores more than
+   * `maxAttempts` timestamps.
+   */
   hit(key: string): RateLimitResult {
     const now = Date.now()
-    const cutoff = now - this.windowMs
-    const timestamps = (this.attempts.get(key) ?? []).filter(t => t > cutoff)
+    const timestamps = this.recent(key, now)
+    if (timestamps.length >= this.maxAttempts) {
+      return {
+        limited: true,
+        remaining: 0,
+        retryAfterMs: timestamps[0] + this.windowMs - now,
+      }
+    }
+
     timestamps.push(now)
     this.attempts.set(key, timestamps)
-
-    const limited = timestamps.length > this.maxAttempts
-    const remaining = Math.max(0, this.maxAttempts - timestamps.length)
-    const retryAfterMs = limited ? timestamps[0] + this.windowMs - now : 0
-
-    return { limited, remaining, retryAfterMs }
+    return {
+      limited: false,
+      remaining: this.maxAttempts - timestamps.length,
+      retryAfterMs: 0,
+    }
   }
 
   isLimited(key: string): boolean {
-    const now = Date.now()
-    const cutoff = now - this.windowMs
-    const timestamps = this.attempts.get(key)
-    if (!timestamps) return false
-
-    const recent = timestamps.filter(t => t > cutoff)
-    return recent.length >= this.maxAttempts
+    return this.recent(key, Date.now()).length >= this.maxAttempts
   }
 
   reset(key: string): void {
@@ -57,6 +63,11 @@ export class RateLimiter {
       clearInterval(this.cleanupTimer)
       this.cleanupTimer = null
     }
+  }
+
+  private recent(key: string, now: number): number[] {
+    const cutoff = now - this.windowMs
+    return (this.attempts.get(key) ?? []).filter(t => t > cutoff)
   }
 
   private cleanup(): void {

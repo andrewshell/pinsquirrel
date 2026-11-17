@@ -61,6 +61,50 @@ describe('RateLimiter', () => {
     })
   })
 
+  describe('refused hits', () => {
+    beforeEach(() => {
+      vi.setSystemTime(0)
+      limiter = new RateLimiter({ maxAttempts: 3, windowMs: 1000 })
+    })
+
+    it('admits a hit made after waiting the advertised retry delay', () => {
+      limiter.hit('k')
+      vi.advanceTimersByTime(1)
+      limiter.hit('k')
+      vi.advanceTimersByTime(1)
+      limiter.hit('k')
+      vi.advanceTimersByTime(498)
+      const refused = limiter.hit('k')
+      expect(refused.limited).toBe(true)
+
+      vi.advanceTimersByTime(refused.retryAfterMs)
+
+      expect(limiter.hit('k').limited).toBe(false)
+    })
+
+    it('do not extend the lockout past the window of the admitted hits', () => {
+      for (let i = 0; i < 3; i++) limiter.hit('k')
+      for (let i = 0; i < 1000; i++) {
+        vi.advanceTimersByTime(1)
+        limiter.hit('k')
+      }
+      vi.advanceTimersByTime(1)
+
+      expect(limiter.hit('k').limited).toBe(false)
+    })
+
+    it('are not counted once the admitted hits leave the window', () => {
+      for (let i = 0; i < 3; i++) limiter.hit('k')
+      for (let i = 0; i < 999; i++) {
+        vi.advanceTimersByTime(1)
+        expect(limiter.hit('k').limited).toBe(true)
+      }
+      vi.advanceTimersByTime(2)
+
+      expect(limiter.hit('k').remaining).toBe(2)
+    })
+  })
+
   describe('isLimited', () => {
     it('returns false when under the limit', () => {
       limiter = new RateLimiter({ maxAttempts: 3, windowMs: 60_000 })
