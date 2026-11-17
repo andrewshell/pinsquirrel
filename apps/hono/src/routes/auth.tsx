@@ -18,6 +18,7 @@ import { getSessionManager } from '../middleware/session'
 import {
   signinLimiter,
   signinIpLimiter,
+  signinUsernameLimiter,
   signinRateLimitKey,
   getClientIp,
   signupLimiter,
@@ -72,14 +73,16 @@ auth.post('/signin', async c => {
   const redirectTo = getString(formData.redirectTo) || undefined
   const embed = getString(formData.embed) === '1'
 
-  // Two keys, two attacks. The IP:username key stops guessing at one account;
-  // the IP-only key stops one address spraying a password across many
+  // Three keys, three attacks. The IP:username key stops guessing at one
+  // account; the IP-only key stops one address spraying a password across many
   // usernames, which the first never sees because every guess lands in a fresh
-  // bucket.
+  // bucket; the username-only key stops many addresses guessing at one account.
   const rateLimitKey = signinRateLimitKey(c, username || '')
+  const usernameKey = username.toLowerCase()
   const attempt = reserve([
     [signinLimiter, rateLimitKey],
     [signinIpLimiter, getClientIp(c)],
+    [signinUsernameLimiter, usernameKey],
   ])
   if (attempt.limited) {
     c.header('Retry-After', retryAfterSeconds(attempt.retryAfterMs))
@@ -101,12 +104,13 @@ auth.post('/signin', async c => {
   try {
     const user = await authService.login({ username, password })
 
-    // Only the per-account counter is cleared. Clearing the IP counter too
+    // Only the per-account counters are cleared. Clearing the IP counter too
     // would let an attacker who owns one valid account wipe their spray budget
     // by signing into it between rounds; releasing this attempt keeps a
     // successful sign-in from spending it either.
     attempt.release()
     signinLimiter.reset(rateLimitKey)
+    signinUsernameLimiter.reset(usernameKey)
 
     // Create session
     await sessionManager.create(user.id, keepSignedIn)

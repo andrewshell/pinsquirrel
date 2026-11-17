@@ -53,6 +53,14 @@ export const signinIpLimiter = new RateLimiter({
   windowMs: 15 * 60 * 1000,
 })
 
+// Keyed on the username alone, so guesses at one account spread across many
+// addresses still meet a limit. Far looser than signinLimiter, because anyone
+// can spend this budget for a victim and so lock them out while it lasts.
+export const signinUsernameLimiter = new RateLimiter({
+  maxAttempts: 50,
+  windowMs: 15 * 60 * 1000,
+})
+
 // Keyed on the user id rather than the address: unlocking requires an
 // authenticated session, so whoever is guessing already holds the cookie and
 // their IP proves nothing - rotating it must not buy them a fresh budget.

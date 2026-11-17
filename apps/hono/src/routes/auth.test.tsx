@@ -88,10 +88,14 @@ vi.mock('../lib/logger.js', () => ({
 }))
 
 import { authRoutes } from './auth'
-import { signinIpLimiter, signinLimiter } from '../middleware/rate-limit'
+import {
+  signinIpLimiter,
+  signinLimiter,
+  signinUsernameLimiter,
+} from '../middleware/rate-limit'
 import { TEST_CLIENT_IP, exhaust } from '../test-support/rate-limit'
 
-const SIGNIN_USERNAMES = ['a', 'alice', 'bob']
+const SIGNIN_USERNAMES = ['a', 'alice', 'bob', 'spread-target']
 
 function form(fields: Record<string, string>): RequestInit {
   return {
@@ -111,6 +115,7 @@ describe('auth routes', () => {
     limiter.ipLimited.mockReturnValue(false)
     for (const username of SIGNIN_USERNAMES) {
       signinLimiter.reset(`${TEST_CLIENT_IP}:${username}`)
+      signinUsernameLimiter.reset(username)
     }
     signinIpLimiter.reset(TEST_CLIENT_IP)
     app = new Hono()
@@ -329,6 +334,23 @@ describe('auth routes', () => {
         }
 
         expect((await signin('pw', 'bob')).status).toBe(429)
+      })
+
+      it('limits failed sign-ins for one username spread across many addresses', async () => {
+        auth.login.mockRejectedValue(new InvalidCredentialsError())
+
+        const statuses: number[] = []
+        for (let i = 0; i < 100; i++) {
+          const res = await app.request(
+            '/signin',
+            form({ username: 'spread-target', password: `guess-${i}` }),
+            { incoming: { socket: { remoteAddress: `198.51.100.${i}` } } }
+          )
+          statuses.push(res.status)
+        }
+
+        expect(auth.login.mock.calls.length).toBeLessThan(100)
+        expect(statuses).toContain(429)
       })
 
       it('does not give the address budget back on a successful sign-in', async () => {
