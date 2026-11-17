@@ -588,6 +588,15 @@ describe('auth routes', () => {
   })
 
   describe('reset-password', () => {
+    it('states the same minimum length the service enforces', async () => {
+      auth.validateResetToken.mockResolvedValue(true)
+
+      const res = await app.request('/reset-password/tok-1')
+      const text = (await res.text()).replace(/\s+/g, ' ')
+
+      expect(text).toContain('at least 12 characters')
+    })
+
     it('renders the form for a valid token', async () => {
       auth.validateResetToken.mockResolvedValue(true)
 
