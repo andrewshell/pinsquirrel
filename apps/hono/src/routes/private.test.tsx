@@ -32,24 +32,6 @@ import {
 const svc = createServiceMocks()
 const session = createSessionMocks()
 
-const unlockLimiter = {
-  isLimited: vi.fn(),
-  hit: vi.fn(),
-  reset: vi.fn(),
-}
-
-// The RateLimiter class has its own unit tests; what matters here is that the
-// unlock route consults it and honours the answer, so the seam is driven
-// directly - same approach as auth.test.tsx.
-vi.mock('../middleware/rate-limit', () => ({
-  privateUnlockLimiter: {
-    isLimited: (...a: unknown[]): boolean =>
-      unlockLimiter.isLimited(...a) as boolean,
-    hit: (...a: unknown[]): unknown => unlockLimiter.hit(...a) as unknown,
-    reset: (...a: unknown[]): unknown => unlockLimiter.reset(...a) as unknown,
-  },
-}))
-
 vi.mock('../lib/services', () => ({
   authService: {
     login: (...a: unknown[]) => svc.login(...a) as unknown,
@@ -79,6 +61,8 @@ vi.mock('../middleware/session', () => ({
 }))
 
 import { privateRoutes } from './private'
+import { privateUnlockLimiter } from '../middleware/rate-limit'
+import { exhaust } from '../test-support/rate-limit'
 
 describe('private routes', () => {
   let app: Hono
@@ -89,7 +73,7 @@ describe('private routes', () => {
     session.authUser.mockReturnValue(testUser)
     session.getFlash.mockReturnValue(null)
     session.isPrivateUnlocked.mockReturnValue(true)
-    unlockLimiter.isLimited.mockReturnValue(false)
+    privateUnlockLimiter.reset(testUser.id)
     svc.getUserTags.mockResolvedValue([makeTag()])
     svc.searchTags.mockResolvedValue([])
     svc.getUserPinsWithPagination.mockResolvedValue({
@@ -287,42 +271,54 @@ describe('private routes', () => {
     // cookie. Keyed on the user id, not the IP: the attacker already has the
     // session, so the address proves nothing and rotating it must not help.
     describe('rate limiting', () => {
-      it('returns 429 without checking the password when limited', async () => {
-        unlockLimiter.isLimited.mockReturnValue(true)
+      async function unlock(password = 'guess') {
+        return app.request('/private/unlock', formBody({ password }))
+      }
 
-        const res = await app.request(
-          '/private/unlock',
-          formBody({ password: 'guess' })
-        )
+      it('returns 429 without checking the password once the budget is spent', async () => {
+        exhaust(privateUnlockLimiter, testUser.id)
+
+        const res = await unlock()
 
         expect(res.status).toBe(429)
+        expect(Number(res.headers.get('Retry-After'))).toBeGreaterThan(0)
         expect(svc.login).not.toHaveBeenCalled()
         expect(session.unlockPrivateMode).not.toHaveBeenCalled()
       })
 
-      it('keys the limiter on the user id', async () => {
-        svc.login.mockResolvedValue(testUser)
-
-        await app.request('/private/unlock', formBody({ password: 'p' }))
-
-        expect(unlockLimiter.isLimited).toHaveBeenCalledWith(testUser.id)
-      })
-
-      it('counts a wrong password against the limiter', async () => {
+      it('spends the budget on wrong passwords only', async () => {
         svc.login.mockRejectedValue(new InvalidCredentialsError())
+        for (let i = 0; i < 5; i++) await unlock(`wrong-${i}`)
 
-        await app.request('/private/unlock', formBody({ password: 'wrong' }))
-
-        expect(unlockLimiter.hit).toHaveBeenCalledWith(testUser.id)
+        expect((await unlock()).status).toBe(429)
+        expect(svc.login).toHaveBeenCalledTimes(5)
       })
 
-      it('clears the limiter on a correct password', async () => {
-        svc.login.mockResolvedValue(testUser)
+      it('lets at most the budget reach the password check when attempts arrive together', async () => {
+        svc.login.mockImplementation(
+          () =>
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new InvalidCredentialsError()), 10)
+            )
+        )
 
-        await app.request('/private/unlock', formBody({ password: 'right' }))
+        const responses = await Promise.all(
+          Array.from({ length: 10 }, (_, i) => unlock(`guess-${i}`))
+        )
 
-        expect(unlockLimiter.reset).toHaveBeenCalledWith(testUser.id)
-        expect(unlockLimiter.hit).not.toHaveBeenCalled()
+        expect(svc.login).toHaveBeenCalledTimes(5)
+        expect(responses.filter(r => r.status === 429)).toHaveLength(5)
+      })
+
+      it('gives the budget back on a correct password', async () => {
+        svc.login.mockRejectedValue(new InvalidCredentialsError())
+        for (let i = 0; i < 4; i++) await unlock(`wrong-${i}`)
+        svc.login.mockResolvedValueOnce(testUser)
+        await unlock('right')
+
+        for (let i = 0; i < 4; i++) await unlock(`wrong-${i}`)
+
+        expect((await unlock()).status).toBe(200)
       })
     })
 

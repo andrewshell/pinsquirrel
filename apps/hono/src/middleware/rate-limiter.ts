@@ -10,6 +10,42 @@ export interface RateLimitResult {
   retryAfterMs: number
 }
 
+/**
+ * One attempt held against one or more buckets. Admitted, it has already been
+ * counted; `release` gives it back when the attempt turned out to prove
+ * nothing about the credential it was guarding.
+ */
+export type Reservation =
+  | { limited: true; retryAfterMs: number }
+  | { limited: false; release: () => void }
+
+/**
+ * Count an attempt against every bucket before doing the work it guards.
+ *
+ * Checking and recording happen in one synchronous step, so attempts that
+ * arrive together cannot all see an empty bucket while the first one is still
+ * being checked. It is all or nothing: a refusal from one bucket spends none
+ * of the others.
+ */
+export function reserve(
+  buckets: ReadonlyArray<readonly [RateLimiter, string]>
+): Reservation {
+  const now = Date.now()
+  const retryAfterMs = Math.max(
+    0,
+    ...buckets.map(([limiter, key]) => limiter.retryAfterMs(key, now))
+  )
+  if (retryAfterMs > 0) return { limited: true, retryAfterMs }
+
+  for (const [limiter, key] of buckets) limiter.record(key, now)
+  return {
+    limited: false,
+    release: () => {
+      for (const [limiter, key] of buckets) limiter.forget(key, now)
+    },
+  }
+}
+
 export class RateLimiter {
   private attempts = new Map<string, number[]>()
   private cleanupTimer: ReturnType<typeof setInterval> | null = null
@@ -32,26 +68,40 @@ export class RateLimiter {
    */
   hit(key: string): RateLimitResult {
     const now = Date.now()
-    const timestamps = this.recent(key, now)
-    if (timestamps.length >= this.maxAttempts) {
-      return {
-        limited: true,
-        remaining: 0,
-        retryAfterMs: timestamps[0] + this.windowMs - now,
-      }
-    }
+    const retryAfterMs = this.retryAfterMs(key, now)
+    if (retryAfterMs > 0) return { limited: true, remaining: 0, retryAfterMs }
 
-    timestamps.push(now)
-    this.attempts.set(key, timestamps)
+    const recorded = this.record(key, now)
     return {
       limited: false,
-      remaining: this.maxAttempts - timestamps.length,
+      remaining: this.maxAttempts - recorded,
       retryAfterMs: 0,
     }
   }
 
   isLimited(key: string): boolean {
-    return this.recent(key, Date.now()).length >= this.maxAttempts
+    return this.retryAfterMs(key, Date.now()) > 0
+  }
+
+  /** How long until `key` has budget again; 0 when it has budget now. */
+  retryAfterMs(key: string, now: number): number {
+    const timestamps = this.recent(key, now)
+    if (timestamps.length < this.maxAttempts) return 0
+    return timestamps[0] + this.windowMs - now
+  }
+
+  record(key: string, now: number): number {
+    const timestamps = this.recent(key, now)
+    timestamps.push(now)
+    this.attempts.set(key, timestamps)
+    return timestamps.length
+  }
+
+  forget(key: string, at: number): void {
+    const timestamps = this.attempts.get(key)
+    if (!timestamps) return
+    const i = timestamps.lastIndexOf(at)
+    if (i !== -1) timestamps.splice(i, 1)
   }
 
   reset(key: string): void {

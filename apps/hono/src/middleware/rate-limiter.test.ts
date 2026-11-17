@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { RateLimiter } from './rate-limiter'
+import { RateLimiter, reserve } from './rate-limiter'
 
 describe('RateLimiter', () => {
   let limiter: RateLimiter
@@ -163,6 +163,71 @@ describe('RateLimiter', () => {
       // After cleanup, the key should be gone — hit should start fresh
       const result = limiter.hit('key1')
       expect(result.remaining).toBe(2)
+    })
+  })
+
+  describe('reserve', () => {
+    let other: RateLimiter
+
+    beforeEach(() => {
+      vi.setSystemTime(0)
+      limiter = new RateLimiter({ maxAttempts: 2, windowMs: 1000 })
+      other = new RateLimiter({ maxAttempts: 5, windowMs: 1000 })
+    })
+
+    afterEach(() => {
+      other.destroy()
+    })
+
+    it('spends one attempt from every bucket when all have budget', () => {
+      expect(
+        reserve([
+          [limiter, 'a'],
+          [other, 'b'],
+        ]).limited
+      ).toBe(false)
+
+      expect(limiter.hit('a').remaining).toBe(0)
+      expect(other.hit('b').remaining).toBe(3)
+    })
+
+    it('refuses without spending any bucket when one is spent', () => {
+      limiter.hit('a')
+      limiter.hit('a')
+
+      const attempt = reserve([
+        [limiter, 'a'],
+        [other, 'b'],
+      ])
+
+      expect(attempt.limited).toBe(true)
+      expect(other.hit('b').remaining).toBe(4)
+    })
+
+    it('reports the wait until every bucket has budget again', () => {
+      limiter.hit('a')
+      limiter.hit('a')
+      vi.advanceTimersByTime(300)
+
+      const attempt = reserve([
+        [limiter, 'a'],
+        [other, 'b'],
+      ])
+
+      expect(attempt).toEqual({ limited: true, retryAfterMs: 700 })
+    })
+
+    it('gives the attempt back to every bucket on release', () => {
+      const attempt = reserve([
+        [limiter, 'a'],
+        [other, 'b'],
+      ])
+      if (attempt.limited) throw new Error('expected an admitted attempt')
+
+      attempt.release()
+
+      expect(limiter.hit('a').remaining).toBe(1)
+      expect(other.hit('b').remaining).toBe(4)
     })
   })
 })

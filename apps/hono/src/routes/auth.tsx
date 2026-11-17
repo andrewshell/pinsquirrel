@@ -23,7 +23,9 @@ import {
   signupLimiter,
   forgotPasswordLimiter,
   rateLimitByIp,
+  retryAfterSeconds,
 } from '../middleware/rate-limit'
+import { reserve } from '../middleware/rate-limiter'
 import { SignInPage } from '../views/pages/signin'
 import { SignUpPage } from '../views/pages/signup'
 import { ForgotPasswordPage } from '../views/pages/forgot-password'
@@ -75,11 +77,12 @@ auth.post('/signin', async c => {
   // usernames, which the first never sees because every guess lands in a fresh
   // bucket.
   const rateLimitKey = signinRateLimitKey(c, username || '')
-  const ipKey = getClientIp(c)
-  if (
-    signinLimiter.isLimited(rateLimitKey) ||
-    signinIpLimiter.isLimited(ipKey)
-  ) {
+  const attempt = reserve([
+    [signinLimiter, rateLimitKey],
+    [signinIpLimiter, getClientIp(c)],
+  ])
+  if (attempt.limited) {
+    c.header('Retry-After', retryAfterSeconds(attempt.retryAfterMs))
     return c.html(
       <SignInPage
         errors={{
@@ -100,7 +103,9 @@ auth.post('/signin', async c => {
 
     // Only the per-account counter is cleared. Clearing the IP counter too
     // would let an attacker who owns one valid account wipe their spray budget
-    // by signing into it between rounds.
+    // by signing into it between rounds; releasing this attempt keeps a
+    // successful sign-in from spending it either.
+    attempt.release()
     signinLimiter.reset(rateLimitKey)
 
     // Create session
@@ -112,13 +117,14 @@ auth.post('/signin', async c => {
       safeRedirect(redirectTo, c.req.url, withEmbed('/pins', embed))
     )
   } catch (error) {
+    // Only a wrong password keeps the attempt it reserved.
+    if (!(error instanceof InvalidCredentialsError)) attempt.release()
+
     let errors: Record<string, string[]>
 
     if (error instanceof ValidationError) {
       errors = error.fields
     } else if (error instanceof InvalidCredentialsError) {
-      signinLimiter.hit(rateLimitKey)
-      signinIpLimiter.hit(ipKey)
       errors = { _form: ['Invalid username or password'] }
     } else if (error instanceof EmailVerificationRequiredError) {
       errors = { _form: [error.message] }

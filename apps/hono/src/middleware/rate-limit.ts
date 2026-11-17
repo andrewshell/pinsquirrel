@@ -147,8 +147,12 @@ export const apiV1Limiter = new RateLimiter({
  * registered OAuth error code meaning "later", so `too_many_requests` is a
  * plain description rather than a claim to be one.
  */
+export function retryAfterSeconds(retryAfterMs: number): string {
+  return String(Math.ceil(retryAfterMs / 1000))
+}
+
 function refuse(c: Context, message: string, retryAfterMs: number) {
-  c.header('Retry-After', String(Math.ceil(retryAfterMs / 1000)))
+  c.header('Retry-After', retryAfterSeconds(retryAfterMs))
 
   if (expectsJsonError(c.req.path)) {
     return c.json(
