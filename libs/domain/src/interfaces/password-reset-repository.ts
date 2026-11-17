@@ -12,6 +12,7 @@ export interface PasswordResetRepository extends Repository<
   findByTokenHash(tokenHash: string): Promise<PasswordResetToken | null>
   findByUserId(userId: string): Promise<PasswordResetToken[]>
   deleteByUserId(userId: string): Promise<boolean>
-  deleteExpiredTokens(): Promise<number>
+  /** Delete the tokens that expired before `expiredBefore`. */
+  deleteExpiredTokens(expiredBefore: Date): Promise<number>
   isValidToken(tokenHash: string): Promise<boolean>
 }

@@ -71,7 +71,6 @@ export {
   PasswordResetError,
   InvalidResetTokenError,
   ResetTokenExpiredError,
-  TooManyResetRequestsError,
   EmailSendError,
   MissingRoleError,
   AccessNotGrantedError,

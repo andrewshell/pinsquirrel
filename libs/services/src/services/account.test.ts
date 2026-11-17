@@ -12,7 +12,6 @@ import type {
 import {
   InvalidResetTokenError,
   ResetTokenExpiredError,
-  TooManyResetRequestsError,
   Role,
   UserAlreadyExistsError,
   UnauthorizedUserAccessError,
@@ -546,9 +545,7 @@ describe('AccountService', () => {
       expect(mockUserRepository.findByEmailHash).toHaveBeenCalledWith(
         'hashed_test@example.com'
       )
-      expect(mockPasswordResetRepository.deleteByUserId).toHaveBeenCalledWith(
-        mockUserWithEmail.id
-      )
+      expect(mockPasswordResetRepository.deleteByUserId).not.toHaveBeenCalled()
       expect(mockPasswordResetRepository.create).toHaveBeenCalledWith({
         userId: mockUserWithEmail.id,
         tokenHash: 'hashed_mock-token',
@@ -680,7 +677,7 @@ describe('AccountService', () => {
       expect(result).toBeNull()
     })
 
-    it('should enforce rate limiting', async () => {
+    it('answers a request over the limit like an unknown address, sending nothing', async () => {
       const mockUserWithEmail = {
         ...mockUser,
         emailHash: 'hashed_test@example.com',
@@ -711,10 +708,53 @@ describe('AccountService', () => {
           email: 'test@example.com',
           resetUrl: 'https://example.com/reset',
         })
-      ).rejects.toThrow(TooManyResetRequestsError)
+      ).resolves.toBeNull()
 
       expect(mockPasswordResetRepository.create).not.toHaveBeenCalled()
       expect(mockEmailService.sendPasswordResetEmail).not.toHaveBeenCalled()
+    })
+
+    it('sends no mail for a fourth request for one account within an hour', async () => {
+      const rows: PasswordResetToken[] = []
+      const repository = {
+        ...mockPasswordResetRepository,
+        findByUserId: vi.fn((userId: string) =>
+          Promise.resolve(rows.filter(r => r.userId === userId))
+        ),
+        create: vi.fn((data: Omit<PasswordResetToken, 'id' | 'createdAt'>) => {
+          const row = {
+            id: `reset-${rows.length}`,
+            createdAt: new Date(),
+            ...data,
+          }
+          rows.push(row)
+          return Promise.resolve(row)
+        }),
+        deleteByUserId: vi.fn((userId: string) => {
+          const before = rows.length
+          rows.splice(0, rows.length, ...rows.filter(r => r.userId !== userId))
+          return Promise.resolve(rows.length < before)
+        }),
+      } as PasswordResetRepository
+      const service = new AccountService(
+        mockUserRepository,
+        repository,
+        mockEmailService
+      )
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(mockUser)
+
+      const results = []
+      for (let i = 0; i < 4; i++) {
+        results.push(
+          await service.requestPasswordReset({
+            email: 'test@example.com',
+            resetUrl: 'https://example.com/reset',
+          })
+        )
+      }
+
+      expect(mockEmailService.sendPasswordResetEmail).toHaveBeenCalledTimes(3)
+      expect(results[3]).toBeNull()
     })
 
     it('should throw validation error for invalid email', async () => {
@@ -753,8 +793,8 @@ describe('AccountService', () => {
       expect(mockUserRepository.update).toHaveBeenCalledWith(mockUser.id, {
         passwordHash: 'hashed_newpassword123',
       })
-      expect(mockPasswordResetRepository.delete).toHaveBeenCalledWith(
-        mockPasswordResetToken.id
+      expect(mockPasswordResetRepository.deleteByUserId).toHaveBeenCalledWith(
+        mockPasswordResetToken.userId
       )
     })
 
