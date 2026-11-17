@@ -102,8 +102,6 @@ vi.mock('../middleware/rate-limit', () => ({
   },
 }))
 
-// The configured public origin, deliberately unlike any host a test request
-// names, so a link built from the request instead shows up as a mismatch.
 vi.mock('../lib/config', () => ({ baseUrl: 'https://pinsquirrel.test' }))
 
 vi.mock('../lib/logger.js', () => ({
