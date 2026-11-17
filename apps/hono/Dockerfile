@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7-labs
 # Build context should be the monorepo root
-FROM node:24.22.1-alpine AS base
-RUN corepack enable
+FROM node:26.13.1-alpine AS base
+RUN npm install -g corepack@0.36.0 && corepack enable
 WORKDIR /app
 
 # Copy package files for dependency installation
@@ -30,8 +30,8 @@ COPY --parents apps/hono/package.json libs/*/package.json ./
 RUN npm_config_ignore_scripts=true pnpm install --frozen-lockfile --prod
 
 # Final runtime image
-FROM node:24.22.1-alpine AS runtime
-RUN corepack enable
+FROM node:26.13.1-alpine AS runtime
+RUN npm install -g corepack@0.36.0 && corepack enable
 WORKDIR /app
 
 # Copy production dependencies
