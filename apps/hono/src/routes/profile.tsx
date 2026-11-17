@@ -14,6 +14,11 @@ import {
   getSessionManager,
   requireAuth,
 } from '../middleware/session'
+import {
+  privateUnlockLimiter,
+  retryAfterSeconds,
+} from '../middleware/rate-limit'
+import { reserve } from '../middleware/rate-limiter'
 import { ProfilePage } from '../views/pages/profile'
 
 const profile = new Hono()
@@ -53,6 +58,22 @@ profile.post('/', async c => {
   const embed = getString(formData['embed']) === '1'
   const back = withEmbed('/profile', embed)
 
+  // Every error path re-renders the whole page, so the grant list has to come
+  // back with it or an unrelated failure would blank the card.
+  const rerender = async (
+    errors: Record<string, string[]>,
+    status: 400 | 429 | 500
+  ) => {
+    const grants = await oauthService.listGrants(
+      new AccessControl(user),
+      user.id
+    )
+    return c.html(
+      <ProfilePage user={user} grants={grants} errors={errors} embed={embed} />,
+      status
+    )
+  }
+
   try {
     if (intent === 'update-email') {
       const email = getString(formData['email'])
@@ -81,11 +102,32 @@ profile.post('/', async c => {
       const currentPassword = getString(formData['currentPassword'])
       const newPassword = getString(formData['newPassword'])
 
-      await authService.changePassword(new AccessControl(user), {
-        userId: user.id,
-        currentPassword,
-        newPassword,
-      })
+      // The same budget as private unlock: both check the account password,
+      // and a session holder must not get a second allowance by switching form.
+      const attempt = reserve([[privateUnlockLimiter, user.id]])
+      if (attempt.limited) {
+        c.header('Retry-After', retryAfterSeconds(attempt.retryAfterMs))
+        return await rerender(
+          {
+            currentPassword: [
+              'Too many failed attempts. Please try again in 15 minutes.',
+            ],
+          },
+          429
+        )
+      }
+
+      try {
+        await authService.changePassword(new AccessControl(user), {
+          userId: user.id,
+          currentPassword,
+          newPassword,
+        })
+      } catch (error) {
+        if (!(error instanceof InvalidCredentialsError)) attempt.release()
+        throw error
+      }
+      privateUnlockLimiter.reset(user.id)
 
       sessionManager.setFlash('success', 'Password changed successfully!')
       return c.redirect(back)
@@ -101,24 +143,6 @@ profile.post('/', async c => {
       400
     )
   } catch (error) {
-    // Every error path re-renders the whole page, so the grant list has to
-    // come back with it or an unrelated failure would blank the card.
-    const grants = await oauthService.listGrants(
-      new AccessControl(user),
-      user.id
-    )
-
-    const rerender = (errors: Record<string, string[]>, status: 400 | 500) =>
-      c.html(
-        <ProfilePage
-          user={user}
-          grants={grants}
-          errors={errors}
-          embed={embed}
-        />,
-        status
-      )
-
     if (error instanceof ValidationError) {
       return rerender(error.fields, 400)
     }
