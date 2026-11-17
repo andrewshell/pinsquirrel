@@ -33,3 +33,6 @@ apps/chrome-extension/release/
 
 # Backlog.md board: local only, never tracked
 /backlog/
+
+# Local working notes (review skills write here)
+_local/
