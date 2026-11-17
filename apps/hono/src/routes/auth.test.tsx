@@ -102,6 +102,10 @@ vi.mock('../middleware/rate-limit', () => ({
   },
 }))
 
+// The configured public origin, deliberately unlike any host a test request
+// names, so a link built from the request instead shows up as a mismatch.
+vi.mock('../lib/config', () => ({ baseUrl: 'https://pinsquirrel.test' }))
+
 vi.mock('../lib/logger.js', () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
   safeError: (e: unknown) => ({ message: String(e) }),
@@ -423,7 +427,7 @@ describe('auth routes', () => {
       expect(await res.text()).toContain('waitlist')
     })
 
-    it('derives the reset and signin URLs from the request origin', async () => {
+    it('builds the emailed links from the configured origin, not the request host', async () => {
       auth.register.mockResolvedValue({ emailFailed: false })
 
       await app.request(
@@ -433,9 +437,9 @@ describe('auth routes', () => {
 
       expect(auth.register).toHaveBeenCalledWith(
         expect.objectContaining({
-          resetUrl: 'http://app.test/reset-password',
-          signinUrl: 'http://app.test/signin',
-          signupUrl: 'http://app.test/signup',
+          resetUrl: 'https://pinsquirrel.test/reset-password',
+          signinUrl: 'https://pinsquirrel.test/signin',
+          signupUrl: 'https://pinsquirrel.test/signup',
         })
       )
     })
@@ -492,6 +496,24 @@ describe('auth routes', () => {
       expect(auth.requestPasswordReset).toHaveBeenCalled()
       expect(await res.text()).toContain('Check Your Email')
     })
+
+    it.each([
+      ['http://app.test/forgot-password', 'a foreign host'],
+      ['http://pinsquirrel.test/forgot-password', 'plain HTTP from the proxy'],
+    ])(
+      'builds the reset link from the configured origin for %s (%s)',
+      async url => {
+        auth.requestPasswordReset.mockResolvedValue(undefined)
+
+        await app.request(url, form({ email: 'a@example.test' }))
+
+        expect(auth.requestPasswordReset).toHaveBeenCalledWith(
+          expect.objectContaining({
+            resetUrl: 'https://pinsquirrel.test/reset-password',
+          })
+        )
+      }
+    )
 
     it('answers identically for a known and an unknown address', async () => {
       // Enumeration safety: the service deliberately resolves the same way for
