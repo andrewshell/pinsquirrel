@@ -17,7 +17,7 @@ import { ImportPage } from '../views/pages/import'
 import { logger, safeError } from '../lib/logger.js'
 
 /** Uploads above this never reach the parser. */
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 const PARSE_ERRORS: Record<InvalidPinboardExportReason, string> = {
   'malformed-json': 'Invalid JSON file format',

@@ -1,5 +1,8 @@
 import { Hono } from 'hono'
+import type { Context } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
+import { bodyLimit } from 'hono/body-limit'
+import { except } from 'hono/combine'
 import { csrf } from 'hono/csrf'
 import { isEmbedRequest } from './lib/embed'
 import { logger } from './lib/logger.js'
@@ -16,7 +19,7 @@ import { apiInternalRoutes } from './routes/api-internal'
 import { apiRoutes } from './routes/api-docs'
 import { staticRoutes } from './routes/static'
 import { styleRoutes } from './routes/style'
-import { importRoutes } from './routes/import'
+import { importRoutes, MAX_UPLOAD_BYTES } from './routes/import'
 import { exportRoutes } from './routes/export'
 import { privateRoutes } from './routes/private'
 import { mcpRoutes } from './routes/mcp'
@@ -26,7 +29,11 @@ import { oauthTokenRoutes } from './routes/oauth-token'
 import { oauthRegisterRoutes } from './routes/oauth-register'
 import { seoRoutes } from './routes/seo'
 import { oauthConfig } from './lib/config'
-import { notFoundResponse, serverErrorResponse } from './lib/error-response'
+import {
+  expectsJsonError,
+  notFoundResponse,
+  serverErrorResponse,
+} from './lib/error-response'
 import { markdownNegotiation } from './middleware/markdown-negotiation'
 import { sessionMiddleware } from './middleware/session'
 import { securityHeaders } from './middleware/security-headers'
@@ -49,6 +56,30 @@ app.use('*', async (c, next) => {
   )
 })
 app.use('*', securityHeaders())
+
+// Every body is buffered whole before anything reads it, so the cap has to sit
+// in front of every route. Only the import upload needs more than a form does.
+const payloadTooLarge = (c: Context) =>
+  expectsJsonError(c.req.path)
+    ? c.json(
+        {
+          error: 'payload_too_large',
+          error_description: 'Request body too large.',
+        },
+        413
+      )
+    : c.text('Payload Too Large', 413)
+const IMPORT_PATHS = ['/import', '/import/*']
+const formBodyLimit = bodyLimit({
+  maxSize: 64 * 1024,
+  onError: payloadTooLarge,
+})
+const importBodyLimit = bodyLimit({
+  maxSize: MAX_UPLOAD_BYTES + 64 * 1024,
+  onError: payloadTooLarge,
+})
+app.use('*', except(IMPORT_PATHS, formBodyLimit))
+app.use('/import/*', importBodyLimit)
 
 // Serve static files (must run before session middleware so CSS/JS load
 // even if the database is unavailable)

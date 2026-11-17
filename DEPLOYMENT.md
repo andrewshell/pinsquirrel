@@ -99,6 +99,8 @@ operator has to know:
   connection to a published port arrive from a private address, which
   `TRUST_PROXY=1` trusts. If Caddy connects from another machine, publish the
   port where Caddy can reach it and set `TRUST_PROXY` to Caddy's address.
+- **Request bodies are capped.** The app answers 413 to a body over 64 KiB, or
+  over 10 MiB on `/import`, before it reads the body.
 - **The counters live in the process's own memory.** They are correct for a
   single instance and nothing else: two instances each enforce half the limit,
   and a restart forgets everything. Running more than one instance means moving
