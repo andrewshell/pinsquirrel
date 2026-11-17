@@ -28,6 +28,9 @@ import {
 import { validationErrorFromZod } from '../validation/zod-error.js'
 import type { EmailSealer } from './authentication.js'
 
+export const RESET_REQUEST_WINDOW_MS = 60 * 60 * 1000
+const RESET_REQUESTS_PER_WINDOW = 3
+
 /**
  * The account lifecycle operations that depend on the email pipeline:
  * registration, email changes, and password recovery.
@@ -36,12 +39,6 @@ import type { EmailSealer } from './authentication.js'
  * required dependency. Everything here needs the reset-token store and a way
  * to send mail; nothing here is reachable without them.
  */
-/**
- * The window the per-account reset limit counts requests in. The expiry sweep
- * keeps expired tokens this long so the count survives it.
- */
-export const RESET_REQUEST_WINDOW_MS = 60 * 60 * 1000
-
 export class AccountService {
   constructor(
     private readonly userRepository: UserRepository,
@@ -246,10 +243,6 @@ export class AccountService {
       }
     }
 
-    // At most 3 links per account an hour, counted from the tokens issued in
-    // that hour: earlier links stay valid until they expire or one is used.
-    // Over the limit looks exactly like an unknown address, so the answer
-    // never says whether the account exists.
     const existingTokens = await this.passwordResetRepository.findByUserId(
       user.id
     )
@@ -257,7 +250,8 @@ export class AccountService {
     const recentTokens = existingTokens.filter(
       token => token.createdAt > windowStart
     )
-    if (recentTokens.length >= 3) {
+    // Over the limit answers exactly like an unknown address.
+    if (recentTokens.length >= RESET_REQUESTS_PER_WINDOW) {
       return null
     }
 
@@ -330,7 +324,6 @@ export class AccountService {
 
     await this.userRepository.update(user.id, updateData)
 
-    // Every outstanding link dies with the one that was used.
     await this.passwordResetRepository.deleteByUserId(user.id)
   }
 

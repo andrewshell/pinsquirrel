@@ -57,8 +57,6 @@ app.use('*', async (c, next) => {
 })
 app.use('*', securityHeaders())
 
-// Every body is buffered whole before anything reads it, so the cap has to sit
-// in front of every route. Only the import upload needs more than a form does.
 const payloadTooLarge = (c: Context) =>
   expectsJsonError(c.req.path)
     ? c.json(

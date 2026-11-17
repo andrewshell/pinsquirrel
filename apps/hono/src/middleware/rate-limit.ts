@@ -33,23 +33,21 @@ const PRIVATE_NETWORKS: ReadonlyArray<readonly [string, number, Family]> = [
   ['fc00::', 7, 'ipv6'],
 ]
 
-/**
- * The peers allowed to speak for the client, from `TRUST_PROXY`.
- *
- * A comma-separated list of addresses and CIDR ranges names the proxy
- * exactly. Any other value (the documented `1`) trusts loopback and the
- * private ranges, where a reverse proxy on the same host or a container
- * network connects from, and nothing a caller on the internet can connect
- * from.
- */
 function parseTrustedPeers(setting: string): BlockList {
   const peers = new BlockList()
   for (const entry of setting.split(',')) {
     const [address = '', prefix] = entry.trim().split('/')
     const type = family(address)
     if (!type) continue
-    if (prefix === undefined) peers.addAddress(address, type)
-    else peers.addSubnet(address, Number(prefix), type)
+    if (prefix === undefined) {
+      peers.addAddress(address, type)
+      continue
+    }
+    const bits = Number(prefix)
+    const maxBits = type === 'ipv4' ? 32 : 128
+    if (/^\d+$/.test(prefix) && bits <= maxBits) {
+      peers.addSubnet(address, bits, type)
+    }
   }
   if (peers.rules.length > 0) return peers
 
@@ -73,12 +71,6 @@ function isTrustedPeer(address: string, setting: string): boolean {
 }
 
 export function getClientIp(c: Context): string {
-  // Forwarding headers are only worth anything when the proxy the operator
-  // runs wrote them. A caller that reaches the port directly can set them
-  // itself and rotate them per request to get a fresh budget from every
-  // IP-keyed limiter, so they count only when the socket peer is a trusted
-  // proxy. Read per call rather than at module load so the deployment's env is
-  // what decides, not import order.
   const peer = socketAddress(c)
   const setting = process.env.TRUST_PROXY
   if (setting && peer && isTrustedPeer(peer, setting)) {
@@ -109,9 +101,6 @@ export const signinIpLimiter = new RateLimiter({
   windowMs: 15 * 60 * 1000,
 })
 
-// Keyed on the username alone, so guesses at one account spread across many
-// addresses still meet a limit. Far looser than signinLimiter, because anyone
-// can spend this budget for a victim and so lock them out while it lasts.
 export const signinUsernameLimiter = new RateLimiter({
   maxAttempts: 50,
   windowMs: 15 * 60 * 1000,

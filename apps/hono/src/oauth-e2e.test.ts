@@ -30,11 +30,6 @@ import { accountService } from './lib/services'
  * worth asserting: a token minted in one step is used two steps later.
  */
 
-/**
- * A documentation address (RFC 5737), given as the socket peer, so every rate
- * limiter in the app buckets this file's requests apart from the `unknown` key
- * the other route tests share.
- */
 const CLIENT_IP = '198.51.100.17'
 
 /** The MCP resource as a user types it into a client. */

@@ -69,9 +69,6 @@ vi.mock('../middleware/session', () => ({
   }),
 }))
 
-// The sign-in limiters are the real ones, so these tests see what a caller
-// sees. rateLimitByIp is faked: signup and forgot-password only need to know
-// that the route honours its answer.
 vi.mock('../middleware/rate-limit', async importOriginal => ({
   ...(await importOriginal<typeof import('../middleware/rate-limit')>()),
   rateLimitByIp: (): MiddlewareHandler => async (c, next) => {
@@ -305,8 +302,6 @@ describe('auth routes', () => {
         ['unexpected error', () => new Error('boom')],
         ['waitlisted account', () => new AccessNotGrantedError()],
       ])('does not spend the budget on a %s', async (_label, make) => {
-        // Only a wrong password burns an attempt. Counting validation or
-        // infrastructure failures would let a broken dependency lock users out.
         auth.login.mockRejectedValue(make())
         await failTimes(25)
         auth.login.mockResolvedValue({ id: 'user-1' })
@@ -314,10 +309,6 @@ describe('auth routes', () => {
         expect((await signin()).status).toBe(302)
       })
 
-      // The IP:username key stops guessing at one account but never fires
-      // against an attacker who sprays one password across many usernames -
-      // every guess lands in a fresh bucket. The looser IP-only limiter is
-      // what covers that.
       it('returns 429 without attempting a login once the address budget is spent', async () => {
         exhaust(signinIpLimiter, TEST_CLIENT_IP)
 
@@ -354,9 +345,6 @@ describe('auth routes', () => {
       })
 
       it('does not give the address budget back on a successful sign-in', async () => {
-        // Deliberate asymmetry with the account budget: an attacker who owns
-        // one valid account could otherwise wipe their spray budget at will by
-        // signing into it between rounds.
         auth.login.mockRejectedValue(new InvalidCredentialsError())
         for (let i = 0; i < 19; i++) {
           await signin('wrong', SIGNIN_USERNAMES[i % SIGNIN_USERNAMES.length])

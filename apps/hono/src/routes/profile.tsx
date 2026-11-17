@@ -58,8 +58,6 @@ profile.post('/', async c => {
   const embed = getString(formData['embed']) === '1'
   const back = withEmbed('/profile', embed)
 
-  // Every error path re-renders the whole page, so the grant list has to come
-  // back with it or an unrelated failure would blank the card.
   const rerender = async (
     errors: Record<string, string[]>,
     status: 400 | 429 | 500
@@ -102,8 +100,6 @@ profile.post('/', async c => {
       const currentPassword = getString(formData['currentPassword'])
       const newPassword = getString(formData['newPassword'])
 
-      // The same budget as private unlock: both check the account password,
-      // and a session holder must not get a second allowance by switching form.
       const attempt = reserve([[privateUnlockLimiter, user.id]])
       if (attempt.limited) {
         c.header('Retry-After', retryAfterSeconds(attempt.retryAfterMs))

@@ -88,9 +88,6 @@ describe('getClientIp', () => {
     )
 
     it('falls back to the socket peer address when no headers present', async () => {
-      // Without a proxy header there is nothing to key a rate limit on, and the
-      // old 'unknown' literal put every such caller in one shared bucket - so a
-      // single attacker could 429 everyone else.
       const res = await app.request('/test', undefined, from('10.9.9.9'))
       expect(await res.text()).toBe('10.9.9.9')
     })
@@ -119,6 +116,19 @@ describe('getClientIp', () => {
         expect(await res.text()).toBe('198.51.100.1')
       }
     )
+
+    it('skips an entry it cannot parse instead of failing the request', async () => {
+      process.env.TRUST_PROXY = '10.0.0.2/33, 10.0.0.3'
+
+      const res = await app.request(
+        '/test',
+        { headers: { 'x-forwarded-for': '198.51.100.1' } },
+        from('10.0.0.3')
+      )
+
+      expect(res.status).toBe(200)
+      expect(await res.text()).toBe('198.51.100.1')
+    })
 
     it.each(['203.0.113.9', '10.0.0.3', '127.0.0.1'])(
       'ignores x-forwarded-for and x-real-ip from unlisted peer %s',

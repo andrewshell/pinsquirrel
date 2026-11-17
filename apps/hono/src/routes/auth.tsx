@@ -73,10 +73,6 @@ auth.post('/signin', async c => {
   const redirectTo = getString(formData.redirectTo) || undefined
   const embed = getString(formData.embed) === '1'
 
-  // Three keys, three attacks. The IP:username key stops guessing at one
-  // account; the IP-only key stops one address spraying a password across many
-  // usernames, which the first never sees because every guess lands in a fresh
-  // bucket; the username-only key stops many addresses guessing at one account.
   const rateLimitKey = signinRateLimitKey(c, username || '')
   const usernameKey = username.toLowerCase()
   const attempt = reserve([
@@ -104,10 +100,6 @@ auth.post('/signin', async c => {
   try {
     const user = await authService.login({ username, password })
 
-    // Only the per-account counters are cleared. Clearing the IP counter too
-    // would let an attacker who owns one valid account wipe their spray budget
-    // by signing into it between rounds; releasing this attempt keeps a
-    // successful sign-in from spending it either.
     attempt.release()
     signinLimiter.reset(rateLimitKey)
     signinUsernameLimiter.reset(usernameKey)
@@ -121,7 +113,6 @@ auth.post('/signin', async c => {
       safeRedirect(redirectTo, c.req.url, withEmbed('/pins', embed))
     )
   } catch (error) {
-    // Only a wrong password keeps the attempt it reserved.
     if (!(error instanceof InvalidCredentialsError)) attempt.release()
 
     let errors: Record<string, string[]>

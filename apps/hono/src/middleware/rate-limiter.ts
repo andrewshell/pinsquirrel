@@ -10,11 +10,6 @@ export interface RateLimitResult {
   retryAfterMs: number
 }
 
-/**
- * One attempt held against one or more buckets. Admitted, it has already been
- * counted; `release` gives it back when the attempt turned out to prove
- * nothing about the credential it was guarding.
- */
 export type Reservation =
   | { limited: true; retryAfterMs: number }
   | { limited: false; release: () => void }

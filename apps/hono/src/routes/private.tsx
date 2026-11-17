@@ -92,8 +92,6 @@ privateRouter.post('/unlock', async c => {
     sessionManager.unlockPrivateMode()
     return c.redirect(safeRedirect(redirectTo, c.req.url, BASE_URL))
   } catch (error) {
-    // Only a wrong password burns an attempt. ValidationError here means an
-    // empty or malformed field, which never reached a credential check.
     if (!(error instanceof InvalidCredentialsError)) attempt.release()
     if (
       error instanceof InvalidCredentialsError ||

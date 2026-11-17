@@ -112,8 +112,6 @@ describe('MaintenanceService', () => {
     expect(age).toBeLessThan(25 * 60 * 60 * 1000)
   })
 
-  // The per-account reset limit counts the tokens issued in the last hour, so
-  // an expired token has to outlive that hour or the sweep resets the count.
   it('keeps expired reset tokens for the hour the request limit counts', async () => {
     const ctx = makeService()
 
