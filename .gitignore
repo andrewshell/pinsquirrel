@@ -30,3 +30,6 @@ apps/chrome-extension/release/
 
 # Subagent worktrees
 .claude/worktrees/
+
+# Backlog.md board: local only, never tracked
+/backlog/
