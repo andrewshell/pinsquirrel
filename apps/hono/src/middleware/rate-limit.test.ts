@@ -10,6 +10,10 @@ import {
   signinRateLimitKey,
 } from './rate-limit'
 
+function from(address: string) {
+  return { incoming: { socket: { remoteAddress: address } } }
+}
+
 describe('getClientIp', () => {
   let app: Hono
   const originalTrustProxy = process.env.TRUST_PROXY
@@ -29,48 +33,106 @@ describe('getClientIp', () => {
     }
   })
 
-  describe('with TRUST_PROXY set', () => {
+  describe('with TRUST_PROXY=1', () => {
     beforeEach(() => {
       process.env.TRUST_PROXY = '1'
     })
 
     it('returns last IP from x-forwarded-for (closest trusted proxy)', async () => {
-      const res = await app.request('/test', {
-        headers: { 'x-forwarded-for': '1.2.3.4, 5.6.7.8' },
-      })
+      const res = await app.request(
+        '/test',
+        { headers: { 'x-forwarded-for': '1.2.3.4, 5.6.7.8' } },
+        from('127.0.0.1')
+      )
       expect(await res.text()).toBe('5.6.7.8')
     })
 
-    it('handles single IP in x-forwarded-for', async () => {
-      const res = await app.request('/test', {
-        headers: { 'x-forwarded-for': '1.2.3.4' },
-      })
+    it('falls back to x-real-ip from a trusted peer', async () => {
+      const res = await app.request(
+        '/test',
+        { headers: { 'x-real-ip': '10.0.0.1' } },
+        from('127.0.0.1')
+      )
+      expect(await res.text()).toBe('10.0.0.1')
+    })
+
+    it.each([
+      '127.0.0.1',
+      '::1',
+      '10.1.2.3',
+      '172.18.0.1',
+      '192.168.1.10',
+      '::ffff:172.17.0.1',
+      'fd00::5',
+    ])('trusts the headers from loopback or private peer %s', async peer => {
+      const res = await app.request(
+        '/test',
+        { headers: { 'x-forwarded-for': '1.2.3.4' } },
+        from(peer)
+      )
       expect(await res.text()).toBe('1.2.3.4')
     })
 
-    it('falls back to x-real-ip', async () => {
-      const res = await app.request('/test', {
-        headers: { 'x-real-ip': '10.0.0.1' },
-      })
-      expect(await res.text()).toBe('10.0.0.1')
-    })
+    it.each(['203.0.113.9', '::ffff:203.0.113.9', '2001:db8::1', '172.32.0.1'])(
+      'ignores the headers from public peer %s',
+      async peer => {
+        const res = await app.request(
+          '/test',
+          {
+            headers: { 'x-forwarded-for': '1.2.3.4', 'x-real-ip': '1.2.3.4' },
+          },
+          from(peer)
+        )
+        expect(await res.text()).toBe(peer)
+      }
+    )
 
     it('falls back to the socket peer address when no headers present', async () => {
       // Without a proxy header there is nothing to key a rate limit on, and the
       // old 'unknown' literal put every such caller in one shared bucket - so a
-      // single attacker could 429 everyone else. The socket address is always
-      // available under @hono/node-server, so this branch is what runs in
-      // production whenever a request arrives without going through the proxy.
-      const res = await app.request('/test', undefined, {
-        incoming: { socket: { remoteAddress: '9.9.9.9' } },
-      })
-      expect(await res.text()).toBe('9.9.9.9')
+      // single attacker could 429 everyone else.
+      const res = await app.request('/test', undefined, from('10.9.9.9'))
+      expect(await res.text()).toBe('10.9.9.9')
     })
 
-    it('returns unknown only when even the socket address is unavailable', async () => {
-      const res = await app.request('/test')
+    it('ignores the headers when the socket address is unavailable', async () => {
+      const res = await app.request('/test', {
+        headers: { 'x-forwarded-for': '1.2.3.4' },
+      })
       expect(await res.text()).toBe('unknown')
     })
+  })
+
+  describe('with TRUST_PROXY naming the proxy', () => {
+    beforeEach(() => {
+      process.env.TRUST_PROXY = '10.0.0.2, 192.168.5.0/24'
+    })
+
+    it.each(['10.0.0.2', '192.168.5.77', '::ffff:10.0.0.2'])(
+      'trusts the headers from listed peer %s',
+      async peer => {
+        const res = await app.request(
+          '/test',
+          { headers: { 'x-forwarded-for': '198.51.100.1' } },
+          from(peer)
+        )
+        expect(await res.text()).toBe('198.51.100.1')
+      }
+    )
+
+    it.each(['203.0.113.9', '10.0.0.3', '127.0.0.1'])(
+      'ignores x-forwarded-for and x-real-ip from unlisted peer %s',
+      async peer => {
+        for (const header of ['x-forwarded-for', 'x-real-ip']) {
+          const res = await app.request(
+            '/test',
+            { headers: { [header]: '198.51.100.1' } },
+            from(peer)
+          )
+          expect(await res.text()).toBe(peer)
+        }
+      }
+    )
   })
 
   describe('with TRUST_PROXY unset', () => {
@@ -110,12 +172,8 @@ describe('getClientIp', () => {
 describe('rateLimitByIp', () => {
   let limiter: RateLimiter
   let app: Hono
-  const originalTrustProxy = process.env.TRUST_PROXY
 
   beforeEach(() => {
-    // These cases distinguish callers by address, which only x-forwarded-for
-    // can express under app.request(); trusting it is what production does.
-    process.env.TRUST_PROXY = '1'
     limiter = new RateLimiter({ maxAttempts: 2, windowMs: 60_000 })
     app = new Hono()
     app.post('/test', rateLimitByIp(limiter, 'Rate limited.'), c =>
@@ -125,28 +183,19 @@ describe('rateLimitByIp', () => {
 
   afterEach(() => {
     limiter.destroy()
-    if (originalTrustProxy === undefined) {
-      delete process.env.TRUST_PROXY
-    } else {
-      process.env.TRUST_PROXY = originalTrustProxy
-    }
   })
 
   it('passes requests through when under limit', async () => {
-    const res = await app.request('/test', {
-      method: 'POST',
-      headers: { 'x-forwarded-for': '1.2.3.4' },
-    })
+    const res = await app.request('/test', { method: 'POST' }, from('1.2.3.4'))
     expect(res.status).toBe(200)
     expect(await res.text()).toBe('ok')
   })
 
   it('returns 429 with Retry-After when limit exceeded', async () => {
-    const headers = { 'x-forwarded-for': '1.2.3.4' }
-    await app.request('/test', { method: 'POST', headers })
-    await app.request('/test', { method: 'POST', headers })
+    await app.request('/test', { method: 'POST' }, from('1.2.3.4'))
+    await app.request('/test', { method: 'POST' }, from('1.2.3.4'))
 
-    const res = await app.request('/test', { method: 'POST', headers })
+    const res = await app.request('/test', { method: 'POST' }, from('1.2.3.4'))
     expect(res.status).toBe(429)
     expect(await res.text()).toBe('Rate limited.')
     expect(res.headers.get('Retry-After')).toBeTruthy()
@@ -166,14 +215,22 @@ describe('rateLimitByIp', () => {
       rateLimitByIp(limiter, 'Rate limited.'),
       c => c.text('ok')
     )
-    const headers = { 'x-forwarded-for': '1.2.3.4' }
-    await machine.request('/oauth/register', { method: 'POST', headers })
-    await machine.request('/oauth/register', { method: 'POST', headers })
+    await machine.request(
+      '/oauth/register',
+      { method: 'POST' },
+      from('1.2.3.4')
+    )
+    await machine.request(
+      '/oauth/register',
+      { method: 'POST' },
+      from('1.2.3.4')
+    )
 
-    const res = await machine.request('/oauth/register', {
-      method: 'POST',
-      headers,
-    })
+    const res = await machine.request(
+      '/oauth/register',
+      { method: 'POST' },
+      from('1.2.3.4')
+    )
 
     expect(res.status).toBe(429)
     expect(res.headers.get('content-type')).toContain('application/json')
@@ -185,38 +242,15 @@ describe('rateLimitByIp', () => {
   })
 
   it('allows different IPs independently', async () => {
-    await app.request('/test', {
-      method: 'POST',
-      headers: { 'x-forwarded-for': '1.1.1.1' },
-    })
-    await app.request('/test', {
-      method: 'POST',
-      headers: { 'x-forwarded-for': '1.1.1.1' },
-    })
+    await app.request('/test', { method: 'POST' }, from('1.1.1.1'))
+    await app.request('/test', { method: 'POST' }, from('1.1.1.1'))
 
-    const res = await app.request('/test', {
-      method: 'POST',
-      headers: { 'x-forwarded-for': '2.2.2.2' },
-    })
+    const res = await app.request('/test', { method: 'POST' }, from('2.2.2.2'))
     expect(res.status).toBe(200)
   })
 })
 
 describe('signinRateLimitKey', () => {
-  const originalTrustProxy = process.env.TRUST_PROXY
-
-  beforeEach(() => {
-    process.env.TRUST_PROXY = '1'
-  })
-
-  afterEach(() => {
-    if (originalTrustProxy === undefined) {
-      delete process.env.TRUST_PROXY
-    } else {
-      process.env.TRUST_PROXY = originalTrustProxy
-    }
-  })
-
   it('builds key from IP and lowercase username', async () => {
     const app = new Hono()
     let key = ''
@@ -225,9 +259,7 @@ describe('signinRateLimitKey', () => {
       return c.text('ok')
     })
 
-    await app.request('/test', {
-      headers: { 'x-forwarded-for': '1.2.3.4' },
-    })
+    await app.request('/test', undefined, from('1.2.3.4'))
 
     expect(key).toBe('1.2.3.4:username')
   })

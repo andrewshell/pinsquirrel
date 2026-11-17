@@ -62,7 +62,8 @@ is not repeated here. On top of it:
   the service.
 - Rate limiting is `RateLimiter` (`middleware/rate-limiter.ts`) plus `rateLimitByIp()` /
   `rateLimitByClientId()` (`middleware/rate-limit.ts`), applied inside the route file. `getClientIp`
-  honours forwarding headers only when `TRUST_PROXY` is set; production sets it.
+  honours forwarding headers only when `TRUST_PROXY` is set and the socket peer is a trusted proxy;
+  production sets it.
 - `/mcp` builds an `McpServer` and a `StreamableHTTPTransport` per request and closes both
   afterwards. Do not reintroduce a shared transport: it caps the process at one MCP session and
   maps responses back to requests by JSON-RPC id across every caller.

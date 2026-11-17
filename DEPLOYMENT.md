@@ -39,7 +39,7 @@ production.
 | `BASE_URL`             | yes in production  | `http://localhost:8100`   | The public origin, e.g. `https://pinsquirrel.com`. It is the OAuth issuer and the origin of both resource identifiers, so it is read from config rather than from the request — a spoofed `Host` header must not change what the server claims to be. Boot fails if it is unset when `NODE_ENV=production`                                                                                                                                                                                                                                                                                              |
 | `PORT`                 | no                 | `8100`                    | HTTP listen port                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `LOG_LEVEL`            | no                 | `info`                    | Pino level (`trace`…`fatal`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `TRUST_PROXY`          | yes behind a proxy | —                         | Set to any non-empty value when a reverse proxy (Caddy here) terminates TLS, so `x-forwarded-for`/`x-real-ip` are honoured for IP rate limiting. Leave unset when the app is reachable directly — otherwise a caller forges the header and every IP-keyed limiter is bypassable                                                                                                                                                                                                                                                                                                                         |
+| `TRUST_PROXY`          | yes behind a proxy | —                         | Set when a reverse proxy (Caddy here) terminates TLS, so the rate limiters key on the client address the proxy reports in `x-forwarded-for` (or `x-real-ip`). The headers count only when the connection comes from a trusted peer: with `1`, any loopback or private-network address (`127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `::1`, `fc00::/7`); with a comma-separated list of addresses and CIDR ranges, only those. A connection from anywhere else is keyed on its own address, whatever headers it sends                                                                 |
 | `OAUTH_STATIC_CLIENTS` | no                 | —                         | JSON array of `{ client_id, client_name, redirect_uris }` objects, so an organisation can paste its own `client_id` when adding PinSquirrel as a custom connector. Reconciled into `oauth_clients` at boot as `static` registrations: created or updated, never deleted, so editing the config cannot sign a connector's users out. They are public clients with PKCE like every other client here — there is no secret. `client_id` must not be an http(s) URL (that form names a CIMD document), and each redirect URI must be https or http on loopback. A malformed value stops the process at boot |
 | `MAILGUN_API_KEY`      | no                 | —                         | Leave empty to disable password-reset and notification email entirely                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `MAILGUN_DOMAIN`       | with Mailgun       | —                         | Sending domain, e.g. `mg.yourdomain.com`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -56,7 +56,8 @@ services:
   pinsquirrel:
     image: andrewshell/pinsquirrel:latest
     ports:
-      - '8100:8100'
+      # Only Caddy on this host should reach the app.
+      - '127.0.0.1:8100:8100'
     environment:
       - DATABASE_URL=mysql://pinsquirrel:pinsquirrel@mysql:3306/pinsquirrel
       - NODE_ENV=production
@@ -91,9 +92,13 @@ Sign-in, sign-up, password reset, `/oauth/token`, `/oauth/revoke`,
 operator has to know:
 
 - **The limiter keys on the client address, and only trusts a forwarding header
-  when `TRUST_PROXY` is set.** Behind the reverse proxy without it, every
-  request buckets under the proxy's own address and one caller exhausts the
-  budget for everyone.
+  when `TRUST_PROXY` is set and the connection comes from a trusted peer.**
+  Behind the reverse proxy without it, every request buckets under the proxy's
+  own address and one caller exhausts the budget for everyone. Publish the port
+  on `127.0.0.1` as above: Docker's userland proxy can make an outside
+  connection to a published port arrive from a private address, which
+  `TRUST_PROXY=1` trusts. If Caddy connects from another machine, publish the
+  port where Caddy can reach it and set `TRUST_PROXY` to Caddy's address.
 - **The counters live in the process's own memory.** They are correct for a
   single instance and nothing else: two instances each enforce half the limit,
   and a restart forgets everything. Running more than one instance means moving

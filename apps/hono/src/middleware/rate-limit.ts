@@ -1,3 +1,4 @@
+import { BlockList, isIP } from 'node:net'
 import type { Context, MiddlewareHandler } from 'hono'
 import { getConnInfo } from '@hono/node-server/conninfo'
 import { RateLimiter } from './rate-limiter'
@@ -14,14 +15,73 @@ function socketAddress(c: Context): string | undefined {
   }
 }
 
+type Family = 'ipv4' | 'ipv6'
+
+function family(address: string): Family | undefined {
+  const version = isIP(address)
+  if (version === 4) return 'ipv4'
+  if (version === 6) return 'ipv6'
+  return undefined
+}
+
+const PRIVATE_NETWORKS: ReadonlyArray<readonly [string, number, Family]> = [
+  ['127.0.0.0', 8, 'ipv4'],
+  ['10.0.0.0', 8, 'ipv4'],
+  ['172.16.0.0', 12, 'ipv4'],
+  ['192.168.0.0', 16, 'ipv4'],
+  ['::1', 128, 'ipv6'],
+  ['fc00::', 7, 'ipv6'],
+]
+
+/**
+ * The peers allowed to speak for the client, from `TRUST_PROXY`.
+ *
+ * A comma-separated list of addresses and CIDR ranges names the proxy
+ * exactly. Any other value (the documented `1`) trusts loopback and the
+ * private ranges, where a reverse proxy on the same host or a container
+ * network connects from, and nothing a caller on the internet can connect
+ * from.
+ */
+function parseTrustedPeers(setting: string): BlockList {
+  const peers = new BlockList()
+  for (const entry of setting.split(',')) {
+    const [address = '', prefix] = entry.trim().split('/')
+    const type = family(address)
+    if (!type) continue
+    if (prefix === undefined) peers.addAddress(address, type)
+    else peers.addSubnet(address, Number(prefix), type)
+  }
+  if (peers.rules.length > 0) return peers
+
+  for (const [network, prefix, type] of PRIVATE_NETWORKS) {
+    peers.addSubnet(network, prefix, type)
+  }
+  return peers
+}
+
+const trustedPeersCache = new Map<string, BlockList>()
+
+function isTrustedPeer(address: string, setting: string): boolean {
+  const type = family(address)
+  if (!type) return false
+  let peers = trustedPeersCache.get(setting)
+  if (!peers) {
+    peers = parseTrustedPeers(setting)
+    trustedPeersCache.set(setting, peers)
+  }
+  return peers.check(address, type)
+}
+
 export function getClientIp(c: Context): string {
-  // Forwarding headers are only worth anything when something the operator
-  // controls writes them. Without TRUST_PROXY the app is reachable directly,
-  // so a caller can set x-forwarded-for itself and rotate it per request to
-  // get a fresh budget from every IP-keyed limiter - the socket peer is the
-  // only thing it cannot forge. Read per call rather than at module load so
-  // the deployment's env is what decides, not import order.
-  if (process.env.TRUST_PROXY) {
+  // Forwarding headers are only worth anything when the proxy the operator
+  // runs wrote them. A caller that reaches the port directly can set them
+  // itself and rotate them per request to get a fresh budget from every
+  // IP-keyed limiter, so they count only when the socket peer is a trusted
+  // proxy. Read per call rather than at module load so the deployment's env is
+  // what decides, not import order.
+  const peer = socketAddress(c)
+  const setting = process.env.TRUST_PROXY
+  if (setting && peer && isTrustedPeer(peer, setting)) {
     const xff = c.req.header('x-forwarded-for')
     if (xff) {
       // The last entry, not the first: a single trusted proxy appends the peer
@@ -30,14 +90,10 @@ export function getClientIp(c: Context): string {
       const parts = xff.split(',')
       return parts[parts.length - 1].trim()
     }
-    // No proxy header means the request did not come through the reverse proxy.
-    // Falling back to the socket peer keeps each such caller in its own bucket;
-    // a single shared literal here would let one attacker exhaust the limit for
-    // everyone else at once.
     const realIp = c.req.header('x-real-ip')
     if (realIp) return realIp
   }
-  return socketAddress(c) ?? 'unknown'
+  return peer ?? 'unknown'
 }
 
 export const signinLimiter = new RateLimiter({
