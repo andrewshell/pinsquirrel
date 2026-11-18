@@ -38,7 +38,7 @@ let doc: Document
 interface Harness {
   deps: OptionsDeps
   requestConnect: ReturnType<typeof vi.fn>
-  disconnect: ReturnType<typeof vi.fn>
+  requestDisconnect: ReturnType<typeof vi.fn>
   getTags: ReturnType<typeof vi.fn>
   requestSync: ReturnType<typeof vi.fn>
   /**
@@ -50,11 +50,11 @@ interface Harness {
 
 function harness(overrides: Partial<OptionsDeps> = {}): Harness {
   const requestConnect = vi.fn(() => Promise.resolve({ ok: true as const }))
-  const disconnect = vi.fn(() => {
+  const requestDisconnect = vi.fn(() => {
     for (const key of Object.keys(chrome.local.items)) {
       delete chrome.local.items[key]
     }
-    return Promise.resolve()
+    return Promise.resolve({ ok: true as const })
   })
   const getTags = vi.fn(() => Promise.resolve(TAGS))
   const requestSync = vi.fn(() => Promise.resolve({ ok: true as const }))
@@ -66,7 +66,7 @@ function harness(overrides: Partial<OptionsDeps> = {}): Harness {
     onConnectFinished: listener => {
       finishedListeners.push(listener)
     },
-    disconnect,
+    requestDisconnect,
     createApiClient: () => ({ getTags }),
     requestSync,
     now: () => NOW,
@@ -76,7 +76,7 @@ function harness(overrides: Partial<OptionsDeps> = {}): Harness {
   return {
     deps,
     requestConnect,
-    disconnect,
+    requestDisconnect,
     getTags,
     requestSync,
     tabAnswered: result => {
@@ -560,18 +560,34 @@ describe('initOptions, with a connection stored', () => {
   })
 
   it('goes back to the settings view on disconnect, server prefilled', async () => {
-    const { deps, disconnect } = harness()
+    const { deps, requestDisconnect } = harness()
     await initOptions(deps)
 
     await click('#disconnect')
 
-    expect(disconnect).toHaveBeenCalled()
+    expect(requestDisconnect).toHaveBeenCalled()
     expect(settingsShown()).toBe(true)
     expect(mainShown()).toBe(false)
     expect(element<HTMLInputElement>('#base-url').value).toBe(
       'https://pinsquirrel.com'
     )
     expect(element('#reconnect-notice').hidden).toBe(true)
+  })
+})
+
+describe('initOptions, when the worker could not disconnect', () => {
+  it('stays connected and says why', async () => {
+    Object.assign(chrome.local.items, CONNECTED)
+    const requestDisconnect = vi.fn(() =>
+      Promise.resolve({ ok: false as const, error: 'Storage is full' })
+    )
+    await initOptions(harness({ requestDisconnect }).deps)
+
+    await click('#disconnect')
+
+    expect(mainShown()).toBe(true)
+    expect(status()).toBe('Storage is full')
+    expect(element<HTMLButtonElement>('#disconnect').disabled).toBe(false)
   })
 })
 

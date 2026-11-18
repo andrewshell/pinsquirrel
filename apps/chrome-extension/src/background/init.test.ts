@@ -60,6 +60,7 @@ function deps(overrides: Partial<BackgroundDeps> = {}): BackgroundDeps {
       Promise.resolve({ status: 'connected' as const })
     ),
     cancelConnect: vi.fn(() => Promise.resolve()),
+    disconnect: vi.fn(() => Promise.resolve()),
     logger: recordingLogger(),
     ...overrides,
   }
@@ -938,5 +939,38 @@ describe('initBackground: the pin window closed without saving', () => {
     await flush()
 
     expect(chrome.local.items.pinWindowId).toBe(PIN_WINDOW_ID)
+  })
+})
+
+// The worker outlives the options page, so a Disconnect still waiting on the
+// refresh lock finishes even if the user closes the page.
+describe("initBackground: the options page's disconnect request", () => {
+  it('disconnects and answers once it has', async () => {
+    const chrome = stubChrome(CONNECTED)
+    const disconnect = vi.fn(() => Promise.resolve())
+    initBackground(deps({ disconnect }))
+
+    const { kept, sendResponse } = deliver(chrome, { type: 'disconnect' })
+
+    expect(kept).toEqual([true])
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalledWith({ ok: true })
+    })
+    expect(disconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('answers a failed disconnect with the reason, rather than rejecting', async () => {
+    const chrome = stubChrome(CONNECTED)
+    const disconnect = vi.fn(() => Promise.reject(new Error('Storage is full')))
+    initBackground(deps({ disconnect }))
+
+    const { sendResponse } = deliver(chrome, { type: 'disconnect' })
+
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalledWith({
+        ok: false,
+        error: 'Storage is full',
+      })
+    })
   })
 })

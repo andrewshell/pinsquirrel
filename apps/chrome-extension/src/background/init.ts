@@ -1,6 +1,7 @@
 import { ReauthorizationRequiredError, type ConnectOutcome } from '../auth.ts'
 import {
   isConnectRequest,
+  isDisconnectRequest,
   isSyncRequest,
   notifyConnectFinished,
   type ConnectResponse,
@@ -54,6 +55,8 @@ export interface BackgroundDeps {
   completeConnect(redirectUrl: string): Promise<ConnectOutcome>
   /** Forget a flow whose tab was closed before it answered. */
   cancelConnect(): Promise<void>
+  /** Revoke the grant and clear storage, for the options page. */
+  disconnect(): Promise<void>
   logger: BackgroundLogger
 }
 
@@ -152,6 +155,15 @@ export function initBackground(deps: BackgroundDeps): void {
   async function syncForOptions(): Promise<SyncResponse> {
     try {
       await sync()
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: messageOf(error) }
+    }
+  }
+
+  async function disconnectForOptions(): Promise<SyncResponse> {
+    try {
+      await deps.disconnect()
       return { ok: true }
     } catch (error) {
       return { ok: false, error: messageOf(error) }
@@ -458,7 +470,7 @@ export function initBackground(deps: BackgroundDeps): void {
   })
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    // Both answers come later, so Chrome has to keep the channel open.
+    // Every answer comes later, so Chrome has to keep the channel open.
     if (isSyncRequest(message)) {
       void syncForOptions().then(sendResponse)
       return true
@@ -466,6 +478,11 @@ export function initBackground(deps: BackgroundDeps): void {
 
     if (isConnectRequest(message)) {
       void openConsentTab(message.baseUrl).then(sendResponse)
+      return true
+    }
+
+    if (isDisconnectRequest(message)) {
+      void disconnectForOptions().then(sendResponse)
       return true
     }
 

@@ -30,8 +30,20 @@ export interface ConnectRequest {
   baseUrl: string
 }
 
+/**
+ * "Disconnect": revoke the grant and forget it.
+ *
+ * The worker runs it because the worker outlives the page. Disconnect can
+ * wait on the refresh lock for as long as another context's refresh takes,
+ * and a page closed during that wait would drop it with the tokens still
+ * stored.
+ */
+export interface DisconnectRequest {
+  type: 'disconnect'
+}
+
 /** Every message the options page can send. */
-export type ExtensionMessage = SyncRequest | ConnectRequest
+export type ExtensionMessage = SyncRequest | ConnectRequest | DisconnectRequest
 
 /**
  * The worker's word that the consent tab has answered, sent to whoever is
@@ -54,6 +66,9 @@ export interface ConnectFinished {
  * sender waiting on a response that never comes.
  */
 export type SyncResponse = { ok: true } | { ok: false; error: string }
+
+/** What the worker answers a `DisconnectRequest` with, once it is done. */
+export type DisconnectResponse = SyncResponse
 
 /**
  * What the worker answers a `ConnectRequest` with - `ok` meaning the consent
@@ -78,6 +93,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** For the worker: is this untyped message the options page's sync request? */
 export function isSyncRequest(value: unknown): value is SyncRequest {
   return isRecord(value) && value.type === 'sync'
+}
+
+/** For the worker: is this untyped message the options page's disconnect request? */
+export function isDisconnectRequest(
+  value: unknown
+): value is DisconnectRequest {
+  return isRecord(value) && value.type === 'disconnect'
 }
 
 /** For the worker: is this untyped message the options page's connect request? */
@@ -139,6 +161,11 @@ export async function requestConnect(
   baseUrl: string
 ): Promise<ConnectResponse> {
   return send({ type: 'connect', baseUrl }, isConnectResponse, 'connect')
+}
+
+/** Ask the service worker to disconnect, answering the way `requestSync` does. */
+export async function requestDisconnect(): Promise<DisconnectResponse> {
+  return send({ type: 'disconnect' }, isSyncResponse, 'disconnect')
 }
 
 /**

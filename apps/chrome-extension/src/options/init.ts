@@ -3,7 +3,11 @@ import {
   ReauthorizationRequiredError,
   readConnection,
 } from '../auth.ts'
-import type { ConnectResponse, SyncResponse } from '../messages.ts'
+import type {
+  ConnectResponse,
+  DisconnectResponse,
+  SyncResponse,
+} from '../messages.ts'
 import * as storage from '../storage.ts'
 import type { TagWithCount } from '../types.ts'
 import { filterSelected, filterTags } from './filter.ts'
@@ -48,7 +52,8 @@ export interface OptionsDeps {
   requestConnect(baseUrl: string): Promise<ConnectResponse>
   /** Hear the worker say the consent tab has answered. */
   onConnectFinished(listener: (result: ConnectResponse) => void): void
-  disconnect(): Promise<void>
+  /** Ask the service worker to disconnect, which finishes if this page closes. */
+  requestDisconnect(): Promise<DisconnectResponse>
   createApiClient(baseUrl: string): OptionsApiClient
   requestSync(): Promise<SyncResponse>
   now(): number
@@ -401,8 +406,9 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
   async function onDisconnect(): Promise<void> {
     await whileBusy(ui.disconnectButton, async () => {
       try {
-        await deps.disconnect()
-        await showConnection()
+        const response = await deps.requestDisconnect()
+        if (response.ok) await showConnection()
+        else setStatus(response.error)
       } catch (error) {
         report(error)
       }
