@@ -67,8 +67,6 @@ if (process.env.EMAIL_PUBLIC_KEY) {
   }
 }
 
-// Without a key, addresses are stored as their unkeyed SHA-256, which anyone
-// holding the table can test candidate addresses against.
 const emailHashKey = process.env.EMAIL_HASH_KEY || undefined
 if (emailHashKey && emailHashKey.length < 32) {
   throw new Error(

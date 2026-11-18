@@ -61,10 +61,6 @@ export interface AccountServiceOptions {
    * of. The composition root decides how failures are logged.
    */
   defer: (work: () => Promise<void>) => void
-  /**
-   * Optional by design: an install that keeps no contactable copy of user
-   * emails simply has no key, and every use below stores null instead.
-   */
   emailSealer?: EmailSealer
   /** Without it, addresses are stored as their unkeyed SHA-256. */
   emailHashKey?: string
@@ -109,18 +105,16 @@ export class AccountService {
   }
 
   private async completeRegistration(input: RegistrationInput): Promise<void> {
-    const existingUserByUsername = await this.unlessStale(
+    const existingUserByUsername = await this.releaseIfStaleUnverified(
       await this.userRepository.findByUsername(input.username)
     )
-    const existingUserByEmail = await this.unlessStale(
-      await this.findUserByEmail(input.email)
+    const existingUserByEmail = await this.releaseIfStaleUnverified(
+      await this.findUserByEmailAndRekey(input.email)
     )
 
     if (existingUserByEmail) {
       if (!input.signinUrl || !input.resetUrl) return
-      // Issued as a reset token so it counts toward the same per-account
-      // limit, which bounds how often sign-ups can mail this address.
-      const token = await this.issueResetToken(
+      const token = await this.issueResetTokenWithinLimit(
         existingUserByEmail.id,
         RESET_LINK_LIFETIME_MS
       )
@@ -160,9 +154,6 @@ export class AccountService {
         roles: [Role.User],
       })
     } catch (error) {
-      // Two signups for the same username or email can pass the checks above
-      // at the same moment; the unique indexes are what actually stop the
-      // second one.
       if (error instanceof UserAlreadyExistsError) return
       throw error
     }
@@ -179,7 +170,7 @@ export class AccountService {
     }
 
     if (input.resetUrl) {
-      const token = await this.issueResetToken(
+      const token = await this.issueResetTokenWithinLimit(
         user.id,
         VERIFICATION_LINK_LIFETIME_MS
       )
@@ -247,7 +238,7 @@ export class AccountService {
   }
 
   private async offerEmailChange(input: EmailChangeInput): Promise<void> {
-    if (await this.findUserByEmail(input.email)) return
+    if (await this.findUserByEmailAndRekey(input.email)) return
 
     const token = generateSecureToken()
     await this.emailChangeRepository.save({
@@ -285,17 +276,13 @@ export class AccountService {
       throw error
     }
 
-    // A reset link mailed to the old address must not outlive the change.
     await this.passwordResetRepository.deleteByUserId(change.userId)
     return true
   }
 
-  /**
-   * The user, or null once a sign-up it never confirmed has been removed for
-   * being older than UNVERIFIED_HOLD_MS, so it stops holding its username and
-   * address against a new sign-up.
-   */
-  private async unlessStale(user: User | null): Promise<User | null> {
+  private async releaseIfStaleUnverified(
+    user: User | null
+  ): Promise<User | null> {
     if (!user || user.status !== UserStatus.Unverified) return user
     const createdBefore = new Date(Date.now() - UNVERIFIED_HOLD_MS)
     if (user.createdAt >= createdBefore) return user
@@ -321,12 +308,9 @@ export class AccountService {
     email: string
     resetUrl: string
   }): Promise<void> {
-    const user = await this.findUserByEmail(input.email)
+    const user = await this.findUserByEmailAndRekey(input.email)
     if (!user) return
 
-    // Opportunistically backfill the sealed email for users created before
-    // sealing existed (their email_encrypted is null). This is one of the few
-    // flows where we have the plaintext email for an existing account.
     if (this.emailSealer && !user.emailEncrypted) {
       try {
         const emailEncrypted = await this.emailSealer.seal(input.email)
@@ -336,7 +320,10 @@ export class AccountService {
       }
     }
 
-    const token = await this.issueResetToken(user.id, RESET_LINK_LIFETIME_MS)
+    const token = await this.issueResetTokenWithinLimit(
+      user.id,
+      RESET_LINK_LIFETIME_MS
+    )
     if (!token) return
 
     await this.emailService.sendPasswordResetEmail(
@@ -346,12 +333,7 @@ export class AccountService {
     )
   }
 
-  /**
-   * A new set-password token for the user, or null once the user has had
-   * RESET_REQUESTS_PER_WINDOW of them within the window, which bounds the
-   * mail any one address can be sent.
-   */
-  private async issueResetToken(
+  private async issueResetTokenWithinLimit(
     userId: string,
     lifetimeMs: number
   ): Promise<string | null> {
@@ -443,17 +425,7 @@ export class AccountService {
     return await this.passwordResetRepository.isValidToken(tokenHash)
   }
 
-  /**
-   * The account registered with this address, if any.
-   *
-   * With a hash key, a row stored before keying is still found under the
-   * unkeyed hash and rewritten keyed, since this is one of the few moments the
-   * server holds the plaintext address.
-   *
-   * Validation is the caller's business: every caller validates at its own
-   * boundary.
-   */
-  private async findUserByEmail(email: string): Promise<User | null> {
+  private async findUserByEmailAndRekey(email: string): Promise<User | null> {
     const emailHash = hashEmail(email, this.emailHashKey)
     const user = await this.userRepository.findByEmailHash(emailHash)
     if (user || !this.emailHashKey) return user

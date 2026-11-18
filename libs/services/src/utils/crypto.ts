@@ -133,11 +133,6 @@ export function needsRehash(hash: string): boolean {
   return N < CURRENT_PARAMS.N || r < CURRENT_PARAMS.r || p < CURRENT_PARAMS.p
 }
 
-/**
- * HMAC-SHA256 under `key` when one is given. Without a key it is the plain
- * SHA-256 every row was stored with before keying existed, which lookups still
- * try so those rows can be found and rewritten.
- */
 export function hashEmail(email: string, key?: string): string {
   const normalizedEmail = email.toLowerCase()
   const hash = key ? createHmac('sha256', key) : createHash('sha256')

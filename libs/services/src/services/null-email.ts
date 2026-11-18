@@ -12,8 +12,7 @@ export class EmailNotConfiguredError extends Error {
  *
  * Every send rejects, so an unconfigured install behaves like a provider that
  * is down — a path callers already handle — rather than one that reports
- * success having sent nothing. AccountService sends from deferred work, so the
- * rejection is logged by the composition root and never changes a response.
+ * success having sent nothing.
  *
  * This exists so AccountService can take its email dependency as required.
  * Choosing it is the app's decision, made visibly in the composition root,

@@ -114,9 +114,6 @@ export const privateUnlockLimiter = new RateLimiter({
   windowMs: 15 * 60 * 1000,
 })
 
-// Accepted email-change requests per user. Each one mails a link to an address
-// the requester chooses, so this bounds that mail; wrong passwords are counted
-// by privateUnlockLimiter instead.
 export const emailChangeLimiter = new RateLimiter({
   maxAttempts: 3,
   windowMs: 60 * 60 * 1000,

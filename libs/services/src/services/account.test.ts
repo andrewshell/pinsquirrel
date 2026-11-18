@@ -43,7 +43,6 @@ vi.mock('../utils/crypto.js', () => ({
     ),
 }))
 
-/** A reset-token store that keeps its rows, so per-account counts are real. */
 function inMemoryResets(): PasswordResetRepository {
   const rows: PasswordResetToken[] = []
   return {

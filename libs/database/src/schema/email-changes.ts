@@ -3,7 +3,6 @@ import { users } from './users'
 
 export const emailChanges = mysqlTable('email_changes', {
   id: varchar('id', { length: 36 }).primaryKey(),
-  // Unique: one pending change per user, replaced by the next request.
   userId: varchar('user_id', { length: 36 })
     .notNull()
     .unique()

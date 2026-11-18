@@ -12,7 +12,6 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
-/** The page every transactional mail shares, around its own body. */
 function htmlEmail(title: string, body: string): string {
   return `
 <!DOCTYPE html>

@@ -191,8 +191,6 @@ describe('profile routes', () => {
       )
     })
 
-    // The service answers a taken and a free address alike; the route must
-    // not add a difference of its own.
     it('answers a taken address exactly as it answers a free one', async () => {
       const free = await request({ email: 'free@example.test' })
       const freePage = await renderedProfile(free)

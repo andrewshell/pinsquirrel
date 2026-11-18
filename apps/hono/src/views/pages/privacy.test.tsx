@@ -20,7 +20,6 @@ async function privacyPageText(): Promise<string> {
     .replace(/\s+/g, ' ')
 }
 
-/** Every argument sign-up passes to the operator notification, as one string. */
 async function whatSignupTellsTheOperator(address: string): Promise<string> {
   const created: User = {
     id: 'new-user',

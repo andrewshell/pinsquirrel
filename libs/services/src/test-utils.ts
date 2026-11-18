@@ -26,10 +26,6 @@ export function createMockUserRepository(): UserRepository {
   }
 }
 
-/**
- * A `defer` for AccountService that runs the work at once and keeps it, so a
- * test can wait for it with `flush()`, which rejects with the first failure.
- */
 export function createDeferQueue() {
   const pending: Promise<void>[] = []
   return {
