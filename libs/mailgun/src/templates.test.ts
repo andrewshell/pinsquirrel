@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   createPasswordResetEmailTemplate,
   createVerificationEmailTemplate,
+  createEmailChangeConfirmationTemplate,
   createSignupNotificationEmailTemplate,
   createEmailAlreadyRegisteredTemplate,
   createUsernameTakenTemplate,
@@ -29,6 +30,16 @@ describe('createVerificationEmailTemplate', () => {
 
     expect(html).not.toContain('<script>')
     expect(html).toContain('href="&quot;&gt;&lt;script&gt;')
+  })
+})
+
+describe('createEmailChangeConfirmationTemplate', () => {
+  it('escapes the link in the HTML body', () => {
+    const { html, text } = createEmailChangeConfirmationTemplate(HOSTILE)
+
+    expect(html).not.toContain('<script>')
+    expect(html).toContain('href="&quot;&gt;&lt;script&gt;')
+    expect(text).toContain(HOSTILE)
   })
 })
 

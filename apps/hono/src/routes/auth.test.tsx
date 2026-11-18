@@ -30,6 +30,7 @@ const auth = {
   requestPasswordReset: vi.fn(),
   resetPassword: vi.fn(),
   validateResetToken: vi.fn(),
+  confirmEmailChange: vi.fn(),
 }
 
 const session = {
@@ -56,6 +57,8 @@ vi.mock('../lib/services', () => ({
     resetPassword: (...a: unknown[]) => auth.resetPassword(...a) as unknown,
     validateResetToken: (...a: unknown[]) =>
       auth.validateResetToken(...a) as unknown,
+    confirmEmailChange: (...a: unknown[]) =>
+      auth.confirmEmailChange(...a) as unknown,
   },
 }))
 
@@ -568,6 +571,34 @@ describe('auth routes', () => {
       )
 
       expect(res.status).toBe(500)
+    })
+  })
+
+  describe('confirm-email', () => {
+    it('asks before changing anything when the link is opened', async () => {
+      const res = await app.request('/confirm-email/tok-1')
+      const html = await res.text()
+
+      expect(res.status).toBe(200)
+      expect(html).toContain('action="/confirm-email/tok-1"')
+      expect(auth.confirmEmailChange).not.toHaveBeenCalled()
+    })
+
+    it('applies the change when the form is posted', async () => {
+      auth.confirmEmailChange.mockResolvedValue(true)
+
+      const res = await app.request('/confirm-email/tok-1', form({}))
+
+      expect(auth.confirmEmailChange).toHaveBeenCalledWith('tok-1')
+      expect(await res.text()).toContain('has been changed')
+    })
+
+    it('says so when the link is no good', async () => {
+      auth.confirmEmailChange.mockResolvedValue(false)
+
+      const res = await app.request('/confirm-email/tok-1', form({}))
+
+      expect(await res.text()).toContain('invalid or has expired')
     })
   })
 

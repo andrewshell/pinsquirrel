@@ -3,10 +3,10 @@ import {
   AccessControl,
   InvalidCredentialsError,
   OAuthError,
-  UserAlreadyExistsError,
   ValidationError,
 } from '@pinsquirrel/domain'
 import { accountService, authService, oauthService } from '../lib/services'
+import { baseUrl } from '../lib/config'
 import { isEmbedRequest, withEmbed } from '../lib/embed'
 import { getString } from '../lib/form'
 import {
@@ -15,6 +15,7 @@ import {
   requireAuth,
 } from '../middleware/session'
 import {
+  emailChangeLimiter,
   privateUnlockLimiter,
   retryAfterSeconds,
 } from '../middleware/rate-limit'
@@ -74,14 +75,48 @@ profile.post('/', async c => {
 
   try {
     if (intent === 'update-email') {
-      const email = getString(formData['email'])
+      const sendWaitMs = emailChangeLimiter.retryAfterMs(user.id, Date.now())
+      const attempt =
+        sendWaitMs > 0
+          ? { limited: true as const, retryAfterMs: sendWaitMs }
+          : reserve([[privateUnlockLimiter, user.id]])
+      if (attempt.limited) {
+        c.header('Retry-After', retryAfterSeconds(attempt.retryAfterMs))
+        return await rerender(
+          { emailPassword: ['Too many attempts. Please try again later.'] },
+          429
+        )
+      }
 
-      await accountService.updateEmail(new AccessControl(user), {
-        userId: user.id,
-        email: email === '' ? null : email,
-      })
+      try {
+        await accountService.requestEmailChange(new AccessControl(user), {
+          userId: user.id,
+          email: getString(formData['email']),
+          currentEmail: getString(formData['currentEmail']),
+          currentPassword: getString(formData['emailPassword']),
+          confirmUrl: `${baseUrl}/confirm-email`,
+        })
+      } catch (error) {
+        if (error instanceof InvalidCredentialsError) {
+          return await rerender(
+            {
+              emailPassword: [
+                'Your current password or email address is incorrect',
+              ],
+            },
+            400
+          )
+        }
+        attempt.release()
+        throw error
+      }
+      privateUnlockLimiter.reset(user.id)
+      emailChangeLimiter.hit(user.id)
 
-      sessionManager.setFlash('success', 'Email updated successfully!')
+      sessionManager.setFlash(
+        'success',
+        'Check your new address for a confirmation link. Your email changes once you follow it.'
+      )
       return c.redirect(back)
     }
 
@@ -152,13 +187,6 @@ profile.post('/', async c => {
         { _form: ['That application access is no longer active.'] },
         400
       )
-    }
-
-    // One account per email is a database constraint, so a taken address
-    // reaches us as a thrown error rather than a validation failure. It is
-    // still a rejected form, not a server fault.
-    if (error instanceof UserAlreadyExistsError) {
-      return rerender({ email: ['That email address is already in use'] }, 400)
     }
 
     if (error instanceof InvalidCredentialsError) {

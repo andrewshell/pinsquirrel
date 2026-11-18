@@ -6,11 +6,14 @@ import type {
   UserRepository,
   User,
   PasswordResetRepository,
+  EmailChangeRepository,
   EmailService,
   PasswordResetToken,
 } from '@pinsquirrel/domain'
 import {
+  InvalidCredentialsError,
   InvalidResetTokenError,
+  ValidationError,
   ResetTokenExpiredError,
   Role,
   UserAlreadyExistsError,
@@ -33,6 +36,11 @@ vi.mock('../utils/crypto.js', () => ({
     ),
   generateSecureToken: vi.fn().mockReturnValue('mock-token'),
   hashToken: vi.fn().mockImplementation((token: string) => `hashed_${token}`),
+  verifyPassword: vi
+    .fn()
+    .mockImplementation((password: string) =>
+      Promise.resolve(password === 'right-password')
+    ),
 }))
 
 /** A reset-token store that keeps its rows, so per-account counts are real. */
@@ -66,6 +74,7 @@ describe('AccountService', () => {
   let accountService: AccountService
   let mockUserRepository: UserRepository
   let mockPasswordResetRepository: PasswordResetRepository
+  let mockEmailChangeRepository: EmailChangeRepository
   let mockEmailService: EmailService
   let queue: ReturnType<typeof createDeferQueue>
 
@@ -108,18 +117,26 @@ describe('AccountService', () => {
       consume: vi.fn().mockResolvedValue(true),
     }
 
+    mockEmailChangeRepository = {
+      save: vi.fn().mockResolvedValue(undefined),
+      consume: vi.fn(),
+    }
+
     mockEmailService = {
       sendPasswordResetEmail: vi.fn(),
       sendSignupNotificationEmail: vi.fn(),
       sendEmailAlreadyRegisteredEmail: vi.fn(),
       sendUsernameTakenEmail: vi.fn(),
       sendVerificationEmail: vi.fn(),
+      sendEmailChangeConfirmationEmail: vi.fn().mockResolvedValue(undefined),
+      sendEmailChangeNoticeEmail: vi.fn().mockResolvedValue(undefined),
     }
 
     queue = createDeferQueue()
     accountService = new AccountService(
       mockUserRepository,
       mockPasswordResetRepository,
+      mockEmailChangeRepository,
       mockEmailService,
       { defer: queue.defer }
     )
@@ -159,6 +176,7 @@ describe('AccountService', () => {
       const service = new AccountService(
         mockUserRepository,
         resets,
+        mockEmailChangeRepository,
         mockEmailService,
         { defer: queue.defer }
       )
@@ -270,6 +288,7 @@ describe('AccountService', () => {
       const service = new AccountService(
         mockUserRepository,
         mockPasswordResetRepository,
+        mockEmailChangeRepository,
         mockEmailService,
         { defer: queue.defer, emailSealer }
       )
@@ -543,6 +562,7 @@ describe('AccountService', () => {
       const service = new AccountService(
         mockUserRepository,
         mockPasswordResetRepository,
+        mockEmailChangeRepository,
         new NullEmailService(),
         { defer: queue.defer }
       )
@@ -568,6 +588,7 @@ describe('AccountService', () => {
       const service = new AccountService(
         mockUserRepository,
         mockPasswordResetRepository,
+        mockEmailChangeRepository,
         new NullEmailService(),
         { defer: queue.defer }
       )
@@ -609,6 +630,7 @@ describe('AccountService', () => {
       const service = new AccountService(
         mockUserRepository,
         mockPasswordResetRepository,
+        mockEmailChangeRepository,
         new NullEmailService(),
         { defer: queue.defer }
       )
@@ -627,96 +649,195 @@ describe('AccountService', () => {
     })
   })
 
-  describe('updateEmail', () => {
-    it('should update email', async () => {
-      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
-      vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
+  describe('requestEmailChange', () => {
+    const owner: User = {
+      ...mockUser,
+      id: 'owner-id',
+      passwordHash: 'stored-password-hash',
+      emailHash: 'hashed_old@example.com',
+    }
+    const change = {
+      userId: owner.id,
+      email: 'new@example.com',
+      currentPassword: 'right-password',
+      currentEmail: 'old@example.com',
+      confirmUrl: 'https://example.com/confirm-email',
+    }
 
-      await accountService.updateEmail(selfAc('123'), {
-        userId: '123',
-        email: 'newemail@example.com',
-      })
-
-      expect(mockUserRepository.findById).toHaveBeenCalledWith('123')
-      // Only the fields this operation owns — never username/passwordHash, which
-      // could clobber a concurrent change made after the findById read.
-      expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
-        emailHash: 'hashed_newemail@example.com',
-        emailEncrypted: null,
-      })
+    beforeEach(() => {
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(owner)
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
     })
 
-    it('should clear email when null is provided', async () => {
-      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
-      vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
+    it('refuses a change without the right current password and writes nothing', async () => {
+      await expect(
+        accountService.requestEmailChange(new AccessControl(owner), {
+          ...change,
+          currentPassword: 'wrong-password',
+        })
+      ).rejects.toBeInstanceOf(InvalidCredentialsError)
+      await queue.flush()
 
-      await accountService.updateEmail(selfAc('123'), {
-        userId: '123',
-        email: null,
-      })
-
-      expect(mockUserRepository.findById).toHaveBeenCalledWith('123')
-      expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
-        emailHash: null,
-        emailEncrypted: null,
-      })
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+      expect(mockEmailChangeRepository.save).not.toHaveBeenCalled()
+      expect(
+        mockEmailService.sendEmailChangeConfirmationEmail
+      ).not.toHaveBeenCalled()
     })
 
-    it('should re-seal the email when a sealer is configured', async () => {
-      const emailSealer = {
-        seal: vi.fn().mockResolvedValue('resealed-blob'),
-      }
-      const service = new AccountService(
-        mockUserRepository,
-        mockPasswordResetRepository,
-        mockEmailService,
-        { defer: queue.defer, emailSealer }
+    it("refuses a current address that is not the account's", async () => {
+      await expect(
+        accountService.requestEmailChange(new AccessControl(owner), {
+          ...change,
+          currentEmail: 'someone-else@example.com',
+        })
+      ).rejects.toBeInstanceOf(InvalidCredentialsError)
+      await queue.flush()
+
+      expect(mockEmailChangeRepository.save).not.toHaveBeenCalled()
+    })
+
+    it('stores the change and mails a link to a free address, changing nothing yet', async () => {
+      await accountService.requestEmailChange(new AccessControl(owner), change)
+      await queue.flush()
+
+      expect(mockEmailChangeRepository.save).toHaveBeenCalledWith({
+        userId: owner.id,
+        tokenHash: 'hashed_mock-token',
+        emailHash: 'hashed_new@example.com',
+        emailEncrypted: null,
+        expiresAt: expect.any(Date) as Date,
+      })
+      expect(
+        mockEmailService.sendEmailChangeConfirmationEmail
+      ).toHaveBeenCalledWith(
+        'new@example.com',
+        'mock-token',
+        'https://example.com/confirm-email'
       )
-      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
-      vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
-
-      await service.updateEmail(selfAc('123'), {
-        userId: '123',
-        email: 'newemail@example.com',
-      })
-
-      expect(emailSealer.seal).toHaveBeenCalledWith('newemail@example.com')
-      expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
-        emailHash: 'hashed_newemail@example.com',
-        emailEncrypted: 'resealed-blob',
-      })
-    })
-
-    it('should throw validation error for invalid email', async () => {
-      await expect(
-        accountService.updateEmail(selfAc('123'), {
-          userId: '123',
-          email: 'invalid-email',
-        })
-      ).rejects.toThrow('Invalid email address')
-    })
-
-    it("should refuse to change another user's email", async () => {
-      const userA = new AccessControl({ ...mockUser, id: 'user-a' })
-
-      await expect(
-        accountService.updateEmail(userA, {
-          userId: 'user-b',
-          email: 'attacker@example.com',
-        })
-      ).rejects.toThrow(UnauthorizedUserAccessError)
-      expect(mockUserRepository.findById).not.toHaveBeenCalled()
       expect(mockUserRepository.update).not.toHaveBeenCalled()
     })
 
-    it('should refuse an anonymous caller', async () => {
+    it('tells the current address that a change was asked for', async () => {
+      await accountService.requestEmailChange(new AccessControl(owner), change)
+      await queue.flush()
+
+      expect(mockEmailService.sendEmailChangeNoticeEmail).toHaveBeenCalledWith(
+        'old@example.com'
+      )
+    })
+
+    it('answers a taken address the same way and sends it nothing', async () => {
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(mockUser)
+
       await expect(
-        accountService.updateEmail(new AccessControl(null), {
-          userId: 'user-a',
-          email: 'attacker@example.com',
+        accountService.requestEmailChange(new AccessControl(owner), change)
+      ).resolves.toBeUndefined()
+      await queue.flush()
+
+      expect(mockEmailChangeRepository.save).not.toHaveBeenCalled()
+      expect(
+        mockEmailService.sendEmailChangeConfirmationEmail
+      ).not.toHaveBeenCalled()
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('needs no current address from an account that has none', async () => {
+      vi.mocked(mockUserRepository.findById).mockResolvedValue({
+        ...owner,
+        emailHash: null,
+      })
+
+      await accountService.requestEmailChange(new AccessControl(owner), {
+        ...change,
+        currentEmail: '',
+      })
+      await queue.flush()
+
+      expect(mockEmailChangeRepository.save).toHaveBeenCalled()
+      expect(mockEmailService.sendEmailChangeNoticeEmail).not.toHaveBeenCalled()
+    })
+
+    it('seals the new address when a sealer is configured', async () => {
+      const service = new AccountService(
+        mockUserRepository,
+        mockPasswordResetRepository,
+        mockEmailChangeRepository,
+        mockEmailService,
+        {
+          defer: queue.defer,
+          emailSealer: { seal: vi.fn().mockResolvedValue('sealed-new') },
+        }
+      )
+
+      await service.requestEmailChange(new AccessControl(owner), change)
+      await queue.flush()
+
+      expect(mockEmailChangeRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ emailEncrypted: 'sealed-new' })
+      )
+    })
+
+    it('rejects an invalid new address', async () => {
+      await expect(
+        accountService.requestEmailChange(new AccessControl(owner), {
+          ...change,
+          email: 'not-an-email',
         })
+      ).rejects.toThrow(ValidationError)
+    })
+
+    it("refuses to change another user's email", async () => {
+      await expect(
+        accountService.requestEmailChange(selfAc('someone-else'), change)
       ).rejects.toThrow(UnauthorizedUserAccessError)
-      expect(mockUserRepository.findById).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('confirmEmailChange', () => {
+    const pending = {
+      id: 'change-1',
+      userId: 'owner-id',
+      tokenHash: 'hashed_link-token',
+      emailHash: 'hashed_new@example.com',
+      emailEncrypted: 'sealed-new',
+      expiresAt: new Date(Date.now() + 60_000),
+      createdAt: new Date(),
+    }
+
+    it('applies the change and ends outstanding reset links', async () => {
+      vi.mocked(mockEmailChangeRepository.consume).mockResolvedValue(pending)
+      vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
+
+      expect(await accountService.confirmEmailChange('link-token')).toBe(true)
+
+      expect(mockEmailChangeRepository.consume).toHaveBeenCalledWith(
+        'hashed_link-token'
+      )
+      expect(mockUserRepository.update).toHaveBeenCalledWith('owner-id', {
+        emailHash: 'hashed_new@example.com',
+        emailEncrypted: 'sealed-new',
+      })
+      expect(mockPasswordResetRepository.deleteByUserId).toHaveBeenCalledWith(
+        'owner-id'
+      )
+    })
+
+    it('changes nothing for an unknown, used or expired link', async () => {
+      vi.mocked(mockEmailChangeRepository.consume).mockResolvedValue(null)
+
+      expect(await accountService.confirmEmailChange('stale')).toBe(false)
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('fails when the address was taken after the link was sent', async () => {
+      vi.mocked(mockEmailChangeRepository.consume).mockResolvedValue(pending)
+      vi.mocked(mockUserRepository.update).mockRejectedValue(
+        new UserAlreadyExistsError('someone')
+      )
+
+      expect(await accountService.confirmEmailChange('link-token')).toBe(false)
+      expect(mockPasswordResetRepository.deleteByUserId).not.toHaveBeenCalled()
     })
   })
 
@@ -725,6 +846,7 @@ describe('AccountService', () => {
       new AccountService(
         mockUserRepository,
         mockPasswordResetRepository,
+        mockEmailChangeRepository,
         mockEmailService,
         { defer: queue.defer, emailHashKey: 'server-secret' }
       )
@@ -833,6 +955,7 @@ describe('AccountService', () => {
       const service = new AccountService(
         mockUserRepository,
         mockPasswordResetRepository,
+        mockEmailChangeRepository,
         mockEmailService,
         { defer: queue.defer, emailSealer }
       )
@@ -868,6 +991,7 @@ describe('AccountService', () => {
       const service = new AccountService(
         mockUserRepository,
         mockPasswordResetRepository,
+        mockEmailChangeRepository,
         mockEmailService,
         { defer: queue.defer, emailSealer }
       )
@@ -900,6 +1024,7 @@ describe('AccountService', () => {
       const service = new AccountService(
         mockUserRepository,
         mockPasswordResetRepository,
+        mockEmailChangeRepository,
         mockEmailService,
         { defer: queue.defer, emailSealer }
       )
@@ -988,6 +1113,7 @@ describe('AccountService', () => {
       const service = new AccountService(
         mockUserRepository,
         inMemoryResets(),
+        mockEmailChangeRepository,
         mockEmailService,
         { defer: queue.defer }
       )
@@ -1014,6 +1140,7 @@ describe('AccountService', () => {
       const service = new AccountService(
         mockUserRepository,
         repository,
+        mockEmailChangeRepository,
         mockEmailService,
         { defer: queue.defer }
       )

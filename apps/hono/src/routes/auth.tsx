@@ -31,6 +31,7 @@ import { SignInPage } from '../views/pages/signin'
 import { SignUpPage } from '../views/pages/signup'
 import { ForgotPasswordPage } from '../views/pages/forgot-password'
 import { ResetPasswordPage } from '../views/pages/reset-password'
+import { ConfirmEmailPage } from '../views/pages/confirm-email'
 
 const auth = new Hono()
 
@@ -285,6 +286,15 @@ auth.post(
     }
   }
 )
+
+auth.get('/confirm-email/:token', c =>
+  c.html(<ConfirmEmailPage state="ask" token={c.req.param('token')} />)
+)
+
+auth.post('/confirm-email/:token', async c => {
+  const changed = await accountService.confirmEmailChange(c.req.param('token'))
+  return c.html(<ConfirmEmailPage state={changed ? 'done' : 'invalid'} />)
+})
 
 // GET /reset-password/:token - Render reset password form
 auth.get('/reset-password/:token', async c => {

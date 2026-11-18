@@ -92,6 +92,85 @@ ${SIGN_OFF}
   return { html, text }
 }
 
+export function createEmailChangeConfirmationTemplate(confirmUrl: string): {
+  html: string
+  text: string
+} {
+  const title = 'Confirm your new PinSquirrel email address'
+  const html = htmlEmail(
+    title,
+    `
+        <p>Hello,</p>
+
+        <p>Someone asked to use this address for their PinSquirrel account. If that was you, confirm it:</p>
+
+        <p style="text-align: center;">
+            <a href="${escapeHtml(confirmUrl)}" class="button">Confirm new address</a>
+        </p>
+
+        <p>Or copy and paste this link into your browser:</p>
+        <p style="word-break: break-all; color: #007bff;">${escapeHtml(confirmUrl)}</p>
+
+        <p>This link expires in 24 hours. Until you confirm, the account keeps its old address.</p>
+
+        <p>If you didn't ask for this, you can safely ignore this email.</p>
+`
+  )
+
+  const text = `
+${title}
+
+Hello,
+
+Someone asked to use this address for their PinSquirrel account. If that was you, confirm it:
+
+${confirmUrl}
+
+This link expires in 24 hours. Until you confirm, the account keeps its old address.
+
+If you didn't ask for this, you can safely ignore this email.
+
+${SIGN_OFF}
+`.trim()
+
+  return { html, text }
+}
+
+export function createEmailChangeNoticeTemplate(): {
+  html: string
+  text: string
+} {
+  const title = 'Your PinSquirrel email address is changing'
+  const body =
+    'Someone signed in to your PinSquirrel account and asked to move it to a different email address. The change takes effect only when the link sent to the new address is followed.'
+  const advice =
+    "If this wasn't you, sign in and change your password now, then contact andrew@pinsquirrel.com."
+  const html = htmlEmail(
+    title,
+    `
+        <p>Hello,</p>
+
+        <p>${body}</p>
+
+        <p>${advice}</p>
+`
+  )
+
+  const text = `
+${title}
+
+Hello,
+
+${body}
+
+${advice}
+
+${SIGN_OFF}
+`.trim()
+
+  return { html, text }
+}
+
 export function createPasswordResetEmailTemplate(resetUrl: string): {
   html: string
   text: string

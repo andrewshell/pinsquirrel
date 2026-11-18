@@ -28,6 +28,12 @@ export class NullEmailService implements EmailService {
   readonly sendVerificationEmail: EmailService['sendVerificationEmail'] = () =>
     Promise.reject(new EmailNotConfiguredError())
 
+  readonly sendEmailChangeConfirmationEmail: EmailService['sendEmailChangeConfirmationEmail'] =
+    () => Promise.reject(new EmailNotConfiguredError())
+
+  readonly sendEmailChangeNoticeEmail: EmailService['sendEmailChangeNoticeEmail'] =
+    () => Promise.reject(new EmailNotConfiguredError())
+
   readonly sendSignupNotificationEmail: EmailService['sendSignupNotificationEmail'] =
     () => Promise.reject(new EmailNotConfiguredError())
 

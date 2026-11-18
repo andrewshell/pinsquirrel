@@ -4,6 +4,8 @@ import Mailgun from 'mailgun.js'
 import {
   createPasswordResetEmailTemplate,
   createVerificationEmailTemplate,
+  createEmailChangeConfirmationTemplate,
+  createEmailChangeNoticeTemplate,
   createSignupNotificationEmailTemplate,
   createEmailAlreadyRegisteredTemplate,
   createUsernameTakenTemplate,
@@ -173,6 +175,38 @@ export class MailgunEmailService implements EmailService {
       'Confirm your PinSquirrel sign-up',
       createVerificationEmailTemplate(`${resetUrl}/${token}`),
       { description: 'verification email' }
+    )
+  }
+
+  async sendEmailChangeConfirmationEmail(
+    email: string,
+    token: string,
+    confirmUrl: string
+  ): Promise<void> {
+    if (!email || !token || !confirmUrl) {
+      throw new EmailSendError(
+        'Invalid email parameters: email, token, and confirmUrl are required'
+      )
+    }
+
+    await this.send(
+      email,
+      'Confirm your new PinSquirrel email address',
+      createEmailChangeConfirmationTemplate(`${confirmUrl}/${token}`),
+      { description: 'email-change confirmation' }
+    )
+  }
+
+  async sendEmailChangeNoticeEmail(email: string): Promise<void> {
+    if (!email) {
+      throw new EmailSendError('Invalid email parameters: email is required')
+    }
+
+    await this.send(
+      email,
+      'Your PinSquirrel email address is changing',
+      createEmailChangeNoticeTemplate(),
+      { description: 'email-change notice' }
     )
   }
 

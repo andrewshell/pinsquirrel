@@ -2,6 +2,7 @@ import type {
   AccessControl,
   UserRepository,
   PasswordResetRepository,
+  EmailChangeRepository,
   EmailService,
   User,
   UpdateUserData,
@@ -19,6 +20,7 @@ import {
   hashEmail,
   generateSecureToken,
   hashToken,
+  verifyPassword,
 } from '../utils/crypto.js'
 import {
   emailSchema,
@@ -33,6 +35,7 @@ const RESET_REQUESTS_PER_WINDOW = 3
 const RESET_LINK_LIFETIME_MS = 15 * 60 * 1000
 const VERIFICATION_LINK_LIFETIME_MS = 48 * 60 * 60 * 1000
 const UNVERIFIED_HOLD_MS = 7 * 24 * 60 * 60 * 1000
+const EMAIL_CHANGE_LINK_LIFETIME_MS = 24 * 60 * 60 * 1000
 
 export interface RegistrationInput {
   username: string
@@ -41,6 +44,15 @@ export interface RegistrationInput {
   notifyEmail?: string
   signinUrl?: string
   signupUrl?: string
+}
+
+export interface EmailChangeInput {
+  userId: string
+  email: string
+  currentPassword: string
+  /** Checked against the stored hash; ignored for an account with no email. */
+  currentEmail: string
+  confirmUrl: string
 }
 
 export interface AccountServiceOptions {
@@ -78,6 +90,7 @@ export class AccountService {
   constructor(
     private readonly userRepository: UserRepository,
     private readonly passwordResetRepository: PasswordResetRepository,
+    private readonly emailChangeRepository: EmailChangeRepository,
     private readonly emailService: EmailService,
     options: AccountServiceOptions
   ) {
@@ -181,29 +194,27 @@ export class AccountService {
   }
 
   /**
-   * Change a user's own email. Only the account holder may do this: the sealed
-   * copy is the waitlist's contact address, so letting anyone else rewrite it
-   * would redirect that contact.
+   * Ask to move the account to a new address. Nothing changes until the link
+   * mailed to the new address is followed (confirmEmailChange).
+   *
+   * The credentials are checked here, so a wrong password or current address
+   * is refused at once. Everything that depends on whether the new address is
+   * taken is deferred, so a taken and a free address answer alike: a taken
+   * one simply gets no link.
    */
-  async updateEmail(
+  async requestEmailChange(
     ac: AccessControl,
-    input: {
-      userId: string
-      email: string | null
-    }
+    input: EmailChangeInput
   ): Promise<void> {
     if (!ac.canUpdate({ userId: input.userId })) {
       throw new UnauthorizedUserAccessError(input.userId)
     }
 
-    // Validate email if provided
-    if (input.email !== null) {
-      const emailResult = emailSchema.safeParse(input.email)
-      if (!emailResult.success) {
-        throw validationErrorFromZod(emailResult.error, {
-          fallbackField: 'email',
-        })
-      }
+    const emailResult = emailSchema.safeParse(input.email)
+    if (!emailResult.success) {
+      throw validationErrorFromZod(emailResult.error, {
+        fallbackField: 'email',
+      })
     }
 
     const user = await this.userRepository.findById(input.userId)
@@ -211,23 +222,72 @@ export class AccountService {
       throw new InvalidCredentialsError()
     }
 
-    // Hash the email in the business logic layer
-    const emailHash = input.email
-      ? hashEmail(input.email, this.emailHashKey)
-      : null
+    const passwordMatches = await verifyPassword(
+      input.currentPassword,
+      user.passwordHash
+    )
+    if (!passwordMatches || !this.isCurrentEmail(user, input.currentEmail)) {
+      throw new InvalidCredentialsError()
+    }
 
-    // Re-seal the email (or clear it) to keep the contactable copy in sync
-    const emailEncrypted =
-      input.email && this.emailSealer
+    if (user.emailHash) {
+      this.defer(() =>
+        this.emailService.sendEmailChangeNoticeEmail(input.currentEmail)
+      )
+    }
+    this.defer(() => this.offerEmailChange(input))
+  }
+
+  private isCurrentEmail(user: User, email: string): boolean {
+    if (!user.emailHash) return true
+    return (
+      user.emailHash === hashEmail(email, this.emailHashKey) ||
+      user.emailHash === hashEmail(email)
+    )
+  }
+
+  private async offerEmailChange(input: EmailChangeInput): Promise<void> {
+    if (await this.findUserByEmail(input.email)) return
+
+    const token = generateSecureToken()
+    await this.emailChangeRepository.save({
+      userId: input.userId,
+      tokenHash: hashToken(token),
+      emailHash: hashEmail(input.email, this.emailHashKey),
+      emailEncrypted: this.emailSealer
         ? await this.emailSealer.seal(input.email)
-        : null
-
-    // Persist only the fields this operation owns. Writing username/passwordHash
-    // from the stale findById snapshot could clobber a concurrent change.
-    await this.userRepository.update(input.userId, {
-      emailHash,
-      emailEncrypted,
+        : null,
+      expiresAt: new Date(Date.now() + EMAIL_CHANGE_LINK_LIFETIME_MS),
     })
+    await this.emailService.sendEmailChangeConfirmationEmail(
+      input.email,
+      token,
+      input.confirmUrl
+    )
+  }
+
+  /**
+   * Apply the change a confirmation link stands for. False when the link is
+   * unknown, used, expired, or its address was taken in the meantime.
+   */
+  async confirmEmailChange(token: string): Promise<boolean> {
+    const change = await this.emailChangeRepository.consume(hashToken(token))
+    if (!change) return false
+
+    try {
+      const updated = await this.userRepository.update(change.userId, {
+        emailHash: change.emailHash,
+        emailEncrypted: change.emailEncrypted,
+      })
+      if (!updated) return false
+    } catch (error) {
+      if (error instanceof UserAlreadyExistsError) return false
+      throw error
+    }
+
+    // A reset link mailed to the old address must not outlive the change.
+    await this.passwordResetRepository.deleteByUserId(change.userId)
+    return true
   }
 
   /**

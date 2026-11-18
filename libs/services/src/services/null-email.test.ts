@@ -17,6 +17,14 @@ describe('NullEmailService', () => {
       () => service.sendVerificationEmail('a@b.com', 't', 'url'),
     ],
     [
+      'sendEmailChangeConfirmationEmail',
+      () => service.sendEmailChangeConfirmationEmail('a@b.com', 't', 'url'),
+    ],
+    [
+      'sendEmailChangeNoticeEmail',
+      () => service.sendEmailChangeNoticeEmail('a@b.com'),
+    ],
+    [
       'sendSignupNotificationEmail',
       () => service.sendSignupNotificationEmail('a@b.com', 'u', 'e@f.com'),
     ],

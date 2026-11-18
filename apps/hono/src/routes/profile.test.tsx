@@ -13,7 +13,6 @@ import {
   AccessControl,
   InvalidCredentialsError,
   OAuthInvalidGrantError,
-  UserAlreadyExistsError,
   ValidationError,
 } from '@pinsquirrel/domain'
 import { formBody } from '../test-support/pin-routes'
@@ -28,7 +27,7 @@ const testUser = {
 } as unknown as User
 
 const svc = {
-  updateEmail: vi.fn(),
+  requestEmailChange: vi.fn(),
   changePassword: vi.fn(),
   listGrants: vi.fn(),
   revokeGrant: vi.fn(),
@@ -49,7 +48,8 @@ function makeGrant(overrides: Record<string, unknown> = {}) {
 
 vi.mock('../lib/services', () => ({
   accountService: {
-    updateEmail: (...a: unknown[]) => svc.updateEmail(...a) as unknown,
+    requestEmailChange: (...a: unknown[]) =>
+      svc.requestEmailChange(...a) as unknown,
   },
   authService: {
     changePassword: (...a: unknown[]) => svc.changePassword(...a) as unknown,
@@ -86,7 +86,8 @@ vi.mock('../middleware/session', () => ({
 }))
 
 const { profileRoutes } = await import('./profile')
-const { privateUnlockLimiter } = await import('../middleware/rate-limit')
+const { emailChangeLimiter, privateUnlockLimiter } =
+  await import('../middleware/rate-limit')
 
 describe('profile routes', () => {
   let app: Hono
@@ -95,6 +96,7 @@ describe('profile routes', () => {
     vi.clearAllMocks()
     flash = null
     privateUnlockLimiter.reset(testUser.id)
+    emailChangeLimiter.reset(testUser.id)
     svc.listGrants.mockResolvedValue([makeGrant()])
     app = new Hono()
     app.route('/profile', profileRoutes)
@@ -121,7 +123,7 @@ describe('profile routes', () => {
 
     it('re-renders a rejected form in embed when it said so', async () => {
       // Once: clearAllMocks in beforeEach clears calls, not implementations.
-      svc.updateEmail.mockRejectedValueOnce(
+      svc.requestEmailChange.mockRejectedValueOnce(
         new ValidationError({ email: ['Invalid email address'] })
       )
 
@@ -152,75 +154,99 @@ describe('profile routes', () => {
   })
 
   describe('POST / — update-email', () => {
-    it('still lists the connected applications once the email has been updated', async () => {
-      const res = await app.request(
+    beforeEach(() => {
+      svc.requestEmailChange.mockResolvedValue(undefined)
+    })
+
+    const request = (fields: Record<string, string> = {}) =>
+      app.request(
         '/profile',
-        formBody({ intent: 'update-email', email: 'new@example.com' })
+        formBody({
+          intent: 'update-email',
+          email: 'new@example.com',
+          currentEmail: 'alice@example.com',
+          emailPassword: 'right-password',
+          ...fields,
+        })
       )
 
-      const html = await renderedProfile(res)
-      expect(svc.updateEmail).toHaveBeenCalledWith(
+    it('asks the service for the change with the credentials from the form', async () => {
+      const html = await renderedProfile(await request())
+
+      expect(svc.requestEmailChange).toHaveBeenCalledWith(
         new AccessControl(testUser),
-        { userId: testUser.id, email: 'new@example.com' }
+        expect.objectContaining({
+          userId: testUser.id,
+          email: 'new@example.com',
+          currentEmail: 'alice@example.com',
+          currentPassword: 'right-password',
+        })
       )
       expect(html).toContain('Claude Code')
     })
 
-    it('confirms the update to the user', async () => {
-      const res = await app.request(
-        '/profile',
-        formBody({ intent: 'update-email', email: 'new@example.com' })
+    it('tells the user to follow the link sent to the new address', async () => {
+      expect(await renderedProfile(await request())).toMatch(
+        /confirmation link/
       )
-
-      expect(await renderedProfile(res)).toMatch(/[Ee]mail updated/)
     })
 
-    // The unique index on email_hash means another account can own the
-    // address; that is a rejected form, not a server fault.
-    it('reports an address another account already uses', async () => {
-      svc.updateEmail.mockRejectedValue(
-        new UserAlreadyExistsError('alice', 'already in use')
-      )
+    // The service answers a taken and a free address alike; the route must
+    // not add a difference of its own.
+    it('answers a taken address exactly as it answers a free one', async () => {
+      const free = await request({ email: 'free@example.test' })
+      const freePage = await renderedProfile(free)
+      const taken = await request({ email: 'taken@example.test' })
+      const takenPage = await renderedProfile(taken)
 
-      const res = await app.request(
-        '/profile',
-        formBody({ intent: 'update-email', email: 'taken@example.com' })
-      )
+      expect({
+        status: taken.status,
+        location: taken.headers.get('location'),
+      }).toEqual({
+        status: free.status,
+        location: free.headers.get('location'),
+      })
+      expect(takenPage).toBe(freePage)
+      expect(takenPage).not.toMatch(/already in use/i)
+    })
 
-      expect(res.status).toBe(400)
-      const html = await res.text()
-      expect(html).toMatch(/already/i)
-      expect(html).not.toMatch(/unexpected error/i)
+    it('refuses wrong credentials and counts them like wrong passwords', async () => {
+      svc.requestEmailChange.mockRejectedValue(new InvalidCredentialsError())
+
+      const responses = []
+      for (let i = 0; i < 6; i++) {
+        responses.push(await request({ emailPassword: 'wrong' }))
+      }
+
+      expect(responses[0]?.status).toBe(400)
+      expect(await responses[0]?.text()).toMatch(/incorrect/)
+      expect(responses[5]?.status).toBe(429)
+      expect(svc.requestEmailChange).toHaveBeenCalledTimes(5)
+    })
+
+    it('accepts at most three changes an hour', async () => {
+      const statuses = []
+      for (let i = 0; i < 4; i++) {
+        statuses.push((await request()).status)
+      }
+
+      expect(statuses).toEqual([302, 302, 302, 429])
+      expect(svc.requestEmailChange).toHaveBeenCalledTimes(3)
     })
 
     // The card list has to come back with the error, or a rejected form would
     // blank the rest of the page.
     it('reports a validation failure without losing the connected applications', async () => {
-      svc.updateEmail.mockRejectedValue(
+      svc.requestEmailChange.mockRejectedValue(
         new ValidationError({ email: ['Invalid email address'] })
       )
 
-      const res = await app.request(
-        '/profile',
-        formBody({ intent: 'update-email', email: 'nope' })
-      )
+      const res = await request({ email: 'nope' })
 
       expect(res.status).toBe(400)
       const html = await res.text()
       expect(html).toContain('Invalid email address')
       expect(html).toContain('Claude Code')
-    })
-
-    it('clears the address when the field is submitted empty', async () => {
-      await app.request(
-        '/profile',
-        formBody({ intent: 'update-email', email: '' })
-      )
-
-      expect(svc.updateEmail).toHaveBeenCalledWith(
-        new AccessControl(testUser),
-        { userId: testUser.id, email: null }
-      )
     })
   })
 

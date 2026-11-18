@@ -22,6 +22,7 @@ import {
   tagRepository,
   pinRepository,
   passwordResetRepository,
+  emailChangeRepository,
   sessionRepository,
   oauthClientRepository,
   oauthAuthorizationCodeRepository,
@@ -80,6 +81,7 @@ export const authService = new AuthenticationService(userRepository)
 export const accountService = new AccountService(
   userRepository,
   passwordResetRepository,
+  emailChangeRepository,
   emailService,
   {
     defer: work => {
