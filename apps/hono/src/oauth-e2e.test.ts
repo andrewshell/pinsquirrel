@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { UserStatus } from '@pinsquirrel/domain'
+import { REFRESH_ROTATION_GRACE_MS } from '@pinsquirrel/services'
 import { app } from './app'
 import {
   db,
@@ -155,10 +156,6 @@ function exchange(fields: Record<string, string>): Promise<Response> {
   return request(pathOf(metadata.token_endpoint), form(fields))
 }
 
-/**
- * Consent and approval, up to the callback. Returns the token request the
- * client would send next.
- */
 async function authorizeForCode(input: {
   resource: string
   scope?: string
@@ -181,10 +178,6 @@ async function authorizeForCode(input: {
   }
 }
 
-/**
- * A whole connection: consent, approval, and the token exchange the callback
- * triggers. Returns what the client ends up holding.
- */
 async function connect(input: {
   resource: string
   scope?: string
@@ -482,7 +475,6 @@ describe('authorization', () => {
       client_id: clientId,
     })
     expect(refresh.status).toBe(400)
-    // Another connection of the same client is a different grant.
     expect((await callListPins(mcpTokens.access_token)).status).toBe(200)
   })
 
@@ -741,9 +733,11 @@ describe('refresh rotation', () => {
       client_id: clientId,
     })
 
-  /** Run with the clock past the window in which a duplicate is tolerated. */
   async function afterTheGraceWindow(run: () => Promise<void>): Promise<void> {
-    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 31 * 1000 })
+    vi.useFakeTimers({
+      toFake: ['Date'],
+      now: Date.now() + REFRESH_ROTATION_GRACE_MS + 1000,
+    })
     try {
       await run()
     } finally {
@@ -766,9 +760,6 @@ describe('refresh rotation', () => {
       expect(replay.status).toBe(400)
       expect(await replay.json()).toMatchObject({ error: 'invalid_grant' })
 
-      // There is no telling a client replaying its own token from somebody
-      // holding a copy, so the successor dies with it and the user
-      // re-consents.
       const successor = await exchange({
         grant_type: 'refresh_token',
         refresh_token: rotated.refresh_token ?? '',

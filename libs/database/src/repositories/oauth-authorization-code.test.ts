@@ -330,9 +330,6 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
       expect(await stored(pair[0])).toBeNull()
     })
 
-    // The exchange holds the user's row shared until its tokens are
-    // committed. A revocation takes that row before it stamps the tokens, so
-    // it either runs first and the code is gone, or runs after and sees them.
     it('should not leave live tokens when the user revokes everything mid-exchange', async () => {
       const created = await createCode()
       const [access, refresh] = tokensFor(created)

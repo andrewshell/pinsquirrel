@@ -70,16 +70,7 @@ const ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000
  */
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
-/**
- * How long after a rotation the retired token may turn up again without it
- * meaning the chain leaked.
- *
- * A client that refreshes from two processes at once, or retries a refresh
- * whose response it never saw, presents the same token twice within moments.
- * Inside this window the duplicate is refused and the grant is left alone;
- * after it, a second presentation revokes the grant.
- */
-const ROTATION_GRACE_MS = 30 * 1000
+export const REFRESH_ROTATION_GRACE_MS = 30 * 1000
 
 /**
  * The prefix on every access token this server issues. Not for dispatch,
@@ -413,7 +404,7 @@ export class OAuthService {
     const { rows, issued } = mintTokens({
       clientId: client.clientId,
       userId: code.userId,
-      scopes: code.scopes,
+      accessScopes: code.scopes,
       refreshScopes: refreshable ? code.scopes : null,
       resource: code.resource,
       grantId: code.grantId ?? randomUUID(),
@@ -421,7 +412,6 @@ export class OAuthService {
 
     const outcome = await this.codeRepository.exchange(code.id, rows)
     if (outcome === 'spent') {
-      // Lost the race with a concurrent exchange of the same code.
       return this.refuseSpentCode(code)
     }
     if (outcome === 'gone') {
@@ -442,7 +432,6 @@ export class OAuthService {
     throw invalidCode()
   }
 
-  /** Everything a code exchange has to prove before the code is honoured. */
   private async requireCodeMatches(
     code: AuthorizationCode,
     client: OAuthClient,
@@ -520,8 +509,6 @@ export class OAuthService {
     }
 
     if (!client.grantTypes.includes('refresh_token')) {
-      // Refused before the token is retired, so a registration that is put
-      // right finds the grant where it left it.
       throw new OAuthUnauthorizedClientError(
         'This client is not registered for the refresh_token grant'
       )
@@ -548,7 +535,7 @@ export class OAuthService {
     const { rows, issued } = mintTokens({
       clientId: client.clientId,
       userId: token.userId,
-      scopes,
+      accessScopes: scopes,
       refreshScopes: token.scopes,
       resource: token.resource,
       grantId: token.grantId ?? randomUUID(),
@@ -558,7 +545,6 @@ export class OAuthService {
     if (!(await this.tokenRepository.rotate(token.id, rows))) {
       const current = await this.tokenRepository.findById(token.id)
       if (current?.rotatedAt && !current.revokedAt) {
-        // Lost the race with a concurrent refresh of the same token.
         return this.refuseRotatedToken(current, current.rotatedAt)
       }
       throw new OAuthInvalidGrantError(
@@ -569,19 +555,11 @@ export class OAuthService {
     return issued
   }
 
-  /**
-   * Answer a refresh token that was already exchanged for a successor.
-   *
-   * Moments after the rotation it is a duplicate request, and is only
-   * refused. Later it means the chain leaked: there is no way to tell a
-   * client replaying its own token from somebody else holding a copy, so the
-   * grant it belongs to dies and the user re-consents.
-   */
   private async refuseRotatedToken(
     token: OAuthToken,
     rotatedAt: Date
   ): Promise<never> {
-    if (Date.now() - rotatedAt.getTime() < ROTATION_GRACE_MS) {
+    if (Date.now() - rotatedAt.getTime() < REFRESH_ROTATION_GRACE_MS) {
       throw new OAuthInvalidGrantError(
         'That refresh token was already exchanged'
       )
@@ -876,11 +854,6 @@ export class OAuthService {
     }
   }
 
-  /**
-   * Kill the grant a token or a code belongs to. One from before grants had
-   * ids cannot be told apart from the user's other tokens for that client, so
-   * all of them go.
-   */
   private async revokeGrantOf(
     holder: Pick<OAuthToken, 'userId' | 'clientId' | 'grantId'>
   ): Promise<void> {
@@ -1111,10 +1084,6 @@ export class OAuthService {
 /** The grant types a client gets if its metadata does not say. */
 const DEFAULT_GRANT_TYPES = ['authorization_code', 'refresh_token']
 
-/**
- * Unknown, expired, or already spent. One answer for all three: telling them
- * apart would say whether a code ever existed.
- */
 function invalidCode(): OAuthInvalidGrantError {
   return new OAuthInvalidGrantError(
     'The authorization code is invalid, expired, or already used'
@@ -1285,9 +1254,7 @@ function sameUriList(a: string[], b: string[]): boolean {
 function mintTokens(grant: {
   clientId: string
   userId: string
-  /** What the access token may do. */
-  scopes: string[]
-  /** What the refresh token stands for, or null to issue none. */
+  accessScopes: string[]
   refreshScopes: string[] | null
   resource: string
   grantId: string
@@ -1306,7 +1273,7 @@ function mintTokens(grant: {
       ...shared,
       tokenHash: hashToken(accessToken),
       kind: 'access',
-      scopes: grant.scopes,
+      scopes: grant.accessScopes,
       expiresAt: new Date(Date.now() + ACCESS_TOKEN_TTL_MS),
     },
   ]
@@ -1331,7 +1298,7 @@ function mintTokens(grant: {
       refreshToken,
       tokenType: 'Bearer',
       expiresIn: Math.floor(ACCESS_TOKEN_TTL_MS / 1000),
-      scopes: grant.scopes,
+      scopes: grant.accessScopes,
       resource: grant.resource,
     },
   }

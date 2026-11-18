@@ -86,8 +86,6 @@ export class DrizzleOAuthAuthorizationCodeRepository implements OAuthAuthorizati
       }
 
       const now = new Date()
-      // Conditional, so the row lock this UPDATE takes is what makes two
-      // concurrent exchanges of the same code resolve to one winner.
       const result = await tx
         .update(oauthAuthorizationCodes)
         .set({ consumedAt: now })

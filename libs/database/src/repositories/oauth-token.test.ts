@@ -362,9 +362,6 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
   })
 
   describe('a revocation while tokens are being issued', () => {
-    // Issuing holds the user's row shared until its rows are committed. Each
-    // revocation takes that row first, so it runs after the commit and sees
-    // them.
     it.each([
       [
         'revokeByUserAndClient',

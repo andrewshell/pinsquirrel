@@ -127,9 +127,6 @@ profile.post('/', async c => {
       return c.redirect(back)
     }
 
-    // Revoking takes every grant the user gave this client, access tokens and
-    // refresh tokens together: leaving either alive would let the client
-    // carry on.
     if (intent === 'revoke-oauth-grant') {
       await oauthService.revokeGrant(
         new AccessControl(user),

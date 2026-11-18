@@ -9,7 +9,7 @@ import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { oauthTokens } from '../schema/oauth-tokens'
 import {
   holdUserWhileIssuing,
-  holdUserWhileRevoking,
+  revokeUserTokens,
   insertTokens,
 } from './oauth-issuance'
 
@@ -65,11 +65,15 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
     userId: string,
     clientId: string
   ): Promise<number> {
-    return this.revokeFor(userId, eq(oauthTokens.clientId, clientId))
+    return this.db.transaction(tx =>
+      revokeUserTokens(tx, userId, eq(oauthTokens.clientId, clientId))
+    )
   }
 
   async revokeByGrant(userId: string, grantId: string): Promise<number> {
-    return this.revokeFor(userId, eq(oauthTokens.grantId, grantId))
+    return this.db.transaction(tx =>
+      revokeUserTokens(tx, userId, eq(oauthTokens.grantId, grantId))
+    )
   }
 
   async rotate(tokenId: string, successors: IssuedTokenData): Promise<boolean> {
@@ -80,8 +84,6 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
         return false
       }
 
-      // Conditional, so the row lock this UPDATE takes is what makes two
-      // concurrent rotations of the same token resolve to one winner.
       const result = await tx
         .update(oauthTokens)
         .set({
@@ -114,26 +116,6 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
         )
       )
     return result[0].affectedRows
-  }
-
-  private async revokeFor(
-    userId: string,
-    which: ReturnType<typeof eq>
-  ): Promise<number> {
-    return this.db.transaction(async tx => {
-      await holdUserWhileRevoking(tx, userId)
-      const result = await tx
-        .update(oauthTokens)
-        .set({ revokedAt: new Date() })
-        .where(
-          and(
-            eq(oauthTokens.userId, userId),
-            which,
-            isNull(oauthTokens.revokedAt)
-          )
-        )
-      return result[0].affectedRows
-    })
   }
 
   /** Not expired, not revoked, not already exchanged for a successor. */

@@ -51,15 +51,6 @@ export function createDeferQueue() {
   }
 }
 
-/**
- * The OAuth code and token repositories over two arrays, with the same
- * conditional writes as the MySQL ones.
- *
- * A test seeds `codes` and `tokens`, calls the service, and asserts on what
- * is live afterwards. Every method yields to the event loop first, so two
- * concurrent service calls interleave the way two requests do. The methods
- * are `vi.fn`s, so one can still be made to fail.
- */
 export function createInMemoryOAuthStore() {
   const codes: AuthorizationCode[] = []
   const tokens: OAuthToken[] = []

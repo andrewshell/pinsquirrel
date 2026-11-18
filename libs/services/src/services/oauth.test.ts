@@ -40,7 +40,7 @@ import {
   createInMemoryOAuthStore,
   createMockUserRepository,
 } from '../test-utils.js'
-import { OAuthService } from './oauth.js'
+import { OAuthService, REFRESH_ROTATION_GRACE_MS } from './oauth.js'
 
 const MCP_RESOURCE = 'https://pinsquirrel.com/mcp'
 const API_RESOURCE = 'https://pinsquirrel.com/api/v1'
@@ -157,11 +157,6 @@ function makeToken(
 
 type Store = ReturnType<typeof createInMemoryOAuthStore>
 
-/**
- * One device's share of a client: an access token and a refresh token under
- * their own grant. The raw tokens are `<device>-access` and
- * `<device>-refresh`.
- */
 function seedDevice(
   store: Store,
   device: string,
@@ -873,8 +868,6 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     ])
   })
 
-  // An unknown, an expired and a spent code all mean the same thing to the
-  // client, and are answered the same way.
   it('refuses a code that never existed', async () => {
     await expect(
       ctx.service.exchangeAuthorizationCode(tokenParams({ code: 'unknown' }))
@@ -951,8 +944,6 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     })
   })
 
-  // The spend and the tokens are one write. If it fails, the client still
-  // holds a code that works.
   it('leaves the code usable when its tokens cannot be written', async () => {
     vi.mocked(ctx.codeRepository.exchange).mockRejectedValueOnce(
       new Error('lost connection to MySQL')
@@ -994,7 +985,6 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     }
   )
 
-  // A failed check must not leave the code alive to try again with.
   it('refuses a verifier that does not hash to the stored challenge, and spends the code', async () => {
     await expect(
       ctx.service.exchangeAuthorizationCode(
@@ -1126,10 +1116,6 @@ describe('OAuthService.exchangeRefreshToken', () => {
     ])
   })
 
-  // A token presented after it was rotated means the chain leaked: either the
-  // client replayed it or somebody else has it, and there is no way to tell
-  // which. The grant it belongs to dies; the same application on another
-  // device is a different grant.
   it('kills the grant when a rotated token is presented again, and no other', async () => {
     presented().rotatedAt = longAgo()
     seedDevice(ctx.store, 'desktop')
@@ -1157,9 +1143,6 @@ describe('OAuthService.exchangeRefreshToken', () => {
     expect(liveTokenIds(ctx.store)).toEqual([])
   })
 
-  // A client that sends the same refresh twice, from two processes or as a
-  // retry, is not a leak. For a moment after a rotation the duplicate is
-  // refused and nothing else happens.
   it('refuses a token presented again moments after it was rotated, and leaves the grant alone', async () => {
     presented().rotatedAt = new Date(Date.now() - 5 * 1000)
 
@@ -1172,7 +1155,9 @@ describe('OAuthService.exchangeRefreshToken', () => {
   })
 
   it('kills the grant once that moment has passed', async () => {
-    presented().rotatedAt = new Date(Date.now() - 31 * 1000)
+    presented().rotatedAt = new Date(
+      Date.now() - REFRESH_ROTATION_GRACE_MS - 1000
+    )
 
     await expect(
       ctx.service.exchangeRefreshToken(refreshParams())
@@ -1218,8 +1203,6 @@ describe('OAuthService.exchangeRefreshToken', () => {
     expect(successors()).toEqual([])
   })
 
-  // The retirement and the successors are one write. If it fails, the client
-  // still holds a token that works.
   it('leaves the token usable when its successors cannot be written', async () => {
     vi.mocked(ctx.tokenRepository.rotate).mockRejectedValueOnce(
       new Error('lost connection to MySQL')
@@ -1344,8 +1327,6 @@ describe('OAuthService.exchangeRefreshToken', () => {
     })
   })
 
-  // A CIMD client's document can stop listing the grant. Refusing before the
-  // token is retired leaves it valid for when the registration is put right.
   it('refuses a client that is no longer registered for refresh_token, and retires nothing', async () => {
     vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
       makeClient({ grantTypes: ['authorization_code'] })

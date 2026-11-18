@@ -28,9 +28,6 @@ export const oauthTokens = mysqlTable(
     // The RFC 8707 audience. Compared against the resource the request
     // arrived at, never defaulted: a token for /mcp must not drive /api/v1.
     resource: varchar('resource', { length: 255 }).notNull(),
-    // The consent approval this token came from. Nullable because rows from
-    // before the column existed have none, and a container still running the
-    // previous release inserts without it.
     grantId: varchar('grant_id', { length: 36 }),
     expiresAt: timestamp('expires_at', { mode: 'date', fsp: 3 }).notNull(),
     revokedAt: timestamp('revoked_at', { mode: 'date', fsp: 3 }),
@@ -53,7 +50,6 @@ export const oauthTokens = mysqlTable(
       table.userId,
       table.clientId
     ),
-    // Revoking one grant.
     grantIdx: index('oauth_tokens_grant_idx').on(table.grantId),
   })
 )
