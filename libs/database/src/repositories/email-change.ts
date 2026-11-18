@@ -1,11 +1,14 @@
 import type {
   CreateEmailChangeData,
-  EmailChange,
   EmailChangeRepository,
 } from '@pinsquirrel/domain'
-import { and, eq, gt } from 'drizzle-orm'
+import { and, eq, gt, TransactionRollbackError } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { emailChanges } from '../schema/email-changes.js'
+import { passwordResetTokens } from '../schema/password-reset-tokens.js'
+import { users } from '../schema/users.js'
+import { writeOrConflict } from './deadlock.js'
+import { isDuplicateKeyError } from './duplicate-key.js'
 
 export class DrizzleEmailChangeRepository implements EmailChangeRepository {
   constructor(private db: MySql2Database) {}
@@ -18,25 +21,55 @@ export class DrizzleEmailChangeRepository implements EmailChangeRepository {
       .onDuplicateKeyUpdate({ set: row })
   }
 
-  async consume(tokenHash: string): Promise<EmailChange | null> {
-    const now = new Date()
-    const [change] = await this.db
-      .select()
-      .from(emailChanges)
-      .where(
-        and(
-          eq(emailChanges.tokenHash, tokenHash),
-          gt(emailChanges.expiresAt, now)
-        )
-      )
-      .limit(1)
-    if (!change) return null
+  /**
+   * The user's row is written before the change is spent: a password change
+   * locks that row and then deletes the user's pending change, and the
+   * opposite order here would deadlock with it. PLAN.md decision 47.
+   */
+  async confirm(tokenHash: string): Promise<boolean> {
+    try {
+      await writeOrConflict(() =>
+        this.db.transaction(async tx => {
+          const now = new Date()
+          const [change] = await tx
+            .select()
+            .from(emailChanges)
+            .where(
+              and(
+                eq(emailChanges.tokenHash, tokenHash),
+                gt(emailChanges.expiresAt, now)
+              )
+            )
+            .limit(1)
+          if (!change) tx.rollback()
 
-    const result = await this.db
-      .delete(emailChanges)
-      .where(
-        and(eq(emailChanges.id, change.id), gt(emailChanges.expiresAt, now))
+          await tx
+            .update(users)
+            .set({
+              emailHash: change.emailHash,
+              emailEncrypted: change.emailEncrypted,
+              updatedAt: now,
+            })
+            .where(eq(users.id, change.userId))
+          const [spent] = await tx
+            .delete(emailChanges)
+            .where(
+              and(
+                eq(emailChanges.id, change.id),
+                gt(emailChanges.expiresAt, now)
+              )
+            )
+          if (spent.affectedRows !== 1) tx.rollback()
+          await tx
+            .delete(passwordResetTokens)
+            .where(eq(passwordResetTokens.userId, change.userId))
+        })
       )
-    return result[0].affectedRows === 1 ? change : null
+      return true
+    } catch (error) {
+      if (error instanceof TransactionRollbackError) return false
+      if (isDuplicateKeyError(error)) return false
+      throw error
+    }
   }
 }

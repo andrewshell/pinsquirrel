@@ -261,22 +261,7 @@ export class AccountService {
    * unknown, used, expired, or its address was taken in the meantime.
    */
   async confirmEmailChange(token: string): Promise<boolean> {
-    const change = await this.emailChangeRepository.consume(hashToken(token))
-    if (!change) return false
-
-    try {
-      const updated = await this.userRepository.update(change.userId, {
-        emailHash: change.emailHash,
-        emailEncrypted: change.emailEncrypted,
-      })
-      if (!updated) return false
-    } catch (error) {
-      if (error instanceof UserAlreadyExistsError) return false
-      throw error
-    }
-
-    await this.passwordResetRepository.deleteByUserId(change.userId)
-    return true
+    return await this.emailChangeRepository.confirm(hashToken(token))
   }
 
   private async releaseIfStaleUnverified(

@@ -728,6 +728,15 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     again; the admin console says that the role was not revoked, beside any role change the
     same form had already made. Removing the Admin role revokes nothing and stays one
     statement.
+    Confirming an email change follows the same rule. It used to spend the confirmation link
+    and then write the address as a second step, so a write that was undone left the link
+    spent and the address unchanged, and the user had to ask for a new email.
+    `EmailChangeRepository.confirm` now writes the address, spends the link and the user's
+    password reset links in one transaction, the user's row first, as a password change
+    takes it. An undone confirmation answers `503` with `Retry-After: 1`, says that the
+    address was not changed and offers the same link again. An address another account
+    took after the link was sent still answers that the link is invalid, and now leaves
+    the link unspent.
 
 ## Reference
 

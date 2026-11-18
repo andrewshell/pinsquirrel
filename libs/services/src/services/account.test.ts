@@ -117,7 +117,7 @@ describe('AccountService', () => {
 
     mockEmailChangeRepository = {
       save: vi.fn().mockResolvedValue(undefined),
-      consume: vi.fn(),
+      confirm: vi.fn(),
     }
 
     mockEmailService = {
@@ -793,49 +793,30 @@ describe('AccountService', () => {
   })
 
   describe('confirmEmailChange', () => {
-    const pending = {
-      id: 'change-1',
-      userId: 'owner-id',
-      tokenHash: 'hashed_link-token',
-      emailHash: 'hashed_new@example.com',
-      emailEncrypted: 'sealed-new',
-      expiresAt: new Date(Date.now() + 60_000),
-      createdAt: new Date(),
-    }
-
-    it('applies the change and ends outstanding reset links', async () => {
-      vi.mocked(mockEmailChangeRepository.consume).mockResolvedValue(pending)
-      vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
+    it('applies the change the link stands for', async () => {
+      vi.mocked(mockEmailChangeRepository.confirm).mockResolvedValue(true)
 
       expect(await accountService.confirmEmailChange('link-token')).toBe(true)
 
-      expect(mockEmailChangeRepository.consume).toHaveBeenCalledWith(
+      expect(mockEmailChangeRepository.confirm).toHaveBeenCalledWith(
         'hashed_link-token'
       )
-      expect(mockUserRepository.update).toHaveBeenCalledWith('owner-id', {
-        emailHash: 'hashed_new@example.com',
-        emailEncrypted: 'sealed-new',
-      })
-      expect(mockPasswordResetRepository.deleteByUserId).toHaveBeenCalledWith(
-        'owner-id'
-      )
     })
 
-    it('changes nothing for an unknown, used or expired link', async () => {
-      vi.mocked(mockEmailChangeRepository.consume).mockResolvedValue(null)
+    it('changes nothing for an unknown, used or expired link, or a taken address', async () => {
+      vi.mocked(mockEmailChangeRepository.confirm).mockResolvedValue(false)
 
       expect(await accountService.confirmEmailChange('stale')).toBe(false)
-      expect(mockUserRepository.update).not.toHaveBeenCalled()
     })
 
-    it('fails when the address was taken after the link was sent', async () => {
-      vi.mocked(mockEmailChangeRepository.consume).mockResolvedValue(pending)
-      vi.mocked(mockUserRepository.update).mockRejectedValue(
-        new UserAlreadyExistsError('someone')
+    it('passes a write conflict on to the caller', async () => {
+      vi.mocked(mockEmailChangeRepository.confirm).mockRejectedValue(
+        new WriteConflictError()
       )
 
-      expect(await accountService.confirmEmailChange('link-token')).toBe(false)
-      expect(mockPasswordResetRepository.deleteByUserId).not.toHaveBeenCalled()
+      await expect(
+        accountService.confirmEmailChange('link-token')
+      ).rejects.toBeInstanceOf(WriteConflictError)
     })
   })
 

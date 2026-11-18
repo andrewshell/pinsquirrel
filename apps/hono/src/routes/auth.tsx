@@ -293,8 +293,26 @@ auth.get('/confirm-email/:token', c =>
 )
 
 auth.post('/confirm-email/:token', async c => {
-  const changed = await accountService.confirmEmailChange(c.req.param('token'))
-  return c.html(<ConfirmEmailPage state={changed ? 'done' : 'invalid'} />)
+  const token = c.req.param('token')
+  try {
+    const changed = await accountService.confirmEmailChange(token)
+    return c.html(<ConfirmEmailPage state={changed ? 'done' : 'invalid'} />)
+  } catch (error) {
+    if (!(error instanceof WriteConflictError)) throw error
+    logger.warn(
+      { cause: safeError(error.cause) },
+      'Email change lost to another write'
+    )
+    c.header('Retry-After', '1')
+    return c.html(
+      <ConfirmEmailPage
+        state="ask"
+        token={token}
+        error="The server was busy and your email address was not changed. Please try again."
+      />,
+      503
+    )
+  }
 })
 
 // GET /reset-password/:token - Render reset password form
