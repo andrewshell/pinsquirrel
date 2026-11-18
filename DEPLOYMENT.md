@@ -118,6 +118,13 @@ the old container after the migration has their cookie cleared and must sign in 
 the old container creates after the migration is stored under the plain token, and the new code
 cannot find it either. Rolling back to code from before that migration ends every session.
 
+`20261118120928_oauth_grant_ids` needs no such care. It adds a nullable `grant_id` column to
+`oauth_authorization_codes` and `oauth_tokens` and rewrites no rows. The old container keeps
+working against it, and the codes and tokens it writes have no `grant_id`. The new code revokes
+such a token together with everything the user holds for that client, which is what the old code
+did for every token, and gives a refresh token an id when it next rotates. Rolling the code back
+leaves the columns in place and unused.
+
 ## Memory
 
 Password hashing uses scrypt with N=2^17, which needs about 128 MiB per derivation. Node runs
