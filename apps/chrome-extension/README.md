@@ -85,8 +85,9 @@ Disconnect with the tokens still stored.
 
 Every open options page follows `chrome.storage`: a Disconnect, a Connect or a lost grant
 in any context redraws them all. A grant the server refuses (`invalid_grant`) removes the
-credentials and keeps `baseUrl`, so the pages offer to reconnect to that server, where a
-Disconnect clears everything and shows the plain settings view.
+credentials and keeps `baseUrl`, so the pages offer to reconnect to that server. They
+also offer Disconnect, which, like a Disconnect while connected, clears everything and
+shows the plain settings view.
 
 ## When it syncs
 

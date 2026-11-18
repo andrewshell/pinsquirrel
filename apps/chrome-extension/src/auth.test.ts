@@ -584,6 +584,19 @@ describe('disconnect', () => {
     expect(server.chrome.local.items).toEqual({})
   })
 
+  it('forgets a server whose grant is gone, sending nothing', async () => {
+    const server = stubOAuthServer({
+      baseUrl: SERVER_BASE_URL,
+      lastSyncError: 'PinSquirrel needs to be reconnected',
+      registeredClients: { [SERVER_BASE_URL]: REGISTERED_CLIENT_ID },
+    })
+
+    await disconnect()
+
+    expect(server.fetched.urls).toEqual([])
+    expect(server.chrome.local.items).toEqual({})
+  })
+
   it('clears local storage even when the server cannot be reached', async () => {
     const server = stubOAuthServer(connected())
     server.fetched.route(REVOKE_URL, () => {

@@ -132,7 +132,13 @@
           spellcheck="false"
           autocomplete="off"
         />
-        <button id="connect" type="button" class="primary">Connect</button>
+        <div class="actions">
+          <button id="connect" type="button" class="primary">Connect</button>
+          <!-- Only while asking to reconnect: forgets the kept server. -->
+          <button id="settings-disconnect" type="button" hidden>
+            Disconnect
+          </button>
+        </div>
       </section>
 
       <!-- Shown once connected: tag selection, sync controls, status. -->

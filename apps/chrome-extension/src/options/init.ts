@@ -71,6 +71,7 @@ function elements(doc: Document) {
     reconnectNotice: find('#reconnect-notice'),
     baseUrlInput: find<HTMLInputElement>('#base-url'),
     connectButton: find<HTMLButtonElement>('#connect'),
+    settingsDisconnectButton: find<HTMLButtonElement>('#settings-disconnect'),
     connectedTo: find('#connected-to'),
     tagFilter: find<HTMLInputElement>('#tag-filter'),
     selectedOnly: find<HTMLInputElement>('#selected-only'),
@@ -143,6 +144,7 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
     ui.settingsView.hidden = false
     ui.mainView.hidden = true
     ui.reconnectNotice.hidden = !reconnect
+    ui.settingsDisconnectButton.hidden = !reconnect
     if (baseUrl) ui.baseUrlInput.value = baseUrl
   }
 
@@ -395,8 +397,13 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
     })
   }
 
-  async function onDisconnect(): Promise<void> {
-    await whileBusy(ui.disconnectButton, async () => {
+  /**
+   * Also offered while asking to reconnect: with the grant gone there is
+   * nothing to revoke, but `baseUrl` is still stored, and the toolbar button
+   * keeps opening that server's pin form until something clears it.
+   */
+  async function onDisconnect(button: HTMLButtonElement): Promise<void> {
+    await whileBusy(button, async () => {
       try {
         const response = await deps.requestDisconnect()
         if (response.ok) await showConnection()
@@ -415,7 +422,9 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
   ui.connectButton.addEventListener('click', () => void onConnect())
   deps.onConnectFinished(result => void onConnectFinished(result))
   ui.syncButton.addEventListener('click', () => void onSyncNow())
-  ui.disconnectButton.addEventListener('click', () => void onDisconnect())
+  for (const button of [ui.disconnectButton, ui.settingsDisconnectButton]) {
+    button.addEventListener('click', () => void onDisconnect(button))
+  }
   // One delegated listener, because the boxes themselves are replaced on
   // every render and per-box listeners would have to be re-attached each time.
   ui.tagList.addEventListener(

@@ -638,6 +638,49 @@ describe('initOptions, when the grant is gone', () => {
   })
 })
 
+describe('initOptions, asking to reconnect to a kept server', () => {
+  const KEPT = { baseUrl: 'https://pins.example.com' }
+  const disconnectShown = () => !element('#settings-disconnect').hidden
+
+  it('offers to disconnect from it instead', async () => {
+    Object.assign(chrome.local.items, KEPT)
+    const { deps, requestDisconnect } = harness()
+    await initOptions(deps)
+
+    expect(disconnectShown()).toBe(true)
+    await click('#settings-disconnect')
+
+    expect(requestDisconnect).toHaveBeenCalledTimes(1)
+    expect(chrome.local.items).toEqual({})
+    expect(settingsShown()).toBe(true)
+    expect(element('#reconnect-notice').hidden).toBe(true)
+    expect(disconnectShown()).toBe(false)
+    expect(status()).toBe('')
+  })
+
+  it('keeps asking, and says why, when the worker could not disconnect', async () => {
+    Object.assign(chrome.local.items, KEPT)
+    const requestDisconnect = vi.fn(() =>
+      Promise.resolve({ ok: false as const, error: 'Storage is full' })
+    )
+    await initOptions(harness({ requestDisconnect }).deps)
+
+    await click('#settings-disconnect')
+
+    expect(element('#reconnect-notice').hidden).toBe(false)
+    expect(status()).toBe('Storage is full')
+    expect(element<HTMLButtonElement>('#settings-disconnect').disabled).toBe(
+      false
+    )
+  })
+
+  it('offers nothing to disconnect from when no server is kept', async () => {
+    await initOptions(harness().deps)
+
+    expect(disconnectShown()).toBe(false)
+  })
+})
+
 describe('initOptions, when another page disconnected', () => {
   beforeEach(() => {
     Object.assign(chrome.local.items, CONNECTED)
