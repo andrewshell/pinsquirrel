@@ -3,7 +3,9 @@ import { DefaultLayout } from '../layouts/default'
 import { ErrorMessage, SuccessMessage } from '../components/FlashMessage'
 
 type ConfirmEmailPageProps =
-  { state: 'ask'; token: string } | { state: 'done' } | { state: 'invalid' }
+  | { state: 'ask'; token: string; error?: string }
+  | { state: 'done' }
+  | { state: 'invalid' }
 
 const buttonClass = `block w-full px-4 py-2 text-center bg-primary text-primary-foreground font-medium
   border-2 border-foreground neobrutalism-shadow
@@ -25,6 +27,9 @@ export const ConfirmEmailPage: FC<ConfirmEmailPageProps> = props => (
             method="post"
             action={`/confirm-email/${encodeURIComponent(props.token)}`}
           >
+            {props.error && (
+              <ErrorMessage message={props.error} className="mb-4" />
+            )}
             <p class="text-muted-foreground mb-4">
               Use this address for your PinSquirrel account from now on.
             </p>

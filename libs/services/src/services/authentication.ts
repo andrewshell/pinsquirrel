@@ -233,7 +233,8 @@ export class AuthenticationService {
    * are standing in, and dropping User suspends sign-in altogether — both need
    * a second admin to undo, so neither is offered as a self-service mistake.
    *
-   * Revoking User also ends the account's sessions and OAuth tokens.
+   * Revoking User also ends the account's sessions and OAuth tokens, all or
+   * nothing: after a `WriteConflictError` the role is still held.
    *
    * Idempotent; revoking a role the user does not hold writes nothing.
    */
@@ -261,9 +262,10 @@ export class AuthenticationService {
       return user
     }
 
-    await this.userRepository.removeRole(userId, role)
     if (role === Role.User) {
-      await this.userRepository.revokeSessionsAndTokens(userId)
+      await this.userRepository.removeRoleAndRevoke(userId, role)
+    } else {
+      await this.userRepository.removeRole(userId, role)
     }
 
     return this.rereadUser(userId)
@@ -277,6 +279,8 @@ export class AuthenticationService {
    * of its own mirrors revokeRole's: not on the caller's own account, since
    * that is every self-lockout revokeRole refuses at once, and could take the
    * system's last admin with it.
+   *
+   * All or nothing: after a `WriteConflictError` the account is as it was.
    *
    * Returns the user as they were, so the caller can still name who is gone.
    */
@@ -415,12 +419,12 @@ export class AuthenticationService {
     // Hash the new password in the business logic layer
     const passwordHash = await hashPassword(input.newPassword)
 
-    // Persist only the field this operation owns to avoid clobbering a
-    // concurrent username/email change made after the findById read.
-    await this.userRepository.update(input.userId, { passwordHash })
-    await this.userRepository.revokeSessionsAndTokens(
+    const changed = await this.userRepository.setPasswordAndRevoke(
       input.userId,
-      input.keepSessionId
+      { passwordHash, keepSessionId: input.keepSessionId }
     )
+    if (!changed) {
+      throw new UserNotFoundError(input.userId)
+    }
   }
 }

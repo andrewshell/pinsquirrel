@@ -1,20 +1,32 @@
 import type {
   CreateUserData,
+  PasswordChange,
   UpdateUserData,
   User,
   UserRepository,
   Role,
 } from '@pinsquirrel/domain'
 import { UserAlreadyExistsError, UserStatus } from '@pinsquirrel/domain'
-import { and, eq, inArray, isNull, lt, ne, sql } from 'drizzle-orm'
+import {
+  and,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lt,
+  ne,
+  sql,
+  TransactionRollbackError,
+} from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { users } from '../schema/users.js'
 import { userRoles } from '../schema/user-roles.js'
 import { sessions } from '../schema/sessions.js'
 import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes.js'
 import { emailChanges } from '../schema/email-changes.js'
-import { retryOnDeadlock } from './deadlock.js'
-import { revokeUserTokens } from './oauth-issuance.js'
+import { passwordResetTokens } from '../schema/password-reset-tokens.js'
+import { writeOrConflict } from './deadlock.js'
+import { revokeUserTokens, type Transaction } from './oauth-issuance.js'
 import { isDuplicateKeyError } from './duplicate-key.js'
 
 /**
@@ -240,9 +252,19 @@ export class DrizzleUserRepository implements UserRepository {
     return await this.attachRoles(updated)
   }
 
+  /**
+   * The sessions go first, by statement and not by the cascade, which would
+   * lock the user's row before them: the order `revoking` keeps. PLAN.md
+   * decision 41.
+   */
   async delete(id: string): Promise<boolean> {
-    const result = await this.db.delete(users).where(eq(users.id, id))
-    return result[0].affectedRows > 0
+    return writeOrConflict(() =>
+      this.db.transaction(async tx => {
+        await tx.delete(sessions).where(eq(sessions.userId, id))
+        const [deleted] = await tx.delete(users).where(eq(users.id, id))
+        return deleted.affectedRows > 0
+      })
+    )
   }
 
   async deleteStaleUnverified(
@@ -273,11 +295,63 @@ export class DrizzleUserRepository implements UserRepository {
     return result[0].affectedRows > 0
   }
 
-  async revokeSessionsAndTokens(
+  async setPasswordAndRevoke(
     userId: string,
-    keepSessionId?: string
+    change: PasswordChange
+  ): Promise<boolean> {
+    try {
+      await this.revoking(userId, change.keepSessionId, async tx => {
+        if (change.resetTokenId !== undefined) {
+          const [spent] = await tx
+            .delete(passwordResetTokens)
+            .where(
+              and(
+                eq(passwordResetTokens.id, change.resetTokenId),
+                gt(passwordResetTokens.expiresAt, new Date())
+              )
+            )
+          if (spent.affectedRows !== 1) tx.rollback()
+          await tx
+            .delete(passwordResetTokens)
+            .where(eq(passwordResetTokens.userId, userId))
+        }
+        const [updated] = await tx
+          .update(users)
+          .set({
+            passwordHash: change.passwordHash,
+            status: change.status,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId))
+        if (updated.affectedRows !== 1) tx.rollback()
+      })
+      return true
+    } catch (error) {
+      if (error instanceof TransactionRollbackError) return false
+      throw error
+    }
+  }
+
+  async removeRoleAndRevoke(userId: string, role: Role): Promise<void> {
+    await this.revoking(userId, undefined, async tx => {
+      await tx
+        .delete(userRoles)
+        .where(and(eq(userRoles.userId, userId), eq(userRoles.role, role)))
+    })
+  }
+
+  /**
+   * Sessions are deleted before `revokeUserTokens` locks the user's row, and
+   * `change` runs after both: creating a code locks its session and then the
+   * user, and the opposite order here would deadlock with it. PLAN.md
+   * decision 41.
+   */
+  private async revoking(
+    userId: string,
+    keepSessionId: string | undefined,
+    change: (tx: Transaction) => Promise<void>
   ): Promise<void> {
-    await retryOnDeadlock(() =>
+    await writeOrConflict(() =>
       this.db.transaction(async tx => {
         await tx
           .delete(sessions)
@@ -289,9 +363,6 @@ export class DrizzleUserRepository implements UserRepository {
                 : ne(sessions.id, keepSessionId)
             )
           )
-        // Sessions before the user's row: a code being written holds its
-        // session and then reads the user, and the opposite order here would
-        // deadlock with it. PLAN.md decision 41.
         await revokeUserTokens(tx, userId)
         await tx
           .delete(oauthAuthorizationCodes)
@@ -302,6 +373,7 @@ export class DrizzleUserRepository implements UserRepository {
             )
           )
         await tx.delete(emailChanges).where(eq(emailChanges.userId, userId))
+        await change(tx)
       })
     )
   }

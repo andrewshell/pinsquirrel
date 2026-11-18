@@ -573,8 +573,8 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     User role) is checked by `authorize`, by both token exchanges and by `verifyAccessToken`,
     so a token stops working the moment its account stops being admitted. An exchange for an
     account that is not admitted also revokes the account's tokens for that client.
-    Revoking the User role calls `revokeSessionsAndTokens`, as a password reset does, so a
-    suspension also clears what the checks would refuse anyway.
+    Revoking the User role ends the account's sessions and tokens, as a password reset does,
+    so a suspension also clears what the checks would refuse anyway.
 37. **A rotated refresh token is kept until its own expiry.** Presenting a retired token again
     is how a copied refresh chain is noticed, and that needs the row, so the sweep removes
     only expired and revoked tokens. The cost is one row per refresh for up to thirty days.
@@ -615,8 +615,8 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     revocation therefore finishes before an issuance, which then finds its code deleted or its
     token revoked, or starts after the issuance commits and takes the new tokens with the rest.
     This closes the window Decision 38 left in the code exchange and replaces the read-back
-    after a refresh. `revokeSessionsAndTokens` takes the lock after it deletes the sessions,
-    the order in which a code being written takes the two rows.
+    after a refresh. A revocation of everything a user holds takes the lock after it deletes
+    the sessions, the order in which a code being written takes the two rows.
     A revocation locks only the tokens it changes. It reads the user's token ids through
     `oauth_tokens_user_client_idx` with `FOR UPDATE` and stamps them by primary key, 500 at a
     time. A single `UPDATE ... WHERE user_id = ?` was rejected: once one user holds about a
@@ -630,10 +630,9 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     A transaction that issues (`rotate`, `exchange`, and the code's `create`) and is rolled
     back by InnoDB to break a deadlock runs once more from the start, so it reads the
     session, the code or the token again and still refuses one that was revoked meanwhile.
-    Rolled back a second time, it reports what it reports for a lost race, and the client
-    gets `invalid_grant` or `access_denied` with its code or token unchanged. A revocation
-    also runs once more, but a second deadlock there is an error: a revocation is never
-    reported as done when it was not.
+    Rolled back a second time, it is an error and nothing was written (Decision 46 gives
+    the answer the client gets). A revocation also runs once more, and a second deadlock
+    there is an error too: a revocation is never reported as done when it was not.
 42. **A refresh can narrow the access token, never the grant.** A `scope` on a refresh request
     applies to the access token in that response. The refresh token that replaces the old one
     keeps the scopes the user approved (RFC 6749 section 6) and is always issued, including
@@ -674,6 +673,77 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     origin, https in production unless loopback. Static clients cannot be retired from the
     config: dropping one needs its row deleted by hand, which revokes its grants, and a
     `disabled` flag waits for a need.
+46. **A token, revocation or approval request whose write was undone answers
+    `temporarily_unavailable`.** A write is undone when it loses two deadlocks or when its
+    wait for a row lock times out (`ER_LOCK_WAIT_TIMEOUT`). Nothing changed, so the answer
+    must be one a client sends again without discarding its code or token. The token
+    endpoint answers `503` with `Retry-After: 1` and the body
+    `{"error":"temporarily_unavailable","error_description":"The server is busy. Send the request again"}`;
+    `authorize` redirects with the same code, which RFC 6749 4.1.2.1 defines for it.
+    RFC 6749 5.2 has no retryable code for the token endpoint, so the choice follows what
+    the clients do. The MCP TypeScript SDK (1.32.2,
+    `client/auth.js`) reads the `error` field whatever the status: `invalid_grant` makes it
+    drop the stored tokens, `server_error`, an unknown code or a body that is not JSON
+    makes it start a new authorization, and any other known code, `temporarily_unavailable`
+    among them, is thrown to the caller with the tokens kept. The Chrome extension drops
+    its tokens on `invalid_grant` only. A client that reads the status alone sees a `503`.
+    `invalid_grant`, the earlier answer, was rejected because it ends a working connection,
+    and a plain `500` because the SDK answers it with a new consent.
+    The rule covers every write of those requests, the revocations among them. An exchange
+    or refresh revokes a grant when a spent code or a rotated token is sent again, or when
+    the user is no longer admitted. If that revocation is undone the grant is still live,
+    and the request answers `503` and not `invalid_grant`: the client sends the same
+    request again, the server finds the same condition, and the revocation runs again.
+    `/oauth/revoke` answers the same `503`, on which RFC 7009 2.2.1 has the client assume
+    the token still exists and retry.
+    A deadlock is run again once, because the rival that won has moved on and the second
+    run usually commits at once. A lock wait that timed out is not run again. It has already
+    waited `innodb_lock_wait_timeout` (50 seconds by default) behind a lock that is probably
+    still held, a second run could double a wait that is already longer than most clients
+    allow a request, and the client is told to try again in any case. InnoDB undoes only the
+    statement that timed out; the rest of the transaction is rolled back when the error
+    leaves Drizzle's transaction callback.
+    The repository reports the undone write as a `WriteConflictError` that says which of the
+    two it was, `OAuthService` names the code at its token, revocation and approval entry
+    points, and the routes log the cause at `warn`, since a `503` does not reach the error
+    handler's log. The hourly sweep reads dead tokens 500 at a time, each read starting
+    after the last id of the one before, so it holds one batch whatever the backlog.
+47. **A password change, a password reset and the removal of the User role commit with the
+    revocation they call for, or not at all.** Each used to write the password or remove the
+    role and then revoke the sessions and tokens as a second step. A revocation that was
+    undone (Decision 46) then left the new password or the suspension in place beside
+    sessions, tokens and unused codes that still worked, and a second attempt at a password
+    change was refused because the "current password" had already changed. The user
+    repository now has `setPasswordAndRevoke` and `removeRoleAndRevoke`, each one
+    transaction, and no revocation of a whole account outside them. The order inside is
+    that of Decision 41: the sessions, then the lock on the user's row, the tokens, the
+    unused codes and the pending email change, and last the password or the role, written
+    under that lock. A deadlock runs the whole transaction again once.
+    A password reset spends its link in the same transaction, so a reset that does not
+    commit leaves the link working and the form can be sent again. Spending the link first
+    was rejected: the user would have to ask for a new email after a failure that changed
+    nothing. The link is still spent once, since of two requests with one link the second
+    waits for the user's row, finds the link gone and is undone.
+    An undone change is a `WriteConflictError` to the caller. The profile and reset pages
+    answer `503` with `Retry-After: 1` and say that the password was not changed and to try
+    again; the admin console says that the role was not revoked, beside any role change the
+    same form had already made. Removing the Admin role revokes nothing and stays one
+    statement.
+    Deleting a user from the admin console keeps the same order. It deletes the user's
+    sessions by statement and then the user's row, whose cascade removes the rest, in one
+    transaction that a deadlock runs again once. Reaching the sessions through the cascade
+    locked the user's row first, the opposite order, so a deletion and a password change
+    could each wait on the other. An undone deletion is a `WriteConflictError` too, and the
+    admin console answers `503` and says that the user was not deleted and to try again.
+    Confirming an email change follows the same rule. It used to spend the confirmation link
+    and then write the address as a second step, so a write that was undone left the link
+    spent and the address unchanged, and the user had to ask for a new email.
+    `EmailChangeRepository.confirm` now writes the address, spends the link and the user's
+    password reset links in one transaction, the user's row first, as a password change
+    takes it. An undone confirmation answers `503` with `Retry-After: 1`, says that the
+    address was not changed and offers the same link again. An address another account
+    took after the link was sent still answers that the link is invalid, and now leaves
+    the link unspent.
 
 ## Reference
 

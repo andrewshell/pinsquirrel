@@ -160,34 +160,6 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
     })
   })
 
-  describe('deleteByUserId', () => {
-    it('should delete all tokens for a user', async () => {
-      const { id: userId } = await insertUser(testPool)
-
-      await repository.create({
-        userId,
-        tokenHash: 'token_hash_1',
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-      })
-      await repository.create({
-        userId,
-        tokenHash: 'token_hash_2',
-        expiresAt: new Date(Date.now() + 30 * 60 * 1000),
-      })
-
-      const result = await repository.deleteByUserId(userId)
-      expect(result).toBe(true)
-
-      const remainingTokens = await repository.findByUserId(userId)
-      expect(remainingTokens).toHaveLength(0)
-    })
-
-    it('should return false for user with no tokens', async () => {
-      const result = await repository.deleteByUserId('non-existent-user')
-      expect(result).toBe(false)
-    })
-  })
-
   describe('isValidToken', () => {
     it('should return true for valid non-expired token', async () => {
       const { id: userId } = await insertUser(testPool)
@@ -218,36 +190,6 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
     it('should return false for non-existent token', async () => {
       const result = await repository.isValidToken('non_existent_token')
       expect(result).toBe(false)
-    })
-  })
-
-  describe('consume', () => {
-    it('lets exactly one of two concurrent calls use a token', async () => {
-      const { id: userId } = await insertUser(testPool)
-      const token = await repository.create({
-        userId,
-        tokenHash: 'hashed_token_consume',
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-      })
-
-      const results = await Promise.all([
-        repository.consume(token.id),
-        repository.consume(token.id),
-      ])
-
-      expect(results.filter(Boolean)).toHaveLength(1)
-      expect(await repository.findById(token.id)).toBeNull()
-    })
-
-    it('refuses an expired token', async () => {
-      const { id: userId } = await insertUser(testPool)
-      const token = await repository.create({
-        userId,
-        tokenHash: 'hashed_token_expired',
-        expiresAt: new Date(Date.now() - 1000),
-      })
-
-      expect(await repository.consume(token.id)).toBe(false)
     })
   })
 

@@ -4,13 +4,21 @@ import {
   OAuthInvalidClientError,
   OAuthInvalidGrantError,
   OAuthInvalidTargetError,
+  OAuthTemporarilyUnavailableError,
   OAuthUnauthorizedClientError,
   ValidationError,
+  WriteConflictError,
 } from '@pinsquirrel/domain'
 
 const mockExchangeAuthorizationCode = vi.fn()
 const mockExchangeRefreshToken = vi.fn()
 const mockRevokeToken = vi.fn()
+const mockLogWarn = vi.hoisted(() => vi.fn())
+
+vi.mock('../lib/logger.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../lib/logger.js')>()),
+  logger: { info: vi.fn(), error: vi.fn(), debug: vi.fn(), warn: mockLogWarn },
+}))
 
 vi.mock('../lib/services', () => ({
   oauthService: {
@@ -272,6 +280,58 @@ describe('POST /oauth/token', () => {
     expect((await res.json()).error).toBe(code)
   })
 
+  it('answers a request the server could not finish with 503 and Retry-After', async () => {
+    mockExchangeRefreshToken.mockRejectedValue(
+      new OAuthTemporarilyUnavailableError()
+    )
+
+    const res = await app.request(
+      '/oauth/token',
+      form({
+        grant_type: 'refresh_token',
+        refresh_token: 'still-valid',
+        client_id: 'https://claude.ai/oauth/client',
+      })
+    )
+
+    expect(res.status).toBe(503)
+    expect(res.headers.get('Retry-After')).toBe('1')
+    expect(res.headers.get('Cache-Control')).toBe('no-store')
+    expect(await res.json()).toEqual({
+      error: 'temporarily_unavailable',
+      error_description: 'The server is busy. Send the request again',
+    })
+  })
+
+  it('logs what a request the server could not finish lost to', async () => {
+    mockExchangeRefreshToken.mockRejectedValue(
+      new OAuthTemporarilyUnavailableError(undefined, {
+        cause: new WriteConflictError(
+          'The write waited too long for a lock and changed nothing'
+        ),
+      })
+    )
+
+    await app.request(
+      '/oauth/token',
+      form({
+        grant_type: 'refresh_token',
+        refresh_token: 'still-valid',
+        client_id: 'https://claude.ai/oauth/client',
+      })
+    )
+
+    expect(mockLogWarn).toHaveBeenCalledWith(
+      {
+        error: 'temporarily_unavailable',
+        cause: expect.objectContaining({
+          message: 'The write waited too long for a lock and changed nothing',
+        }) as unknown,
+      },
+      'The server is busy. Send the request again'
+    )
+  })
+
   it('marks an error response no-store too', async () => {
     mockExchangeAuthorizationCode.mockRejectedValue(
       new OAuthInvalidGrantError()
@@ -340,6 +400,28 @@ describe('POST /oauth/revoke', () => {
 
     expect(res.status).toBe(415)
     expect(mockRevokeToken).not.toHaveBeenCalled()
+  })
+
+  it('answers a revocation the server could not finish with 503 and Retry-After, and logs what it lost to', async () => {
+    mockRevokeToken.mockRejectedValue(
+      new OAuthTemporarilyUnavailableError(undefined, {
+        cause: new Error('Deadlock found'),
+      })
+    )
+
+    const res = await app.request(
+      '/oauth/revoke',
+      form({ token: 'pso_refresh' })
+    )
+
+    expect(res.status).toBe(503)
+    expect(res.headers.get('Retry-After')).toBe('1')
+    expect(res.headers.get('Cache-Control')).toBe('no-store')
+    expect(await res.json()).toEqual({
+      error: 'temporarily_unavailable',
+      error_description: 'The server is busy. Send the request again',
+    })
+    expect(mockLogWarn).toHaveBeenCalledOnce()
   })
 
   it('hands the token to the service and answers 200 with no body', async () => {

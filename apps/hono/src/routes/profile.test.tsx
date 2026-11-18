@@ -14,6 +14,7 @@ import {
   InvalidCredentialsError,
   OAuthInvalidGrantError,
   ValidationError,
+  WriteConflictError,
 } from '@pinsquirrel/domain'
 import { formBody } from '../test-support/pin-routes'
 import type { FlashMessage } from '../middleware/session'
@@ -357,6 +358,25 @@ describe('profile routes', () => {
     expect(html).toContain('Invalid action')
     expect(cardSection(html, 'Update Email')).not.toContain('Invalid action')
     expect(cardSection(html, 'Connected Applications')).toContain('Claude Code')
+  })
+
+  it('says the password was not changed, and to try again, when the change lost to another write', async () => {
+    svc.changePassword.mockRejectedValue(new WriteConflictError())
+
+    const res = await app.request(
+      '/profile',
+      formBody({
+        intent: 'change-password',
+        currentPassword: 'current',
+        newPassword: 'newpassword123',
+      })
+    )
+
+    expect(res.status).toBe(503)
+    expect(res.headers.get('Retry-After')).toBe('1')
+    const card = cardSection(await res.text(), 'Change Password')
+    expect(card).toContain('your password was not changed')
+    expect(card).toContain('Please try again')
   })
 
   it('shows an unexpected failure in the card of the form that failed', async () => {

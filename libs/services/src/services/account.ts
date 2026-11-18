@@ -5,7 +5,6 @@ import type {
   EmailChangeRepository,
   EmailService,
   User,
-  UpdateUserData,
 } from '@pinsquirrel/domain'
 import { Role, UserStatus } from '@pinsquirrel/domain'
 import {
@@ -262,22 +261,7 @@ export class AccountService {
    * unknown, used, expired, or its address was taken in the meantime.
    */
   async confirmEmailChange(token: string): Promise<boolean> {
-    const change = await this.emailChangeRepository.consume(hashToken(token))
-    if (!change) return false
-
-    try {
-      const updated = await this.userRepository.update(change.userId, {
-        emailHash: change.emailHash,
-        emailEncrypted: change.emailEncrypted,
-      })
-      if (!updated) return false
-    } catch (error) {
-      if (error instanceof UserAlreadyExistsError) return false
-      throw error
-    }
-
-    await this.passwordResetRepository.deleteByUserId(change.userId)
-    return true
+    return await this.emailChangeRepository.confirm(hashToken(token))
   }
 
   private async releaseIfStaleUnverified(
@@ -392,27 +376,16 @@ export class AccountService {
     // Hash the new password
     const passwordHash = await hashPassword(input.newPassword)
 
-    if (!(await this.passwordResetRepository.consume(resetToken.id))) {
+    const reset = await this.userRepository.setPasswordAndRevoke(user.id, {
+      passwordHash,
+      ...(user.status === UserStatus.Unverified && {
+        status: UserStatus.Waitlist,
+      }),
+      resetTokenId: resetToken.id,
+    })
+    if (!reset) {
       throw new InvalidResetTokenError()
     }
-
-    // Persist only the fields this operation owns: the new password and, for a
-    // brand-new (unverified) account, the verification status transition.
-    // Never write username/emailHash from the stale snapshot, and never demote
-    // an already-active user resetting a forgotten password.
-    const updateData: UpdateUserData = { passwordHash }
-    if (user.status === UserStatus.Unverified) {
-      updateData.status = UserStatus.Waitlist
-    }
-
-    // A stale unverified account can be deleted between the reads above and
-    // this write; its link is then as dead as the account.
-    if (!(await this.userRepository.update(user.id, updateData))) {
-      throw new InvalidResetTokenError()
-    }
-
-    await this.passwordResetRepository.deleteByUserId(user.id)
-    await this.userRepository.revokeSessionsAndTokens(user.id)
   }
 
   async validateResetToken(token: string): Promise<boolean> {

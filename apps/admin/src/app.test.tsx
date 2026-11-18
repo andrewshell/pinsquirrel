@@ -37,6 +37,7 @@ import {
   CannotDeleteOwnAccountError,
   AdminAlreadyExistsError,
   AccessControl,
+  WriteConflictError,
 } from '@pinsquirrel/domain'
 import type { Hono } from 'hono'
 import type { User } from '@pinsquirrel/domain'
@@ -2153,6 +2154,37 @@ describe('POST /users/update', () => {
     expect(await res.text()).toContain('your own account')
   })
 
+  it('says the role was not revoked, and to try again, when the revocation lost to another write', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockResolvedValue([target])
+    authService.revokeRole.mockRejectedValue(new WriteConflictError())
+
+    const res = await saveFor(target.id, { Admin: 'no', User: 'no' }, cookie)
+
+    expect(res.status).toBe(503)
+    const html = await res.text()
+    expect(html).toContain('the User role was not revoked from bob')
+    expect(html).toContain('Please try again')
+    expect(html).not.toContain('Revoked the User role')
+  })
+
+  it('still reports the change it made before the one that lost to another write', async () => {
+    const cookie = await signIn()
+    userService.listByStatus.mockResolvedValue([target])
+    authService.grantRole.mockResolvedValue({
+      ...target,
+      roles: [Role.User, Role.Admin],
+    })
+    authService.revokeRole.mockRejectedValue(new WriteConflictError())
+
+    const res = await saveFor(target.id, { Admin: 'yes', User: 'no' }, cookie)
+
+    expect(res.status).toBe(503)
+    const html = await res.text()
+    expect(html).toContain('Granted the Admin role to bob.')
+    expect(html).toContain('the User role was not revoked from bob')
+  })
+
   it('reports an unexpected failure as a 500', async () => {
     const cookie = await signIn()
     userService.listByStatus.mockResolvedValue([target])
@@ -2242,6 +2274,22 @@ describe('POST /users/delete', () => {
 
     expect(res.status).toBe(404)
     expect(await res.text()).toContain('no longer exists')
+  })
+
+  it('says the user was not deleted, and to try again, when the deletion lost to another write', async () => {
+    const cookie = await signIn()
+    authService.deleteUser.mockRejectedValue(new WriteConflictError())
+
+    const res = await app.request(
+      '/users/delete',
+      form({ userId: target.id }, cookie)
+    )
+
+    expect(res.status).toBe(503)
+    const html = await res.text()
+    expect(html).toContain('the user was not deleted')
+    expect(html).toContain('Please try again')
+    expect(html).not.toContain('Deleted')
   })
 
   it('reports an unexpected failure as a 500', async () => {

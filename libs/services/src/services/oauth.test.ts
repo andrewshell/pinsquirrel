@@ -31,11 +31,13 @@ import {
   OAuthInvalidRequestError,
   OAuthInvalidScopeError,
   OAuthInvalidTargetError,
+  OAuthTemporarilyUnavailableError,
   OAuthUnauthorizedClientError,
   ResponseTooLargeError,
   Role,
   UserStatus,
   ValidationError,
+  WriteConflictError,
 } from '@pinsquirrel/domain'
 import {
   createInMemoryOAuthStore,
@@ -835,6 +837,50 @@ describe('OAuthService.authorize', () => {
     })
   })
 
+  it('redirects temporarily_unavailable when the code could not be written, and approves the same request sent again', async () => {
+    vi.mocked(ctx.codeRepository.create).mockRejectedValueOnce(
+      new WriteConflictError()
+    )
+    const approval = {
+      params: authorizeParams(),
+      userId: user.id,
+      sessionId: SESSION_ID,
+      approved: true,
+    }
+
+    await expect(ctx.service.authorize(ac, approval)).resolves.toMatchObject({
+      status: 'error',
+      error: 'temporarily_unavailable',
+      redirectUri: 'http://localhost:54321/callback',
+      state: 'opaque-state',
+      cause: expect.any(WriteConflictError) as unknown,
+    })
+    await expect(ctx.service.authorize(ac, approval)).resolves.toMatchObject({
+      status: 'approved',
+    })
+  })
+
+  it('redirects temporarily_unavailable when the client could not be marked completed, and approves the same request sent again', async () => {
+    vi.mocked(ctx.clientRepository.markCompleted).mockRejectedValueOnce(
+      new WriteConflictError()
+    )
+    const approval = {
+      params: authorizeParams(),
+      userId: user.id,
+      sessionId: SESSION_ID,
+      approved: true,
+    }
+
+    await expect(ctx.service.authorize(ac, approval)).resolves.toMatchObject({
+      status: 'error',
+      error: 'temporarily_unavailable',
+    })
+    expect(ctx.store.codes).toEqual([])
+    await expect(ctx.service.authorize(ac, approval)).resolves.toMatchObject({
+      status: 'approved',
+    })
+  })
+
   it('marks the client as having completed an authorization', async () => {
     await ctx.service.authorize(ac, {
       params: authorizeParams(),
@@ -1067,6 +1113,27 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
       ])
     })
 
+    it('answers temporarily_unavailable when the revocation loses to other writes, leaves the grant live, and revokes it when the code is sent again', async () => {
+      await ctx.service.exchangeAuthorizationCode(tokenParams())
+      const exchanged = liveTokenIds(ctx.store)
+      vi.mocked(ctx.tokenRepository.revokeByGrant).mockRejectedValueOnce(
+        new WriteConflictError()
+      )
+
+      await expect(
+        ctx.service.exchangeAuthorizationCode(tokenParams())
+      ).rejects.toBeInstanceOf(OAuthTemporarilyUnavailableError)
+      expect(liveTokenIds(ctx.store)).toEqual(exchanged)
+
+      await expect(
+        ctx.service.exchangeAuthorizationCode(tokenParams())
+      ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+      expect(liveTokenIds(ctx.store)).toEqual([
+        'desktop-access',
+        'desktop-refresh',
+      ])
+    })
+
     it('ends the first exchange when the two arrive together', async () => {
       const outcomes = await Promise.allSettled([
         ctx.service.exchangeAuthorizationCode(tokenParams()),
@@ -1125,6 +1192,20 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     expect(ctx.store.tokens).toHaveLength(1)
   })
 
+  it('answers temporarily_unavailable, and leaves the code usable, when its tokens lose to other writes', async () => {
+    vi.mocked(ctx.codeRepository.exchange).mockRejectedValueOnce(
+      new WriteConflictError()
+    )
+    await expect(
+      ctx.service.exchangeAuthorizationCode(tokenParams())
+    ).rejects.toBeInstanceOf(OAuthTemporarilyUnavailableError)
+
+    const issued = await ctx.service.exchangeAuthorizationCode(tokenParams())
+
+    expect(issued.accessToken).toBeTruthy()
+    expect(ctx.store.tokens).toHaveLength(1)
+  })
+
   it('leaves the code usable when the account could not be looked up', async () => {
     vi.mocked(ctx.userRepository.findById).mockRejectedValueOnce(
       new Error('lost connection to MySQL')
@@ -1151,6 +1232,43 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
       expect(liveTokenIds(ctx.store)).toEqual([])
     }
   )
+
+  it('answers temporarily_unavailable when the revocation for a user not admitted loses to other writes, leaves the grant live, and revokes it when the code is sent again', async () => {
+    vi.mocked(ctx.userRepository.findById).mockResolvedValue(notAdmitted[0][1])
+    seedDevice(ctx.store, 'laptop')
+    vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockRejectedValueOnce(
+      new WriteConflictError()
+    )
+
+    await expect(
+      ctx.service.exchangeAuthorizationCode(tokenParams())
+    ).rejects.toBeInstanceOf(OAuthTemporarilyUnavailableError)
+    expect(liveTokenIds(ctx.store)).toEqual(['laptop-access', 'laptop-refresh'])
+
+    await expect(
+      ctx.service.exchangeAuthorizationCode(tokenParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+    expect(liveTokenIds(ctx.store)).toEqual([])
+  })
+
+  it('answers temporarily_unavailable when a code that failed a check could not be spent, and spends it when it is sent again', async () => {
+    vi.mocked(ctx.codeRepository.consume).mockRejectedValueOnce(
+      new WriteConflictError()
+    )
+    const mismatched = tokenParams({
+      code_verifier: 'V-a-s-t-l-y-different-but-still-a-valid-PKCE-value',
+    })
+
+    await expect(
+      ctx.service.exchangeAuthorizationCode(mismatched)
+    ).rejects.toBeInstanceOf(OAuthTemporarilyUnavailableError)
+    expect(ctx.store.codes[0].consumedAt).toBeNull()
+
+    await expect(
+      ctx.service.exchangeAuthorizationCode(mismatched)
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+    expect(ctx.store.codes[0].consumedAt).toBeInstanceOf(Date)
+  })
 
   it('refuses a verifier that does not hash to the stored challenge, and spends the code', async () => {
     await expect(
@@ -1438,6 +1556,54 @@ describe('OAuthService.exchangeRefreshToken', () => {
 
     expect(issued.refreshToken).toBeTruthy()
     expect(ctx.store.tokens.some(token => token.revokedAt)).toBe(false)
+  })
+
+  it('answers temporarily_unavailable, and leaves the token usable, when its successors lose to other writes', async () => {
+    vi.mocked(ctx.tokenRepository.rotate).mockRejectedValueOnce(
+      new WriteConflictError()
+    )
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthTemporarilyUnavailableError)
+
+    const issued = await ctx.service.exchangeRefreshToken(refreshParams())
+
+    expect(issued.refreshToken).toBeTruthy()
+    expect(ctx.store.tokens.some(token => token.revokedAt)).toBe(false)
+  })
+
+  it('answers temporarily_unavailable when the revocation for a rotated token loses to other writes, leaves the grant live, and revokes it when the token is sent again', async () => {
+    presented().rotatedAt = longAgo()
+    vi.mocked(ctx.tokenRepository.revokeByGrant).mockRejectedValueOnce(
+      new WriteConflictError()
+    )
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthTemporarilyUnavailableError)
+    expect(liveTokenIds(ctx.store)).toEqual(['laptop-access', 'laptop-refresh'])
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+    expect(liveTokenIds(ctx.store)).toEqual([])
+  })
+
+  it('answers temporarily_unavailable when the revocation for a user not admitted loses to other writes, leaves the grant live, and revokes it when the token is sent again', async () => {
+    vi.mocked(ctx.userRepository.findById).mockResolvedValue(notAdmitted[0][1])
+    vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockRejectedValueOnce(
+      new WriteConflictError()
+    )
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthTemporarilyUnavailableError)
+    expect(liveTokenIds(ctx.store)).toEqual(['laptop-access', 'laptop-refresh'])
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+    expect(liveTokenIds(ctx.store)).toEqual([])
   })
 
   it('gives a token from before grant ids, and its successors, a grant of their own', async () => {
@@ -2145,6 +2311,31 @@ describe('OAuthService.revokeToken', () => {
 
     expect(liveTokenIds(ctx.store)).toEqual([])
   })
+
+  it.each([
+    ['refresh', 'revokeByGrant', ['desktop-access', 'desktop-refresh']],
+    [
+      'access',
+      'revoke',
+      ['laptop-refresh', 'desktop-access', 'desktop-refresh'],
+    ],
+  ] as const)(
+    'answers temporarily_unavailable when the revocation of the %s token loses to other writes, leaves it live, and revokes it when it is sent again',
+    async (kind, write, liveAfterwards) => {
+      vi.mocked(ctx.tokenRepository[write]).mockRejectedValueOnce(
+        new WriteConflictError()
+      )
+      const request = { token: `laptop-${kind}`, client_id: CIMD_URL }
+
+      await expect(ctx.service.revokeToken(request)).rejects.toBeInstanceOf(
+        OAuthTemporarilyUnavailableError
+      )
+      expect(liveTokenIds(ctx.store)).toHaveLength(4)
+
+      await ctx.service.revokeToken(request)
+      expect(liveTokenIds(ctx.store)).toEqual(liveAfterwards)
+    }
+  )
 
   // RFC 7009 4.1.1: an unknown token is a success, so revocation cannot be
   // used to find out which tokens exist.

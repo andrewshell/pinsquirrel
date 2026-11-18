@@ -1,4 +1,6 @@
-import type { Pool } from 'mysql2/promise'
+import { drizzle, type MySql2Database } from 'drizzle-orm/mysql2'
+import mysql, { type Pool, type PoolConnection } from 'mysql2/promise'
+import { onTestFinished } from 'vitest'
 
 /**
  * Row builders for the integration tests.
@@ -89,4 +91,60 @@ export async function insertPin(
   )
 
   return id
+}
+
+/**
+ * An open transaction that InnoDB will not pick as the victim of a deadlock
+ * with a repository call: it has written more changes than the call will,
+ * deleting a user with all they own included. It changes each row three
+ * times: with three times the rows, the tests that open two of these timed
+ * out. It is rolled back and released when the test ends. It
+ * changes a column with no index: changing `username` left locks in that
+ * unique index, and a second one waited on them to insert its rows.
+ */
+export async function heavyTransaction(pool: Pool): Promise<PoolConnection> {
+  const bystanders = await Promise.all(
+    Array.from({ length: 20 }, () =>
+      insertUser(pool, { emailHash: crypto.randomUUID() })
+    )
+  )
+  const connection = await pool.getConnection()
+  await connection.beginTransaction()
+  for (const suffix of ['.', '', '.']) {
+    for (const bystander of bystanders) {
+      await connection.query(
+        "UPDATE users SET password_hash = CONCAT('hashed_password', ?) WHERE id = ?",
+        [suffix, bystander.id]
+      )
+    }
+  }
+  onTestFinished(async () => {
+    await connection.rollback()
+    connection.release()
+  })
+  return connection
+}
+
+/** Lock waits give up after a second where the server default is fifty. */
+export async function impatientDatabase(url: string): Promise<MySql2Database> {
+  const pool = mysql.createPool({ uri: url, connectionLimit: 1 })
+  await pool.query('SET SESSION innodb_lock_wait_timeout = 1')
+  onTestFinished(() => pool.end())
+  return drizzle({ client: pool })
+}
+
+/** The test may roll it back sooner. */
+export async function transactionHolding(
+  pool: Pool,
+  lockingRead: string,
+  params: unknown[]
+): Promise<PoolConnection> {
+  const connection = await pool.getConnection()
+  await connection.beginTransaction()
+  await connection.query(lockingRead, params)
+  onTestFinished(async () => {
+    await connection.rollback()
+    connection.release()
+  })
+  return connection
 }

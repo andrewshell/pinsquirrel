@@ -23,9 +23,11 @@ import {
   OAuthInvalidRequestError,
   OAuthInvalidScopeError,
   OAuthInvalidTargetError,
+  OAuthTemporarilyUnavailableError,
   OAuthUnauthorizedClientError,
   ResponseTooLargeError,
   ValidationError,
+  WriteConflictError,
 } from '@pinsquirrel/domain'
 import { generateSecureToken, hashToken } from '../utils/crypto.js'
 import {
@@ -179,6 +181,8 @@ export interface AuthorizationErrorRedirect {
   state?: string
   /** RFC 9207, which the redirect carries on success and on failure. */
   issuer: string
+  /** What the server failed on, for the transport's log and never the client. */
+  cause?: unknown
 }
 
 export type AuthorizationRequestResolution =
@@ -358,27 +362,45 @@ export class OAuthService {
       )
     }
 
-    if (!resolved.client.completedAt) {
-      await this.clientRepository.markCompleted(resolved.client.id, new Date())
-    }
-
     const code = generateSecureToken()
     const expiresAt = new Date(Date.now() + AUTHORIZATION_CODE_TTL_MS)
 
-    const created = await this.codeRepository.create(
-      {
-        codeHash: hashToken(code),
-        clientId: resolved.client.clientId,
-        userId: input.userId,
-        redirectUri: resolved.redirectUri,
-        codeChallenge: resolved.codeChallenge,
-        scopes: resolved.scopes,
-        resource: resolved.resource,
-        grantId: randomUUID(),
-        expiresAt,
-      },
-      input.sessionId
-    )
+    let created: AuthorizationCode | null
+    try {
+      if (!resolved.client.completedAt) {
+        await this.clientRepository.markCompleted(
+          resolved.client.id,
+          new Date()
+        )
+      }
+      created = await this.codeRepository.create(
+        {
+          codeHash: hashToken(code),
+          clientId: resolved.client.clientId,
+          userId: input.userId,
+          redirectUri: resolved.redirectUri,
+          codeChallenge: resolved.codeChallenge,
+          scopes: resolved.scopes,
+          resource: resolved.resource,
+          grantId: randomUUID(),
+          expiresAt,
+        },
+        input.sessionId
+      )
+    } catch (error) {
+      if (error instanceof WriteConflictError) {
+        const unavailable = new OAuthTemporarilyUnavailableError()
+        return {
+          ...this.errorRedirect(
+            resolved,
+            unavailable.code,
+            unavailable.message
+          ),
+          cause: error,
+        }
+      }
+      throw error
+    }
     if (!created) {
       return this.errorRedirect(
         resolved,
@@ -415,6 +437,10 @@ export class OAuthService {
    * `MaintenanceService` takes none.
    */
   async exchangeAuthorizationCode(params: unknown): Promise<IssuedTokens> {
+    return conflictAsTemporarilyUnavailable(this.spendCode(params))
+  }
+
+  private async spendCode(params: unknown): Promise<IssuedTokens> {
     refuseSeveralResources(params)
     const parsed = authorizationCodeGrantSchema.safeParse(params)
     if (!parsed.success) {
@@ -533,6 +559,10 @@ export class OAuthService {
    * back after it was rotated.
    */
   async exchangeRefreshToken(params: unknown): Promise<IssuedTokens> {
+    return conflictAsTemporarilyUnavailable(this.rotateRefreshToken(params))
+  }
+
+  private async rotateRefreshToken(params: unknown): Promise<IssuedTokens> {
     refuseSeveralResources(params)
     const parsed = refreshTokenGrantSchema.safeParse(params)
     if (!parsed.success) {
@@ -598,7 +628,8 @@ export class OAuthService {
       rotatedFrom: token.id,
     })
 
-    if (!(await this.tokenRepository.rotate(token.id, rows))) {
+    const rotated = await this.tokenRepository.rotate(token.id, rows)
+    if (!rotated) {
       const current = await this.tokenRepository.findById(token.id)
       if (current?.rotatedAt && !current.revokedAt) {
         return this.refuseRotatedToken(current, current.rotatedAt)
@@ -896,6 +927,10 @@ export class OAuthService {
    * was revoked does not.
    */
   async revokeToken(params: unknown): Promise<void> {
+    return conflictAsTemporarilyUnavailable(this.revokePresentedToken(params))
+  }
+
+  private async revokePresentedToken(params: unknown): Promise<void> {
     const parsed = revocationRequestSchema.safeParse(params)
     if (!parsed.success) {
       throw validationErrorFromZod(parsed.error, {
@@ -1204,6 +1239,24 @@ function refuseSeveralResources(params: unknown): void {
     throw new OAuthInvalidTargetError(
       'Name one resource: this server binds each token to a single resource'
     )
+  }
+}
+
+/**
+ * The client is told to send the request again, which finds what this one
+ * found: a working code or token is still working, and a revocation that was
+ * due is still due (PLAN.md decision 46).
+ */
+async function conflictAsTemporarilyUnavailable<T>(
+  request: Promise<T>
+): Promise<T> {
+  try {
+    return await request
+  } catch (error) {
+    if (error instanceof WriteConflictError) {
+      throw new OAuthTemporarilyUnavailableError(undefined, { cause: error })
+    }
+    throw error
   }
 }
 

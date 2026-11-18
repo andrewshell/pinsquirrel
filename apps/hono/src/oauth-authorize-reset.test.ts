@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   AccessControl,
+  Role,
   UserStatus,
   type HttpFetcher,
   type User,
@@ -173,7 +174,7 @@ describe('an authorization in flight across a revocation', () => {
       authorizeInput(clientId, sessionId, challenge)
     )
     await fetchStarted
-    await userRepository.revokeSessionsAndTokens(user.id)
+    await userRepository.removeRoleAndRevoke(user.id, Role.User)
     release()
 
     await expect(inFlight).resolves.toMatchObject({

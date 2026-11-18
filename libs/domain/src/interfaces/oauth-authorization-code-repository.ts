@@ -16,7 +16,8 @@ export interface OAuthAuthorizationCodeRepository {
    *
    * The session check and the insert are one step: a revocation of the user's
    * sessions either precedes it, and nothing is written, or follows it, and
-   * deletes the code with the user's other unspent codes.
+   * deletes the code with the user's other unspent codes. A
+   * `WriteConflictError` means it lost to concurrent writes and wrote nothing.
    */
   create(
     data: CreateAuthorizationCodeData,
@@ -29,7 +30,9 @@ export interface OAuthAuthorizationCodeRepository {
    * Either the code is marked spent and every token is stored, or nothing
    * changed. The mark is conditional, so of two concurrent exchanges of one
    * code exactly one is `exchanged`; a failure while writing the tokens
-   * leaves the code unspent for the client to retry with.
+   * leaves the code unspent for the client to retry with, and a
+   * `WriteConflictError` is the failure of an exchange that lost to
+   * concurrent writes.
    *
    * It also cannot overlap a revocation of the user's tokens: the revocation
    * either ran first, and the code is `gone`, or runs after and takes the new

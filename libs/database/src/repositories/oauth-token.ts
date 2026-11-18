@@ -17,13 +17,12 @@ import {
 } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { oauthTokens } from '../schema/oauth-tokens'
-import { retryOnDeadlock } from './deadlock'
+import { writeOrConflict } from './deadlock'
 import {
   changedRows,
   holdUserWhileIssuing,
-  inBatches,
   insertTokens,
-  issueOrRefuse,
+  PRIMARY_KEY_BATCH,
   revokeUserTokens,
 } from './oauth-issuance'
 
@@ -68,10 +67,12 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
   }
 
   async revoke(id: string): Promise<boolean> {
-    const result = await this.db
-      .update(oauthTokens)
-      .set({ revokedAt: new Date() })
-      .where(and(eq(oauthTokens.id, id), isNull(oauthTokens.revokedAt)))
+    const result = await writeOrConflict(() =>
+      this.db
+        .update(oauthTokens)
+        .set({ revokedAt: new Date() })
+        .where(and(eq(oauthTokens.id, id), isNull(oauthTokens.revokedAt)))
+    )
     return result[0].affectedRows > 0
   }
 
@@ -79,7 +80,7 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
     userId: string,
     clientId: string
   ): Promise<number> {
-    return retryOnDeadlock(() =>
+    return writeOrConflict(() =>
       this.db.transaction(tx =>
         revokeUserTokens(tx, userId, eq(oauthTokens.clientId, clientId))
       )
@@ -87,7 +88,7 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
   }
 
   async revokeByGrant(userId: string, grantId: string): Promise<number> {
-    return retryOnDeadlock(() =>
+    return writeOrConflict(() =>
       this.db.transaction(tx =>
         revokeUserTokens(tx, userId, eq(oauthTokens.grantId, grantId))
       )
@@ -124,7 +125,7 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
         return true
       })
 
-    return issueOrRefuse(rotation, false)
+    return writeOrConflict(rotation)
   }
 
   async deleteExpiredTokens(): Promise<number> {
@@ -136,21 +137,27 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
     // DELETE over the whole table locks every gap in it, and a refresh that
     // has retired its token cannot then insert the successors. PLAN.md
     // decision 41.
-    const found = await this.db
-      .select({ id: oauthTokens.id })
-      .from(oauthTokens)
-      .where(dead)
-
     let deleted = 0
-    for (const batch of inBatches(found.map(row => row.id))) {
-      deleted += await retryOnDeadlock(() =>
+    let lastId = ''
+    for (;;) {
+      const batch = await this.db
+        .select({ id: oauthTokens.id })
+        .from(oauthTokens)
+        .where(and(gt(oauthTokens.id, lastId), dead))
+        .orderBy(oauthTokens.id)
+        .limit(PRIMARY_KEY_BATCH)
+      if (batch.length === 0) {
+        return deleted
+      }
+      const ids = batch.map(row => row.id)
+      deleted += await writeOrConflict(() =>
         changedRows(
           this.db,
-          sql`delete ${oauthTokens} from ${oauthTokens} force index (primary) where ${and(inArray(oauthTokens.id, batch), dead)}`
+          sql`delete ${oauthTokens} from ${oauthTokens} force index (primary) where ${and(inArray(oauthTokens.id, ids), dead)}`
         )
       )
+      lastId = ids[ids.length - 1]
     }
-    return deleted
   }
 
   /** Not expired, not revoked, not already exchanged for a successor. */

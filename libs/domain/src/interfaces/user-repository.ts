@@ -8,6 +8,12 @@ export interface UserRepository extends Repository<
   CreateUserData,
   UpdateUserData
 > {
+  /**
+   * Delete the user and everything they own, in one transaction. True when
+   * there was a user to delete. A `WriteConflictError` means nothing changed
+   * and the call can be retried.
+   */
+  delete(id: string): Promise<boolean>
   findByEmailHash(emailHash: string): Promise<User | null>
   findByUsername(username: string): Promise<User | null>
   findByStatus(status: UserStatus): Promise<User[]>
@@ -37,9 +43,30 @@ export interface UserRepository extends Repository<
    */
   deleteStaleUnverified(id: string, createdBefore: Date): Promise<boolean>
   /**
-   * End every web session, OAuth token and unused authorization code issued
-   * to a user, and cancel their pending email change, all or nothing, except
-   * the one session named by `keepSessionId`.
+   * Write a new password hash and end what was issued under the old one, in
+   * one transaction: every web session but `keepSessionId`, every OAuth
+   * token and unused authorization code, and the pending email change.
+   *
+   * With `resetTokenId` the change also spends that reset token and the
+   * user's others. Resolves false, with nothing changed, when that token is
+   * gone or expired, or when the user is gone. Of concurrent calls with one
+   * token, at most one resolves true.
+   *
+   * A `WriteConflictError` means nothing changed and the call can be retried.
    */
-  revokeSessionsAndTokens(userId: string, keepSessionId?: string): Promise<void>
+  setPasswordAndRevoke(userId: string, change: PasswordChange): Promise<boolean>
+  /**
+   * Remove a role and end every web session, OAuth token and unused
+   * authorization code issued to the user, and their pending email change,
+   * in one transaction. A `WriteConflictError` means nothing changed.
+   */
+  removeRoleAndRevoke(userId: string, role: Role): Promise<void>
+}
+
+export interface PasswordChange {
+  passwordHash: string
+  /** Written with the hash; the status is left alone without it. */
+  status?: UserStatus
+  keepSessionId?: string
+  resetTokenId?: string
 }

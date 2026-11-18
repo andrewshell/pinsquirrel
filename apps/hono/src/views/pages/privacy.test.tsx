@@ -45,7 +45,7 @@ async function whatSignupTellsTheOperator(address: string): Promise<string> {
   new AccountService(
     users,
     {} as PasswordResetRepository,
-    { save: vi.fn(), consume: vi.fn() },
+    { save: vi.fn(), confirm: vi.fn() },
     email,
     { defer: work => void pending.push(work()) }
   ).register({

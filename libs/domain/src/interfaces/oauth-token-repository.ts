@@ -47,7 +47,9 @@ export interface OAuthTokenRepository {
    * nothing changed. False, with nothing written, when the token was already
    * rotated or revoked: the mark is conditional, so of two concurrent
    * rotations of one token exactly one wins. A failure while writing the
-   * successors leaves the token unrotated for the client to retry with.
+   * successors leaves the token unrotated for the client to retry with, and
+   * a `WriteConflictError` is the failure of a rotation that lost to
+   * concurrent writes.
    *
    * Rotation is distinct from `revoke` so that a later presentation of the
    * token is recognisable as a replay rather than a user revocation. A token

@@ -9,7 +9,13 @@ import type {
   CreateAuthorizationCodeData,
   CreateOAuthTokenData,
 } from '@pinsquirrel/domain'
-import { insertUser } from '../test-fixtures.js'
+import { Role, WriteConflictError } from '@pinsquirrel/domain'
+import {
+  heavyTransaction,
+  impatientDatabase,
+  insertUser,
+  transactionHolding,
+} from '../test-fixtures.js'
 import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes.js'
 import { DrizzleOAuthClientRepository } from './oauth-client.js'
 import { DrizzleOAuthAuthorizationCodeRepository } from './oauth-authorization-code.js'
@@ -136,9 +142,10 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
       const data = code()
       const creating = repository.create(data, sessionId)
       await new Promise(resolve => setTimeout(resolve, 200))
-      const revoking = new DrizzleUserRepository(
-        testDb
-      ).revokeSessionsAndTokens(userId)
+      const revoking = new DrizzleUserRepository(testDb).removeRoleAndRevoke(
+        userId,
+        Role.User
+      )
       await new Promise(resolve => setTimeout(resolve, 200))
       await stall.commit()
       stall.release()
@@ -148,7 +155,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
       expect(await repository.findByCodeHash(data.codeHash)).toBeNull()
     })
 
-    it('should create nothing, and not fail, when the user is deleted between its session check and its insert', async () => {
+    it('should leave no code, and not fail, when the user is deleted between its session check and its insert', async () => {
       const stall = await testPool.getConnection()
       await stall.beginTransaction()
       await stall.query(
@@ -163,9 +170,38 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
       await stall.commit()
       stall.release()
 
-      expect(await creating).toBeNull()
+      await creating
       expect(await deleting).toBe(true)
       expect(await repository.findByCodeHash(data.codeHash)).toBeNull()
+    })
+
+    it('should throw a write conflict, and leave the code to create later, when it loses a deadlock twice', async () => {
+      const pause = () => new Promise(resolve => setTimeout(resolve, 200))
+      const holdClient =
+        'SELECT client_id FROM oauth_clients WHERE client_id = ? FOR UPDATE'
+      const holdSession = 'SELECT id FROM sessions WHERE id = ? FOR UPDATE'
+      const first = await heavyTransaction(testPool)
+      const second = await heavyTransaction(testPool)
+      await first.query(holdClient, [clientId])
+      const data = code()
+
+      const creating = repository
+        .create(data, sessionId)
+        .catch((error: unknown) => error)
+      await pause()
+      await first.query(holdSession, [sessionId])
+      const secondHoldsClient = second.query(holdClient, [clientId])
+      await pause()
+      await first.rollback()
+      await secondHoldsClient
+      await pause()
+      await second.query(holdSession, [sessionId])
+      const thrown = await Promise.race([creating, pause()])
+      await second.rollback()
+
+      expect(thrown).toBeInstanceOf(WriteConflictError)
+      expect(await repository.findByCodeHash(data.codeHash)).toBeNull()
+      expect(await repository.create(data, sessionId)).not.toBeNull()
     })
 
     it('should create nothing under a session that belongs to another user', async () => {
@@ -345,7 +381,10 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
     it('should say a code the user revoked is gone, and write nothing', async () => {
       const created = await createCode()
       const pair = tokensFor(created)
-      await new DrizzleUserRepository(testDb).revokeSessionsAndTokens(userId)
+      await new DrizzleUserRepository(testDb).removeRoleAndRevoke(
+        userId,
+        Role.User
+      )
 
       expect(await repository.exchange(created.id, pair)).toBe('gone')
       expect(await stored(pair[0])).toBeNull()
@@ -394,32 +433,21 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
     it.each([
       ['run again when it loses a deadlock, and write its tokens', 1],
       [
-        'say the code is gone, and leave it unspent, when it loses a deadlock twice',
+        'throw a write conflict, and leave the code to exchange later, when it loses a deadlock twice',
         2,
       ],
     ])('should %s', async (_name, deadlocks) => {
       const created = await createCode()
       const [access, refresh] = tokensFor(created)
-      // InnoDB picks the transaction that changed fewer rows as the victim.
-      const bystanders = await Promise.all(
-        Array.from({ length: 20 }, () =>
-          insertUser(testPool, { emailHash: crypto.randomUUID() })
-        )
-      )
-      const rival = await testPool.getConnection()
-      await rival.beginTransaction()
-      for (const bystander of bystanders) {
-        await rival.query(
-          'UPDATE users SET username = UPPER(username) WHERE id = ?',
-          [bystander.id]
-        )
-      }
+      const rival = await heavyTransaction(testPool)
       await rival.query(
         'SELECT client_id FROM oauth_clients WHERE client_id = ? FOR UPDATE',
         [clientId]
       )
 
-      const exchanging = repository.exchange(created.id, [access, refresh])
+      const exchanging = repository
+        .exchange(created.id, [access, refresh])
+        .catch((error: unknown) => error)
       await new Promise(resolve => setTimeout(resolve, 200))
       await rival.query(
         'SELECT id FROM oauth_authorization_codes WHERE id = ? FOR UPDATE',
@@ -433,17 +461,41 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
         await new Promise(resolve => setTimeout(resolve, 200))
       }
       await rival.rollback()
-      rival.release()
 
       if (deadlocks === 1) {
         expect(await exchanging).toBe('exchanged')
         expect(await stored(access)).not.toBeNull()
         expect(await stored(refresh)).not.toBeNull()
       } else {
-        expect(await exchanging).toBe('gone')
+        expect(await exchanging).toBeInstanceOf(WriteConflictError)
         expect((await repository.findById(created.id))?.consumedAt).toBeNull()
         expect(await stored(access)).toBeNull()
+        expect(await repository.exchange(created.id, [access, refresh])).toBe(
+          'exchanged'
+        )
       }
+    })
+
+    it('should throw a write conflict when its lock wait times out, leave the code unspent, and exchange when called again', async () => {
+      const created = await createCode()
+      const tokens = tokensFor(created)
+      const rival = await transactionHolding(
+        testPool,
+        'SELECT client_id FROM oauth_clients WHERE client_id = ? FOR UPDATE',
+        [clientId]
+      )
+      const impatient = new DrizzleOAuthAuthorizationCodeRepository(
+        await impatientDatabase(TEST_DATABASE_URL)
+      )
+
+      const thrown: unknown = await impatient
+        .exchange(created.id, tokens)
+        .catch((error: unknown) => error)
+      await rival.rollback()
+
+      expect(thrown).toBeInstanceOf(WriteConflictError)
+      expect((await repository.findById(created.id))?.consumedAt).toBeNull()
+      expect(await repository.exchange(created.id, tokens)).toBe('exchanged')
     })
 
     it('should not leave live tokens when the user revokes everything mid-exchange', async () => {
@@ -459,9 +511,10 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
       )
       const exchanging = repository.exchange(created.id, [access, refresh])
       await new Promise(resolve => setTimeout(resolve, 200))
-      const revoking = new DrizzleUserRepository(
-        testDb
-      ).revokeSessionsAndTokens(userId)
+      const revoking = new DrizzleUserRepository(testDb).removeRoleAndRevoke(
+        userId,
+        Role.User
+      )
       await new Promise(resolve => setTimeout(resolve, 200))
       await stall.commit()
       stall.release()
@@ -470,6 +523,55 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
 
       expect((await stored(access))?.revokedAt).toBeInstanceOf(Date)
       expect((await stored(refresh))?.revokedAt).toBeInstanceOf(Date)
+    })
+  })
+
+  describe('a write whose lock wait times out', () => {
+    const impatient = async () =>
+      new DrizzleOAuthAuthorizationCodeRepository(
+        await impatientDatabase(TEST_DATABASE_URL)
+      )
+    const holdingClient = () =>
+      transactionHolding(
+        testPool,
+        'SELECT client_id FROM oauth_clients WHERE client_id = ? FOR UPDATE',
+        [clientId]
+      )
+
+    it('create throws a write conflict, writes nothing, and creates when called again', async () => {
+      const data = code()
+      const rival = await holdingClient()
+
+      const thrown: unknown = await (
+        await impatient()
+      )
+        .create(data, sessionId)
+        .catch((error: unknown) => error)
+      await rival.rollback()
+
+      expect(thrown).toBeInstanceOf(WriteConflictError)
+      expect(await repository.findByCodeHash(data.codeHash)).toBeNull()
+      expect(await repository.create(data, sessionId)).not.toBeNull()
+    })
+
+    it('consume throws a write conflict, leaves the code unspent, and consumes when called again', async () => {
+      const created = await createCode()
+      const rival = await transactionHolding(
+        testPool,
+        'SELECT id FROM oauth_authorization_codes WHERE id = ? FOR UPDATE',
+        [created.id]
+      )
+
+      const thrown: unknown = await (
+        await impatient()
+      )
+        .consume(created.codeHash)
+        .catch((error: unknown) => error)
+      await rival.rollback()
+
+      expect(thrown).toBeInstanceOf(WriteConflictError)
+      expect((await repository.findById(created.id))?.consumedAt).toBeNull()
+      expect(await repository.consume(created.codeHash)).not.toBeNull()
     })
   })
 

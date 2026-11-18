@@ -55,7 +55,10 @@ export type { Jsonify } from './jsonify.js'
 
 // Interfaces
 export type { Repository } from './interfaces/repository.js'
-export type { UserRepository } from './interfaces/user-repository.js'
+export type {
+  PasswordChange,
+  UserRepository,
+} from './interfaces/user-repository.js'
 export type { PinRepository, PinFilter } from './interfaces/pin-repository.js'
 export type { TagRepository } from './interfaces/tag-repository.js'
 export type { PasswordResetRepository } from './interfaces/password-reset-repository.js'
@@ -113,6 +116,7 @@ export {
   ResponseTooLargeError,
 } from './errors/metadata.js'
 export { ValidationError } from './errors/validation.js'
+export { WriteConflictError } from './errors/write-conflict.js'
 export {
   OAuthError,
   OAuthInvalidRequestError,
@@ -123,6 +127,7 @@ export {
   OAuthInvalidScopeError,
   OAuthInvalidTargetError,
   OAuthAccessDeniedError,
+  OAuthTemporarilyUnavailableError,
   OAuthInvalidClientMetadataError,
   OAuthInvalidRedirectUriError,
 } from './errors/oauth.js'

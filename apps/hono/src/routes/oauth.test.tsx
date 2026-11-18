@@ -506,6 +506,32 @@ describe('oauth authorize routes', () => {
       expect(location.searchParams.get('iss')).toBe('http://localhost:8100')
     })
 
+    it('logs what an approval the server could not finish lost to, and redirects without it', async () => {
+      mockAuthorize.mockResolvedValue({
+        status: 'error',
+        error: 'temporarily_unavailable',
+        errorDescription: 'The server is busy. Send the request again',
+        redirectUri: 'https://claude.ai/api/mcp/auth_callback',
+        state: 'the-state',
+        issuer: 'http://localhost:8100',
+        cause: new Error('The write lost two deadlocks and changed nothing'),
+      })
+
+      const res = await post({ decision: 'approve' })
+
+      expect(res.status).toBe(302)
+      expect(res.headers.get('Location')).not.toContain('deadlocks')
+      expect(mockLogWarn).toHaveBeenCalledWith(
+        {
+          error: 'temporarily_unavailable',
+          cause: expect.objectContaining({
+            message: 'The write lost two deadlocks and changed nothing',
+          }) as unknown,
+        },
+        'The server is busy. Send the request again'
+      )
+    })
+
     it('hands a repeated field to the service as every value posted', async () => {
       mockAuthorize.mockResolvedValue({
         status: 'error',
