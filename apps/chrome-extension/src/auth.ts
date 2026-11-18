@@ -469,25 +469,38 @@ function isSpent(tokens: StoredTokens): boolean {
 }
 
 /**
- * The one refresh allowed to be in flight.
+ * The lock every refresh runs under.
  *
- * Rotation is mandatory server-side and a rotated token is a replay: two
- * concurrent refreshes of the same token means one of them loses the race and
- * the *whole grant* is revoked. The options page and the service worker can both want
- * a token at once, so they share this promise rather than each posting.
+ * Rotation is mandatory server-side, so of two refreshes of one token the
+ * server lets one win and answers the other `invalid_grant`, which would
+ * clear a connection that is still good. The options page and the service
+ * worker each load this module, so module state cannot keep them apart; a Web
+ * Lock is held per origin and both contexts share the extension's.
  */
-let refreshInFlight: Promise<StoredTokens> | null = null
+const REFRESH_LOCK = 'pinsquirrel-token-refresh'
 
 /**
  * Spend the refresh token for a new pair, and store what comes back.
+ *
+ * Under the lock, the stored refresh token is read again: if it is no longer
+ * the one `spent` holds, another caller refreshed while this one waited, and
+ * its pair is the answer.
  *
  * The endpoints are rediscovered rather than cached across calls: a service
  * worker is torn down between wakes, so a cache would rarely survive to be
  * used, and a stale one would send a refresh to an endpoint the server has
  * moved.
  */
-async function refreshTokens(current: StoredTokens): Promise<StoredTokens> {
-  refreshInFlight ??= (async () => {
+async function refreshTokens(spent: StoredTokens): Promise<StoredTokens> {
+  return navigator.locks.request(REFRESH_LOCK, async () => {
+    const current = await storedTokens()
+    if (!current) {
+      throw new ReauthorizationRequiredError(
+        'The extension is not connected to a PinSquirrel server'
+      )
+    }
+    if (current.refreshToken !== spent.refreshToken) return current
+
     try {
       const endpoints = await discoverEndpoints(current.baseUrl)
       const body = await postTokenRequest(endpoints.tokenEndpoint, {
@@ -515,12 +528,8 @@ async function refreshTokens(current: StoredTokens): Promise<StoredTokens> {
         throw new ReauthorizationRequiredError(error.message)
       }
       throw error
-    } finally {
-      refreshInFlight = null
     }
-  })()
-
-  return refreshInFlight
+  })
 }
 
 /**

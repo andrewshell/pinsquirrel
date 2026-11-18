@@ -388,6 +388,42 @@ describe('getAccessToken', () => {
     expect(one).toBe('pso_access')
     expect(other).toBe('pso_access')
   })
+
+  // The options page and the service worker each load their own copy of this
+  // module, sharing only storage. Like the real server, the stub lets one
+  // refresh of a token win and answers the other invalid_grant.
+  it('keeps the connection when the options page and the worker refresh at once', async () => {
+    const server = stubOAuthServer(connected({ expiresAt: Date.now() - 1000 }))
+    const spent = new Set<string>()
+    let issued = 0
+    server.answerTokenWith(form => {
+      if (spent.has(form.refresh_token)) {
+        return oauthErrorResponse('invalid_grant')
+      }
+      spent.add(form.refresh_token)
+      issued += 1
+      return tokenResponse({
+        access_token: `pso_fresh-${issued}`,
+        refresh_token: `refresh-${issued + 1}`,
+      })
+    })
+    vi.resetModules()
+    const optionsPage = await import('./auth.ts')
+    vi.resetModules()
+    const worker = await import('./auth.ts')
+
+    const [one, other] = await Promise.all([
+      optionsPage.getAccessToken(),
+      worker.getAccessToken(),
+    ])
+
+    expect(one).toBe('pso_fresh-1')
+    expect(other).toBe('pso_fresh-1')
+    expect(server.chrome.local.items).toMatchObject({
+      accessToken: 'pso_fresh-1',
+      refreshToken: 'refresh-2',
+    })
+  })
 })
 
 const TAGS_URL = `${SERVER_BASE_URL}/api/v1/tags`
