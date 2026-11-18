@@ -2018,6 +2018,18 @@ describe('OAuthService.registerClient', () => {
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['empty userinfo', 'http://@127.0.0.1/callback'],
+    ['a value that is not a URI', 'not a uri'],
+    ['a loopback port above 65535', 'http://127.0.0.1:99999/callback'],
+    ['a script scheme', 'javascript:alert(1)'],
+  ])('refuses %s as invalid_redirect_uri', async (_, uri) => {
+    await expect(
+      ctx.service.registerClient(registration({ redirect_uris: [uri] }))
+    ).rejects.toBeInstanceOf(OAuthInvalidRedirectUriError)
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
   it('refuses an authentication method this server does not advertise', async () => {
     await expect(
       ctx.service.registerClient(

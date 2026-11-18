@@ -1,7 +1,4 @@
-import {
-  OAuthClientMetadataSchema,
-  SafeUrlSchema,
-} from '@modelcontextprotocol/sdk/shared/auth.js'
+import { OAuthClientMetadataSchema } from '@modelcontextprotocol/sdk/shared/auth.js'
 import { z } from 'zod'
 import { isLoopbackRedirectHost } from './oauth-uri.js'
 
@@ -117,9 +114,14 @@ export type TokenRequestParams = z.infer<typeof tokenRequestSchema>
 
 const MAX_REDIRECT_URIS = 10
 
+/**
+ * `redirect_uris` are strings here rather than the SDK's URL schema, so that a
+ * value that does not parse is refused by `isUsableRedirectUri` as
+ * `invalid_redirect_uri` (RFC 7591 3.2.2), not as a malformed body.
+ */
 const clientMetadataSchema = OAuthClientMetadataSchema.extend({
   client_name: z.string().max(MAX_CLIENT_NAME_LENGTH).optional(),
-  redirect_uris: z.array(SafeUrlSchema.max(MAX_REDIRECT_URI_LENGTH)),
+  redirect_uris: z.array(redirectUriValue),
 })
 
 /**
@@ -166,16 +168,23 @@ export type ClientIdMetadataDocument = z.infer<
  * 3.1.2), and no userinfo, which only hides the host from a reader.
  */
 export function isUsableRedirectUri(uri: string): boolean {
-  if (uri.includes('#')) return false
+  if (uri.includes('#') || hasUserinfo(uri)) return false
   let url: URL
   try {
     url = new URL(uri)
   } catch {
     return false
   }
-  if (url.username || url.password) return false
   if (url.protocol === 'https:') return true
   return url.protocol === 'http:' && isLoopbackRedirectHost(url.hostname)
+}
+
+/**
+ * An `@` in the authority, read from the string because `URL` reports an
+ * empty userinfo (`http://@host/`) the same as none.
+ */
+function hasUserinfo(uri: string): boolean {
+  return /^[^:]*:[/\\]*[^/\\?#]*@/.test(uri)
 }
 
 /**
