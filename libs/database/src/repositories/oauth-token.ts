@@ -134,8 +134,7 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
     // Found with a read that locks nothing, then deleted by primary key. One
     // DELETE over the whole table locks every gap in it, and a refresh that
     // has retired its token cannot then insert the successors. PLAN.md
-    // decision 41. One batch at a time, each read starting after the last id
-    // of the one before, so a backlog of any size is one pass over the table.
+    // decision 41.
     let deleted = 0
     let lastId = ''
     for (;;) {

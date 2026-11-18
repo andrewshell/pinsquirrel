@@ -369,7 +369,7 @@ export class OAuthService {
 
     let created: AuthorizationCode | null
     try {
-      created = await sendAgainOnConflict(
+      created = await conflictAsTemporarilyUnavailable(
         this.codeRepository.create(
           {
             codeHash: hashToken(code),
@@ -476,7 +476,7 @@ export class OAuthService {
       grantedAt: code.createdAt,
     })
 
-    const outcome = await sendAgainOnConflict(
+    const outcome = await conflictAsTemporarilyUnavailable(
       this.codeRepository.exchange(code.id, rows)
     )
     if (outcome === 'spent') {
@@ -612,7 +612,7 @@ export class OAuthService {
       rotatedFrom: token.id,
     })
 
-    const rotated = await sendAgainOnConflict(
+    const rotated = await conflictAsTemporarilyUnavailable(
       this.tokenRepository.rotate(token.id, rows)
     )
     if (!rotated) {
@@ -1225,11 +1225,12 @@ function refuseSeveralResources(params: unknown): void {
 }
 
 /**
- * Answer a write that lost to concurrent writes with `temporarily_unavailable`.
- * The code or token it was for is unchanged, and `invalid_grant` would have
- * the client throw a working one away (PLAN.md decision 46).
+ * The code or token the write was for is unchanged, and `invalid_grant` would
+ * have the client throw a working one away (PLAN.md decision 46).
  */
-async function sendAgainOnConflict<T>(write: Promise<T>): Promise<T> {
+async function conflictAsTemporarilyUnavailable<T>(
+  write: Promise<T>
+): Promise<T> {
   try {
     return await write
   } catch (error) {

@@ -800,7 +800,6 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       ])
       await pause()
       await rival.rollback()
-      rival.release()
       await revoking
 
       expect(await sessions.findByUserId(userId)).toEqual([])

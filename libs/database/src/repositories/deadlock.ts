@@ -12,8 +12,7 @@ export function isDeadlockError(error: unknown): boolean {
 /**
  * Run a whole transaction, and once more if InnoDB chose it as the victim of
  * a deadlock. The victim has been rolled back in full, so the second run
- * starts from nothing and re-reads everything it decides on. A second
- * deadlock, which rolled it back again, is a `WriteConflictError`.
+ * starts from nothing and re-reads everything it decides on.
  */
 export async function retryOnDeadlock<T>(
   transaction: () => Promise<T>

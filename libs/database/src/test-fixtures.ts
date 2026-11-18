@@ -1,4 +1,5 @@
 import type { Pool, PoolConnection } from 'mysql2/promise'
+import { onTestFinished } from 'vitest'
 
 /**
  * Row builders for the integration tests.
@@ -93,10 +94,10 @@ export async function insertPin(
 
 /**
  * An open transaction that InnoDB will not pick as the victim of a deadlock
- * with a repository call: it has changed more rows than the call will. The
- * caller takes the locks that make the cycle, then rolls it back and releases
- * it. The column it changes has no index, so it locks its own rows and no gap
- * a second one would insert into.
+ * with a repository call: it has changed more rows than the call will. It is
+ * rolled back and released when the test ends. It changes a column with no
+ * index: changing `username` left locks in that unique index, and a second
+ * one waited on them to insert its rows.
  */
 export async function heavyTransaction(pool: Pool): Promise<PoolConnection> {
   const bystanders = await Promise.all(
@@ -112,5 +113,9 @@ export async function heavyTransaction(pool: Pool): Promise<PoolConnection> {
       [bystander.id]
     )
   }
+  onTestFinished(async () => {
+    await connection.rollback()
+    connection.release()
+  })
   return connection
 }

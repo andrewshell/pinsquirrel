@@ -349,7 +349,6 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
       ])
       await pause()
       await rival.rollback()
-      rival.release()
 
       expect(await revoking).toBe(1)
       expect((await repository.findById(held.id))?.revokedAt).toBeInstanceOf(
@@ -541,7 +540,6 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
       ])
       await pause()
       await rival.rollback()
-      rival.release()
 
       expect(await rotating).toBe(true)
       for (const successor of successors) {
@@ -563,7 +561,6 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
         [parent.id]
       )
       await rival.commit()
-      rival.release()
 
       expect(await rotating).toBe(false)
       for (const successor of successors) {
@@ -590,7 +587,6 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
         pause(),
       ])
       await rival.rollback()
-      rival.release()
 
       expect(thrown).toBeInstanceOf(WriteConflictError)
       expect((await repository.findById(parent.id))?.rotatedAt).toBeNull()

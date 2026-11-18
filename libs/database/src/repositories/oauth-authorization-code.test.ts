@@ -187,13 +187,11 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
       const secondHoldsClient = second.query(holdClient, [clientId])
       await pause()
       await first.rollback()
-      first.release()
       await secondHoldsClient
       await pause()
       await second.query(holdSession, [sessionId])
       const thrown = await Promise.race([creating, pause()])
       await second.rollback()
-      second.release()
 
       expect(thrown).toBeInstanceOf(WriteConflictError)
       expect(await repository.findByCodeHash(data.codeHash)).toBeNull()
@@ -454,7 +452,6 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
         await new Promise(resolve => setTimeout(resolve, 200))
       }
       await rival.rollback()
-      rival.release()
 
       if (deadlocks === 1) {
         expect(await exchanging).toBe('exchanged')
