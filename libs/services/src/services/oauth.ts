@@ -11,6 +11,7 @@ import type {
   UserRepository,
 } from '@pinsquirrel/domain'
 import {
+  isAdmitted,
   OAuthAccessDeniedError,
   OAuthInvalidClientError,
   OAuthInvalidGrantError,
@@ -274,12 +275,21 @@ export class OAuthService {
    */
   async authorize(
     ac: AccessControl,
-    input: { params: unknown; userId: string; approved: boolean }
+    input: {
+      params: unknown
+      userId: string
+      /** The session the user approved in; the code is written only while it exists. */
+      sessionId: string
+      approved: boolean
+    }
   ): Promise<AuthorizationOutcome> {
     if (!ac.canCreateAs(input.userId)) {
       throw new OAuthAccessDeniedError(
         'Not authorized to grant access on behalf of another user'
       )
+    }
+    if (!ac.user || !isAdmitted(ac.user)) {
+      throw new OAuthAccessDeniedError('This account cannot grant access')
     }
 
     const resolved = await this.resolveAuthorizationRequest(input.params)
@@ -298,16 +308,24 @@ export class OAuthService {
     const code = generateSecureToken()
     const expiresAt = new Date(Date.now() + AUTHORIZATION_CODE_TTL_MS)
 
-    await this.codeRepository.create({
-      codeHash: hashToken(code),
-      clientId: resolved.client.clientId,
-      userId: input.userId,
-      redirectUri: resolved.redirectUri,
-      codeChallenge: resolved.codeChallenge,
-      scopes: resolved.scopes,
-      resource: resolved.resource,
-      expiresAt,
-    })
+    const created = await this.codeRepository.create(
+      {
+        codeHash: hashToken(code),
+        clientId: resolved.client.clientId,
+        userId: input.userId,
+        redirectUri: resolved.redirectUri,
+        codeChallenge: resolved.codeChallenge,
+        scopes: resolved.scopes,
+        resource: resolved.resource,
+        expiresAt,
+      },
+      input.sessionId
+    )
+    if (!created) {
+      throw new OAuthAccessDeniedError(
+        'The session that approved this request has ended'
+      )
+    }
 
     if (!resolved.client.completedAt) {
       // What takes a registration out of the incomplete-DCR sweep. A client
@@ -384,6 +402,8 @@ export class OAuthService {
       }
     }
 
+    await this.revokeGrantUnlessAdmitted(code.userId, client.clientId)
+
     return this.issueTokens({
       client,
       userId: code.userId,
@@ -437,6 +457,8 @@ export class OAuthService {
       )
     }
 
+    await this.revokeGrantUnlessAdmitted(token.userId, client.clientId)
+
     const scopes = request.scope
       ? narrowedScopes(request.scope, token.scopes)
       : token.scopes
@@ -468,7 +490,7 @@ export class OAuthService {
     })
 
     const parent = await this.tokenRepository.findById(token.id)
-    if (parent?.revokedAt) {
+    if (!parent || parent.revokedAt) {
       await this.revokeGrantFamily(token.userId, token.clientId)
       throw new OAuthInvalidGrantError(
         'The grant was revoked during the refresh'
@@ -488,7 +510,8 @@ export class OAuthService {
    * Every failure is the same `null`. A token for the wrong audience, an
    * expired one, a revoked one and one that never existed are indistinguishable
    * from outside on purpose, and a token whose user is gone reads as invalid
-   * too: a distinct answer would confirm the token itself was good.
+   * too: a distinct answer would confirm the token itself was good. So does
+   * one whose user is no longer admitted.
    */
   async verifyAccessToken(
     rawToken: string,
@@ -512,7 +535,7 @@ export class OAuthService {
     }
 
     const user = await this.userRepository.findById(token.userId)
-    if (!user) {
+    if (!user || !isAdmitted(user)) {
       return null
     }
 
@@ -741,6 +764,19 @@ export class OAuthService {
     }
 
     await this.tokenRepository.revoke(token.id)
+  }
+
+  private async revokeGrantUnlessAdmitted(
+    userId: string,
+    clientId: string
+  ): Promise<void> {
+    const user = await this.userRepository.findById(userId)
+    if (!user || !isAdmitted(user)) {
+      await this.revokeGrantFamily(userId, clientId)
+      throw new OAuthInvalidGrantError(
+        'The account behind this grant is not active'
+      )
+    }
   }
 
   /** Kill every live token a user holds for one client. */

@@ -8,7 +8,18 @@ export interface OAuthAuthorizationCodeRepository {
 
   findByCodeHash(codeHash: string): Promise<AuthorizationCode | null>
 
-  create(data: CreateAuthorizationCodeData): Promise<AuthorizationCode>
+  /**
+   * Write a code, but only while `sessionId` is still one of the user's
+   * sessions, and return null when it is not.
+   *
+   * The session check and the insert are one step: a revocation of the user's
+   * sessions either precedes it, and nothing is written, or follows it, and
+   * deletes the code with the user's other unspent codes.
+   */
+  create(
+    data: CreateAuthorizationCodeData,
+    sessionId: string
+  ): Promise<AuthorizationCode | null>
 
   /**
    * Spend a code, once.

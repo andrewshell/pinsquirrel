@@ -43,8 +43,8 @@ export interface OAuthTokenRepository {
   markRotated(id: string): Promise<boolean>
 
   /**
-   * Remove tokens that can never authenticate again — expired, revoked, or
-   * rotated — and report how many. Joins the sweep in the shape of
+   * Remove expired and revoked tokens and report how many. A rotated refresh
+   * token is kept until its own expiry. Joins the sweep in the shape of
    * `SessionRepository.deleteExpiredSessions`.
    */
   deleteExpiredTokens(): Promise<number>

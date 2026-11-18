@@ -490,6 +490,30 @@ describe('AuthenticationService', () => {
       expect(result.roles).toEqual([])
     })
 
+    it('should revoke the sessions and tokens of a user losing the User role', async () => {
+      const plainUser = { ...mockUser, roles: [Role.User] }
+      vi.mocked(mockUserRepository.findById)
+        .mockResolvedValueOnce(plainUser)
+        .mockResolvedValueOnce({ ...mockUser, roles: [] })
+
+      await authService.revokeRole(adminAc, plainUser.id, Role.User)
+
+      expect(mockUserRepository.revokeSessionsAndTokens).toHaveBeenCalledWith(
+        plainUser.id
+      )
+    })
+
+    it('should leave sessions and tokens alone when only Admin is revoked', async () => {
+      const adminUser = { ...mockUser, roles: [Role.User, Role.Admin] }
+      vi.mocked(mockUserRepository.findById)
+        .mockResolvedValueOnce(adminUser)
+        .mockResolvedValueOnce({ ...mockUser, roles: [Role.User] })
+
+      await authService.revokeRole(adminAc, adminUser.id, Role.Admin)
+
+      expect(mockUserRepository.revokeSessionsAndTokens).not.toHaveBeenCalled()
+    })
+
     it('should be idempotent for a user who does not hold the role', async () => {
       const plainUser = { ...mockUser, roles: [Role.User] }
       vi.mocked(mockUserRepository.findById).mockResolvedValue(plainUser)

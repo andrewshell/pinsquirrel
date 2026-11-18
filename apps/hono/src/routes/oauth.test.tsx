@@ -344,7 +344,7 @@ describe('oauth authorize routes', () => {
       expect(location.searchParams.get('iss')).toBe('http://localhost:8100')
     })
 
-    it('hands the decision and the signed-in user to the service', async () => {
+    it('hands the decision, the signed-in user and the session to the service', async () => {
       mockAuthorize.mockResolvedValue({
         status: 'approved',
         code: 'the-code',
@@ -359,6 +359,7 @@ describe('oauth authorize routes', () => {
       expect(mockAuthorize).toHaveBeenCalledWith(expect.anything(), {
         params: REQUEST_PARAMS,
         userId: 'user-1',
+        sessionId: 'session-1',
         approved: true,
       })
     })

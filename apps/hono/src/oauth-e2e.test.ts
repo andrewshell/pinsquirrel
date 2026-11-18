@@ -9,7 +9,7 @@ import {
   sessionRepository,
   userRepository,
 } from './lib/db'
-import { accountService } from './lib/services'
+import { accountService, maintenanceService } from './lib/services'
 
 /**
  * One OAuth connection, end to end, against the real app and a real database.
@@ -737,6 +737,33 @@ describe('refresh rotation', () => {
     expect(await successor.json()).toMatchObject({ error: 'invalid_grant' })
 
     const call = await mcpRequest(rotated.access_token, {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/list',
+    })
+    expect(call.status).toBe(401)
+  })
+
+  it('still kills the grant when the retired token comes back after a sweep', async () => {
+    const original = await connect({ resource: mcpResource })
+    const res = await exchange({
+      grant_type: 'refresh_token',
+      refresh_token: original.refresh_token ?? '',
+      client_id: clientId,
+    })
+    expect(res.status).toBe(200)
+    const successor = (await res.json()) as TokenResponse
+
+    await maintenanceService.sweepExpired()
+
+    const replay = await exchange({
+      grant_type: 'refresh_token',
+      refresh_token: original.refresh_token ?? '',
+      client_id: clientId,
+    })
+    expect(replay.status).toBe(400)
+
+    const call = await mcpRequest(successor.access_token, {
       jsonrpc: '2.0',
       id: 1,
       method: 'tools/list',

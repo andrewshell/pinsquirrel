@@ -737,23 +737,29 @@ describe('DrizzleUserRepository - Integration Tests', () => {
           resource: 'https://example.test/mcp',
           expiresAt: later(),
         })
-      const code = await codes.create({
-        codeHash: crypto.randomUUID().replace(/-/g, '').repeat(2),
-        clientId: client.clientId,
-        userId,
-        redirectUri: 'https://example.test/cb',
-        codeChallenge: 'challenge',
-        scopes: ['pins:read'],
-        resource: 'https://example.test/mcp',
-        expiresAt: later(),
-      })
+      const kept = await makeSession()
+      const other = await makeSession()
+      const code = await codes.create(
+        {
+          codeHash: crypto.randomUUID().replace(/-/g, '').repeat(2),
+          clientId: client.clientId,
+          userId,
+          redirectUri: 'https://example.test/cb',
+          codeChallenge: 'challenge',
+          scopes: ['pins:read'],
+          resource: 'https://example.test/mcp',
+          expiresAt: later(),
+        },
+        other.id
+      )
+      if (!code) throw new Error('The seeded session is missing')
       return {
         sessions,
         tokens,
         codes,
         code,
-        kept: await makeSession(),
-        other: await makeSession(),
+        kept,
+        other,
         access: await makeToken('access'),
         refresh: await makeToken('refresh'),
       }

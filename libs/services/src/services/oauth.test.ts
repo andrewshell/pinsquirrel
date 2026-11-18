@@ -46,6 +46,8 @@ const API_RESOURCE = 'https://pinsquirrel.com/api/v1'
 
 const CIMD_URL = 'https://claude.ai/oauth/claude-code-client-metadata'
 
+const SESSION_ID = 'session-1'
+
 /** Claude Code's real published document. */
 const cimdDocument = {
   client_id: CIMD_URL,
@@ -93,6 +95,11 @@ function makeUser(id: string, username: string): User {
 
 const user = makeUser('user-1', 'squirrel')
 const otherUser = makeUser('user-2', 'intruder')
+
+const notAdmitted: [string, User][] = [
+  ['without the User role', { ...user, roles: [] }],
+  ['on the waitlist', { ...user, status: UserStatus.Waitlist }],
+]
 
 function makeClient(overrides: Partial<OAuthClient> = {}): OAuthClient {
   return {
@@ -178,6 +185,7 @@ function setup() {
   } as unknown as OAuthTokenRepository
 
   const userRepository: UserRepository = createMockUserRepository()
+  vi.mocked(userRepository.findById).mockResolvedValue(user)
 
   const fetcher = {
     fetch: vi.fn().mockResolvedValue(JSON.stringify(cimdDocument)),
@@ -631,6 +639,7 @@ describe('OAuthService.authorize', () => {
     const outcome = await ctx.service.authorize(ac, {
       params: authorizeParams(),
       userId: user.id,
+      sessionId: SESSION_ID,
       approved: true,
     })
 
@@ -652,10 +661,25 @@ describe('OAuthService.authorize', () => {
         codeChallenge: CODE_CHALLENGE,
         scopes: ['pins:read', 'tags:read'],
         resource: MCP_RESOURCE,
-      })
+      }),
+      SESSION_ID
     )
     const created = vi.mocked(ctx.codeRepository.create).mock.calls[0][0]
     expect(created.expiresAt.getTime()).toBeGreaterThan(Date.now())
+  })
+
+  it('refuses when the session that approved the request has ended', async () => {
+    vi.mocked(ctx.codeRepository.create).mockResolvedValue(null)
+
+    await expect(
+      ctx.service.authorize(ac, {
+        params: authorizeParams(),
+        userId: user.id,
+        sessionId: SESSION_ID,
+        approved: true,
+      })
+    ).rejects.toBeInstanceOf(OAuthAccessDeniedError)
+    expect(ctx.clientRepository.markCompleted).not.toHaveBeenCalled()
   })
 
   // `completed_at` is what keeps a registration out of the incomplete-DCR
@@ -664,6 +688,7 @@ describe('OAuthService.authorize', () => {
     await ctx.service.authorize(ac, {
       params: authorizeParams(),
       userId: user.id,
+      sessionId: SESSION_ID,
       approved: true,
     })
 
@@ -681,6 +706,7 @@ describe('OAuthService.authorize', () => {
     await ctx.service.authorize(ac, {
       params: authorizeParams(),
       userId: user.id,
+      sessionId: SESSION_ID,
       approved: true,
     })
 
@@ -693,6 +719,7 @@ describe('OAuthService.authorize', () => {
     const outcome = await ctx.service.authorize(ac, {
       params: authorizeParams(),
       userId: user.id,
+      sessionId: SESSION_ID,
       approved: false,
     })
 
@@ -706,11 +733,27 @@ describe('OAuthService.authorize', () => {
     expect(ctx.codeRepository.create).not.toHaveBeenCalled()
   })
 
+  it.each(notAdmitted)(
+    'refuses to issue a code to a user %s',
+    async (_label, account) => {
+      await expect(
+        ctx.service.authorize(new AccessControl(account), {
+          params: authorizeParams(),
+          userId: account.id,
+          sessionId: SESSION_ID,
+          approved: true,
+        })
+      ).rejects.toBeInstanceOf(OAuthAccessDeniedError)
+      expect(ctx.codeRepository.create).not.toHaveBeenCalled()
+    }
+  )
+
   it('refuses to issue a code on behalf of another user', async () => {
     await expect(
       ctx.service.authorize(new AccessControl(otherUser), {
         params: authorizeParams(),
         userId: user.id,
+        sessionId: SESSION_ID,
         approved: true,
       })
     ).rejects.toBeInstanceOf(OAuthAccessDeniedError)
@@ -802,6 +845,22 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
     expect(ctx.tokenRepository.create).not.toHaveBeenCalled()
   })
+
+  it.each(notAdmitted)(
+    'refuses a code for a user %s and revokes the grant',
+    async (_label, account) => {
+      vi.mocked(ctx.userRepository.findById).mockResolvedValue(account)
+
+      await expect(
+        ctx.service.exchangeAuthorizationCode(tokenParams())
+      ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+      expect(ctx.tokenRepository.create).not.toHaveBeenCalled()
+      expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
+        user.id,
+        CIMD_URL
+      )
+    }
+  )
 
   it('refuses a verifier that does not hash to the stored challenge', async () => {
     await expect(
@@ -901,6 +960,9 @@ describe('OAuthService.exchangeRefreshToken', () => {
       storedRefresh()
     )
     vi.mocked(ctx.tokenRepository.markRotated).mockResolvedValue(true)
+    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(
+      storedRefresh({ rotatedAt: new Date() })
+    )
     vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockResolvedValue(2)
     vi.mocked(ctx.tokenRepository.create).mockImplementation(data =>
       Promise.resolve(makeToken(data))
@@ -966,6 +1028,35 @@ describe('OAuthService.exchangeRefreshToken', () => {
     vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(
       storedRefresh({ rotatedAt: new Date(), revokedAt: new Date() })
     )
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+    expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
+      user.id,
+      CIMD_URL
+    )
+  })
+
+  it.each(notAdmitted)(
+    'refuses a user %s and revokes the grant',
+    async (_label, account) => {
+      vi.mocked(ctx.userRepository.findById).mockResolvedValue(account)
+
+      await expect(
+        ctx.service.exchangeRefreshToken(refreshParams())
+      ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+      expect(ctx.tokenRepository.create).not.toHaveBeenCalled()
+      expect(ctx.tokenRepository.markRotated).not.toHaveBeenCalled()
+      expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
+        user.id,
+        CIMD_URL
+      )
+    }
+  )
+
+  it('takes back the new tokens when the retired token has gone missing', async () => {
+    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(null)
 
     await expect(
       ctx.service.exchangeRefreshToken(refreshParams())
@@ -1155,6 +1246,17 @@ describe('OAuthService.verifyAccessToken', () => {
       null
     )
   })
+
+  it.each(notAdmitted)(
+    'refuses a token whose user is %s',
+    async (_label, account) => {
+      vi.mocked(ctx.userRepository.findById).mockResolvedValue(account)
+
+      expect(await ctx.service.verifyAccessToken('pso_raw', MCP_RESOURCE)).toBe(
+        null
+      )
+    }
+  )
 
   // A distinct answer would confirm the token itself was good.
   it('reads a token whose user is gone as an invalid token', async () => {
@@ -1667,18 +1769,21 @@ describe('OAuthService token requests and the latency budget', () => {
   })
 
   it('refreshes without waiting on the client metadata document', async () => {
-    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
-      makeToken({
-        kind: 'refresh',
-        tokenHash: 'hashed_raw-refresh',
-        clientId: CIMD_URL,
-        userId: user.id,
-        scopes: ['pins:read', 'offline_access'],
-        resource: MCP_RESOURCE,
-        expiresAt: new Date(Date.now() + 60_000),
-      })
-    )
+    const stored = makeToken({
+      kind: 'refresh',
+      tokenHash: 'hashed_raw-refresh',
+      clientId: CIMD_URL,
+      userId: user.id,
+      scopes: ['pins:read', 'offline_access'],
+      resource: MCP_RESOURCE,
+      expiresAt: new Date(Date.now() + 60_000),
+    })
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(stored)
     vi.mocked(ctx.tokenRepository.markRotated).mockResolvedValue(true)
+    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue({
+      ...stored,
+      rotatedAt: new Date(),
+    })
 
     await ctx.service.exchangeRefreshToken({
       grant_type: 'refresh_token',

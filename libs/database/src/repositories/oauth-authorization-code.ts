@@ -6,6 +6,7 @@ import type {
 import { and, eq, gt, isNull, lt } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes'
+import { sessions } from '../schema/sessions'
 
 export class DrizzleOAuthAuthorizationCodeRepository implements OAuthAuthorizationCodeRepository {
   constructor(private db: MySql2Database) {}
@@ -28,31 +29,45 @@ export class DrizzleOAuthAuthorizationCodeRepository implements OAuthAuthorizati
     return result[0] || null
   }
 
-  async create(data: CreateAuthorizationCodeData): Promise<AuthorizationCode> {
+  async create(
+    data: CreateAuthorizationCodeData,
+    sessionId: string
+  ): Promise<AuthorizationCode | null> {
     const id = crypto.randomUUID()
-    const now = new Date()
 
-    await this.db.insert(oauthAuthorizationCodes).values({
-      id,
-      codeHash: data.codeHash,
-      clientId: data.clientId,
-      userId: data.userId,
-      redirectUri: data.redirectUri,
-      codeChallenge: data.codeChallenge,
-      scopes: data.scopes,
-      resource: data.resource,
-      expiresAt: data.expiresAt,
-      consumedAt: null,
-      createdAt: now,
+    return this.db.transaction(async tx => {
+      const [session] = await tx
+        .select({ id: sessions.id })
+        .from(sessions)
+        .where(
+          and(eq(sessions.id, sessionId), eq(sessions.userId, data.userId))
+        )
+        .for('share')
+      if (!session) {
+        return null
+      }
+
+      await tx.insert(oauthAuthorizationCodes).values({
+        id,
+        codeHash: data.codeHash,
+        clientId: data.clientId,
+        userId: data.userId,
+        redirectUri: data.redirectUri,
+        codeChallenge: data.codeChallenge,
+        scopes: data.scopes,
+        resource: data.resource,
+        expiresAt: data.expiresAt,
+        consumedAt: null,
+        createdAt: new Date(),
+      })
+
+      const [created] = await tx
+        .select()
+        .from(oauthAuthorizationCodes)
+        .where(eq(oauthAuthorizationCodes.id, id))
+        .limit(1)
+      return created
     })
-
-    const [created] = await this.db
-      .select()
-      .from(oauthAuthorizationCodes)
-      .where(eq(oauthAuthorizationCodes.id, id))
-      .limit(1)
-
-    return created
   }
 
   async consume(codeHash: string): Promise<AuthorizationCode | null> {
