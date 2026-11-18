@@ -32,6 +32,7 @@ echo "$name $*" >> "$STUB_LOG"
 case "$name $1" in
   "pnpm quality") [ -z "$STUB_FAIL_GATE" ] || exit 1 ;;
   "docker manifest")
+    if [ -n "$STUB_REGISTRY_ERROR" ]; then echo "$STUB_REGISTRY_ERROR" >&2; exit 1; fi
     for found in $STUB_IMAGES; do
       if [ "$found" = "$3" ]; then echo '{}'; exit 0; fi
     done
@@ -124,6 +125,7 @@ interface Options {
   images?: string[]
   failGate?: boolean
   buildFails?: boolean
+  registryError?: string
 }
 
 interface Run {
@@ -152,6 +154,7 @@ function release(
         STUB_IMAGES: (options.images ?? []).join(' '),
         STUB_FAIL_GATE: options.failGate === true ? '1' : '',
         STUB_BUILD_FAILS: options.buildFails === true ? '1' : '',
+        STUB_REGISTRY_ERROR: options.registryError ?? '',
       },
       encoding: 'utf8',
     }
@@ -195,6 +198,22 @@ describe('release.ts when the image is in the registry', () => {
     expect(output).toMatch(/no image to push/)
     expect(builds(calls)).toEqual([])
   })
+})
+
+describe('release.ts when the registry cannot be asked', () => {
+  it.each(['unauthorized: authentication required', 'denied'])(
+    'stops without pushing on "%s", rather than taking it for a missing image',
+    registryError => {
+      const repo = repository()
+      const { status, output, calls } = release(repo, [], { registryError })
+
+      expect(status, output).not.toBe(0)
+      expect(output).toMatch(/could not ask the registry/)
+      expect(output).toContain(registryError)
+      expect(gatesRun(calls)).toEqual([])
+      expect(builds(calls)).toEqual([])
+    }
+  )
 })
 
 describe('release.ts real run', () => {
