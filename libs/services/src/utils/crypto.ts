@@ -3,6 +3,7 @@ import {
   scrypt,
   timingSafeEqual,
   createHash,
+  createHmac,
   type ScryptOptions,
 } from 'node:crypto'
 import { promisify } from 'node:util'
@@ -132,12 +133,15 @@ export function needsRehash(hash: string): boolean {
   return N < CURRENT_PARAMS.N || r < CURRENT_PARAMS.r || p < CURRENT_PARAMS.p
 }
 
-export function hashEmail(email: string): string {
-  // Normalize email to lowercase for consistent hashing
+/**
+ * HMAC-SHA256 under `key` when one is given. Without a key it is the plain
+ * SHA-256 every row was stored with before keying existed, which lookups still
+ * try so those rows can be found and rewritten.
+ */
+export function hashEmail(email: string, key?: string): string {
   const normalizedEmail = email.toLowerCase()
-  const hash = createHash('sha256')
-  hash.update(normalizedEmail)
-  return hash.digest('hex')
+  const hash = key ? createHmac('sha256', key) : createHash('sha256')
+  return hash.update(normalizedEmail).digest('hex')
 }
 
 export function generateSecureToken(): string {

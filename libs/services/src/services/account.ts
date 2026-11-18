@@ -39,16 +39,29 @@ const RESET_REQUESTS_PER_WINDOW = 3
  * required dependency. Everything here needs the reset-token store and a way
  * to send mail; nothing here is reachable without them.
  */
+export interface AccountServiceOptions {
+  /**
+   * Optional by design: an install that keeps no contactable copy of user
+   * emails simply has no key, and every use below stores null instead.
+   */
+  emailSealer?: EmailSealer
+  /** Without it, addresses are stored as their unkeyed SHA-256. */
+  emailHashKey?: string
+}
+
 export class AccountService {
+  private readonly emailSealer?: EmailSealer
+  private readonly emailHashKey?: string
+
   constructor(
     private readonly userRepository: UserRepository,
     private readonly passwordResetRepository: PasswordResetRepository,
     private readonly emailService: EmailService,
-    // Optional by design, unlike the two above: an install that keeps no
-    // contactable copy of user emails simply has no key. Every use below
-    // stores null rather than failing. Pass a sealer to enable it.
-    private readonly emailSealer?: EmailSealer
-  ) {}
+    options: AccountServiceOptions = {}
+  ) {
+    this.emailSealer = options.emailSealer
+    this.emailHashKey = options.emailHashKey
+  }
 
   async register(input: {
     username: string
@@ -115,7 +128,7 @@ export class AccountService {
         passwordHash: null, // No password yet - they'll set it via email verification
         // Hashed here rather than reusing a binding from the duplicate check:
         // this is the stored value, and the lookup above hides its own hashing.
-        emailHash: hashEmail(input.email),
+        emailHash: hashEmail(input.email, this.emailHashKey),
         emailEncrypted,
         roles: [Role.User],
       })
@@ -192,7 +205,9 @@ export class AccountService {
     }
 
     // Hash the email in the business logic layer
-    const emailHash = input.email ? hashEmail(input.email) : null
+    const emailHash = input.email
+      ? hashEmail(input.email, this.emailHashKey)
+      : null
 
     // Re-seal the email (or clear it) to keep the contactable copy in sync
     const emailEncrypted =
@@ -346,14 +361,21 @@ export class AccountService {
   /**
    * The account registered with this address, if any.
    *
-   * Emails are never stored in the clear, so every lookup has to go through
-   * the same hash. This was written out at each of the three call sites, one
-   * of which was a public findByEmail that nothing called.
+   * With a hash key, a row stored before keying is still found under the
+   * unkeyed hash and rewritten keyed, since this is one of the few moments the
+   * server holds the plaintext address.
    *
-   * Validation is the caller's business: both callers validate at their own
-   * boundary, and register does so well before it gets here.
+   * Validation is the caller's business: every caller validates at its own
+   * boundary.
    */
   private async findUserByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findByEmailHash(hashEmail(email))
+    const emailHash = hashEmail(email, this.emailHashKey)
+    const user = await this.userRepository.findByEmailHash(emailHash)
+    if (user || !this.emailHashKey) return user
+
+    const legacy = await this.userRepository.findByEmailHash(hashEmail(email))
+    if (!legacy) return null
+    await this.userRepository.update(legacy.id, { emailHash })
+    return { ...legacy, emailHash }
   }
 }

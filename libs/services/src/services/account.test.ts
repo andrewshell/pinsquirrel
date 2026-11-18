@@ -26,7 +26,11 @@ vi.mock('../utils/crypto.js', () => ({
     .mockImplementation((password: string) =>
       Promise.resolve(`hashed_${password}`)
     ),
-  hashEmail: vi.fn().mockImplementation((email: string) => `hashed_${email}`),
+  hashEmail: vi
+    .fn()
+    .mockImplementation((email: string, key?: string) =>
+      key ? `keyed_${email}` : `hashed_${email}`
+    ),
   generateSecureToken: vi.fn().mockReturnValue('mock-token'),
   hashToken: vi.fn().mockImplementation((token: string) => `hashed_${token}`),
 }))
@@ -126,7 +130,7 @@ describe('AccountService', () => {
         mockUserRepository,
         mockPasswordResetRepository,
         mockEmailService,
-        emailSealer
+        { emailSealer }
       )
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
       vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
@@ -472,7 +476,7 @@ describe('AccountService', () => {
         mockUserRepository,
         mockPasswordResetRepository,
         mockEmailService,
-        emailSealer
+        { emailSealer }
       )
       vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
       vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
@@ -522,6 +526,74 @@ describe('AccountService', () => {
     })
   })
 
+  describe('with an email hash key', () => {
+    const keyed = () =>
+      new AccountService(
+        mockUserRepository,
+        mockPasswordResetRepository,
+        mockEmailService,
+        { emailHashKey: 'server-secret' }
+      )
+
+    it('stores the keyed hash for a new account', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+
+      await keyed().register({
+        username: 'testuser',
+        email: 'test@example.com',
+      })
+
+      expect(mockUserRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ emailHash: 'keyed_test@example.com' })
+      )
+    })
+
+    it('finds an account stored under the unkeyed hash and rewrites it keyed', async () => {
+      const legacy = { ...mockUser, emailHash: 'hashed_test@example.com' }
+      vi.mocked(mockUserRepository.findByEmailHash).mockImplementation(hash =>
+        Promise.resolve(hash === 'hashed_test@example.com' ? legacy : null)
+      )
+      vi.mocked(mockPasswordResetRepository.findByUserId).mockResolvedValue([])
+      vi.mocked(mockPasswordResetRepository.create).mockResolvedValue(
+        mockPasswordResetToken
+      )
+
+      await keyed().requestPasswordReset({
+        email: 'test@example.com',
+        resetUrl: 'https://example.com/reset',
+      })
+
+      expect(mockUserRepository.update).toHaveBeenCalledWith(legacy.id, {
+        emailHash: 'keyed_test@example.com',
+      })
+      expect(mockEmailService.sendPasswordResetEmail).toHaveBeenCalled()
+    })
+
+    it('does not rewrite an account already stored keyed', async () => {
+      vi.mocked(mockUserRepository.findByEmailHash).mockImplementation(hash =>
+        Promise.resolve(
+          hash === 'keyed_test@example.com'
+            ? { ...mockUser, emailHash: hash }
+            : null
+        )
+      )
+      vi.mocked(mockPasswordResetRepository.findByUserId).mockResolvedValue([])
+      vi.mocked(mockPasswordResetRepository.create).mockResolvedValue(
+        mockPasswordResetToken
+      )
+
+      await keyed().requestPasswordReset({
+        email: 'test@example.com',
+        resetUrl: 'https://example.com/reset',
+      })
+
+      expect(mockUserRepository.findByEmailHash).toHaveBeenCalledTimes(1)
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+    })
+  })
+
   describe('requestPasswordReset', () => {
     it('should create a password reset token and send email', async () => {
       const mockUserWithEmail = {
@@ -565,7 +637,7 @@ describe('AccountService', () => {
         mockUserRepository,
         mockPasswordResetRepository,
         mockEmailService,
-        emailSealer
+        { emailSealer }
       )
       const userMissingSeal = {
         ...mockUser,
@@ -599,7 +671,7 @@ describe('AccountService', () => {
         mockUserRepository,
         mockPasswordResetRepository,
         mockEmailService,
-        emailSealer
+        { emailSealer }
       )
       const userWithSeal = {
         ...mockUser,
@@ -630,7 +702,7 @@ describe('AccountService', () => {
         mockUserRepository,
         mockPasswordResetRepository,
         mockEmailService,
-        emailSealer
+        { emailSealer }
       )
       const userMissingSeal = {
         ...mockUser,

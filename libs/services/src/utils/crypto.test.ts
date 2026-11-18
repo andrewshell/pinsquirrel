@@ -1,4 +1,4 @@
-import { randomBytes, scryptSync } from 'node:crypto'
+import { createHash, randomBytes, scryptSync } from 'node:crypto'
 import { describe, it, expect } from 'vitest'
 import {
   hashPassword,
@@ -159,6 +159,26 @@ describe('crypto utilities', () => {
       const hash2 = hashEmail(email2)
 
       expect(hash1).toBe(hash2)
+    })
+
+    it('is not the plain SHA-256 of the address when given a key', () => {
+      const email = 'a@example.test'
+      const plain = createHash('sha256').update(email).digest('hex')
+
+      expect(hashEmail(email, 'server-secret')).not.toBe(plain)
+      expect(hashEmail(email, 'server-secret')).toMatch(/^[0-9a-f]{64}$/)
+    })
+
+    it('depends on the key', () => {
+      expect(hashEmail('a@example.test', 'key-one')).not.toBe(
+        hashEmail('a@example.test', 'key-two')
+      )
+    })
+
+    it('is case-insensitive when keyed', () => {
+      expect(hashEmail('User@Example.COM', 'k')).toBe(
+        hashEmail('user@example.com', 'k')
+      )
     })
   })
 
