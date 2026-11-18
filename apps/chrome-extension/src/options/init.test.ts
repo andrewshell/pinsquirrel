@@ -118,7 +118,6 @@ function selectedOnly(on: boolean): Promise<void> {
   return flush()
 }
 
-/** What `invalid_grant` leaves behind: the server, without the grant. */
 function dropGrant(): void {
   for (const key of ['clientId', 'accessToken', 'refreshToken', 'expiresAt']) {
     delete chrome.local.items[key]
@@ -609,8 +608,6 @@ describe('initOptions, when the grant is gone', () => {
     )
   })
 
-  // The worker's refresh got invalid_grant. Its answer is only text: the
-  // class does not cross the channel, so the page reads what is stored.
   it('asks to reconnect when a sync says the grant is gone', async () => {
     const requestSync = vi.fn(() => {
       dropGrant()
@@ -664,8 +661,6 @@ describe('initOptions, when another page disconnected', () => {
   })
 })
 
-// Every open options page draws from one store. A change made by the worker
-// or by another page shows up here without a reload.
 describe('initOptions, when storage changes under an open page', () => {
   it('goes to the settings view, without the notice, on a Disconnect elsewhere', async () => {
     Object.assign(chrome.local.items, CONNECTED)

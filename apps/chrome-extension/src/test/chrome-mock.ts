@@ -117,7 +117,6 @@ export interface ChromeStub {
   runtime: RuntimeEventsStub
   /** `chrome.runtime.openOptionsPage`, which the pin flow falls back to. */
   openOptionsPage: ReturnType<typeof vi.fn<() => Promise<void>>>
-  /** `chrome.runtime.getPlatformInfo`, the call the worker keeps itself alive with. */
   getPlatformInfo: ReturnType<
     typeof vi.fn<() => Promise<chrome.runtime.PlatformInfo>>
   >
@@ -156,7 +155,7 @@ function eventStub<Args extends unknown[], R = void>(): EventStub<Args, R> & {
  * The callback-free half of `chrome.storage.StorageArea`, backed by an object.
  *
  * `onChanged` fires as Chrome's does: after the write, with only the keys
- * whose value changed. A test that edits `items` directly fires nothing.
+ * whose value changed.
  */
 function storageArea(area: StubbedStorageArea) {
   const onChanged = eventStub<[Record<string, chrome.storage.StorageChange>]>()

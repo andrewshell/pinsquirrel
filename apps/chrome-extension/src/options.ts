@@ -2,9 +2,10 @@
  * The options page's entry point, and nothing else.
  *
  * All it does is hand `initOptions` the four things it cannot do itself - ask
- * the worker to connect, disconnect or sync, and talk to `/api/v1` - so that the wiring in `options/init.ts` can be driven by a test with
- * none of them. Keeping the entry point this thin is what lets the tests
- * import the wiring without waking a service worker on import.
+ * the worker to connect, disconnect or sync, and talk to `/api/v1` - so that
+ * the wiring in `options/init.ts` can be driven by a test with none of them.
+ * Keeping the entry point this thin is what lets the tests import the wiring
+ * without waking a service worker on import.
  *
  * The OAuth flow is deliberately not among them: it ends in a tab the worker
  * watches, and the answer can come after this page is gone. It runs in the

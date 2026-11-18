@@ -32,7 +32,6 @@ const SYNC_ALARM = 'sync'
  */
 const SYNC_PERIOD_MINUTES = 60
 
-/** How often a long Disconnect calls an extension API to keep the worker up. */
 const KEEP_ALIVE_MS = 20_000
 
 /** Everything the worker does that a test cannot run for real. */
@@ -58,7 +57,6 @@ export interface BackgroundDeps {
   completeConnect(redirectUrl: string): Promise<ConnectOutcome>
   /** Forget a flow whose tab was closed before it answered. */
   cancelConnect(): Promise<void>
-  /** Revoke the grant and clear storage, for the options page. */
   disconnect(): Promise<void>
   logger: BackgroundLogger
 }
@@ -165,8 +163,6 @@ export function initBackground(deps: BackgroundDeps): void {
   }
 
   /**
-   * Disconnect for the options page, which may close before it finishes.
-   *
    * Chrome stops a worker after 30 seconds with no event or extension API
    * call, and Disconnect can wait on the refresh lock longer than that. An API
    * call every 20 seconds resets the timer until it is done.

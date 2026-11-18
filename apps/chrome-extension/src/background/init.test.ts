@@ -942,8 +942,6 @@ describe('initBackground: the pin window closed without saving', () => {
   })
 })
 
-// The worker outlives the options page, so a Disconnect still waiting on the
-// refresh lock finishes even if the user closes the page.
 describe("initBackground: the options page's disconnect request", () => {
   it('disconnects and answers once it has', async () => {
     const chrome = stubChrome(CONNECTED)
@@ -959,8 +957,6 @@ describe("initBackground: the options page's disconnect request", () => {
     expect(disconnect).toHaveBeenCalledTimes(1)
   })
 
-  // Chrome stops a worker after 30 seconds with no event or extension API
-  // call, and waiting on a lock is neither.
   it('keeps the worker alive while Disconnect waits, and stops after', async () => {
     vi.useFakeTimers()
     try {

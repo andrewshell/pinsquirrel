@@ -52,7 +52,6 @@ export interface OptionsDeps {
   requestConnect(baseUrl: string): Promise<ConnectResponse>
   /** Hear the worker say the consent tab has answered. */
   onConnectFinished(listener: (result: ConnectResponse) => void): void
-  /** Ask the service worker to disconnect, which finishes if this page closes. */
   requestDisconnect(): Promise<DisconnectResponse>
   createApiClient(baseUrl: string): OptionsApiClient
   requestSync(): Promise<SyncResponse>
@@ -133,7 +132,6 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
    */
   const selection = new Set<string>()
 
-  /** Which view is on screen, so a repeat of the same state redraws nothing. */
   let view: 'main' | 'settings' | 'reconnect' | undefined
 
   const setStatus = (text: string): void => {
@@ -162,12 +160,6 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
     await loadTags()
   }
 
-  /**
-   * Show the view the stored connection calls for, if it is not already up.
-   *
-   * Storage is the one record every context shares: the worker connects and
-   * loses grants there, and another options page disconnects there.
-   */
   async function showConnection(): Promise<void> {
     const connection = await readConnection()
     const previous = baseUrl

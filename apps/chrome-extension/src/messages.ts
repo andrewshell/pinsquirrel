@@ -30,14 +30,6 @@ export interface ConnectRequest {
   baseUrl: string
 }
 
-/**
- * "Disconnect": revoke the grant and forget it.
- *
- * The worker runs it because the worker outlives the page. Disconnect can
- * wait on the refresh lock for as long as another context's refresh takes,
- * and a page closed during that wait would drop it with the tokens still
- * stored.
- */
 export interface DisconnectRequest {
   type: 'disconnect'
 }
@@ -67,7 +59,6 @@ export interface ConnectFinished {
  */
 export type SyncResponse = { ok: true } | { ok: false; error: string }
 
-/** What the worker answers a `DisconnectRequest` with, once it is done. */
 export type DisconnectResponse = SyncResponse
 
 /**
@@ -95,7 +86,6 @@ export function isSyncRequest(value: unknown): value is SyncRequest {
   return isRecord(value) && value.type === 'sync'
 }
 
-/** For the worker: is this untyped message the options page's disconnect request? */
 export function isDisconnectRequest(
   value: unknown
 ): value is DisconnectRequest {
@@ -163,7 +153,6 @@ export async function requestConnect(
   return send({ type: 'connect', baseUrl }, isConnectResponse, 'connect')
 }
 
-/** Ask the service worker to disconnect, answering the way `requestSync` does. */
 export async function requestDisconnect(): Promise<DisconnectResponse> {
   return send({ type: 'disconnect' }, isSyncResponse, 'disconnect')
 }

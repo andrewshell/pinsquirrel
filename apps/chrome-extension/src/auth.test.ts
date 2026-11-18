@@ -404,8 +404,6 @@ describe('getAccessToken', () => {
     expect(server.chrome.local.items.selectedTagIds).toEqual(['tag-1'])
   })
 
-  // The server stays, so every open options page can tell a grant the server
-  // dropped from a Disconnect, and offer to reconnect to the same server.
   it('remembers the server whose grant was dropped', async () => {
     const server = stubOAuthServer(connected({ expiresAt: Date.now() - 1000 }))
     server.answerTokenWith(() => oauthErrorResponse('invalid_grant'))

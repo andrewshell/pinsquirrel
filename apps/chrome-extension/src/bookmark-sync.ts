@@ -247,7 +247,6 @@ export async function syncAll(input: {
   try {
     await mirrorTags(input)
   } catch (error) {
-    // A Disconnect cleared storage under the sync: nothing to report against.
     if (!(error instanceof NotConnectedError)) {
       await storage.set({ lastSyncError: syncErrorMessage(error) })
     }
@@ -295,11 +294,6 @@ async function mirrorTags(input: {
  * The convenience form for the service worker (5f), which wakes with nothing
  * in hand and has to rebuild both the client and the selection every time.
  * `syncAll` stays the injectable one, so a test never has to stand up a token.
- *
- * No base URL means the extension was never connected or has been
- * disconnected. That is not a sync failure to record - the options page is
- * showing its Connect view either way - so it is raised as
- * `NotConnectedError` and left to the caller.
  */
 export async function runSync(): Promise<void> {
   const stored = await storage.getMany(['baseUrl', 'selectedTagIds'])

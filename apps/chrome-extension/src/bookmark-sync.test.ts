@@ -460,8 +460,6 @@ describe('syncAll, reporting to the options page through storage', () => {
     )
   })
 
-  // A Disconnect cleared storage while the sync ran. There is no connection
-  // left for a failure to belong to.
   it('records nothing when the connection was ended mid-sync', async () => {
     const { local } = stubChrome()
 
