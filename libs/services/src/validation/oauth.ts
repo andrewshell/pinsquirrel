@@ -65,6 +65,13 @@ export type AuthorizationRequestParams = z.infer<
   typeof authorizationRequestSchema
 >
 
+/** The part of an authorization request that says where to send the answer. */
+export const authorizationRedirectSchema = authorizationRequestSchema.pick({
+  client_id: true,
+  redirect_uri: true,
+  state: true,
+})
+
 /** `grant_type=authorization_code` on `/oauth/token`. */
 export const authorizationCodeGrantSchema = z.object({
   grant_type: z.literal('authorization_code'),
@@ -149,7 +156,7 @@ export type ClientIdMetadataDocument = z.infer<
 /**
  * A redirect URI this server is willing to send a browser to: https, or http
  * on a loopback host (RFC 8252 section 7.3). No fragment (RFC 6749 section
- * 3.1.2).
+ * 3.1.2), and no userinfo, which only hides the host from a reader.
  */
 export function isUsableRedirectUri(uri: string): boolean {
   if (uri.includes('#')) return false
@@ -159,6 +166,7 @@ export function isUsableRedirectUri(uri: string): boolean {
   } catch {
     return false
   }
+  if (url.username || url.password) return false
   if (url.protocol === 'https:') return true
   return url.protocol === 'http:' && isLoopbackRedirectHost(url.hostname)
 }
@@ -187,7 +195,8 @@ export const staticOAuthClientsSchema = z
       redirect_uris: z
         .array(
           redirectUriValue.refine(isUsableRedirectUri, {
-            message: 'must be https, or http on loopback, with no fragment',
+            message:
+              'must be https, or http on loopback, with no fragment or userinfo',
           })
         )
         .min(1, 'at least one redirect_uri is required'),

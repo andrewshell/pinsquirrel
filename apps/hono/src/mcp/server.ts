@@ -31,11 +31,9 @@ function getUserFromExtra(extra: {
  * request (see `routes/mcp.ts`): a server shared across callers is a session
  * shared across callers, and this process serves every client at once.
  *
- * The three reads need no scope beyond a valid token. Each write calls
- * `requireScope(extra, …)` from `./scopes.js` before it touches a service,
- * inside the same `try`, so the refusal travels back through
- * `mapDomainErrorToMcp` as a tool error the model can act on rather than as a
- * transport failure it will retry.
+ * `requireScope` runs inside each tool's `try`, so the refusal travels back
+ * through `mapDomainErrorToMcp` as a tool error the model can act on rather
+ * than as a transport failure it will retry.
  *
  * Every tool is a public-pins-only surface, reads and writes alike:
  * `pinFilterFromInput` forces `isPrivate: false`, `get_pin` goes through
@@ -69,12 +67,13 @@ export function createMcpServer(): McpServer {
         'List and search bookmarks with filtering and pagination. Returns ' +
         'pins sorted by creation date (newest first) by default. Set ' +
         'noTags: true to find the pins that carry no tags at all, which is ' +
-        'where a retagging pass starts.',
+        'where a retagging pass starts. Requires the pins:read scope.',
       inputSchema: pinListInputSchema.shape,
       annotations: { readOnlyHint: true },
     },
     async (args, extra) => {
       try {
+        requireScope(extra, 'pins:read')
         const user = getUserFromExtra(extra)
         const ac = new AccessControl(user)
         const input = args as PinListInput
@@ -96,12 +95,14 @@ export function createMcpServer(): McpServer {
     'get_pin',
     {
       title: 'Get Pin',
-      description: 'Get a single bookmark by its ID.',
+      description:
+        'Get a single bookmark by its ID. Requires the pins:read scope.',
       inputSchema: pinGetInputSchema.shape,
       annotations: { readOnlyHint: true },
     },
     async ({ id }, extra) => {
       try {
+        requireScope(extra, 'pins:read')
         const user = getUserFromExtra(extra)
         const ac = new AccessControl(user)
         const pin = await pinService.getPublicPin(ac, id)
@@ -122,12 +123,13 @@ export function createMcpServer(): McpServer {
         'List your tags. Set withCounts: true for the number of bookmarks ' +
         'on each, which is how to find the tags holding only one or two pins ' +
         'and worth consolidating. The IDs it returns are what merge_tags and ' +
-        'delete_tag take.',
+        'delete_tag take. Requires the tags:read scope.',
       inputSchema: tagListInputSchema.shape,
       annotations: { readOnlyHint: true },
     },
     async ({ withCounts }, extra) => {
       try {
+        requireScope(extra, 'tags:read')
         const user = getUserFromExtra(extra)
         const ac = new AccessControl(user)
         const tags = withCounts

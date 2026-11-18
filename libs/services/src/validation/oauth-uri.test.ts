@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  canonicalizeRedirectUri,
+  redirectUriDedupKey,
   isLoopbackRedirectHost,
-  matchRedirectUri,
   normalizeOAuthUri,
   protectedResourceMetadataPath,
   redirectUriMatches,
@@ -115,29 +114,29 @@ describe('isLoopbackRedirectHost', () => {
   })
 })
 
-describe('canonicalizeRedirectUri', () => {
+describe('redirectUriDedupKey', () => {
   // RFC 8252 7.3: a native client listens on an ephemeral port it cannot know
   // at registration time, so the port is not part of its identity.
   it('drops the port for loopback hosts', () => {
-    expect(canonicalizeRedirectUri('http://localhost:54321/callback')).toBe(
+    expect(redirectUriDedupKey('http://localhost:54321/callback')).toBe(
       'http://localhost/callback'
     )
-    expect(canonicalizeRedirectUri('http://127.0.0.1:8912/callback')).toBe(
+    expect(redirectUriDedupKey('http://127.0.0.1:8912/callback')).toBe(
       'http://127.0.0.1/callback'
     )
-    expect(canonicalizeRedirectUri('http://[::1]:8912/callback')).toBe(
+    expect(redirectUriDedupKey('http://[::1]:8912/callback')).toBe(
       'http://[::1]/callback'
     )
   })
 
   it('keeps the port for every other host', () => {
-    expect(canonicalizeRedirectUri('https://claude.ai:8443/cb')).toBe(
+    expect(redirectUriDedupKey('https://claude.ai:8443/cb')).toBe(
       'https://claude.ai:8443/cb'
     )
   })
 
   it('normalizes scheme, host case and trailing slash like any OAuth URI', () => {
-    expect(canonicalizeRedirectUri('HTTPS://Claude.AI/api/mcp/cb/')).toBe(
+    expect(redirectUriDedupKey('HTTPS://Claude.AI/api/mcp/cb/')).toBe(
       'https://claude.ai/api/mcp/cb'
     )
   })
@@ -199,29 +198,65 @@ describe('redirectUriMatches', () => {
     ).toBe(false)
   })
 
-  it('reads an unparseable URI as no match rather than throwing', () => {
-    expect(redirectUriMatches('http://localhost/cb', '/cb')).toBe(false)
-    expect(redirectUriMatches('not a uri', 'not a uri')).toBe(false)
+  // RFC 9700 4.1.3: simple string comparison.
+  it.each([
+    ['https://client.example/cb/', 'trailing slash'],
+    ['https://u@client.example/cb', 'userinfo'],
+    ['https://user:pw@client.example/cb', 'userinfo with password'],
+    ['https://client.example/cb#f', 'fragment'],
+    ['https://client.example/x/../cb', 'dot segments'],
+    ['https://CLIENT.example/cb', 'host case'],
+    ['https://client.example:443/cb', 'explicit default port'],
+  ])('does not match %s (%s) against its registration', requested => {
+    expect(redirectUriMatches('https://client.example/cb', requested)).toBe(
+      false
+    )
   })
-})
 
-describe('matchRedirectUri', () => {
-  // Claude Code's registered list, verbatim.
-  const registered = ['http://localhost/callback', 'http://127.0.0.1/callback']
-
-  it('returns the registered entry the request matched', () => {
+  it('compares everything but the port on a loopback redirect', () => {
+    const registered = 'http://127.0.0.1/callback'
     expect(
-      matchRedirectUri(registered, 'http://localhost:54321/callback')
-    ).toBe('http://localhost/callback')
-    expect(matchRedirectUri(registered, 'http://127.0.0.1:1/callback')).toBe(
-      'http://127.0.0.1/callback'
-    )
+      redirectUriMatches(registered, 'http://127.0.0.1:53211/callback/')
+    ).toBe(false)
+    expect(
+      redirectUriMatches(registered, 'http://u@127.0.0.1:53211/callback')
+    ).toBe(false)
+    expect(
+      redirectUriMatches(registered, 'http://127.0.0.1:53211/callback#f')
+    ).toBe(false)
+    expect(
+      redirectUriMatches(registered, 'http://127.0.0.1:53211/x/../callback')
+    ).toBe(false)
   })
 
-  it('returns null when nothing in the list matches', () => {
-    expect(matchRedirectUri(registered, 'http://localhost:54321/evil')).toBe(
-      null
-    )
-    expect(matchRedirectUri([], 'http://localhost/callback')).toBe(null)
+  it('lets a registered loopback port change too', () => {
+    expect(
+      redirectUriMatches(
+        'http://localhost:8080/callback',
+        'http://localhost:53211/callback'
+      )
+    ).toBe(true)
+  })
+
+  it('never matches an unparseable request', () => {
+    expect(redirectUriMatches('http://localhost/cb', '/cb')).toBe(false)
+  })
+
+  it.each(['99999', '65536', '0', '00'])(
+    'does not match a loopback request on port %s, which is no port',
+    port => {
+      expect(
+        redirectUriMatches('http://127.0.0.1/cb', `http://127.0.0.1:${port}/cb`)
+      ).toBe(false)
+    }
+  )
+
+  it('matches a loopback request on either end of the port range', () => {
+    expect(
+      redirectUriMatches('http://127.0.0.1/cb', 'http://127.0.0.1:1/cb')
+    ).toBe(true)
+    expect(
+      redirectUriMatches('http://127.0.0.1/cb', 'http://127.0.0.1:65535/cb')
+    ).toBe(true)
   })
 })

@@ -206,10 +206,7 @@ describe('requireScope', () => {
     )
   })
 
-  // The reads have to stay reachable on a read-only token, which is the whole
-  // reason the check sits on the operation and not on the resource
-  // (Decision 20).
-  it('leaves a read route alone', async () => {
+  it('leaves an unguarded route alone', async () => {
     withScopes(['pins:read'])
     const app = new Hono()
     app.use('*', oauthAuth(mcpResource))

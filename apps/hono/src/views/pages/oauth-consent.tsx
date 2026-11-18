@@ -1,5 +1,5 @@
 import type { FC } from 'hono/jsx'
-import type { User } from '@pinsquirrel/domain'
+import type { OAuthClient, User } from '@pinsquirrel/domain'
 import { DefaultLayout } from '../layouts/default'
 import {
   Card,
@@ -26,8 +26,7 @@ import {
 
 interface OAuthConsentPageProps {
   user: User
-  /** The client's own name, or its identifier when it published none. */
-  clientLabel: string
+  client: Pick<OAuthClient, 'clientId' | 'clientName' | 'registrationType'>
   /** The host the browser will be sent back to, as the user should read it. */
   redirectHost: string
   redirectUri: string
@@ -51,9 +50,32 @@ const SCOPE_DESCRIPTIONS: Record<string, string> = {
   offline_access: 'Stay connected without asking you again',
 }
 
+/**
+ * Unicode format characters (Cf), such as bidi overrides and zero-width
+ * characters, can reorder or hide part of the registrant's text.
+ */
+function displayName(client: OAuthConsentPageProps['client']): string {
+  const name = client.clientName?.replace(/\p{Cf}/gu, '').trim()
+  return name || client.clientId
+}
+
+/**
+ * A CIMD client is identified by a URL this server fetched its metadata from,
+ * so its host is checked even though its name is not.
+ */
+function provenance(client: OAuthConsentPageProps['client']): string | null {
+  if (client.registrationType === 'cimd') {
+    return `Published by ${new URL(client.clientId).host}.`
+  }
+  if (client.registrationType === 'dcr') {
+    return 'This name was chosen by the application and is not verified.'
+  }
+  return null
+}
+
 export const OAuthConsentPage: FC<OAuthConsentPageProps> = ({
   user,
-  clientLabel,
+  client,
   redirectHost,
   redirectUri,
   scopes,
@@ -69,14 +91,17 @@ export const OAuthConsentPage: FC<OAuthConsentPageProps> = ({
   >
     <Card>
       <CardHeader>
-        <CardTitle>Authorize {clientLabel}</CardTitle>
+        <CardTitle>Authorize {displayName(client)}</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
         <p class="text-sm text-muted-foreground">
-          <span class="font-bold text-foreground">{clientLabel}</span> wants
-          access to your PinSquirrel account as{' '}
+          <span class="font-bold text-foreground">{displayName(client)}</span>{' '}
+          wants access to your PinSquirrel account as{' '}
           <span class="font-bold text-foreground">{user.username}</span>.
         </p>
+        {provenance(client) && (
+          <p class="text-sm text-muted-foreground">{provenance(client)}</p>
+        )}
 
         <div class="bg-muted p-4 border-2 border-foreground neobrutalism-shadow space-y-2">
           <p class="text-sm font-medium text-foreground">It is asking to:</p>

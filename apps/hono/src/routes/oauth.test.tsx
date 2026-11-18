@@ -11,7 +11,6 @@ import { Hono } from 'hono'
 import type { OAuthClient, User } from '@pinsquirrel/domain'
 import {
   OAuthInvalidRequestError,
-  OAuthInvalidScopeError,
   Role,
   UserStatus,
   ValidationError,
@@ -76,9 +75,9 @@ const REQUEST_PARAMS = {
 }
 
 const RESOLVED = {
+  status: 'resolved',
   client: testClient,
   redirectUri: 'https://claude.ai/api/mcp/auth_callback',
-  registeredRedirectUri: 'https://claude.ai/api/mcp/auth_callback',
   scopes: ['pins:read', 'tags:read', 'offline_access'],
   resource: 'http://localhost:8100/mcp',
   codeChallenge: 'c'.repeat(43),
@@ -179,8 +178,41 @@ describe('oauth authorize routes', () => {
       expect(res.status).toBe(200)
       const body = await res.text()
       expect(body).toContain('Extension not connected')
-      expect(body).toContain('You said no')
+      expect(body).toContain('You declined the connection')
       expect(body).toContain('access_denied')
+    })
+
+    it('does not render the error_description from the query string', async () => {
+      const res = await app.request(
+        `/oauth/extension/callback?${new URLSearchParams({
+          error: 'access_denied',
+          error_description: 'Your account is suspended, call 555 0100',
+        }).toString()}`
+      )
+
+      expect(await res.text()).not.toContain('suspended')
+    })
+
+    it('shows neither an unknown error code nor its text', async () => {
+      const res = await app.request(
+        `/oauth/extension/callback?${new URLSearchParams({
+          error: 'Your account is suspended',
+        }).toString()}`
+      )
+
+      const body = await res.text()
+      expect(body).toContain('Extension not connected')
+      expect(body).not.toContain('suspended')
+    })
+
+    it('does not read an error code off the object prototype', async () => {
+      const res = await app.request(
+        '/oauth/extension/callback?error=constructor'
+      )
+
+      const body = await res.text()
+      expect(body).toContain('The connection did not complete.')
+      expect(body).not.toContain('constructor')
     })
   })
 
@@ -241,6 +273,70 @@ describe('oauth authorize routes', () => {
       )
     })
 
+    function visible(html: string): string {
+      return html.replace(/<input[^>]*>/g, '')
+    }
+
+    it('names the host that published a CIMD client', async () => {
+      mockResolveAuthorizationRequest.mockResolvedValue({
+        ...RESOLVED,
+        client: {
+          ...testClient,
+          clientId: 'https://other.example/c.json',
+          clientName: 'Claude',
+        },
+      })
+
+      const html = visible(await (await get()).text())
+
+      expect(html).toContain('other.example')
+    })
+
+    it('says a dynamically registered name is unverified', async () => {
+      mockResolveAuthorizationRequest.mockResolvedValue({
+        ...RESOLVED,
+        client: {
+          ...testClient,
+          clientId: 'dcr_abc',
+          registrationType: 'dcr',
+        },
+      })
+
+      const html = visible(await (await get()).text())
+
+      expect(html).toContain('not verified')
+    })
+
+    it.each(['', '   ', '\u200B\u200E'])(
+      'names the client by its id when its name is %j',
+      async clientName => {
+        mockResolveAuthorizationRequest.mockResolvedValue({
+          ...RESOLVED,
+          client: {
+            ...testClient,
+            clientId: 'dcr_abc',
+            clientName,
+            registrationType: 'dcr',
+          },
+        })
+
+        const html = visible(await (await get()).text())
+
+        expect(html).toContain('Authorize dcr_abc')
+      }
+    )
+
+    it('drops invisible format characters from a name', async () => {
+      mockResolveAuthorizationRequest.mockResolvedValue({
+        ...RESOLVED,
+        client: { ...testClient, clientName: 'Cla\u200Bude \u202ECode' },
+      })
+
+      const html = visible(await (await get()).text())
+
+      expect(html).toContain('Authorize Claude Code')
+    })
+
     it('offers approve and deny as a plain form posting back here', async () => {
       mockResolveAuthorizationRequest.mockResolvedValue(RESOLVED)
 
@@ -277,6 +373,28 @@ describe('oauth authorize routes', () => {
       expect(await res.text()).toContain(
         'redirect_uri does not match a URI this client registered'
       )
+    })
+
+    it('redirects an error the service resolved to the client', async () => {
+      mockResolveAuthorizationRequest.mockResolvedValue({
+        status: 'error',
+        error: 'invalid_scope',
+        errorDescription: '1 unknown scope requested',
+        redirectUri: 'https://claude.ai/api/mcp/auth_callback',
+        state: 'the-state',
+        issuer: 'http://localhost:8100',
+      })
+
+      const res = await get()
+
+      expect(res.status).toBe(302)
+      const location = new URL(res.headers.get('Location') ?? '')
+      expect(location.origin + location.pathname).toBe(
+        'https://claude.ai/api/mcp/auth_callback'
+      )
+      expect(location.searchParams.get('error')).toBe('invalid_scope')
+      expect(location.searchParams.get('state')).toBe('the-state')
+      expect(location.searchParams.get('iss')).toBe('http://localhost:8100')
     })
 
     it('renders a validation failure the same way', async () => {
@@ -368,7 +486,7 @@ describe('oauth authorize routes', () => {
     // one the client registered.
     it('redirects with access_denied and iss on denial', async () => {
       mockAuthorize.mockResolvedValue({
-        status: 'denied',
+        status: 'error',
         error: 'access_denied',
         errorDescription: 'The user denied the authorization request',
         redirectUri: 'https://claude.ai/api/mcp/auth_callback',
@@ -391,7 +509,7 @@ describe('oauth authorize routes', () => {
 
     it('treats anything that is not approve as a denial', async () => {
       mockAuthorize.mockResolvedValue({
-        status: 'denied',
+        status: 'error',
         error: 'access_denied',
         errorDescription: 'The user denied the authorization request',
         redirectUri: 'https://claude.ai/api/mcp/auth_callback',
@@ -426,14 +544,18 @@ describe('oauth authorize routes', () => {
 
     it('renders a request error instead of redirecting', async () => {
       mockAuthorize.mockRejectedValue(
-        new OAuthInvalidScopeError('Unknown scope: pins:write')
+        new OAuthInvalidRequestError(
+          'redirect_uri does not match a URI this client registered'
+        )
       )
 
       const res = await post({ ...REQUEST_PARAMS, decision: 'approve' })
 
       expect(res.status).toBe(400)
       expect(res.headers.get('Location')).toBeNull()
-      expect(await res.text()).toContain('Unknown scope: pins:write')
+      expect(await res.text()).toContain(
+        'redirect_uri does not match a URI this client registered'
+      )
     })
   })
 })

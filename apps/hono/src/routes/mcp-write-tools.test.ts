@@ -160,6 +160,20 @@ describe('mcp write tools', () => {
       // things it must not guess at are in it.
       expect(byName.get('update_pin')?.description).toContain('REPLACES')
       expect(byName.get('merge_tags')?.description).toContain('list_tags')
+      for (const [name, scope] of [
+        ['list_pins', 'pins:read'],
+        ['get_pin', 'pins:read'],
+        ['list_tags', 'tags:read'],
+        ['create_pin', 'pins:write'],
+        ['update_pin', 'pins:write'],
+        ['delete_pin', 'pins:write'],
+        ['merge_tags', 'tags:write'],
+        ['delete_tag', 'tags:write'],
+      ]) {
+        expect(byName.get(name)?.description).toContain(
+          `Requires the ${scope} scope.`
+        )
+      }
     })
   })
 

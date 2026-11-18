@@ -141,6 +141,21 @@ function authorizationQuery(input: {
   }
 }
 
+function expectRedirectedError(
+  res: Response,
+  query: Record<string, string>,
+  error: string
+): URL {
+  expect(res.status).toBe(302)
+  const location = new URL(res.headers.get('Location') ?? 'about:blank')
+  expect(`${location.origin}${location.pathname}`).toBe(query.redirect_uri)
+  expect(location.searchParams.get('error')).toBe(error)
+  expect(location.searchParams.get('state')).toBe(query.state)
+  expect(location.searchParams.get('iss')).toBe(metadata.issuer)
+  expect(location.searchParams.get('code')).toBeNull()
+  return location
+}
+
 /** Approve a consent form and read the client's callback out of the redirect. */
 async function approve(query: Record<string, string>): Promise<URL> {
   const res = await browserRequest(
@@ -257,6 +272,7 @@ let mcpResource: string
 let apiResource: string
 let authorizationServer: string
 let clientId: string
+const otherClientIds: string[] = []
 let mcpTokens: TokenResponse
 let apiTokens: TokenResponse
 let mcpInitialized = false
@@ -295,8 +311,8 @@ afterAll(async () => {
   // it: all three cascade from `users.id`. The client this run registered has
   // nothing to cascade from, so it goes explicitly.
   if (userId) await userRepository.delete(userId)
-  if (clientId) {
-    const client = await oauthClientRepository.findByClientId(clientId)
+  for (const id of [clientId, ...otherClientIds]) {
+    const client = id ? await oauthClientRepository.findByClientId(id) : null
     if (client) await oauthClientRepository.delete(client.id)
   }
   // The pool would otherwise hold the worker open once the run is over.
@@ -565,8 +581,7 @@ describe('audience binding', () => {
       `${pathOf(metadata.authorization_endpoint)}?${new URLSearchParams(query).toString()}`
     )
 
-    expect(res.status).toBe(400)
-    expect(await res.text()).toContain('invalid_target')
+    expectRedirectedError(res, query, 'invalid_target')
   })
 
   it('refuses a token request naming a resource the code was not issued for', async () => {
@@ -590,6 +605,222 @@ describe('audience binding', () => {
 
     expect(res.status).toBe(400)
     expect(await res.json()).toMatchObject({ error: 'invalid_target' })
+  })
+})
+
+describe('consent screen identity', () => {
+  it('names a client registered with an empty name by its client_id, and says the name is unverified', async () => {
+    const registered = await request(
+      pathOf(metadata.registration_endpoint),
+      json({
+        client_name: '',
+        redirect_uris: [REGISTERED_REDIRECT_URI],
+        token_endpoint_auth_method: 'none',
+      })
+    )
+    expect(registered.status).toBe(201)
+    const unnamed = ((await registered.json()) as { client_id: string })
+      .client_id
+    otherClientIds.push(unnamed)
+    const query = {
+      ...authorizationQuery({
+        challenge: pkcePair().challenge,
+        resource: mcpResource,
+        scope: 'pins:read',
+        state: randomUUID(),
+      }),
+      client_id: unnamed,
+    }
+
+    const res = await browserRequest(
+      `${pathOf(metadata.authorization_endpoint)}?${new URLSearchParams(query).toString()}`
+    )
+
+    expect(res.status).toBe(200)
+    const page = (await res.text()).replace(/<input[^>]*>/g, '')
+    expect(page).toContain(`Authorize ${unnamed}`)
+    expect(page).toContain('not verified')
+  })
+})
+
+describe('authorization errors', () => {
+  function getAuthorize(query: Record<string, string>): Promise<Response> {
+    return browserRequest(
+      `${pathOf(metadata.authorization_endpoint)}?${new URLSearchParams(query).toString()}`
+    )
+  }
+
+  function readQuery(scope = 'pins:read'): Record<string, string> {
+    return authorizationQuery({
+      challenge: pkcePair().challenge,
+      resource: mcpResource,
+      scope,
+      state: randomUUID(),
+    })
+  }
+
+  it('redirects an unknown scope as invalid_scope, without repeating it', async () => {
+    const query = readQuery('Your account is suspended')
+
+    const res = await getAuthorize(query)
+
+    const location = expectRedirectedError(res, query, 'invalid_scope')
+    expect(location.searchParams.get('error_description')).not.toContain(
+      'suspended'
+    )
+  })
+
+  it('redirects a request without a code_challenge as invalid_request', async () => {
+    const query = readQuery()
+    delete query.code_challenge
+
+    expectRedirectedError(await getAuthorize(query), query, 'invalid_request')
+  })
+
+  it('redirects a client not registered for the code grant as unauthorized_client', async () => {
+    const registered = await request(
+      pathOf(metadata.registration_endpoint),
+      json({
+        client_name: 'Refresh-only client',
+        redirect_uris: [REGISTERED_REDIRECT_URI],
+        grant_types: ['refresh_token'],
+        token_endpoint_auth_method: 'none',
+      })
+    )
+    expect(registered.status).toBe(201)
+    const refreshOnly = ((await registered.json()) as { client_id: string })
+      .client_id
+    otherClientIds.push(refreshOnly)
+    const query = { ...readQuery(), client_id: refreshOnly }
+
+    expectRedirectedError(
+      await getAuthorize(query),
+      query,
+      'unauthorized_client'
+    )
+  })
+
+  it('renders a redirect URI the client never registered, and sends nothing there', async () => {
+    const query = authorizationQuery({
+      challenge: pkcePair().challenge,
+      resource: mcpResource,
+      scope: 'pins:read',
+      state: randomUUID(),
+      redirectUri: 'http://127.0.0.1:53211/elsewhere',
+    })
+
+    const res = await getAuthorize(query)
+
+    expect(res.status).toBe(400)
+    expect(res.headers.get('Location')).toBeNull()
+    expect(await res.text()).toContain('invalid_request')
+  })
+
+  it.each([
+    ['GET', 'pins:read', undefined],
+    ['GET with an unknown scope', 'nonsense', undefined],
+    ['POST approve', 'pins:read', 'approve'],
+    ['POST deny', 'pins:read', 'deny'],
+  ])(
+    'renders a loopback redirect URI on a port no browser can open (%s)',
+    async (_, scope, decision) => {
+      const query = authorizationQuery({
+        challenge: pkcePair().challenge,
+        resource: mcpResource,
+        scope,
+        state: randomUUID(),
+        redirectUri: 'http://127.0.0.1:99999/callback',
+      })
+      const path = pathOf(metadata.authorization_endpoint)
+
+      const res = decision
+        ? await browserRequest(path, form({ ...query, decision }))
+        : await getAuthorize(query)
+
+      expect(res.status).toBe(400)
+      expect(res.headers.get('Location')).toBeNull()
+      expect(await res.text()).toContain(
+        'redirect_uri does not match a URI this client registered'
+      )
+    }
+  )
+})
+
+describe('read scopes', () => {
+  async function callTool(
+    token: string,
+    name: string
+  ): Promise<{ isError?: boolean; content: { text: string }[] }> {
+    await mcpHandshake(token)
+    const res = await mcpRequest(token, {
+      jsonrpc: '2.0',
+      id: 4,
+      method: 'tools/call',
+      params: { name, arguments: {} },
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      result?: { isError?: boolean; content: { text: string }[] }
+    }
+    return body.result!
+  }
+
+  it('refuses list_pins and get_pin over MCP to a grant without pins:read', async () => {
+    const tokens = await connect({ resource: mcpResource, scope: 'tags:read' })
+
+    const listed = await callTool(tokens.access_token, 'list_pins')
+    expect(listed.isError).toBe(true)
+    expect(listed.content[0].text).toContain('pins:read')
+
+    await mcpHandshake(tokens.access_token)
+    const got = await mcpRequest(tokens.access_token, {
+      jsonrpc: '2.0',
+      id: 5,
+      method: 'tools/call',
+      params: { name: 'get_pin', arguments: { id: 'any-pin-id' } },
+    })
+    const body = (await got.json()) as {
+      result: { isError?: boolean; content: { text: string }[] }
+    }
+    expect(body.result.isError).toBe(true)
+    expect(body.result.content[0].text).toContain('pins:read')
+  })
+
+  it('refuses list_tags over MCP to a grant without tags:read', async () => {
+    const tokens = await connect({ resource: mcpResource, scope: 'pins:read' })
+
+    const listed = await callTool(tokens.access_token, 'list_tags')
+    expect(listed.isError).toBe(true)
+    expect(listed.content[0].text).toContain('tags:read')
+  })
+
+  it('answers the REST pin reads with 403 insufficient_scope without pins:read', async () => {
+    const tokens = await connect({ resource: apiResource, scope: 'tags:read' })
+
+    for (const path of [
+      '/api/v1/pins',
+      '/api/v1/pins/any-pin-id',
+      '/api/v1/tags/any-tag-id/pins',
+    ]) {
+      const res = await request(path, {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      })
+      expect(res.status, path).toBe(403)
+      expect(res.headers.get('WWW-Authenticate'), path).toContain(
+        'scope="pins:read"'
+      )
+    }
+  })
+
+  it('answers GET /api/v1/tags with 403 without tags:read', async () => {
+    const tokens = await connect({ resource: apiResource, scope: 'pins:read' })
+
+    const res = await request('/api/v1/tags', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    })
+
+    expect(res.status).toBe(403)
+    expect(res.headers.get('WWW-Authenticate')).toContain('scope="tags:read"')
   })
 })
 

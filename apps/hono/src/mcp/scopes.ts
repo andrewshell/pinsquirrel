@@ -1,5 +1,5 @@
 /**
- * The scope check a write tool runs before it touches a service.
+ * The scope check a tool runs before it touches a service.
  *
  * MCP has no equivalent of an HTTP status, so the refusal travels as a thrown
  * error that `mapDomainErrorToMcp()` turns into a tool error the model can

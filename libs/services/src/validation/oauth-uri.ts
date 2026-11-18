@@ -5,9 +5,6 @@
  * authorization request and the audience stored on a token all have to compare
  * as the same string, so they all pass through one normalization here rather
  * than each caller deciding what a trailing slash means.
- *
- * Phase 6c added redirect-URI matching and the loopback port-agnostic rule on
- * top of the normalization and RFC 9728 path transform 6a needed.
  */
 
 const WELL_KNOWN_PROTECTED_RESOURCE = '/.well-known/oauth-protected-resource'
@@ -73,22 +70,15 @@ export function isLoopbackRedirectHost(hostname: string): boolean {
 }
 
 /**
- * The form of a redirect URI that two of them are compared by.
+ * The form of a redirect URI the DCR dedup key is built from.
  *
  * Normalized like every other OAuth URI, and with the port dropped when the
- * host is loopback. A native client is handed an ephemeral port by the
- * operating system at the moment it starts listening, long after it published
- * the portless `http://localhost/callback` in its metadata, so the port cannot
- * be part of what identifies the URI (RFC 8252 7.3). Every other host keeps
- * its port: for a hosted client the port is as much a part of the address as
- * the hostname, and ignoring it would widen an exact match into a wildcard.
- *
- * The same canonical form is the DCR dedup key, for the same reason. Claude
- * Code registers a fresh ephemeral port on every connection, so byte-equal
- * metadata comparison would store one client row per connection, which is the
- * exact thing dedup exists to prevent.
+ * host is loopback. Claude Code registers a fresh ephemeral port on every
+ * connection (RFC 8252 7.3), so byte-equal metadata comparison would store one
+ * client row per connection, which is the exact thing dedup exists to
+ * prevent.
  */
-export function canonicalizeRedirectUri(uri: string): string {
+export function redirectUriDedupKey(uri: string): string {
   const normalized = normalizeOAuthUri(uri)
   const url = new URL(normalized)
   if (!url.port || !isLoopbackRedirectHost(url.hostname)) {
@@ -101,41 +91,44 @@ export function canonicalizeRedirectUri(uri: string): string {
   return `${url.protocol}//${url.host}${path}${url.search}`
 }
 
+const LOOPBACK_AUTHORITY =
+  /^(http:\/\/(?:localhost|127\.\d{1,3}\.\d{1,3}\.\d{1,3}|\[::1\]))(?::(\d{1,5}))?(?=[/?]|$)/
+
+function withoutLoopbackPort(uri: string): string {
+  return uri.replace(LOOPBACK_AUTHORITY, '$1')
+}
+
+function hasUsablePort(uri: string): boolean {
+  const port = LOOPBACK_AUTHORITY.exec(uri)?.[2]
+  return port === undefined || (Number(port) >= 1 && Number(port) <= 65535)
+}
+
 /**
  * Does a request's `redirect_uri` match one the client registered?
  *
- * Exact on the canonical form, which means exact for a hosted callback and
- * port-agnostic for a loopback one. Hosts are never treated as equivalent to
- * each other: `localhost` and `127.0.0.1` are different registrations, which
- * is why Claude Code publishes both.
+ * Simple string comparison (RFC 9700 4.1.3), with one allowance: on a
+ * loopback redirect the port may differ (RFC 8252 7.3). A native client is
+ * handed an ephemeral port when it starts listening, long after it published
+ * `http://localhost/callback`, so the port cannot be part of what identifies
+ * it, though it still has to be a port a browser can open (1-65535), or the
+ * redirect back to the client could not be built. Everything else, path and
+ * query included, has to be byte-equal: a trailing slash, userinfo, a
+ * fragment or a dot segment can each send the browser somewhere the client
+ * did not register, even on the same host.
  *
- * A URI that will not parse is not a match rather than an exception. This is
- * called with attacker-controlled input on every authorization request, and
- * "no match" is already the right answer for it.
+ * Hosts are never treated as equivalent to each other: `localhost` and
+ * `127.0.0.1` are different registrations, which is why Claude Code publishes
+ * both.
  */
 export function redirectUriMatches(
   registered: string,
   requested: string
 ): boolean {
-  try {
-    return (
-      canonicalizeRedirectUri(registered) === canonicalizeRedirectUri(requested)
-    )
-  } catch {
-    return false
-  }
-}
-
-/**
- * The registered URI a request matched, or null if none did.
- *
- * The registered value is what gets stored on the authorization code and
- * repeated at the token exchange, so the caller needs the entry back rather
- * than a boolean.
- */
-export function matchRedirectUri(
-  registered: string[],
-  requested: string
-): string | null {
-  return registered.find(uri => redirectUriMatches(uri, requested)) ?? null
+  if (registered === requested) return true
+  return (
+    LOOPBACK_AUTHORITY.test(registered) &&
+    URL.canParse(requested) &&
+    hasUsablePort(requested) &&
+    withoutLoopbackPort(registered) === withoutLoopbackPort(requested)
+  )
 }

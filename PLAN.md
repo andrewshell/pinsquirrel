@@ -55,8 +55,9 @@ is not repeated here. On top of it:
   those strings and never read `process.env`. Never derive an issuer from the request — a
   spoofed `Host` header must not change what the server claims to be.
 - One URI normalization rule, `libs/services/src/validation/oauth-uri.ts`, shared by metadata
-  generation, redirect-URI matching, DCR dedup and the audience check. Divergent normalization
-  produces audience failures that look like random connection breakage.
+  generation, DCR dedup and the audience check. Divergent normalization produces audience
+  failures that look like random connection breakage. Redirect URIs are the exception: they
+  are compared as strings (Decision 44).
 - One Zod-to-`ValidationError` helper, `validationErrorFromZod`
   (`libs/services/src/validation/zod-error.ts`). Routes translate that to RFC 6749 codes, not
   the service.
@@ -122,7 +123,8 @@ because its pin flow runs on the browser session (Phase 9).
       names that resource's metadata document, not the other one's. Applied per route, never
       globally, so the reads stay reachable on a read-only token — with Phase 9 no longer adding
       v1 write routes the REST half has no consumer, so the middleware is tested but mounted
-      nowhere, and the MCP guard is the one that matters.
+      nowhere, and the MCP guard is the one that matters. Decision 43 later mounted it on the
+      v1 reads.
       For MCP, `requireScope(extra, scope)` in `mcp/scopes.ts` — beside the tools rather than
       inside `server.ts`, so it is testable without building an `McpServer` — throwing
       `InsufficientScopeError`, which `mapDomainErrorToMcp()` maps to a tool error naming the
@@ -427,7 +429,8 @@ manifest's `host_permissions`, and the session cookie is only `Secure` in produc
     takes both. No client uses both audiences. Revocation by token is narrower and follows the
     grant (Decision 39).
 20. **Scopes are enforced at the operation, not at the resource.** `requireScope` sits on the
-    write routes and inside the write tools, so a read-only token still reads everything. A
+    write routes and inside the write tools, so a read-only token still reads everything
+    (narrowed by Decision 43: each read now needs its own read scope). A
     resource-level check would either lock reads behind write or make the scope decorative,
     which is what it is today. The challenge is RFC 6750's `insufficient_scope`, and step-up is
     the client re-authorizing with the wider scope: no server-side upgrade, and the old family
@@ -636,6 +639,26 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     keeps the scopes the user approved (RFC 6749 section 6) and is always issued, including
     when the request leaves out `offline_access`. A client no longer registered for
     `refresh_token` is refused with `unauthorized_client` before the token is retired.
+43. **Each read needs the read scope the consent screen lists.** This narrows Decision 20.
+    `list_pins`, `get_pin` and the v1 pin routes need `pins:read`; `list_tags` and
+    `GET /api/v1/tags` need `tags:read`. A missing scope gets the same tool error, or the same
+    403 `insufficient_scope` response, as a missing write scope. The alternative was to add
+    both reads to every grant and list them on the consent screen, which takes the choice
+    away from the user. The known clients already ask for both reads: the extension names
+    them, and Claude asks for `scopes_supported` or names nothing and gets the default. A
+    token granted without a read scope cannot use that read after deploy, and its client has
+    to re-authorize with the scope.
+44. **A redirect URI is compared as a string, except for a loopback port.** The request's
+    `redirect_uri` must be byte-equal to a registered one; on an `http` loopback redirect
+    (`localhost`, `127.x.x.x`, `[::1]`) the port may differ, per RFC 8252, though it has to be a
+    real port (1-65535). A trailing slash, userinfo, a fragment, a dot segment, an upper-case
+    host or an explicit default port no longer matches, so a client has to send what it
+    registered. The token exchange requires the exact `redirect_uri` the code was issued to. The
+    canonical form is still the DCR dedup key. Registration also refuses a redirect URI with
+    userinfo, as it refuses a fragment. Once the redirect URI has matched, every later
+    authorization failure, including an ended approving session, is redirected to the client as
+    an RFC 6749 error with `state` and `iss`; only a bad `client_id`, `redirect_uri` or `state`
+    is shown as a page.
 
 ## Reference
 
