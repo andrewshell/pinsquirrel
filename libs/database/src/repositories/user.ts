@@ -6,7 +6,7 @@ import type {
   Role,
 } from '@pinsquirrel/domain'
 import { UserAlreadyExistsError, UserStatus } from '@pinsquirrel/domain'
-import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, lt, ne, sql } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { users } from '../schema/users.js'
 import { userRoles } from '../schema/user-roles.js'
@@ -239,6 +239,22 @@ export class DrizzleUserRepository implements UserRepository {
 
   async delete(id: string): Promise<boolean> {
     const result = await this.db.delete(users).where(eq(users.id, id))
+    return result[0].affectedRows > 0
+  }
+
+  async deleteStaleUnverified(
+    id: string,
+    createdBefore: Date
+  ): Promise<boolean> {
+    const result = await this.db
+      .delete(users)
+      .where(
+        and(
+          eq(users.id, id),
+          eq(users.status, 'unverified'),
+          lt(users.createdAt, createdBefore)
+        )
+      )
     return result[0].affectedRows > 0
   }
 

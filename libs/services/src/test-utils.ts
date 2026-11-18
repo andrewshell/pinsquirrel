@@ -21,6 +21,7 @@ export function createMockUserRepository(): UserRepository {
     removeRole: vi.fn(),
     countByRole: vi.fn(),
     replacePasswordHash: vi.fn(),
+    deleteStaleUnverified: vi.fn(),
     revokeSessionsAndTokens: vi.fn(),
   }
 }

@@ -32,6 +32,7 @@ export const RESET_REQUEST_WINDOW_MS = 60 * 60 * 1000
 const RESET_REQUESTS_PER_WINDOW = 3
 const RESET_LINK_LIFETIME_MS = 15 * 60 * 1000
 const VERIFICATION_LINK_LIFETIME_MS = 48 * 60 * 60 * 1000
+const UNVERIFIED_HOLD_MS = 7 * 24 * 60 * 60 * 1000
 
 export interface RegistrationInput {
   username: string
@@ -95,10 +96,12 @@ export class AccountService {
   }
 
   private async completeRegistration(input: RegistrationInput): Promise<void> {
-    const existingUserByUsername = await this.userRepository.findByUsername(
-      input.username
+    const existingUserByUsername = await this.unlessStale(
+      await this.userRepository.findByUsername(input.username)
     )
-    const existingUserByEmail = await this.findUserByEmail(input.email)
+    const existingUserByEmail = await this.unlessStale(
+      await this.findUserByEmail(input.email)
+    )
 
     if (existingUserByEmail) {
       if (!input.signinUrl || !input.resetUrl) return
@@ -225,6 +228,22 @@ export class AccountService {
       emailHash,
       emailEncrypted,
     })
+  }
+
+  /**
+   * The user, or null once a sign-up it never confirmed has been removed for
+   * being older than UNVERIFIED_HOLD_MS, so it stops holding its username and
+   * address against a new sign-up.
+   */
+  private async unlessStale(user: User | null): Promise<User | null> {
+    if (!user || user.status !== UserStatus.Unverified) return user
+    const createdBefore = new Date(Date.now() - UNVERIFIED_HOLD_MS)
+    if (user.createdAt >= createdBefore) return user
+    const deleted = await this.userRepository.deleteStaleUnverified(
+      user.id,
+      createdBefore
+    )
+    return deleted ? null : user
   }
 
   requestPasswordReset(input: { email: string; resetUrl: string }): void {

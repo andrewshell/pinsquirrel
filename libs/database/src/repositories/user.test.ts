@@ -650,6 +650,34 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     })
   })
 
+  describe('deleteStaleUnverified', () => {
+    const cutoff = new Date('2026-01-08T00:00:00Z')
+
+    it('deletes an unverified account created before the cutoff', async () => {
+      const { id } = await insertUser(testPool, {
+        status: 'unverified',
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+      })
+
+      expect(await repository.deleteStaleUnverified(id, cutoff)).toBe(true)
+      expect(await repository.findById(id)).toBeNull()
+    })
+
+    it.each([
+      ['a verified account', 'waitlist', '2026-01-01T00:00:00Z'],
+      ['an active account', 'active', '2026-01-01T00:00:00Z'],
+      ['a recent unverified account', 'unverified', '2026-01-09T00:00:00Z'],
+    ] as const)('keeps %s', async (_label, status, createdAt) => {
+      const { id } = await insertUser(testPool, {
+        status,
+        createdAt: new Date(createdAt),
+      })
+
+      expect(await repository.deleteStaleUnverified(id, cutoff)).toBe(false)
+      expect(await repository.findById(id)).not.toBeNull()
+    })
+  })
+
   describe('revokeSessionsAndTokens', () => {
     const later = () => new Date(Date.now() + 60 * 60 * 1000)
 

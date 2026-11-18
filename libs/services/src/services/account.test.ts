@@ -173,6 +173,7 @@ describe('AccountService', () => {
         resetUrl: 'https://example.com/reset-password',
       })
       await queue.flush()
+      const after = Date.now()
 
       expect(mockEmailService.sendVerificationEmail).toHaveBeenCalledWith(
         'new@example.com',
@@ -181,9 +182,85 @@ describe('AccountService', () => {
       )
       expect(mockEmailService.sendPasswordResetEmail).not.toHaveBeenCalled()
       const [row] = await resets.findByUserId(mockUser.id)
-      const lifetimeHours = (row.expiresAt.getTime() - before) / 3_600_000
-      expect(lifetimeHours).toBeGreaterThan(47.9)
-      expect(lifetimeHours).toBeLessThanOrEqual(48)
+      const fortyEightHours = 48 * 60 * 60 * 1000
+      expect(row.expiresAt.getTime()).toBeGreaterThanOrEqual(
+        before + fortyEightHours
+      )
+      expect(row.expiresAt.getTime()).toBeLessThanOrEqual(
+        after + fortyEightHours
+      )
+    })
+
+    describe('an unverified account older than seven days', () => {
+      const stale: User = {
+        ...mockUser,
+        id: 'stale-id',
+        username: 'squatted',
+        passwordHash: null,
+        status: UserStatus.Unverified,
+        createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      }
+
+      beforeEach(() => {
+        vi.mocked(mockUserRepository.deleteStaleUnverified).mockResolvedValue(
+          true
+        )
+        vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+      })
+
+      it('no longer blocks its username', async () => {
+        vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(stale)
+        vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
+
+        accountService.register({
+          username: 'squatted',
+          email: 'owner@example.com',
+          signupUrl: 'https://example.com/signup',
+        })
+        await queue.flush()
+
+        expect(mockEmailService.sendUsernameTakenEmail).not.toHaveBeenCalled()
+        expect(mockUserRepository.create).toHaveBeenCalledWith(
+          expect.objectContaining({ username: 'squatted' })
+        )
+      })
+
+      it('no longer blocks its email address', async () => {
+        vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+        vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(stale)
+
+        accountService.register({
+          username: 'realowner',
+          email: 'owner@example.com',
+          signinUrl: 'https://example.com/signin',
+          resetUrl: 'https://example.com/reset',
+        })
+        await queue.flush()
+
+        expect(
+          mockEmailService.sendEmailAlreadyRegisteredEmail
+        ).not.toHaveBeenCalled()
+        expect(mockUserRepository.create).toHaveBeenCalledWith(
+          expect.objectContaining({ username: 'realowner' })
+        )
+      })
+
+      it('still blocks when it was verified before it could be removed', async () => {
+        vi.mocked(mockUserRepository.deleteStaleUnverified).mockResolvedValue(
+          false
+        )
+        vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(stale)
+        vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
+
+        accountService.register({
+          username: 'squatted',
+          email: 'owner@example.com',
+          signupUrl: 'https://example.com/signup',
+        })
+        await queue.flush()
+
+        expect(mockUserRepository.create).not.toHaveBeenCalled()
+      })
     })
 
     it('should seal the email when an email sealer is configured', async () => {

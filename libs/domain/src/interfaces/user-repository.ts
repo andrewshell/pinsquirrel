@@ -32,6 +32,11 @@ export interface UserRepository extends Repository<
     next: string
   ): Promise<boolean>
   /**
+   * Delete the user only while it is still unverified and was created before
+   * `createdBefore`. True when it was deleted.
+   */
+  deleteStaleUnverified(id: string, createdBefore: Date): Promise<boolean>
+  /**
    * End every web session, OAuth token and unused authorization code issued
    * to a user, all or nothing, except the one session named by
    * `keepSessionId`.
