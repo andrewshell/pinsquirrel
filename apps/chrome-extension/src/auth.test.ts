@@ -25,6 +25,7 @@ import {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
 const BASE_URL = 'https://pinsquirrel.com'
@@ -302,6 +303,33 @@ describe('completeConnect', () => {
   })
 })
 
+const TOKEN_URL = `${SERVER_BASE_URL}/oauth/token`
+const REVOKE_URL = `${SERVER_BASE_URL}/oauth/revoke`
+
+/**
+ * Every timeout the code asks `AbortSignal.timeout` for, recorded, with each
+ * cut to a few milliseconds so a test does not sit through it.
+ */
+function shortenTimeouts(): number[] {
+  const asked: number[] = []
+  const timeout = AbortSignal.timeout.bind(AbortSignal)
+  vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+    asked.push(ms)
+    return timeout(5)
+  })
+  return asked
+}
+
+/** A server that took the request and never answers, as `fetch` sees it. */
+function neverAnswers(init: RequestInit | undefined): Promise<Response> {
+  return new Promise((_resolve, reject) => {
+    const signal = init?.signal
+    signal?.addEventListener('abort', () => {
+      reject(signal.reason as Error)
+    })
+  })
+}
+
 /** A connection already in storage, with the access token still good. */
 function connected(overrides: Record<string, unknown> = {}) {
   return {
@@ -428,6 +456,49 @@ describe('getAccessToken', () => {
 
 const TAGS_URL = `${SERVER_BASE_URL}/api/v1/tags`
 
+// Every refresh runs under a lock the options page and the worker share, so a
+// token request that hangs would hold up the other context's refreshes too.
+describe('a request the server never answers', () => {
+  it('fails a refresh with a clear error and lets the next one through', async () => {
+    const server = stubOAuthServer(connected({ expiresAt: Date.now() - 1000 }))
+    const timeouts = shortenTimeouts()
+    let hang = true
+    server.fetched.route(TOKEN_URL, (_url, init) =>
+      hang ? neverAnswers(init) : tokenResponse()
+    )
+
+    await expect(getAccessToken()).rejects.toThrow(
+      `${TOKEN_URL} did not answer within 20 seconds`
+    )
+    expect(new Set(timeouts)).toEqual(new Set([20_000]))
+    // The refresh token was never spent, so the connection is still good.
+    expect(server.chrome.local.items.refreshToken).toBe('refresh-stored')
+
+    hang = false
+    expect(await getAccessToken()).toBe('pso_access')
+  })
+
+  it('fails an API call with a clear error', async () => {
+    const server = stubOAuthServer(connected())
+    shortenTimeouts()
+    server.fetched.route(TAGS_URL, (_url, init) => neverAnswers(init))
+
+    await expect(authorizedFetch(TAGS_URL)).rejects.toThrow(
+      `${TAGS_URL} did not answer within 20 seconds`
+    )
+  })
+
+  it('still clears storage when the revocation never answers', async () => {
+    const server = stubOAuthServer(connected())
+    shortenTimeouts()
+    server.fetched.route(REVOKE_URL, (_url, init) => neverAnswers(init))
+
+    await disconnect()
+
+    expect(server.chrome.local.items).toEqual({})
+  })
+})
+
 describe('authorizedFetch', () => {
   it('sends the access token as a bearer credential', async () => {
     const server = stubOAuthServer(connected())
@@ -501,7 +572,7 @@ describe('disconnect', () => {
 
   it('clears local storage even when the server cannot be reached', async () => {
     const server = stubOAuthServer(connected())
-    server.fetched.route(`${SERVER_BASE_URL}/oauth/revoke`, () => {
+    server.fetched.route(REVOKE_URL, () => {
       throw new Error('offline')
     })
 

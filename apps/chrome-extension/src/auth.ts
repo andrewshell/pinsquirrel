@@ -1,6 +1,7 @@
 import { discoverEndpoints, type OAuthEndpoints } from './oauth-metadata.ts'
 import { createPkcePair, randomUrlSafeToken } from './pkce.ts'
 import * as storage from './storage.ts'
+import { timedFetch } from './timed-fetch.ts'
 import type { PendingConnect, StoredTokens } from './types.ts'
 
 /**
@@ -193,7 +194,7 @@ async function postTokenRequest(
   endpoint: string,
   params: Record<string, string>
 ): Promise<TokenResponseBody> {
-  const response = await fetch(endpoint, {
+  const response = await timedFetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams(params).toString(),
@@ -237,7 +238,7 @@ async function registerClient(
   endpoints: OAuthEndpoints,
   redirectUri: string
 ): Promise<string> {
-  const response = await fetch(endpoints.registrationEndpoint, {
+  const response = await timedFetch(endpoints.registrationEndpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -585,7 +586,7 @@ export async function authorizedFetch(
   const send = (token: string) => {
     const headers = new Headers(init.headers)
     headers.set('Authorization', `Bearer ${token}`)
-    return fetch(input, { ...init, headers })
+    return timedFetch(input, { ...init, headers })
   }
 
   const token = await getAccessToken()
@@ -617,7 +618,7 @@ export async function disconnect(): Promise<void> {
   if (tokens) {
     try {
       const endpoints = await discoverEndpoints(tokens.baseUrl)
-      await fetch(endpoints.revocationEndpoint, {
+      await timedFetch(endpoints.revocationEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
