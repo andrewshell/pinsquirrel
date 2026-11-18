@@ -38,6 +38,42 @@ describe('resolveBaseUrl', () => {
   it('fails when BASE_URL is not an absolute URI', () => {
     expect(() => resolveBaseUrl({ BASE_URL: 'pinsquirrel.com' })).toThrow()
   })
+
+  it.each([
+    ['a path', 'https://pinsquirrel.com/app'],
+    ['a query', 'https://pinsquirrel.com/?x=1'],
+    ['a fragment', 'https://pinsquirrel.com/#top'],
+    ['userinfo', 'https://admin@pinsquirrel.com'],
+  ])(
+    'fails when BASE_URL carries %s, since discovery is served at the origin',
+    (_, value) => {
+      expect(() => resolveBaseUrl({ BASE_URL: value })).toThrow(/BASE_URL/)
+    }
+  )
+
+  it('fails when BASE_URL is plain http in production', () => {
+    expect(() =>
+      resolveBaseUrl({
+        NODE_ENV: 'production',
+        BASE_URL: 'http://pinsquirrel.com',
+      })
+    ).toThrow(/BASE_URL/)
+  })
+
+  it('accepts plain http on loopback in production, for a local container', () => {
+    expect(
+      resolveBaseUrl({
+        NODE_ENV: 'production',
+        BASE_URL: 'http://localhost:8100',
+      })
+    ).toBe('http://localhost:8100')
+  })
+
+  it('accepts plain http outside production, for a tunnel or a LAN host', () => {
+    expect(resolveBaseUrl({ BASE_URL: 'http://192.168.1.20:8100' })).toBe(
+      'http://192.168.1.20:8100'
+    )
+  })
 })
 
 describe('createOAuthConfig', () => {
