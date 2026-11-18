@@ -12,6 +12,9 @@ import type { MySql2Database } from 'drizzle-orm/mysql2'
 import mysql from 'mysql2/promise'
 import type { Pool } from 'mysql2/promise'
 import { insertUser } from '../test-fixtures.js'
+import { DrizzleOAuthClientRepository } from './oauth-client.js'
+import { DrizzleOAuthTokenRepository } from './oauth-token.js'
+import { DrizzleSessionRepository } from './session.js'
 import { DrizzleUserRepository } from './user.js'
 import { Role, UserAlreadyExistsError, UserStatus } from '@pinsquirrel/domain'
 
@@ -628,6 +631,86 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       })
 
       expect(second.emailHash).toBeNull()
+    })
+  })
+
+  describe('revokeSessionsAndTokens', () => {
+    const later = () => new Date(Date.now() + 60 * 60 * 1000)
+
+    async function seed(userId: string) {
+      const sessions = new DrizzleSessionRepository(testDb)
+      const tokens = new DrizzleOAuthTokenRepository(testDb)
+      const client = await new DrizzleOAuthClientRepository(testDb).create({
+        clientId: `client-${crypto.randomUUID()}`,
+        clientName: 'test',
+        redirectUris: ['https://example.test/cb'],
+        grantTypes: ['authorization_code', 'refresh_token'],
+        tokenEndpointAuthMethod: 'none',
+        registrationType: 'dcr',
+      })
+      const makeSession = () =>
+        sessions.create({ id: crypto.randomUUID(), userId, expiresAt: later() })
+      const makeToken = (kind: 'access' | 'refresh') =>
+        tokens.create({
+          tokenHash: crypto.randomUUID().replace(/-/g, '').repeat(2),
+          kind,
+          clientId: client.clientId,
+          userId,
+          scopes: ['pins:read'],
+          resource: 'https://example.test/mcp',
+          expiresAt: later(),
+        })
+      return {
+        sessions,
+        tokens,
+        kept: await makeSession(),
+        other: await makeSession(),
+        access: await makeToken('access'),
+        refresh: await makeToken('refresh'),
+      }
+    }
+
+    beforeEach(async () => {
+      await testPool.query('DELETE FROM oauth_tokens')
+      await testPool.query('DELETE FROM oauth_clients')
+    })
+
+    it('ends every session and OAuth token the user holds', async () => {
+      const { id: userId } = await insertUser(testPool)
+      const { sessions, tokens } = await seed(userId)
+
+      await repository.revokeSessionsAndTokens(userId)
+
+      expect(await sessions.findByUserId(userId)).toEqual([])
+      expect(await tokens.findActiveByUserId(userId)).toEqual([])
+    })
+
+    it('keeps the one session it is told to keep', async () => {
+      const { id: userId } = await insertUser(testPool)
+      const { sessions, tokens, kept } = await seed(userId)
+
+      await repository.revokeSessionsAndTokens(userId, kept.id)
+
+      expect((await sessions.findByUserId(userId)).map(s => s.id)).toEqual([
+        kept.id,
+      ])
+      expect(await tokens.findActiveByUserId(userId)).toEqual([])
+    })
+
+    it("leaves other users' sessions and tokens alone", async () => {
+      const { id: userId } = await insertUser(testPool)
+      const { id: bystanderId } = await insertUser(testPool, {
+        emailHash: 'bystander_email',
+      })
+      await seed(userId)
+      const bystander = await seed(bystanderId)
+
+      await repository.revokeSessionsAndTokens(userId)
+
+      expect(await bystander.sessions.findByUserId(bystanderId)).toHaveLength(2)
+      expect(
+        await bystander.tokens.findActiveByUserId(bystanderId)
+      ).toHaveLength(2)
     })
   })
 })

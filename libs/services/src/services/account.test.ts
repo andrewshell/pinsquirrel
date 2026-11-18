@@ -798,6 +798,10 @@ describe('AccountService', () => {
       expect(mockPasswordResetRepository.deleteByUserId).toHaveBeenCalledWith(
         mockPasswordResetToken.userId
       )
+      // Whoever held the old password holds nothing after a reset.
+      expect(mockUserRepository.revokeSessionsAndTokens).toHaveBeenCalledWith(
+        mockUser.id
+      )
     })
 
     it('should promote an unverified user to the waitlist when they set their password', async () => {

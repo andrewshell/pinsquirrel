@@ -328,6 +328,7 @@ export class AccountService {
     await this.userRepository.update(user.id, updateData)
 
     await this.passwordResetRepository.deleteByUserId(user.id)
+    await this.userRepository.revokeSessionsAndTokens(user.id)
   }
 
   async validateResetToken(token: string): Promise<boolean> {

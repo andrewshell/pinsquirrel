@@ -377,6 +377,8 @@ export class AuthenticationService {
       userId: string
       currentPassword: string
       newPassword: string
+      // The session making the change, which stays signed in.
+      currentSessionId?: string
     }
   ): Promise<void> {
     if (!ac.canUpdate({ userId: input.userId })) {
@@ -413,5 +415,9 @@ export class AuthenticationService {
     // Persist only the field this operation owns to avoid clobbering a
     // concurrent username/email change made after the findById read.
     await this.userRepository.update(input.userId, { passwordHash })
+    await this.userRepository.revokeSessionsAndTokens(
+      input.userId,
+      input.currentSessionId
+    )
   }
 }

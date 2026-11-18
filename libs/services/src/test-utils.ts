@@ -20,5 +20,6 @@ export function createMockUserRepository(): UserRepository {
     addRole: vi.fn(),
     removeRole: vi.fn(),
     countByRole: vi.fn(),
+    revokeSessionsAndTokens: vi.fn(),
   }
 }

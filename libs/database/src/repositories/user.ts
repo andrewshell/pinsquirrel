@@ -6,10 +6,12 @@ import type {
   Role,
 } from '@pinsquirrel/domain'
 import { UserAlreadyExistsError, UserStatus } from '@pinsquirrel/domain'
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { users } from '../schema/users.js'
 import { userRoles } from '../schema/user-roles.js'
+import { sessions } from '../schema/sessions.js'
+import { oauthTokens } from '../schema/oauth-tokens.js'
 import { isDuplicateKeyError } from './duplicate-key.js'
 
 /**
@@ -237,6 +239,30 @@ export class DrizzleUserRepository implements UserRepository {
   async delete(id: string): Promise<boolean> {
     const result = await this.db.delete(users).where(eq(users.id, id))
     return result[0].affectedRows > 0
+  }
+
+  async revokeSessionsAndTokens(
+    userId: string,
+    keepSessionId?: string
+  ): Promise<void> {
+    await this.db.transaction(async tx => {
+      await tx
+        .delete(sessions)
+        .where(
+          and(
+            eq(sessions.userId, userId),
+            keepSessionId === undefined
+              ? undefined
+              : ne(sessions.id, keepSessionId)
+          )
+        )
+      await tx
+        .update(oauthTokens)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(eq(oauthTokens.userId, userId), isNull(oauthTokens.revokedAt))
+        )
+    })
   }
 
   // Role management methods

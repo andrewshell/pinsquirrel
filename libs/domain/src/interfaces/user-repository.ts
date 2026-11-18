@@ -22,4 +22,9 @@ export interface UserRepository extends Repository<
    * asking about.
    */
   countByRole(role: Role): Promise<number>
+  /**
+   * End every web session and OAuth token issued to a user, all or nothing,
+   * except the one session named by `keepSessionId`.
+   */
+  revokeSessionsAndTokens(userId: string, keepSessionId?: string): Promise<void>
 }

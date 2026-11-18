@@ -73,6 +73,7 @@ vi.mock('../middleware/session', () => ({
   getAuthUser: () => testUser,
   getSessionManager: () => ({
     getUser: () => Promise.resolve(testUser),
+    getSession: () => ({ id: 'session-in-use' }),
     setFlash: (type: FlashMessage['type'], message: string) => {
       flash = { type, message }
     },
@@ -236,6 +237,22 @@ describe('profile routes', () => {
 
       const html = await renderedProfile(res)
       expect(html).toContain('Claude Code')
+    })
+
+    it('keeps the session that made the change signed in', async () => {
+      await app.request(
+        '/profile',
+        formBody({
+          intent: 'change-password',
+          currentPassword: 'old-password',
+          newPassword: 'new-password',
+        })
+      )
+
+      expect(svc.changePassword).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ currentSessionId: 'session-in-use' })
+      )
     })
 
     it('confirms the change to the user', async () => {

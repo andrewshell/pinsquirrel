@@ -868,6 +868,23 @@ describe('AuthenticationService', () => {
       })
     })
 
+    it("ends the user's other sessions and OAuth tokens but keeps the current session", async () => {
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
+      vi.mocked(verifyPassword).mockResolvedValue(true)
+
+      await authService.changePassword(selfAc('123'), {
+        userId: '123',
+        currentPassword: 'currentpass123',
+        newPassword: 'newpass1234567',
+        currentSessionId: 'session-in-use',
+      })
+
+      expect(mockUserRepository.revokeSessionsAndTokens).toHaveBeenCalledWith(
+        '123',
+        'session-in-use'
+      )
+    })
+
     it('should throw InvalidCredentialsError for wrong current password', async () => {
       vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
       vi.mocked(verifyPassword).mockResolvedValue(false)
