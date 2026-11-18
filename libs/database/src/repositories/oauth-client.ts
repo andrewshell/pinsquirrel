@@ -49,8 +49,6 @@ export class DrizzleOAuthClientRepository implements OAuthClientRepository {
         createdAt: now,
       })
     } catch (error) {
-      // Two first registrations of one client raced, and this one lost. The
-      // client is registered either way.
       const existing = isDuplicateKeyError(error)
         ? await this.findByClientId(data.clientId)
         : null

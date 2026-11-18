@@ -655,8 +655,6 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
     ).resolves.toMatchObject(redirectedError('invalid_target'))
   })
 
-  // offline_access asks for a refresh token, not a permission. Alone it would
-  // mint a token that can read nothing.
   it('grants the read scopes alongside offline_access when that is all a request names', async () => {
     const resolved = await resolve(authorizeParams({ scope: 'offline_access' }))
 
@@ -667,8 +665,6 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
     ])
   })
 
-  // The consent screen promises "stay connected" for offline_access, which a
-  // client without the refresh_token grant can never do.
   it('drops offline_access for a client not registered for refresh_token', async () => {
     vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
       makeClient({ grantTypes: ['authorization_code'] })
@@ -839,8 +835,6 @@ describe('OAuthService.authorize', () => {
     })
   })
 
-  // `completed_at` is what keeps a registration out of the incomplete-client
-  // sweep, and an authorization is what completes it.
   it('marks the client as having completed an authorization', async () => {
     await ctx.service.authorize(ac, {
       params: authorizeParams(),
@@ -855,8 +849,6 @@ describe('OAuthService.authorize', () => {
     )
   })
 
-  // The sweep deletes incomplete clients, and the code's row cascades from
-  // its client: marked after the insert, a sweep in between takes the code.
   it('marks the client before it writes the code', async () => {
     await ctx.service.authorize(ac, {
       params: authorizeParams(),
@@ -1091,8 +1083,6 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
       ])
     })
 
-    // Only the client the code was issued to can end its grant by presenting
-    // it again; anyone else is told the same thing and changes nothing.
     it('is refused without ending the grant when another client presents it', async () => {
       const first = await ctx.service.exchangeAuthorizationCode(tokenParams())
       const other = 'dcr_another_client'
@@ -1782,8 +1772,6 @@ describe('OAuthService.registerClient', () => {
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
-  // Two registrations share a client only when their redirect URIs would
-  // match each other at authorize, which compares them as strings.
   it.each([
     ['a trailing slash', 'https://example.com/cb', 'https://example.com/cb/'],
     ['host case', 'https://example.com/cb', 'https://Example.com/cb'],
@@ -1799,8 +1787,6 @@ describe('OAuthService.registerClient', () => {
     expect(second.clientId).not.toBe(first.clientId)
   })
 
-  // The sweep counts from registration, and a client registers again when it
-  // reconnects; the clock restarts so a user on its consent page keeps it.
   it('restarts the sweep clock on a registration that has not completed', async () => {
     const pending = makeClient({
       id: 'client-row-dcr',
@@ -2023,7 +2009,6 @@ describe('OAuthService grants', () => {
     }
   )
 
-  // A refresh mints new rows; the profile says when the user approved.
   it('reports when the user authorized the client, not when it last refreshed', async () => {
     const approved = new Date('2026-11-01T10:00:00Z')
     ctx.store.tokens.push(
@@ -2032,7 +2017,7 @@ describe('OAuthService grants', () => {
 
     const [grant] = await ctx.service.listGrants(ac, user.id)
 
-    expect(grant.createdAt).toEqual(approved)
+    expect(grant.grantedAt).toEqual(approved)
   })
 
   it('reports the earliest approval when the client has several grants', async () => {
@@ -2044,7 +2029,7 @@ describe('OAuthService grants', () => {
 
     const [grant] = await ctx.service.listGrants(ac, user.id)
 
-    expect(grant.createdAt).toEqual(first)
+    expect(grant.grantedAt).toEqual(first)
   })
 
   it('keeps grants for different clients apart', async () => {
@@ -2217,8 +2202,6 @@ describe('OAuthService.revokeToken', () => {
     }
   )
 
-  // A rotated token handed back is the replay `refuseRotatedToken` answers by
-  // ending the grant; revocation agrees with it.
   it('still takes the grant when the refresh token handed back was rotated', async () => {
     Object.assign(
       ctx.store.tokens.find(token => token.id === 'laptop-refresh')!,

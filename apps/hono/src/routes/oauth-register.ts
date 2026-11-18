@@ -18,11 +18,7 @@ import {
  * RFC 7591 Dynamic Client Registration, the fallback path.
  *
  * CIMD is the preferred one (Decision 13): DCR is deprecated in the current
- * spec and lets an anonymous caller create rows. What bounds the damage lives
- * in the service and the sweep, not here - `registerClient` derives the
- * identifier from the metadata, loopback ports aside, so re-registering the
- * same client returns the same row, and `MaintenanceService.sweepExpired`
- * removes registrations that never complete an authorization.
+ * spec and lets an anonymous caller create rows.
  *
  * A per-IP quota bounds it further, and it is the tightest limit in the app:
  * the endpoint is unauthenticated and it creates rows, while a real client

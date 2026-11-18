@@ -111,11 +111,7 @@ export class OAuthInvalidClientMetadataError extends OAuthError {
   }
 }
 
-/**
- * A redirect URI this server will not redirect to (RFC 7591 §3.2.2). Still
- * client metadata, so it is caught wherever that is, but registration answers
- * with its own code.
- */
+/** A redirect URI this server will not redirect to (RFC 7591 §3.2.2). */
 export class OAuthInvalidRedirectUriError extends OAuthInvalidClientMetadataError {
   override readonly code = 'invalid_redirect_uri'
 

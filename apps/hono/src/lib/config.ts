@@ -66,12 +66,7 @@ export function resolveBaseUrl(env: NodeJS.ProcessEnv): string {
   return DEV_BASE_URL
 }
 
-/**
- * The discovery documents, the endpoints and the resource identifiers are all
- * served at the origin, so a path or a query would name URLs this app does not
- * answer. Production needs https, which every OAuth client requires of a
- * remote server; loopback stays open for a container run locally.
- */
+// RFC 8414 2: the issuer uses https and has no query or fragment.
 function requireOrigin(configured: string, env: NodeJS.ProcessEnv): string {
   const normalized = normalizeOAuthUri(configured)
   const url = new URL(configured)

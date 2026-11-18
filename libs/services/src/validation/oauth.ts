@@ -97,11 +97,7 @@ export const refreshTokenGrantSchema = z.object({
 
 export type RefreshTokenGrantParams = z.infer<typeof refreshTokenGrantSchema>
 
-/**
- * An RFC 7009 revocation request. `client_id` stays optional: RFC 6749 2.3.1
- * lets a public client leave it out, and the token itself is the proof of
- * possession. When it is sent, it has to match.
- */
+// `client_id` is optional for a public client (RFC 6749 3.2.1).
 export const revocationRequestSchema = z.object({
   token: z.string().min(1),
   client_id: clientIdValue.optional(),

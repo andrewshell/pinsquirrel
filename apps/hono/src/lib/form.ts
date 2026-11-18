@@ -29,13 +29,8 @@ export function getString(value: FormValue): string {
   return ''
 }
 
-/**
- * Protocol parameters as they arrived, from `parseBody({ all: true })` or
- * `c.req.queries()`: one string for a parameter sent once, every string for
- * one sent more than once. OAuth refuses a repeated parameter (RFC 6749 3.1),
- * which it can only do if the repeat survives parsing. Files and empty values
- * are dropped, so a schema sees them as missing.
- */
+// OAuth refuses a repeated parameter (RFC 6749 3.1, 3.2), which it can only
+// do if the repeat survives parsing.
 export function protocolParams(
   source: Record<string, unknown>
 ): Record<string, string | string[]> {

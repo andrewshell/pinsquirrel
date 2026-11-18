@@ -179,8 +179,7 @@ describe('POST /oauth/token', () => {
     expect((await res.json()).error).toBe('unsupported_grant_type')
   })
 
-  // RFC 6749 3.1: the schemas refuse a repeated parameter, so the service has
-  // to see every value rather than whichever one the parser kept.
+  // RFC 6749 3.2: a parameter MUST NOT be included more than once.
   it('hands a repeated parameter to the service as every value sent', async () => {
     mockExchangeAuthorizationCode.mockResolvedValue(ISSUED)
     const body = new URLSearchParams(CODE_GRANT)

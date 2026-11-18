@@ -42,10 +42,7 @@ startExpirySweep(maintenanceService)
 
 // Clients an operator pre-registered via OAUTH_STATIC_CLIENTS. Reconciled
 // here rather than at `lib/services.ts` module load, so importing a service in
-// a test does not reach for the database. A malformed value has already
-// stopped the process in `lib/config.ts`; a failure here is the database being
-// unreachable or one entry being refused, which is not a reason to refuse to
-// serve everything else.
+// a test does not reach for the database.
 if (staticOAuthClients.length > 0) {
   void oauthService
     .reconcileStaticClients(staticOAuthClients)

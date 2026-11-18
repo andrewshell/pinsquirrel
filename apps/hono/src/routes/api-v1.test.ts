@@ -409,7 +409,6 @@ describe('api-v1 OpenAPI document', () => {
       info: { title: 'PinSquirrel API', version: 'v1' },
     })
 
-  // The 401 and 403 bodies are OAuth errors, which carry a description.
   it.each(['401', '403'])(
     'describes the %s body with error and error_description',
     status => {

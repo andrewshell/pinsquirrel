@@ -144,8 +144,7 @@ export interface OAuthGrant {
   resources: string[]
   /** When the longest-lived of the client's tokens runs out. */
   expiresAt: Date
-  /** When the user first approved the client, of the grants still live. */
-  createdAt: Date
+  grantedAt: Date
 }
 
 /** Who a bearer token turns out to be, once it checks out. */
@@ -302,13 +301,7 @@ export class OAuthService {
     }
 
     const resource = this.requireKnownResource(request.resource)
-    // Without the refresh_token grant there is no refresh token to ask for,
-    // and the consent screen would promise one.
-    const scopes = grantedScopes(request.scope).filter(
-      scope =>
-        scope !== OFFLINE_ACCESS_SCOPE ||
-        client.grantTypes.includes('refresh_token')
-    )
+    const scopes = withoutUnusableRefresh(grantedScopes(request.scope), client)
 
     return {
       status: 'resolved',
@@ -366,9 +359,6 @@ export class OAuthService {
     }
 
     if (!resolved.client.completedAt) {
-      // What takes a client out of the incomplete-client sweep: one that has
-      // authorized somebody is in use, however it registered. Marked before
-      // the code is written, which the sweep would otherwise take with it.
       await this.clientRepository.markCompleted(resolved.client.id, new Date())
     }
 
@@ -415,10 +405,10 @@ export class OAuthService {
    * tokens it produced down with it, when the client it was issued to presents
    * it. A code that passes is spent and its tokens are written in one step
    * (`exchange`), so a failure in between leaves the client a code that still
-   * works. A code that fails a check is
-   * spent anyway, because a failed check must not leave a code alive to try
-   * again with a different verifier. A check that could not be made, because
-   * the database was unreachable, spends nothing.
+   * works. A code that fails a check is spent anyway, because a failed check
+   * must not leave a code alive to try again with a different verifier. A
+   * check that could not be made, because the database was unreachable, spends
+   * nothing.
    *
    * There is no `AccessControl` here: the caller is a client, not a user, and
    * the code plus the PKCE verifier is the proof. That is the same reason
@@ -714,8 +704,6 @@ export class OAuthService {
     const existing = await this.clientRepository.findByClientId(clientId)
     if (existing) {
       if (!existing.completedAt) {
-        // The sweep counts from registration. A client registering again is
-        // about to send a user to consent, which must not outlive the row.
         await this.clientRepository.renewRegistration(existing.id, new Date())
       }
       return existing
@@ -858,7 +846,7 @@ export class OAuthService {
         expiresAt: new Date(
           Math.max(...group.map(token => token.expiresAt.getTime()))
         ),
-        createdAt: new Date(
+        grantedAt: new Date(
           Math.min(
             ...group.map(token =>
               (token.grantedAt ?? token.createdAt).getTime()
@@ -904,9 +892,8 @@ export class OAuthService {
    * An unknown token succeeds, because a revocation endpoint that reported it
    * would be a way to find out whether a token exists. A token issued to
    * another client than the one named is refused (RFC 7009 2.1). Only a live
-   * or rotated refresh token takes its grant with it: one that has expired or
-   * was revoked stands for nothing any more, and a rotated one handed back is
-   * the replay `refuseRotatedToken` ends the grant for.
+   * or rotated refresh token takes its grant with it; one that has expired or
+   * was revoked does not.
    */
   async revokeToken(params: unknown): Promise<void> {
     const parsed = revocationRequestSchema.safeParse(params)
@@ -1164,8 +1151,7 @@ export class OAuthService {
         )
       }
       // Whatever went wrong out there, the client_id is unusable here. The
-      // reason is not echoed back: it describes somebody else's server. It is
-      // kept as the cause, for the log.
+      // reason is not echoed back: it describes somebody else's server.
       throw new OAuthInvalidClientError(
         'The client metadata document could not be fetched',
         { cause: error }
@@ -1207,7 +1193,7 @@ const DEFAULT_GRANT_TYPES = ['authorization_code', 'refresh_token']
  * RFC 8707 lets a request name several resources. This server binds each
  * token to one, so several is `invalid_target` rather than a malformed
  * request. Every other repeated parameter fails its schema, which wants a
- * single string, as `invalid_request` (RFC 6749 3.1).
+ * single string, as `invalid_request` (RFC 6749 3.1, 3.2).
  */
 function refuseSeveralResources(params: unknown): void {
   if (
@@ -1245,17 +1231,15 @@ function pkceVerifies(verifier: string, challenge: string): boolean {
 }
 
 /**
- * The scopes a request is granted, or a refusal.
- *
- * A request that names no scope, or only `offline_access`, gets the read
- * scopes rather than no permission: an empty grant would mint a token that
- * can do nothing, and the client has no way to tell that from one that works. An unknown scope is refused rather
- * than dropped, so a client asking for something it will not get finds out
- * now instead of at the first call.
+ * An unknown scope is refused rather than dropped, so a client asking for
+ * something it will not get finds out now instead of at the first call.
  */
 function grantedScopes(scope: string | undefined): string[] {
   const requested = (scope ?? '').split(/\s+/).filter(Boolean)
-  if (requested.every(one => one === OFFLINE_ACCESS_SCOPE)) {
+  const asksForNoPermission = requested.every(
+    one => one === OFFLINE_ACCESS_SCOPE
+  )
+  if (asksForNoPermission) {
     return [...DEFAULT_SCOPES, ...new Set(requested)]
   }
 
@@ -1268,6 +1252,16 @@ function grantedScopes(scope: string | undefined): string[] {
   }
 
   return [...new Set(requested)]
+}
+
+/** `offline_access` asks for a refresh token, which needs the refresh grant. */
+function withoutUnusableRefresh(
+  scopes: string[],
+  client: OAuthClient
+): string[] {
+  return client.grantTypes.includes('refresh_token')
+    ? scopes
+    : scopes.filter(scope => scope !== OFFLINE_ACCESS_SCOPE)
 }
 
 /**
@@ -1327,10 +1321,7 @@ function requireClientRules(metadata: {
  * The identifier a dynamic registration gets, derived from what it registered.
  *
  * Derived rather than random so that re-registering the same client resolves
- * to the same row. The redirect URIs go in as sent, less the port on a
- * loopback host: Claude Code registering a fresh ephemeral port on every
- * connection is one client, and any other difference is a different one,
- * because authorize would not match one URI against the other. There is no secret here to protect - a public client's
+ * to the same row. There is no secret here to protect - a public client's
  * identifier is public by definition.
  */
 function dcrClientId(metadata: {

@@ -86,8 +86,6 @@ describe('DrizzleOAuthClientRepository - Integration Tests', () => {
       expect(result.metadataFetchedAt?.getTime()).toBe(fetchedAt.getTime())
     })
 
-    // Two first registrations of one client, or two first fetches of one
-    // CIMD document, race to the insert. The loser gets the winner's row.
     it('should return the existing row when the client id is already taken', async () => {
       const data = dcrClient()
 
