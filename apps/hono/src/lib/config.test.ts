@@ -161,6 +161,20 @@ describe('resolveStaticOAuthClients', () => {
     ).toThrow(/OAUTH_STATIC_CLIENTS/)
   })
 
+  it('fails at boot on a redirect URI with a fragment', () => {
+    expect(() =>
+      resolveStaticOAuthClients({
+        OAUTH_STATIC_CLIENTS: JSON.stringify([
+          {
+            client_id: 'acme',
+            client_name: 'Acme',
+            redirect_uris: ['https://acme.example.com/callback#x'],
+          },
+        ]),
+      })
+    ).toThrow(/OAUTH_STATIC_CLIENTS/)
+  })
+
   it('fails at boot on a client_id that looks like a CIMD document URL', () => {
     // An http(s) client_id is resolved by fetching it, so a static row under
     // that identifier would never be looked up in the table.

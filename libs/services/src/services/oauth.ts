@@ -24,7 +24,6 @@ import {
 import { generateSecureToken, hashToken } from '../utils/crypto.js'
 import {
   canonicalizeRedirectUri,
-  isLoopbackRedirectHost,
   matchRedirectUri,
   normalizeOAuthUri,
   redirectUriMatches,
@@ -34,6 +33,7 @@ import {
   authorizationRequestSchema,
   clientIdMetadataDocumentSchema,
   clientRegistrationSchema,
+  isUsableRedirectUri,
   refreshTokenGrantSchema,
   type ClientIdMetadataDocument,
 } from '../validation/oauth.js'
@@ -546,29 +546,7 @@ export class OAuthService {
     }
     const request = parsed.data
 
-    const authMethod = request.token_endpoint_auth_method ?? 'none'
-    if (authMethod !== 'none') {
-      // The metadata document advertises `none` and nothing else. Advertise
-      // what is implemented; a secret this server never checks is worse than
-      // no secret at all.
-      throw new OAuthInvalidClientMetadataError(
-        'This server registers public clients only (token_endpoint_auth_method must be none)'
-      )
-    }
-
-    const grantTypes = request.grant_types ?? DEFAULT_GRANT_TYPES
-    const unsupported = grantTypes.filter(
-      grant => !DEFAULT_GRANT_TYPES.includes(grant)
-    )
-    if (unsupported.length > 0) {
-      throw new OAuthInvalidClientMetadataError(
-        `Unsupported grant type: ${unsupported.join(', ')}`
-      )
-    }
-
-    const redirectUris = request.redirect_uris.map(uri =>
-      requireUsableRedirectUri(uri)
-    )
+    const { redirectUris, grantTypes, authMethod } = requireClientRules(request)
 
     const clientId = dcrClientId({
       clientName: request.client_name ?? null,
@@ -617,9 +595,9 @@ export class OAuthService {
     }[]
   ): Promise<void> {
     for (const client of clients) {
-      const redirectUris = client.redirectUris.map(uri =>
-        requireUsableRedirectUri(uri)
-      )
+      const { redirectUris, grantTypes, authMethod } = requireClientRules({
+        redirect_uris: client.redirectUris,
+      })
 
       const existing = await this.clientRepository.findByClientId(
         client.clientId
@@ -630,8 +608,8 @@ export class OAuthService {
           clientId: client.clientId,
           clientName: client.clientName,
           redirectUris,
-          grantTypes: DEFAULT_GRANT_TYPES,
-          tokenEndpointAuthMethod: 'none',
+          grantTypes,
+          tokenEndpointAuthMethod: authMethod,
           registrationType: 'static',
           metadataUrl: null,
           metadataFetchedAt: null,
@@ -937,14 +915,16 @@ export class OAuthService {
     }
 
     const document = await this.fetchClientIdMetadataDocument(url, clientId)
+    const { redirectUris, grantTypes, authMethod } =
+      requireClientRules(document)
     const fetchedAt = new Date()
 
     if (cached) {
       const updated = await this.clientRepository.update(cached.id, {
         clientName: document.client_name ?? null,
-        redirectUris: document.redirect_uris,
-        grantTypes: document.grant_types ?? DEFAULT_GRANT_TYPES,
-        tokenEndpointAuthMethod: document.token_endpoint_auth_method ?? 'none',
+        redirectUris,
+        grantTypes,
+        tokenEndpointAuthMethod: authMethod,
         metadataUrl: clientId,
         metadataFetchedAt: fetchedAt,
       })
@@ -954,9 +934,9 @@ export class OAuthService {
     return this.clientRepository.create({
       clientId,
       clientName: document.client_name ?? null,
-      redirectUris: document.redirect_uris,
-      grantTypes: document.grant_types ?? DEFAULT_GRANT_TYPES,
-      tokenEndpointAuthMethod: document.token_endpoint_auth_method ?? 'none',
+      redirectUris,
+      grantTypes,
+      tokenEndpointAuthMethod: authMethod,
       registrationType: 'cimd',
       metadataUrl: clientId,
       metadataFetchedAt: fetchedAt,
@@ -1134,28 +1114,49 @@ function narrowedScopes(scope: string, granted: string[]): string[] {
  * connection breakage from the outside.
  */
 /**
- * A redirect URI a client may register.
+ * The rules every client is held to, whichever way it arrived: registered
+ * (DCR), published (CIMD) or configured (static). Applied before anything is
+ * stored, so no path is a way around the others.
  *
- * https anywhere, and plaintext only on loopback, where there is no network
- * to intercept and RFC 8252 expects it. A plaintext URI on a real host would
- * carry an authorization code across the internet in the clear.
+ * Public clients only: the server metadata advertises
+ * `token_endpoint_auth_method` `none` and nothing else, and a client that
+ * expects a secret or a key to be checked is refused rather than silently
+ * served as one that does not. Only the grant types this server implements,
+ * and redirect URIs it is willing to send a browser to.
  */
-function requireUsableRedirectUri(uri: string): string {
-  let url: URL
-  try {
-    url = new URL(uri)
-  } catch {
-    throw new OAuthInvalidClientMetadataError(`Unusable redirect_uri: ${uri}`)
+function requireClientRules(metadata: {
+  redirect_uris: string[]
+  grant_types?: string[]
+  token_endpoint_auth_method?: string
+}): { redirectUris: string[]; grantTypes: string[]; authMethod: 'none' } {
+  if ((metadata.token_endpoint_auth_method ?? 'none') !== 'none') {
+    throw new OAuthInvalidClientMetadataError(
+      'This server registers public clients only (token_endpoint_auth_method must be none)'
+    )
   }
 
-  if (url.protocol === 'https:') return uri
-  if (url.protocol === 'http:' && isLoopbackRedirectHost(url.hostname)) {
-    return uri
-  }
-
-  throw new OAuthInvalidClientMetadataError(
-    `redirect_uri must be https, or http on loopback: ${uri}`
+  const grantTypes = metadata.grant_types ?? DEFAULT_GRANT_TYPES
+  const unsupported = grantTypes.filter(
+    grant => !DEFAULT_GRANT_TYPES.includes(grant)
   )
+  if (unsupported.length > 0) {
+    throw new OAuthInvalidClientMetadataError(
+      `Unsupported grant type: ${unsupported.join(', ')}`
+    )
+  }
+
+  const unusable = metadata.redirect_uris.find(uri => !isUsableRedirectUri(uri))
+  if (unusable !== undefined) {
+    throw new OAuthInvalidClientMetadataError(
+      `redirect_uri must be https, or http on loopback, with no fragment: ${unusable}`
+    )
+  }
+
+  return {
+    redirectUris: metadata.redirect_uris,
+    grantTypes,
+    authMethod: 'none',
+  }
 }
 
 /**

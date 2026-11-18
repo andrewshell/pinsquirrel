@@ -135,10 +135,17 @@ export type ClientIdMetadataDocument = z.infer<
 
 /**
  * A redirect URI this server is willing to send a browser to: https, or http
- * on a loopback host. Same rule the registration path applies, stated here so
- * an operator's typo fails at boot rather than at the first consent screen.
+ * on a loopback host, where there is no network to intercept and RFC 8252
+ * expects it. A plaintext URI on a real host would carry an authorization code
+ * across the internet in the clear. No fragment, which RFC 6749 3.1.2 forbids:
+ * the code and `state` go in the query, and a fragment would follow them.
+ *
+ * The one rule for every way a client arrives (registration, metadata
+ * document, operator config), so the config fails at boot on what the
+ * registration path would refuse.
  */
-function isUsableRedirectUri(uri: string): boolean {
+export function isUsableRedirectUri(uri: string): boolean {
+  if (uri.includes('#')) return false
   let url: URL
   try {
     url = new URL(uri)
@@ -176,7 +183,7 @@ export const staticOAuthClientsSchema = z
       redirect_uris: z
         .array(
           z.string().min(1).refine(isUsableRedirectUri, {
-            message: 'must be https, or http on loopback',
+            message: 'must be https, or http on loopback, with no fragment',
           })
         )
         .min(1, 'at least one redirect_uri is required'),

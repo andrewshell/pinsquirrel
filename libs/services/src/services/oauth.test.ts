@@ -407,6 +407,57 @@ describe('OAuthService.resolveClient', () => {
     )
   })
 
+  // A published document is held to the rules a registration is: anything
+  // else would make CIMD the way around them.
+  it.each([
+    [
+      'a plaintext redirect URI that is not loopback',
+      { redirect_uris: ['http://client.example/cb'] },
+    ],
+    ['a custom-scheme redirect URI', { redirect_uris: ['myapp:/cb'] }],
+    [
+      'a redirect URI with a fragment',
+      { redirect_uris: ['https://client.example/cb#x'] },
+    ],
+    [
+      'auth method private_key_jwt',
+      { token_endpoint_auth_method: 'private_key_jwt' },
+    ],
+    [
+      'auth method client_secret_basic',
+      { token_endpoint_auth_method: 'client_secret_basic' },
+    ],
+    [
+      'a grant type this server does not implement',
+      { grant_types: ['authorization_code', 'client_credentials'] },
+    ],
+  ])('refuses a document with %s and stores nothing', async (_, patch) => {
+    vi.mocked(ctx.fetcher.fetch).mockResolvedValue(
+      JSON.stringify({ ...cimdDocument, ...patch })
+    )
+
+    await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(
+      OAuthInvalidClientMetadataError
+    )
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses to refresh a cached row from a document that breaks the rules', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({
+        metadataFetchedAt: new Date(Date.now() - 48 * 60 * 60 * 1000),
+      })
+    )
+    vi.mocked(ctx.fetcher.fetch).mockResolvedValue(
+      JSON.stringify({ ...cimdDocument, redirect_uris: ['myapp:/cb'] })
+    )
+
+    await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(
+      OAuthInvalidClientMetadataError
+    )
+    expect(ctx.clientRepository.update).not.toHaveBeenCalled()
+  })
+
   it('refuses a document it could not fetch at all', async () => {
     vi.mocked(ctx.fetcher.fetch).mockRejectedValue(new Error('ECONNREFUSED'))
 
@@ -1157,6 +1208,15 @@ describe('OAuthService.registerClient', () => {
     ).rejects.toBeInstanceOf(OAuthInvalidClientMetadataError)
   })
 
+  it('refuses a redirect URI with a fragment', async () => {
+    await expect(
+      ctx.service.registerClient(
+        registration({ redirect_uris: ['https://example.com/callback#x'] })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidClientMetadataError)
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
   it('refuses an authentication method this server does not advertise', async () => {
     await expect(
       ctx.service.registerClient(
@@ -1494,6 +1554,15 @@ describe('OAuthService.reconcileStaticClients', () => {
     await ctx.service.reconcileStaticClients([])
 
     expect(ctx.clientRepository.delete).not.toHaveBeenCalled()
+  })
+
+  it('refuses a redirect URI with a fragment', async () => {
+    await expect(
+      ctx.service.reconcileStaticClients([
+        { ...acme, redirectUris: ['https://acme.example.com/callback#x'] },
+      ])
+    ).rejects.toThrow(OAuthInvalidClientMetadataError)
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
   it('refuses a redirect URI this server would never redirect to', async () => {
