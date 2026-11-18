@@ -1124,6 +1124,37 @@ describe('revocation', () => {
     })
     expect(call.status).toBe(401)
   })
+  it('refuses a revocation with no token as malformed', async () => {
+    const res = await request(
+      pathOf(metadata.revocation_endpoint),
+      form({ client_id: clientId })
+    )
+
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as { error: string }).error).toBe(
+      'invalid_request'
+    )
+  })
+
+  it('refuses to revoke a token for a client it was not issued to, and it keeps working', async () => {
+    const granted = await connect({ resource: mcpResource })
+
+    const res = await request(
+      pathOf(metadata.revocation_endpoint),
+      form({ token: granted.refresh_token ?? '', client_id: 'dcr_another' })
+    )
+
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as { error: string }).error).toBe(
+      'invalid_grant'
+    )
+    const call = await mcpRequest(granted.access_token, {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/list',
+    })
+    expect(call.status).toBe(200)
+  })
 })
 
 describe('two connections of one client', () => {

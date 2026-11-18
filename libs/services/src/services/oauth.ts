@@ -41,6 +41,7 @@ import {
   isUsableRedirectUri,
   MAX_CLIENT_ID_LENGTH,
   refreshTokenGrantSchema,
+  revocationRequestSchema,
   type ClientIdMetadataDocument,
 } from '../validation/oauth.js'
 import { validateUrlForFetching } from '../validation/url.js'
@@ -871,24 +872,34 @@ export class OAuthService {
   /**
    * Hand a token back (RFC 7009).
    *
-   * Always succeeds, whatever was presented. An unknown token, an already dead
-   * one and one belonging to a different client all answer the same way,
-   * because a revocation endpoint that reported which was which would be a way
-   * to find out whether a token exists.
+   * An unknown token succeeds, because a revocation endpoint that reported it
+   * would be a way to find out whether a token exists. A token issued to
+   * another client than the one named is refused (RFC 7009 2.1). Only a live
+   * or rotated refresh token takes its grant with it: one that has expired or
+   * was revoked stands for nothing any more, and a rotated one handed back is
+   * the replay `refuseRotatedToken` ends the grant for.
    */
-  async revokeToken(input: {
-    token: string
-    client_id?: string
-    token_type_hint?: string
-  }): Promise<void> {
+  async revokeToken(params: unknown): Promise<void> {
+    const parsed = revocationRequestSchema.safeParse(params)
+    if (!parsed.success) {
+      throw validationErrorFromZod(parsed.error, {
+        fallbackField: 'revocation_request',
+      })
+    }
+    const request = parsed.data
+
     const token = await this.tokenRepository.findByTokenHash(
-      hashToken(input.token)
+      hashToken(request.token)
     )
     if (!token) {
       return
     }
 
-    if (input.client_id && token.clientId !== input.client_id) {
+    if (request.client_id && token.clientId !== request.client_id) {
+      throw new OAuthInvalidGrantError('The token was issued to another client')
+    }
+
+    if (token.revokedAt || token.expiresAt <= new Date()) {
       return
     }
 

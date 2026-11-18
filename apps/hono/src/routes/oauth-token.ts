@@ -138,9 +138,10 @@ oauthToken.post('/token', async c => {
  * approval, and no other connection of that client. The profile page's Revoke
  * is the wider one, and ends every grant the user gave the client.
  *
- * Always 200. An unknown token, an already dead one, and one belonging to
- * another client all answer identically, because reporting which was which
- * would be a way to find out whether a token exists.
+ * An unknown or already dead token answers 200, as a revoked one does,
+ * because telling them apart would be a way to find out whether a token
+ * exists. A request with no token, or with a `client_id` the token was not
+ * issued to, is refused.
  */
 oauthToken.post('/revoke', async c => {
   if (!isFormEncoded(c)) {
@@ -154,16 +155,16 @@ oauthToken.post('/revoke', async c => {
     )
   }
 
-  const params = await formParams(c)
-
-  if (params.token) {
-    await oauthService.revokeToken({
-      token: params.token,
-      ...(params.client_id ? { client_id: params.client_id } : {}),
-      ...(params.token_type_hint
-        ? { token_type_hint: params.token_type_hint }
-        : {}),
-    })
+  try {
+    await oauthService.revokeToken(await formParams(c))
+  } catch (error) {
+    if (error instanceof OAuthError) {
+      return errorResponse(c, error.code, error.message)
+    }
+    if (error instanceof ValidationError) {
+      return errorResponse(c, 'invalid_request', describeValidationError(error))
+    }
+    throw error
   }
 
   return c.body(null, 200, NO_STORE as Record<string, string>)

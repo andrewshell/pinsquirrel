@@ -1952,14 +1952,70 @@ describe('OAuthService.revokeToken', () => {
     expect(liveTokenIds(ctx.store)).toHaveLength(4)
   })
 
-  it('leaves a token that belongs to another client alone, and still says nothing', async () => {
+  // RFC 7009 2.1: the server checks the token was issued to the client asking.
+  it('refuses a token that belongs to another client, and leaves it alone', async () => {
     await expect(
       ctx.service.revokeToken({
-        token: 'laptop-access',
+        token: 'laptop-refresh',
         client_id: 'dcr_someone_else',
       })
-    ).resolves.toBeUndefined()
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
     expect(liveTokenIds(ctx.store)).toHaveLength(4)
+  })
+
+  it('refuses a request with no token as malformed', async () => {
+    await expect(
+      ctx.service.revokeToken({ client_id: CIMD_URL })
+    ).rejects.toBeInstanceOf(ValidationError)
+  })
+
+  it('refuses a token sent twice as malformed', async () => {
+    await expect(
+      ctx.service.revokeToken({
+        token: ['laptop-access', 'desktop-access'],
+        client_id: CIMD_URL,
+      })
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(liveTokenIds(ctx.store)).toHaveLength(4)
+  })
+
+  it.each([
+    ['expired', { expiresAt: new Date(Date.now() - 1000) }],
+    ['revoked', { revokedAt: new Date(Date.now() - 1000) }],
+  ])(
+    'leaves the grant alone when the refresh token handed back is already %s',
+    async (_, dead) => {
+      Object.assign(
+        ctx.store.tokens.find(token => token.id === 'laptop-refresh')!,
+        dead
+      )
+
+      await ctx.service.revokeToken({
+        token: 'laptop-refresh',
+        client_id: CIMD_URL,
+      })
+
+      expect(liveTokenIds(ctx.store)).toContain('laptop-access')
+    }
+  )
+
+  // A rotated token handed back is the replay `refuseRotatedToken` answers by
+  // ending the grant; revocation agrees with it.
+  it('still takes the grant when the refresh token handed back was rotated', async () => {
+    Object.assign(
+      ctx.store.tokens.find(token => token.id === 'laptop-refresh')!,
+      { rotatedAt: new Date(Date.now() - 1000) }
+    )
+
+    await ctx.service.revokeToken({
+      token: 'laptop-refresh',
+      client_id: CIMD_URL,
+    })
+
+    expect(liveTokenIds(ctx.store)).toEqual([
+      'desktop-access',
+      'desktop-refresh',
+    ])
   })
 })
 

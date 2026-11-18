@@ -343,10 +343,35 @@ describe('POST /oauth/revoke', () => {
     expect(res.status).toBe(200)
   })
 
-  it('answers 200 without calling the service when no token was sent', async () => {
+  it('answers 400 invalid_request when the service finds the request malformed', async () => {
+    mockRevokeToken.mockRejectedValue(
+      new ValidationError({ token: ['Required'] })
+    )
+
     const res = await app.request('/oauth/revoke', form({ client_id: 'c' }))
 
-    expect(res.status).toBe(200)
-    expect(mockRevokeToken).not.toHaveBeenCalled()
+    expect(res.status).toBe(400)
+    expect(res.headers.get('Cache-Control')).toBe('no-store')
+    expect(await res.json()).toEqual({
+      error: 'invalid_request',
+      error_description: 'token: Required',
+    })
+  })
+
+  it('answers 400 with the code the service refuses a token with', async () => {
+    mockRevokeToken.mockRejectedValue(
+      new OAuthInvalidGrantError('The token was issued to another client')
+    )
+
+    const res = await app.request(
+      '/oauth/revoke',
+      form({ token: 'pso_x', client_id: 'other' })
+    )
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({
+      error: 'invalid_grant',
+      error_description: 'The token was issued to another client',
+    })
   })
 })

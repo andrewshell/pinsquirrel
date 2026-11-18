@@ -98,6 +98,17 @@ export const refreshTokenGrantSchema = z.object({
 export type RefreshTokenGrantParams = z.infer<typeof refreshTokenGrantSchema>
 
 /**
+ * An RFC 7009 revocation request. `client_id` stays optional: RFC 6749 2.3.1
+ * lets a public client leave it out, and the token itself is the proof of
+ * possession. When it is sent, it has to match.
+ */
+export const revocationRequestSchema = z.object({
+  token: z.string().min(1),
+  client_id: clientIdValue.optional(),
+  token_type_hint: parameterValue.optional(),
+})
+
+/**
  * Either grant. The token endpoint dispatches on `grant_type`, so anything
  * else is `unsupported_grant_type` rather than a malformed request.
  */
