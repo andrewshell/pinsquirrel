@@ -14,7 +14,10 @@ vi.mock('../lib/services', () => ({
   },
 }))
 
-import { oauthRegisterLimiter } from '../middleware/rate-limit'
+import {
+  oauthRegisterLimiter,
+  oauthRegisterNetworkLimiter,
+} from '../middleware/rate-limit'
 import { TEST_CLIENT_IP, exhaust } from '../test-support/rate-limit'
 
 const { oauthRegisterRoutes } = await import('./oauth-register')
@@ -54,6 +57,7 @@ describe('POST /oauth/register', () => {
     // The limiter is a module-level singleton, so each case starts with its
     // own budget rather than inheriting whatever the last one spent.
     oauthRegisterLimiter.reset(TEST_CLIENT_IP)
+    oauthRegisterNetworkLimiter.reset(TEST_CLIENT_IP)
     app = new Hono()
     app.route('/oauth', oauthRegisterRoutes)
   })

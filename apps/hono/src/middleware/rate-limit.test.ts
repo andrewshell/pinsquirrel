@@ -4,6 +4,7 @@ import { RateLimiter } from './rate-limiter'
 import {
   apiV1Limiter,
   clientAddressKey,
+  clientNetworkKey,
   getClientIp,
   mcpLimiter,
   rateLimitByIp,
@@ -361,6 +362,25 @@ describe('signinRateLimitKey', () => {
     } finally {
       vi.unstubAllGlobals()
     }
+  })
+
+  it.each([
+    ['1.2.3.4', '1.2.3.4'],
+    ['::ffff:1.2.3.4', '1.2.3.4'],
+    ['::1', '::1'],
+    ['2001:db8:1:2:3:4:5:6', '2001:db8:1::/48'],
+    ['2001:db8::1', '2001:db8:0::/48'],
+  ])('keys the network around %s as %s', async (address, expected) => {
+    const app = new Hono()
+    let key = ''
+    app.get('/test', c => {
+      key = clientNetworkKey(c)
+      return c.text('ok')
+    })
+
+    await app.request('/test', undefined, from(address))
+
+    expect(key).toBe(expected)
   })
 
   it('keys an IPv6 caller on its /64', async () => {

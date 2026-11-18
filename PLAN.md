@@ -318,7 +318,8 @@ manifest's `host_permissions`, and the session cookie is only `Secure` in produc
 3. The redirect URI is `http://localhost:8100/oauth/extension/callback`, a page on the server
    that needs no session. The DCR `client_id` is derived from the metadata, so one extension
    dedups to one `oauth_clients` row, and the manifest's `key` fixes the ID, so a second
-   checkout is the same row. `/oauth/register` allows ten per IP per hour.
+   checkout is the same row. `/oauth/register` allows ten per IP (or IPv6 /64) per hour, and
+   thirty per IPv6 /48.
 4. Tick tags, Sync Now, and check the bookmarks bar for a "PinSquirrel" folder. Revoke from
    `/profile` and confirm the options page comes back on Connect with a notice rather than
    failing silently.
@@ -549,6 +550,11 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     other addresses refuse that client's real users. Authorization codes and refresh tokens
     are 32 random bytes, so there is nothing a distributed caller could guess; the per-/64
     budget bounds each caller.
+34. **Dynamic client registration is also counted per IPv6 /48, and its metadata is bounded.**
+    A routed /48 holds 65,536 /64s, each with its own budget of ten an hour, so `/register`
+    also allows thirty an hour per /48, checked together with the /64 budget. A registration
+    carries at most ten redirect URIs of at most 512 characters each, the width of the
+    column an authorization code stores its redirect URI in.
 
 ## Reference
 

@@ -1,7 +1,7 @@
 import { BlockList, isIP } from 'node:net'
 import type { Context, MiddlewareHandler } from 'hono'
 import { getConnInfo } from '@hono/node-server/conninfo'
-import { RateLimiter } from './rate-limiter'
+import { RateLimiter, reserve } from './rate-limiter'
 import { expectsJsonError } from '../lib/error-response.js'
 
 // getConnInfo reaches into c.env.incoming.socket, which only exists when the
@@ -94,17 +94,29 @@ export function getClientIp(c: Context): string {
  * Loopback and the unspecified address are single hosts, not subscribers.
  */
 export function clientAddressKey(c: Context): string {
-  const address = getClientIp(c)
+  return addressKey(getClientIp(c), 64)
+}
+
+/**
+ * The network around the caller: an IPv6 caller's /48, and otherwise the same
+ * key as `clientAddressKey`. A routed /48 is free from tunnel brokers and holds
+ * 65,536 /64s, each with its own `clientAddressKey` budget.
+ */
+export function clientNetworkKey(c: Context): string {
+  return addressKey(getClientIp(c), 48)
+}
+
+function addressKey(address: string, prefixBits: 48 | 64): string {
   if (isIP(address) !== 6) return address
   try {
-    return ipv6Key(address)
+    return ipv6Key(address, prefixBits)
   } catch {
     // A key the limiter cannot canonicalise still has to count, never 500.
     return address
   }
 }
 
-function ipv6Key(address: string): string {
+function ipv6Key(address: string, prefixBits: 48 | 64): string {
   // Zone ids (`fe80::1%eth0`) name a local interface, not a different peer,
   // and the URL parser rejects them.
   const bare = address.split('%')[0]
@@ -126,7 +138,7 @@ function ipv6Key(address: string): string {
     ...Array<string>(8 - leading.length - trailing.length).fill('0'),
     ...trailing,
   ]
-  return `${groups.slice(0, 4).join(':')}::/64`
+  return `${groups.slice(0, prefixBits / 16).join(':')}::/${prefixBits}`
 }
 
 export const signinLimiter = new RateLimiter({
@@ -180,6 +192,17 @@ export const forgotPasswordLimiter = new RateLimiter({
  */
 export const oauthRegisterLimiter = new RateLimiter({
   maxAttempts: 10,
+  windowMs: 60 * 60 * 1000,
+})
+
+/**
+ * Dynamic client registration, per IPv6 /48, beside the per-/64 limit above.
+ * Three /64s' worth: enough for a site that numbers each office or household
+ * from one /48, while one holder of a /48 can no longer multiply the
+ * per-/64 budget by 65,536.
+ */
+export const oauthRegisterNetworkLimiter = new RateLimiter({
+  maxAttempts: 30,
   windowMs: 60 * 60 * 1000,
 })
 
@@ -255,6 +278,28 @@ export function rateLimitByIp(
 ): MiddlewareHandler {
   return async (c, next) => {
     const result = limiter.hit(clientAddressKey(c))
+    if (result.limited) {
+      return refuse(c, message, result.retryAfterMs)
+    }
+    await next()
+  }
+}
+
+/**
+ * `rateLimitByIp`, plus a second budget for the network around the caller
+ * (`clientNetworkKey`). Both are checked before either is spent, so a request
+ * one of them refuses costs the other nothing.
+ */
+export function rateLimitByIpAndNetwork(
+  addressLimiter: RateLimiter,
+  networkLimiter: RateLimiter,
+  message: string
+): MiddlewareHandler {
+  return async (c, next) => {
+    const result = reserve([
+      [addressLimiter, clientAddressKey(c)],
+      [networkLimiter, clientNetworkKey(c)],
+    ])
     if (result.limited) {
       return refuse(c, message, result.retryAfterMs)
     }

@@ -6,7 +6,8 @@ import { oauthService } from '../lib/services.js'
 import { describeValidationError } from '../lib/oauth-error.js'
 import {
   oauthRegisterLimiter,
-  rateLimitByIp,
+  oauthRegisterNetworkLimiter,
+  rateLimitByIpAndNetwork,
 } from '../middleware/rate-limit.js'
 
 /**
@@ -21,7 +22,8 @@ import {
  *
  * A per-IP quota bounds it further, and it is the tightest limit in the app:
  * the endpoint is unauthenticated and it creates rows, while a real client
- * registers once per fresh connection. A refusal is a plain `429` with
+ * registers once per fresh connection. An IPv6 caller is also counted by its
+ * /48, so holding many /64s does not multiply the quota. A refusal is a plain `429` with
  * `Retry-After`; RFC 7591 has no error code that means "later".
  *
  * `application/json` only. `/oauth/token` is the form-encoded one; the two do
@@ -67,8 +69,9 @@ const oauthRegister = new Hono()
 // consent screen, and a wildcard would count every page under that prefix.
 oauthRegister.use(
   '/register',
-  rateLimitByIp(
+  rateLimitByIpAndNetwork(
     oauthRegisterLimiter,
+    oauthRegisterNetworkLimiter,
     'Too many client registrations. Please try again later.'
   )
 )
