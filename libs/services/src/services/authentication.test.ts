@@ -30,7 +30,6 @@ vi.mock('../utils/crypto.js', () => ({
   hashEmail: vi.fn().mockImplementation((email: string) => `hashed_${email}`),
   generateSecureToken: vi.fn().mockReturnValue('mock-token'),
   hashToken: vi.fn().mockImplementation((token: string) => `hashed_${token}`),
-  getDummyHash: vi.fn().mockReturnValue('dummy_salt:dummy_key'),
 }))
 
 import { needsRehash, verifyPassword } from '../utils/crypto.js'
@@ -137,10 +136,7 @@ describe('AuthenticationService', () => {
         InvalidCredentialsError
       )
       // verifyPassword should still be called (timing side-channel mitigation)
-      expect(verifyPassword).toHaveBeenCalledWith(
-        'password12345',
-        'dummy_salt:dummy_key'
-      )
+      expect(verifyPassword).toHaveBeenCalledWith('password12345', null)
     })
 
     it('should throw InvalidCredentialsError for user without password hash', async () => {
@@ -159,10 +155,7 @@ describe('AuthenticationService', () => {
         InvalidCredentialsError
       )
       // Should use dummy hash when passwordHash is null
-      expect(verifyPassword).toHaveBeenCalledWith(
-        'password12345',
-        'dummy_salt:dummy_key'
-      )
+      expect(verifyPassword).toHaveBeenCalledWith('password12345', null)
     })
 
     it('should throw InvalidCredentialsError for wrong password', async () => {
@@ -660,10 +653,7 @@ describe('AuthenticationService', () => {
       await expect(authService.loginForBootstrap(credentials)).rejects.toThrow(
         InvalidCredentialsError
       )
-      expect(verifyPassword).toHaveBeenCalledWith(
-        'password12345',
-        'dummy_salt:dummy_key'
-      )
+      expect(verifyPassword).toHaveBeenCalledWith('password12345', null)
     })
 
     // The credentials are checked first, so the route cannot be used to ask

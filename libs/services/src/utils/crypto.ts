@@ -89,15 +89,14 @@ function parseHash(hash: string): ParsedHash | null {
   }
 }
 
-const DUMMY_HASH = formatHash(
-  CURRENT_PARAMS,
-  randomBytes(SALT_LENGTH),
-  randomBytes(KEY_LENGTH)
-)
+// Every parameter set a stored hash can have. Each verification derives one
+// key at every one of these, the stored hash's own with its salt and the rest
+// with a throwaway salt, so the time a sign-in takes does not say whether the
+// account exists or which kind of hash it has.
+const KNOWN_PARAMS: ScryptParams[] = [CURRENT_PARAMS, LEGACY_PARAMS]
 
-export function getDummyHash(): string {
-  return DUMMY_HASH
-}
+const sameParams = (a: ScryptParams, b: ScryptParams) =>
+  a.N === b.N && a.r === b.r && a.p === b.p
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(SALT_LENGTH)
@@ -107,14 +106,20 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(
   password: string,
-  hash: string
+  hash: string | null
 ): Promise<boolean> {
   try {
-    const parsed = parseHash(hash)
-    if (!parsed) return false
-
-    const key = await deriveKey(password, parsed.salt, parsed.params)
-    return timingSafeEqual(parsed.key, key)
+    const parsed = hash === null ? null : parseHash(hash)
+    const decoys = KNOWN_PARAMS.filter(
+      params => !parsed || !sameParams(params, parsed.params)
+    )
+    const [key] = await Promise.all([
+      parsed && deriveKey(password, parsed.salt, parsed.params),
+      ...decoys.map(params =>
+        deriveKey(password, randomBytes(SALT_LENGTH), params)
+      ),
+    ])
+    return parsed !== null && key !== null && timingSafeEqual(parsed.key, key)
   } catch {
     return false
   }

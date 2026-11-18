@@ -12,12 +12,7 @@ import {
   UnauthorizedUserAccessError,
   AdminAlreadyExistsError,
 } from '@pinsquirrel/domain'
-import {
-  hashPassword,
-  verifyPassword,
-  getDummyHash,
-  needsRehash,
-} from '../utils/crypto.js'
+import { hashPassword, verifyPassword, needsRehash } from '../utils/crypto.js'
 import { credentialsSchema, passwordChangeSchema } from '../validation/user.js'
 import { validationErrorFromZod } from '../validation/zod-error.js'
 
@@ -63,8 +58,10 @@ export class AuthenticationService {
     }
 
     const user = await this.userRepository.findByUsername(input.username)
-    const passwordHash = user?.passwordHash ?? getDummyHash()
-    const isValidPassword = await verifyPassword(input.password, passwordHash)
+    const isValidPassword = await verifyPassword(
+      input.password,
+      user?.passwordHash ?? null
+    )
 
     if (!user || !user.passwordHash || !isValidPassword) {
       throw new InvalidCredentialsError()
