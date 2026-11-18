@@ -1,5 +1,6 @@
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import type {
+  EmailChangeRepository,
   OAuthAuthorizationCodeRepository,
   OAuthClientRepository,
   OAuthTokenRepository,
@@ -9,6 +10,7 @@ import type {
   TagRepository,
   UserRepository,
 } from '@pinsquirrel/domain'
+import { DrizzleEmailChangeRepository } from './repositories/email-change.js'
 import { DrizzleOAuthAuthorizationCodeRepository } from './repositories/oauth-authorization-code.js'
 import { DrizzleOAuthClientRepository } from './repositories/oauth-client.js'
 import { DrizzleOAuthTokenRepository } from './repositories/oauth-token.js'
@@ -23,6 +25,7 @@ export interface Repositories {
   tagRepository: TagRepository
   pinRepository: PinRepository
   passwordResetRepository: PasswordResetRepository
+  emailChangeRepository: EmailChangeRepository
   sessionRepository: SessionRepository
   oauthClientRepository: OAuthClientRepository
   oauthAuthorizationCodeRepository: OAuthAuthorizationCodeRepository
@@ -50,6 +53,7 @@ export function createRepositories(db: MySql2Database): Repositories {
     // interface — see its constructor for why.
     pinRepository: new DrizzlePinRepository(db, tagRepository),
     passwordResetRepository: new DrizzlePasswordResetRepository(db),
+    emailChangeRepository: new DrizzleEmailChangeRepository(db),
     sessionRepository: new DrizzleSessionRepository(db),
     oauthClientRepository: new DrizzleOAuthClientRepository(db),
     oauthAuthorizationCodeRepository:

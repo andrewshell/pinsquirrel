@@ -55,7 +55,7 @@ export function ProfilePage({
 
       <div class="space-y-6">
         <AccountCard user={user} />
-        <EmailForm errors={errors} embed={embed} />
+        <EmailForm user={user} errors={errors} embed={embed} />
         <PasswordForm user={user} errors={errors} embed={embed} />
         <OAuthGrantsCard grants={grants} embed={embed} />
         <BookmarkletCard />

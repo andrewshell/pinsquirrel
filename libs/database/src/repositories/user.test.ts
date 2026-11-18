@@ -16,6 +16,7 @@ import { DrizzleOAuthAuthorizationCodeRepository } from './oauth-authorization-c
 import { DrizzleOAuthClientRepository } from './oauth-client.js'
 import { DrizzleOAuthTokenRepository } from './oauth-token.js'
 import { DrizzleSessionRepository } from './session.js'
+import { DrizzleEmailChangeRepository } from './email-change.js'
 import { DrizzleUserRepository } from './user.js'
 import { Role, UserAlreadyExistsError, UserStatus } from '@pinsquirrel/domain'
 
@@ -650,6 +651,34 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     })
   })
 
+  describe('deleteStaleUnverified', () => {
+    const cutoff = new Date('2026-01-08T00:00:00Z')
+
+    it('deletes an unverified account created before the cutoff', async () => {
+      const { id } = await insertUser(testPool, {
+        status: 'unverified',
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+      })
+
+      expect(await repository.deleteStaleUnverified(id, cutoff)).toBe(true)
+      expect(await repository.findById(id)).toBeNull()
+    })
+
+    it.each([
+      ['a verified account', 'waitlist', '2026-01-01T00:00:00Z'],
+      ['an active account', 'active', '2026-01-01T00:00:00Z'],
+      ['a recent unverified account', 'unverified', '2026-01-09T00:00:00Z'],
+    ] as const)('keeps %s', async (_label, status, createdAt) => {
+      const { id } = await insertUser(testPool, {
+        status,
+        createdAt: new Date(createdAt),
+      })
+
+      expect(await repository.deleteStaleUnverified(id, cutoff)).toBe(false)
+      expect(await repository.findById(id)).not.toBeNull()
+    })
+  })
+
   describe('revokeSessionsAndTokens', () => {
     const later = () => new Date(Date.now() + 60 * 60 * 1000)
 
@@ -722,6 +751,31 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       await repository.revokeSessionsAndTokens(userId)
 
       expect(await codes.consume(code.codeHash)).toBeNull()
+    })
+
+    it('cancels a pending email change, leaving others alone', async () => {
+      const { id: userId } = await insertUser(testPool)
+      const { id: bystanderId } = await insertUser(testPool, {
+        emailHash: 'bystander_email',
+      })
+      const changes = new DrizzleEmailChangeRepository(testDb)
+      for (const [id, tokenHash] of [
+        [userId, 'pending-change'],
+        [bystanderId, 'bystander-change'],
+      ]) {
+        await changes.save({
+          userId: id,
+          tokenHash,
+          emailHash: `new-${tokenHash}`,
+          emailEncrypted: null,
+          expiresAt: later(),
+        })
+      }
+
+      await repository.revokeSessionsAndTokens(userId)
+
+      expect(await changes.consume('pending-change')).toBeNull()
+      expect(await changes.consume('bystander-change')).not.toBeNull()
     })
 
     it('keeps the one session it is told to keep', async () => {

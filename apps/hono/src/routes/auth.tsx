@@ -31,6 +31,7 @@ import { SignInPage } from '../views/pages/signin'
 import { SignUpPage } from '../views/pages/signup'
 import { ForgotPasswordPage } from '../views/pages/forgot-password'
 import { ResetPasswordPage } from '../views/pages/reset-password'
+import { ConfirmEmailPage } from '../views/pages/confirm-email'
 
 const auth = new Hono()
 
@@ -177,7 +178,7 @@ auth.post(
     const embed = getString(formData.embed) === '1'
 
     try {
-      const result = await accountService.register({
+      accountService.register({
         username,
         email,
         resetUrl: `${baseUrl}/reset-password`,
@@ -185,18 +186,6 @@ auth.post(
         signinUrl: `${baseUrl}/signin`,
         signupUrl: `${baseUrl}/signup`,
       })
-
-      if (result.emailFailed) {
-        logger.error('Verification email failed to send during signup')
-        return c.html(
-          <SignUpPage
-            success={true}
-            message="You're on the waitlist, but we had trouble sending your confirmation email."
-            showResendLink={true}
-            embed={embed}
-          />
-        )
-      }
 
       // Always show success - conflicts are communicated privately via email
       return c.html(
@@ -263,7 +252,7 @@ auth.post(
 
     try {
       // Request password reset - service handles validation
-      await accountService.requestPasswordReset({
+      accountService.requestPasswordReset({
         email,
         resetUrl: `${baseUrl}/reset-password`,
       })
@@ -297,6 +286,15 @@ auth.post(
     }
   }
 )
+
+auth.get('/confirm-email/:token', c =>
+  c.html(<ConfirmEmailPage state="ask" token={c.req.param('token')} />)
+)
+
+auth.post('/confirm-email/:token', async c => {
+  const changed = await accountService.confirmEmailChange(c.req.param('token'))
+  return c.html(<ConfirmEmailPage state={changed ? 'done' : 'invalid'} />)
+})
 
 // GET /reset-password/:token - Render reset password form
 auth.get('/reset-password/:token', async c => {

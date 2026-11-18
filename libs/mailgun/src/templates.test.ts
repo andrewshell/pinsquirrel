@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   createPasswordResetEmailTemplate,
+  createVerificationEmailTemplate,
+  createEmailChangeConfirmationTemplate,
   createSignupNotificationEmailTemplate,
   createEmailAlreadyRegisteredTemplate,
   createUsernameTakenTemplate,
@@ -11,6 +13,35 @@ import {
 // inside a quoted attribute. `resetUrl`/`signinUrl`/`signupUrl` are built from
 // the request origin, so none of these is a trusted constant.
 const HOSTILE = '"><script>alert(1)</script>'
+
+describe('createVerificationEmailTemplate', () => {
+  it('asks a new user to confirm, not to reset, and gives the 48-hour lifetime', () => {
+    const { html, text } = createVerificationEmailTemplate('https://x.test/v')
+
+    for (const body of [html, text]) {
+      expect(body).toContain('Confirm')
+      expect(body).toContain('48 hours')
+      expect(body).not.toMatch(/reset your password/i)
+    }
+  })
+
+  it('escapes the link in the HTML body', () => {
+    const { html } = createVerificationEmailTemplate(HOSTILE)
+
+    expect(html).not.toContain('<script>')
+    expect(html).toContain('href="&quot;&gt;&lt;script&gt;')
+  })
+})
+
+describe('createEmailChangeConfirmationTemplate', () => {
+  it('escapes the link in the HTML body', () => {
+    const { html, text } = createEmailChangeConfirmationTemplate(HOSTILE)
+
+    expect(html).not.toContain('<script>')
+    expect(html).toContain('href="&quot;&gt;&lt;script&gt;')
+    expect(text).toContain(HOSTILE)
+  })
+})
 
 describe('createPasswordResetEmailTemplate', () => {
   it('escapes the reset URL in both the href and the visible copy', () => {
@@ -56,14 +87,14 @@ describe('createSignupNotificationEmailTemplate', () => {
 
 describe('createEmailAlreadyRegisteredTemplate', () => {
   it('escapes the sign-in URL in the href', () => {
-    const { html } = createEmailAlreadyRegisteredTemplate(HOSTILE)
+    const { html } = createEmailAlreadyRegisteredTemplate(HOSTILE, HOSTILE)
 
     expect(html).not.toContain('<script>')
     expect(html).toContain('href="&quot;&gt;&lt;script&gt;')
   })
 
   it('leaves the plain-text body alone', () => {
-    const { text } = createEmailAlreadyRegisteredTemplate(HOSTILE)
+    const { text } = createEmailAlreadyRegisteredTemplate(HOSTILE, HOSTILE)
 
     expect(text).toContain(`Sign in: ${HOSTILE}`)
   })

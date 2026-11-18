@@ -515,6 +515,26 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     mitigation not taken yet is a device cookie set at successful sign-in that exempts that
     browser from the username-wide bucket. Revisit it if lockouts show up in practice.
 
+28. **An email change asks for the current address as well as the password.** The change is
+    confirmed by a link sent to the new address, and the old address gets a notice. The
+    server cannot read the old address: it keeps a hash and a copy sealed to a key only the
+    admin console holds. So the form asks for the current address, checks it against the
+    hash, and sends the notice there. An account with no address skips the field. The cost
+    is one more field and a refusal for anyone who has forgotten which address they used.
+    The alternative was no notice at all.
+
+29. **The stored email hash is keyed when `EMAIL_HASH_KEY` is set, and old rows are re-keyed
+    only when used.** A lookup that misses under the keyed hash tries the plain SHA-256 and
+    rewrites the row. Only sign-up, password reset and email change look addresses up, so an
+    account that never uses them keeps its plain hash. A bulk re-key from the admin console,
+    which can open the sealed copies, is the follow-up that closes that gap.
+
+30. **Sign-up and reset requests return once the input is valid.** Lookups, writes and mail
+    run afterwards in deferred work that the composition root logs. A registered and an
+    unknown address then take the same time and get the same answer, whatever the mail
+    provider does. The cost is that a database failure during sign-up is logged instead of
+    shown, and the user sees the usual "check your email".
+
 ## Reference
 
 - [MCP spec: Authorization](https://modelcontextprotocol.io/specification/draft/basic/authorization)

@@ -2,6 +2,7 @@ import type {
   AccessControl,
   UserRepository,
   PasswordResetRepository,
+  EmailChangeRepository,
   EmailService,
   User,
   UpdateUserData,
@@ -19,6 +20,7 @@ import {
   hashEmail,
   generateSecureToken,
   hashToken,
+  verifyPassword,
 } from '../utils/crypto.js'
 import {
   emailSchema,
@@ -30,6 +32,39 @@ import type { EmailSealer } from './authentication.js'
 
 export const RESET_REQUEST_WINDOW_MS = 60 * 60 * 1000
 const RESET_REQUESTS_PER_WINDOW = 3
+const RESET_LINK_LIFETIME_MS = 15 * 60 * 1000
+const VERIFICATION_LINK_LIFETIME_MS = 48 * 60 * 60 * 1000
+const UNVERIFIED_HOLD_MS = 7 * 24 * 60 * 60 * 1000
+const EMAIL_CHANGE_LINK_LIFETIME_MS = 24 * 60 * 60 * 1000
+
+export interface RegistrationInput {
+  username: string
+  email: string
+  resetUrl?: string
+  notifyEmail?: string
+  signinUrl?: string
+  signupUrl?: string
+}
+
+export interface EmailChangeInput {
+  userId: string
+  email: string
+  currentPassword: string
+  /** Checked against the stored hash; ignored for an account with no email. */
+  currentEmail: string
+  confirmUrl: string
+}
+
+export interface AccountServiceOptions {
+  /**
+   * Runs work the caller's response must not wait for or learn the outcome
+   * of. The composition root decides how failures are logged.
+   */
+  defer: (work: () => Promise<void>) => void
+  emailSealer?: EmailSealer
+  /** Without it, addresses are stored as their unkeyed SHA-256. */
+  emailHashKey?: string
+}
 
 /**
  * The account lifecycle operations that depend on the email pipeline:
@@ -38,181 +73,134 @@ const RESET_REQUESTS_PER_WINDOW = 3
  * Split out of AuthenticationService so that service could drop to a single
  * required dependency. Everything here needs the reset-token store and a way
  * to send mail; nothing here is reachable without them.
+ *
+ * Registration and reset requests validate their input and defer the rest,
+ * so whether an address is registered changes neither the answer nor how
+ * long it takes, and a mail failure never reaches the caller.
  */
 export class AccountService {
+  private readonly defer: AccountServiceOptions['defer']
+  private readonly emailSealer?: EmailSealer
+  private readonly emailHashKey?: string
+
   constructor(
     private readonly userRepository: UserRepository,
     private readonly passwordResetRepository: PasswordResetRepository,
+    private readonly emailChangeRepository: EmailChangeRepository,
     private readonly emailService: EmailService,
-    // Optional by design, unlike the two above: an install that keeps no
-    // contactable copy of user emails simply has no key. Every use below
-    // stores null rather than failing. Pass a sealer to enable it.
-    private readonly emailSealer?: EmailSealer
-  ) {}
+    options: AccountServiceOptions
+  ) {
+    this.defer = options.defer
+    this.emailSealer = options.emailSealer
+    this.emailHashKey = options.emailHashKey
+  }
 
-  async register(input: {
-    username: string
-    email: string
-    resetUrl?: string
-    notifyEmail?: string
-    signinUrl?: string
-    signupUrl?: string
-  }): Promise<{ emailFailed: boolean }> {
-    // Validate inputs at service boundary
+  register(input: RegistrationInput): void {
     const result = registrationSchema.safeParse(input)
     if (!result.success) {
       throw validationErrorFromZod(result.error)
     }
 
-    // Check for existing username and email
-    const existingUserByUsername = await this.userRepository.findByUsername(
-      input.username
-    )
-    const existingUserByEmail = await this.findUserByEmail(input.email)
+    this.defer(() => this.completeRegistration(input))
+  }
 
-    // Handle conflicts without revealing which field conflicted
+  private async completeRegistration(input: RegistrationInput): Promise<void> {
+    const existingUserByUsername = await this.releaseIfStaleUnverified(
+      await this.userRepository.findByUsername(input.username)
+    )
+    const existingUserByEmail = await this.releaseIfStaleUnverified(
+      await this.findUserByEmailAndRekey(input.email)
+    )
+
     if (existingUserByEmail) {
-      // Email already registered — notify the email owner privately
-      if (input.signinUrl) {
-        try {
-          await this.emailService.sendEmailAlreadyRegisteredEmail(
-            input.email,
-            input.signinUrl
-          )
-        } catch {
-          // Don't fail if notification email fails
-        }
+      if (!input.signinUrl || !input.resetUrl) return
+      const token = await this.issueResetTokenWithinLimit(
+        existingUserByEmail.id,
+        RESET_LINK_LIFETIME_MS
+      )
+      if (token) {
+        await this.emailService.sendEmailAlreadyRegisteredEmail(
+          input.email,
+          input.signinUrl,
+          token,
+          input.resetUrl
+        )
       }
-      return { emailFailed: false }
+      return
     }
 
     if (existingUserByUsername) {
-      // Username taken — notify the provided email privately
       if (input.signupUrl) {
-        try {
-          await this.emailService.sendUsernameTakenEmail(
-            input.email,
-            input.username,
-            input.signupUrl
-          )
-        } catch {
-          // Don't fail if notification email fails
-        }
+        await this.emailService.sendUsernameTakenEmail(
+          input.email,
+          input.username,
+          input.signupUrl
+        )
       }
-      return { emailFailed: false }
+      return
     }
 
-    // Seal the email (if a public key is configured) so the waitlist can be
-    // contacted later. The server cannot decrypt this.
     const emailEncrypted = this.emailSealer
       ? await this.emailSealer.seal(input.email)
       : null
 
-    // Create user without password (they'll set it via email verification)
+    let user: User
     try {
-      await this.userRepository.create({
+      user = await this.userRepository.create({
         username: input.username,
-        passwordHash: null, // No password yet - they'll set it via email verification
-        // Hashed here rather than reusing a binding from the duplicate check:
-        // this is the stored value, and the lookup above hides its own hashing.
-        emailHash: hashEmail(input.email),
+        passwordHash: null,
+        emailHash: hashEmail(input.email, this.emailHashKey),
         emailEncrypted,
         roles: [Role.User],
       })
     } catch (error) {
-      // Two signups for the same username or email can pass the checks above
-      // at the same moment; the unique indexes are what actually stop the
-      // second one. Answer exactly as if this signup had lost by a
-      // millisecond and been caught by the check — the alternative is a 500
-      // that tells the caller an account exists.
-      if (error instanceof UserAlreadyExistsError) {
-        return { emailFailed: false }
-      }
+      if (error instanceof UserAlreadyExistsError) return
       throw error
     }
 
-    // Auto-trigger password reset email for verification if URL provided
-    let emailFailed = false
-    if (input.resetUrl) {
-      try {
-        await this.requestPasswordReset({
-          email: input.email,
-          resetUrl: input.resetUrl,
-        })
-      } catch {
-        emailFailed = true
-      }
-    }
-
-    // Send signup notification email if notifyEmail is provided
-    if (input.notifyEmail) {
-      try {
-        await this.emailService.sendSignupNotificationEmail(
-          input.notifyEmail,
+    const { notifyEmail } = input
+    if (notifyEmail) {
+      this.defer(() =>
+        this.emailService.sendSignupNotificationEmail(
+          notifyEmail,
           input.username,
           input.email
         )
-      } catch {
-        // Don't fail registration if notification email fails
-      }
+      )
     }
 
-    return { emailFailed }
+    if (input.resetUrl) {
+      const token = await this.issueResetTokenWithinLimit(
+        user.id,
+        VERIFICATION_LINK_LIFETIME_MS
+      )
+      if (token) {
+        await this.emailService.sendVerificationEmail(
+          input.email,
+          token,
+          input.resetUrl
+        )
+      }
+    }
   }
 
   /**
-   * Change a user's own email. Only the account holder may do this: the sealed
-   * copy is the waitlist's contact address, so letting anyone else rewrite it
-   * would redirect that contact.
+   * Ask to move the account to a new address. Nothing changes until the link
+   * mailed to the new address is followed (confirmEmailChange).
+   *
+   * The credentials are checked here, so a wrong password or current address
+   * is refused at once. Everything that depends on whether the new address is
+   * taken is deferred, so a taken and a free address answer alike: a taken
+   * one simply gets no link.
    */
-  async updateEmail(
+  async requestEmailChange(
     ac: AccessControl,
-    input: {
-      userId: string
-      email: string | null
-    }
+    input: EmailChangeInput
   ): Promise<void> {
     if (!ac.canUpdate({ userId: input.userId })) {
       throw new UnauthorizedUserAccessError(input.userId)
     }
 
-    // Validate email if provided
-    if (input.email !== null) {
-      const emailResult = emailSchema.safeParse(input.email)
-      if (!emailResult.success) {
-        throw validationErrorFromZod(emailResult.error, {
-          fallbackField: 'email',
-        })
-      }
-    }
-
-    const user = await this.userRepository.findById(input.userId)
-    if (!user) {
-      throw new InvalidCredentialsError()
-    }
-
-    // Hash the email in the business logic layer
-    const emailHash = input.email ? hashEmail(input.email) : null
-
-    // Re-seal the email (or clear it) to keep the contactable copy in sync
-    const emailEncrypted =
-      input.email && this.emailSealer
-        ? await this.emailSealer.seal(input.email)
-        : null
-
-    // Persist only the fields this operation owns. Writing username/passwordHash
-    // from the stale findById snapshot could clobber a concurrent change.
-    await this.userRepository.update(input.userId, {
-      emailHash,
-      emailEncrypted,
-    })
-  }
-
-  async requestPasswordReset(input: {
-    email: string
-    resetUrl: string
-  }): Promise<string | null> {
-    // Validate email at service boundary
     const emailResult = emailSchema.safeParse(input.email)
     if (!emailResult.success) {
       throw validationErrorFromZod(emailResult.error, {
@@ -220,17 +208,109 @@ export class AccountService {
       })
     }
 
-    const user = await this.findUserByEmail(input.email)
-
-    // Don't reveal whether the email exists or not for security
+    const user = await this.userRepository.findById(input.userId)
     if (!user) {
-      return null
+      throw new InvalidCredentialsError()
     }
 
-    // Opportunistically backfill the sealed email for users created before
-    // sealing existed (their email_encrypted is null). This is the one flow
-    // where we have the plaintext email for an existing account. Best-effort:
-    // a sealing or write failure must never abort the password reset itself.
+    const passwordMatches = await verifyPassword(
+      input.currentPassword,
+      user.passwordHash
+    )
+    if (!passwordMatches || !this.isCurrentEmail(user, input.currentEmail)) {
+      throw new InvalidCredentialsError()
+    }
+
+    if (user.emailHash) {
+      this.defer(() =>
+        this.emailService.sendEmailChangeNoticeEmail(input.currentEmail)
+      )
+    }
+    this.defer(() => this.offerEmailChange(input))
+  }
+
+  private isCurrentEmail(user: User, email: string): boolean {
+    if (!user.emailHash) return true
+    return (
+      user.emailHash === hashEmail(email, this.emailHashKey) ||
+      user.emailHash === hashEmail(email)
+    )
+  }
+
+  private async offerEmailChange(input: EmailChangeInput): Promise<void> {
+    if (await this.findUserByEmailAndRekey(input.email)) return
+
+    const token = generateSecureToken()
+    await this.emailChangeRepository.save({
+      userId: input.userId,
+      tokenHash: hashToken(token),
+      emailHash: hashEmail(input.email, this.emailHashKey),
+      emailEncrypted: this.emailSealer
+        ? await this.emailSealer.seal(input.email)
+        : null,
+      expiresAt: new Date(Date.now() + EMAIL_CHANGE_LINK_LIFETIME_MS),
+    })
+    await this.emailService.sendEmailChangeConfirmationEmail(
+      input.email,
+      token,
+      input.confirmUrl
+    )
+  }
+
+  /**
+   * Apply the change a confirmation link stands for. False when the link is
+   * unknown, used, expired, or its address was taken in the meantime.
+   */
+  async confirmEmailChange(token: string): Promise<boolean> {
+    const change = await this.emailChangeRepository.consume(hashToken(token))
+    if (!change) return false
+
+    try {
+      const updated = await this.userRepository.update(change.userId, {
+        emailHash: change.emailHash,
+        emailEncrypted: change.emailEncrypted,
+      })
+      if (!updated) return false
+    } catch (error) {
+      if (error instanceof UserAlreadyExistsError) return false
+      throw error
+    }
+
+    await this.passwordResetRepository.deleteByUserId(change.userId)
+    return true
+  }
+
+  private async releaseIfStaleUnverified(
+    user: User | null
+  ): Promise<User | null> {
+    if (!user || user.status !== UserStatus.Unverified) return user
+    const createdBefore = new Date(Date.now() - UNVERIFIED_HOLD_MS)
+    if (user.createdAt >= createdBefore) return user
+    const deleted = await this.userRepository.deleteStaleUnverified(
+      user.id,
+      createdBefore
+    )
+    return deleted ? null : user
+  }
+
+  requestPasswordReset(input: { email: string; resetUrl: string }): void {
+    const emailResult = emailSchema.safeParse(input.email)
+    if (!emailResult.success) {
+      throw validationErrorFromZod(emailResult.error, {
+        fallbackField: 'email',
+      })
+    }
+
+    this.defer(() => this.sendResetLink(input))
+  }
+
+  private async sendResetLink(input: {
+    email: string
+    resetUrl: string
+  }): Promise<void> {
+    const user = await this.findUserByEmailAndRekey(input.email)
+    if (!user) return
+
     if (this.emailSealer && !user.emailEncrypted) {
       try {
         const emailEncrypted = await this.emailSealer.seal(input.email)
@@ -240,37 +320,39 @@ export class AccountService {
       }
     }
 
-    const existingTokens = await this.passwordResetRepository.findByUserId(
-      user.id
+    const token = await this.issueResetTokenWithinLimit(
+      user.id,
+      RESET_LINK_LIFETIME_MS
     )
-    const windowStart = new Date(Date.now() - RESET_REQUEST_WINDOW_MS)
-    const recentTokens = existingTokens.filter(
-      token => token.createdAt > windowStart
-    )
-    // Over the limit answers exactly like an unknown address.
-    if (recentTokens.length >= RESET_REQUESTS_PER_WINDOW) {
-      return null
-    }
+    if (!token) return
 
-    // Generate new token
-    const token = generateSecureToken()
-    const tokenHash = hashToken(token)
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 minutes from now
-
-    // Store the hashed token
-    await this.passwordResetRepository.create({
-      userId: user.id,
-      tokenHash,
-      expiresAt,
-    })
-
-    // Send the email with the plain token
     await this.emailService.sendPasswordResetEmail(
       input.email,
       token,
       input.resetUrl
     )
+  }
 
+  private async issueResetTokenWithinLimit(
+    userId: string,
+    lifetimeMs: number
+  ): Promise<string | null> {
+    const existingTokens =
+      await this.passwordResetRepository.findByUserId(userId)
+    const windowStart = new Date(Date.now() - RESET_REQUEST_WINDOW_MS)
+    const recentTokens = existingTokens.filter(
+      token => token.createdAt > windowStart
+    )
+    if (recentTokens.length >= RESET_REQUESTS_PER_WINDOW) {
+      return null
+    }
+
+    const token = generateSecureToken()
+    await this.passwordResetRepository.create({
+      userId,
+      tokenHash: hashToken(token),
+      expiresAt: new Date(Date.now() + lifetimeMs),
+    })
     return token
   }
 
@@ -323,7 +405,11 @@ export class AccountService {
       updateData.status = UserStatus.Waitlist
     }
 
-    await this.userRepository.update(user.id, updateData)
+    // A stale unverified account can be deleted between the reads above and
+    // this write; its link is then as dead as the account.
+    if (!(await this.userRepository.update(user.id, updateData))) {
+      throw new InvalidResetTokenError()
+    }
 
     await this.passwordResetRepository.deleteByUserId(user.id)
     await this.userRepository.revokeSessionsAndTokens(user.id)
@@ -343,17 +429,14 @@ export class AccountService {
     return await this.passwordResetRepository.isValidToken(tokenHash)
   }
 
-  /**
-   * The account registered with this address, if any.
-   *
-   * Emails are never stored in the clear, so every lookup has to go through
-   * the same hash. This was written out at each of the three call sites, one
-   * of which was a public findByEmail that nothing called.
-   *
-   * Validation is the caller's business: both callers validate at their own
-   * boundary, and register does so well before it gets here.
-   */
-  private async findUserByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findByEmailHash(hashEmail(email))
+  private async findUserByEmailAndRekey(email: string): Promise<User | null> {
+    const emailHash = hashEmail(email, this.emailHashKey)
+    const user = await this.userRepository.findByEmailHash(emailHash)
+    if (user || !this.emailHashKey) return user
+
+    const legacy = await this.userRepository.findByEmailHash(hashEmail(email))
+    if (!legacy) return null
+    await this.userRepository.update(legacy.id, { emailHash })
+    return { ...legacy, emailHash }
   }
 }

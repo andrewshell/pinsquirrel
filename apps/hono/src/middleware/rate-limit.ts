@@ -114,6 +114,11 @@ export const privateUnlockLimiter = new RateLimiter({
   windowMs: 15 * 60 * 1000,
 })
 
+export const emailChangeLimiter = new RateLimiter({
+  maxAttempts: 3,
+  windowMs: 60 * 60 * 1000,
+})
+
 export const signupLimiter = new RateLimiter({
   maxAttempts: 3,
   windowMs: 60 * 60 * 1000,

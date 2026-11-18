@@ -21,6 +21,23 @@ export function createMockUserRepository(): UserRepository {
     removeRole: vi.fn(),
     countByRole: vi.fn(),
     replacePasswordHash: vi.fn(),
+    deleteStaleUnverified: vi.fn(),
     revokeSessionsAndTokens: vi.fn(),
+  }
+}
+
+export function createDeferQueue() {
+  const pending: Promise<void>[] = []
+  return {
+    defer: (work: () => Promise<void>) => {
+      const run = work()
+      run.catch(() => undefined)
+      pending.push(run)
+    },
+    flush: async () => {
+      while (pending.length > 0) {
+        await Promise.all(pending.splice(0))
+      }
+    },
   }
 }

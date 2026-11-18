@@ -18,6 +18,10 @@ export type {
   CreatePasswordResetTokenData,
 } from './entities/password-reset-token.js'
 export type {
+  EmailChange,
+  CreateEmailChangeData,
+} from './entities/email-change.js'
+export type {
   Session,
   CreateSessionData,
   UpdateSessionData,
@@ -52,6 +56,7 @@ export type { UserRepository } from './interfaces/user-repository.js'
 export type { PinRepository, PinFilter } from './interfaces/pin-repository.js'
 export type { TagRepository } from './interfaces/tag-repository.js'
 export type { PasswordResetRepository } from './interfaces/password-reset-repository.js'
+export type { EmailChangeRepository } from './interfaces/email-change-repository.js'
 export type { SessionRepository } from './interfaces/session-repository.js'
 export type { OAuthClientRepository } from './interfaces/oauth-client-repository.js'
 export type { OAuthAuthorizationCodeRepository } from './interfaces/oauth-authorization-code-repository.js'

@@ -13,12 +13,25 @@ describe('NullEmailService', () => {
       () => service.sendPasswordResetEmail('a@b.com', 't', 'url'),
     ],
     [
+      'sendVerificationEmail',
+      () => service.sendVerificationEmail('a@b.com', 't', 'url'),
+    ],
+    [
+      'sendEmailChangeConfirmationEmail',
+      () => service.sendEmailChangeConfirmationEmail('a@b.com', 't', 'url'),
+    ],
+    [
+      'sendEmailChangeNoticeEmail',
+      () => service.sendEmailChangeNoticeEmail('a@b.com'),
+    ],
+    [
       'sendSignupNotificationEmail',
       () => service.sendSignupNotificationEmail('a@b.com', 'u', 'e@f.com'),
     ],
     [
       'sendEmailAlreadyRegisteredEmail',
-      () => service.sendEmailAlreadyRegisteredEmail('a@b.com', 'url'),
+      () =>
+        service.sendEmailAlreadyRegisteredEmail('a@b.com', 'url', 't', 'url'),
     ],
     [
       'sendUsernameTakenEmail',

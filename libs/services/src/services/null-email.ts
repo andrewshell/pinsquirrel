@@ -12,9 +12,7 @@ export class EmailNotConfiguredError extends Error {
  *
  * Every send rejects, so an unconfigured install behaves like a provider that
  * is down — a path callers already handle — rather than one that reports
- * success having sent nothing. `AccountService.register` catches the rejection
- * and returns `emailFailed: true`, which the sign-up page already renders as
- * "we had trouble sending your confirmation email".
+ * success having sent nothing.
  *
  * This exists so AccountService can take its email dependency as required.
  * Choosing it is the app's decision, made visibly in the composition root,
@@ -24,6 +22,15 @@ export class NullEmailService implements EmailService {
   // Typed by the interface so callers get the real arity, implemented with a
   // zero-parameter arrow so there are no unused bindings to silence.
   readonly sendPasswordResetEmail: EmailService['sendPasswordResetEmail'] =
+    () => Promise.reject(new EmailNotConfiguredError())
+
+  readonly sendVerificationEmail: EmailService['sendVerificationEmail'] = () =>
+    Promise.reject(new EmailNotConfiguredError())
+
+  readonly sendEmailChangeConfirmationEmail: EmailService['sendEmailChangeConfirmationEmail'] =
+    () => Promise.reject(new EmailNotConfiguredError())
+
+  readonly sendEmailChangeNoticeEmail: EmailService['sendEmailChangeNoticeEmail'] =
     () => Promise.reject(new EmailNotConfiguredError())
 
   readonly sendSignupNotificationEmail: EmailService['sendSignupNotificationEmail'] =

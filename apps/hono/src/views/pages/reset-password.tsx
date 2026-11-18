@@ -47,8 +47,8 @@ export const ResetPasswordPage: FC<ResetPasswordPageProps> = ({
                   className="mb-4"
                 />
                 <p class="text-muted-foreground mb-4">
-                  Password reset links expire after 15 minutes for security.
-                  Please request a new one.
+                  Password reset links expire after 15 minutes and sign-up links
+                  after 48 hours. Please request a new one.
                 </p>
                 <a
                   href={withEmbed('/forgot-password', embed)}

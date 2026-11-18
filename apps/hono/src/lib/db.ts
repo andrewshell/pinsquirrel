@@ -12,6 +12,7 @@ export const {
   tagRepository,
   pinRepository,
   passwordResetRepository,
+  emailChangeRepository,
   sessionRepository,
   oauthClientRepository,
   oauthAuthorizationCodeRepository,
