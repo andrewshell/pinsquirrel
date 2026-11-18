@@ -241,4 +241,22 @@ describe('redirectUriMatches', () => {
   it('never matches an unparseable request', () => {
     expect(redirectUriMatches('http://localhost/cb', '/cb')).toBe(false)
   })
+
+  it.each(['99999', '65536', '0', '00'])(
+    'does not match a loopback request on port %s, which is no port',
+    port => {
+      expect(
+        redirectUriMatches('http://127.0.0.1/cb', `http://127.0.0.1:${port}/cb`)
+      ).toBe(false)
+    }
+  )
+
+  it('matches a loopback request on either end of the port range', () => {
+    expect(
+      redirectUriMatches('http://127.0.0.1/cb', 'http://127.0.0.1:1/cb')
+    ).toBe(true)
+    expect(
+      redirectUriMatches('http://127.0.0.1/cb', 'http://127.0.0.1:65535/cb')
+    ).toBe(true)
+  })
 })

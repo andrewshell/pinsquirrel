@@ -92,10 +92,15 @@ export function redirectUriDedupKey(uri: string): string {
 }
 
 const LOOPBACK_AUTHORITY =
-  /^(http:\/\/(?:localhost|127\.\d{1,3}\.\d{1,3}\.\d{1,3}|\[::1\]))(?::\d{1,5})?(?=[/?]|$)/
+  /^(http:\/\/(?:localhost|127\.\d{1,3}\.\d{1,3}\.\d{1,3}|\[::1\]))(?::(\d{1,5}))?(?=[/?]|$)/
 
 function withoutLoopbackPort(uri: string): string {
   return uri.replace(LOOPBACK_AUTHORITY, '$1')
+}
+
+function hasUsablePort(uri: string): boolean {
+  const port = LOOPBACK_AUTHORITY.exec(uri)?.[2]
+  return port === undefined || (Number(port) >= 1 && Number(port) <= 65535)
 }
 
 /**
@@ -105,9 +110,11 @@ function withoutLoopbackPort(uri: string): string {
  * loopback redirect the port may differ (RFC 8252 7.3). A native client is
  * handed an ephemeral port when it starts listening, long after it published
  * `http://localhost/callback`, so the port cannot be part of what identifies
- * it. Everything else, path and query included, has to be byte-equal: a
- * trailing slash, userinfo, a fragment or a dot segment can each send the
- * browser somewhere the client did not register, even on the same host.
+ * it, though it still has to be a port a browser can open (1-65535), or the
+ * redirect back to the client could not be built. Everything else, path and
+ * query included, has to be byte-equal: a trailing slash, userinfo, a
+ * fragment or a dot segment can each send the browser somewhere the client
+ * did not register, even on the same host.
  *
  * Hosts are never treated as equivalent to each other: `localhost` and
  * `127.0.0.1` are different registrations, which is why Claude Code publishes
@@ -120,6 +127,8 @@ export function redirectUriMatches(
   if (registered === requested) return true
   return (
     LOOPBACK_AUTHORITY.test(registered) &&
+    URL.canParse(requested) &&
+    hasUsablePort(requested) &&
     withoutLoopbackPort(registered) === withoutLoopbackPort(requested)
   )
 }

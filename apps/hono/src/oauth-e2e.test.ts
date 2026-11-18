@@ -715,6 +715,35 @@ describe('authorization errors', () => {
     expect(res.headers.get('Location')).toBeNull()
     expect(await res.text()).toContain('invalid_request')
   })
+
+  it.each([
+    ['GET', 'pins:read', undefined],
+    ['GET with an unknown scope', 'nonsense', undefined],
+    ['POST approve', 'pins:read', 'approve'],
+    ['POST deny', 'pins:read', 'deny'],
+  ])(
+    'renders a loopback redirect URI on a port no browser can open (%s)',
+    async (_, scope, decision) => {
+      const query = authorizationQuery({
+        challenge: pkcePair().challenge,
+        resource: mcpResource,
+        scope,
+        state: randomUUID(),
+        redirectUri: 'http://127.0.0.1:99999/callback',
+      })
+      const path = pathOf(metadata.authorization_endpoint)
+
+      const res = decision
+        ? await browserRequest(path, form({ ...query, decision }))
+        : await getAuthorize(query)
+
+      expect(res.status).toBe(400)
+      expect(res.headers.get('Location')).toBeNull()
+      expect(await res.text()).toContain(
+        'redirect_uri does not match a URI this client registered'
+      )
+    }
+  )
 })
 
 describe('read scopes', () => {
