@@ -2,12 +2,21 @@ import { createHash } from 'node:crypto'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
+import { Role, UserStatus } from '@pinsquirrel/domain'
 import {
   sessionMiddleware,
   requireAuth,
   getSessionManager,
   getAuthUser,
 } from './session'
+
+/** A signed-in account in good standing: admitted and holding the User role. */
+const alice = {
+  id: 'user-456',
+  username: 'alice',
+  roles: [Role.User],
+  status: UserStatus.Active,
+}
 
 const sha256 = (value: string) =>
   createHash('sha256').update(value).digest('hex')
@@ -418,7 +427,7 @@ describe('requireAuth Middleware', () => {
     mockFindById.mockResolvedValue(mockSession)
     // requireAuth now resolves the user as well as checking the session, so a
     // request only counts as authenticated if the user row is actually there.
-    mockFindUserById.mockResolvedValue({ id: 'user-456', username: 'alice' })
+    mockFindUserById.mockResolvedValue(alice)
 
     app.get('/protected', requireAuth(), c => {
       return c.json({ protected: true })
@@ -462,7 +471,7 @@ describe('requireAuth Middleware', () => {
     })
 
     it('exposes the resolved user to handlers via getAuthUser', async () => {
-      mockFindUserById.mockResolvedValue({ id: 'user-456', username: 'alice' })
+      mockFindUserById.mockResolvedValue(alice)
 
       app.get('/protected', requireAuth(), c => {
         return c.json({ username: getAuthUser(c).username })
@@ -475,7 +484,7 @@ describe('requireAuth Middleware', () => {
     })
 
     it('resolves the user exactly once per request', async () => {
-      mockFindUserById.mockResolvedValue({ id: 'user-456', username: 'alice' })
+      mockFindUserById.mockResolvedValue(alice)
 
       app.get('/protected', requireAuth(), c => {
         getAuthUser(c)
@@ -506,12 +515,42 @@ describe('requireAuth Middleware', () => {
       expect(handler).not.toHaveBeenCalled()
     })
 
+    it('ends the session of a user who no longer holds the User role', async () => {
+      mockFindUserById.mockResolvedValue({ ...alice, roles: [] })
+      mockDelete.mockResolvedValue(true)
+
+      const handler = vi.fn((c: Context) => c.json({ reached: true }))
+      app.get('/pins', requireAuth(), handler)
+
+      const res = await app.request('/pins', authedRequest)
+
+      expect(handler).not.toHaveBeenCalled()
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toMatch(/^\/signin/)
+      expect(mockDelete).toHaveBeenCalledWith(validSession.id)
+    })
+
+    it('ends the session of a user who is no longer active', async () => {
+      mockFindUserById.mockResolvedValue({
+        ...alice,
+        status: UserStatus.Waitlist,
+      })
+
+      const handler = vi.fn((c: Context) => c.json({ reached: true }))
+      app.get('/pins', requireAuth(), handler)
+
+      const res = await app.request('/pins', authedRequest)
+
+      expect(handler).not.toHaveBeenCalled()
+      expect(res.headers.get('location')).toMatch(/^\/signin/)
+    })
+
     it('throws rather than returning undefined when requireAuth is missing', async () => {
       // Wiring guard: if a router loses its requireAuth(), handlers calling
       // getAuthUser must fail loudly (500) instead of proceeding with an
       // undefined user, which would read as "no user" and silently skip
       // ownership checks.
-      mockFindUserById.mockResolvedValue({ id: 'user-456', username: 'alice' })
+      mockFindUserById.mockResolvedValue(alice)
 
       app.get('/unguarded', c => c.json({ id: getAuthUser(c).id }))
 

@@ -25,6 +25,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { Context, MiddlewareHandler } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
+import { isAdmitted } from '@pinsquirrel/domain'
 import type { Session, User } from '@pinsquirrel/domain'
 import { sessionRepository, userRepository } from '../lib/db'
 import { isEmbedRequest, withEmbed } from '../lib/embed'
@@ -317,8 +318,10 @@ export function sessionMiddleware(): MiddlewareHandler {
  * Gate a route on a signed-in user, and resolve that user once for the whole
  * request.
  *
- * Two ways to fail, both ending in the same redirect: there is no session at
- * all, or the session names a user that no longer exists (deleted mid-session).
+ * Three ways to fail, all ending in the same redirect: there is no session at
+ * all, the session names a user that no longer exists (deleted mid-session),
+ * or the user is no longer admitted (see `isAdmitted`), which also ends the
+ * session.
  * The second used to fall through to the handlers, which each coped with it
  * differently — some redirected, some returned `HX-Redirect` with a 204 — so
  * the same condition produced eight different responses across the app.
@@ -354,6 +357,12 @@ export function requireAuth(redirectTo = '/signin'): MiddlewareHandler {
 
     const user = await sessionManager.getUser()
     if (!user) {
+      return redirectToSignin()
+    }
+
+    // Access revoked after sign-in ends the session, not just this request.
+    if (!isAdmitted(user)) {
+      await sessionManager.destroy()
       return redirectToSignin()
     }
 

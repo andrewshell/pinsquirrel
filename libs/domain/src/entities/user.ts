@@ -1,5 +1,5 @@
-import type { Role } from './role.js'
-import type { UserStatus } from './user-status.js'
+import { Role } from './role.js'
+import { UserStatus } from './user-status.js'
 
 export interface User {
   id: string
@@ -29,3 +29,12 @@ export type CreateUserData = Omit<
 export type UpdateUserData = Partial<
   Omit<User, 'id' | 'roles' | 'createdAt' | 'updatedAt'>
 >
+
+/**
+ * Whether an account may use the app at all: let in off the waitlist and
+ * holding the User role. Sign-in admits exactly these accounts, and a signed-in
+ * session that stops meeting this rule ends.
+ */
+export function isAdmitted(user: User): boolean {
+  return user.status === UserStatus.Active && user.roles.includes(Role.User)
+}

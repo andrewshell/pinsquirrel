@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { UserStatus } from '@pinsquirrel/domain'
 import { app } from './app'
 import {
   db,
@@ -266,6 +267,9 @@ beforeAll(async () => {
   const user = await userRepository.findByUsername(username)
   if (!user) throw new Error('Signup did not create the test user')
   userId = user.id
+  // Let in off the waitlist, as an admin would; only admitted accounts can
+  // use a session.
+  await userRepository.update(userId, { status: UserStatus.Active })
 
   // Seeding, not behaviour: signup leaves an account with no password (it is
   // set from an emailed reset link), so there is no password to sign in with

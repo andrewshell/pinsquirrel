@@ -3,6 +3,7 @@
 
 // Entities
 export type { User, CreateUserData, UpdateUserData } from './entities/user.js'
+export { isAdmitted } from './entities/user.js'
 export { Role } from './entities/role.js'
 export { UserStatus } from './entities/user-status.js'
 export type { Pin, CreatePinData, UpdatePinData } from './entities/pin.js'

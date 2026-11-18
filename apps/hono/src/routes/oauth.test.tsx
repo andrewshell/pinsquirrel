@@ -12,6 +12,8 @@ import type { OAuthClient, User } from '@pinsquirrel/domain'
 import {
   OAuthInvalidRequestError,
   OAuthInvalidScopeError,
+  Role,
+  UserStatus,
   ValidationError,
 } from '@pinsquirrel/domain'
 
@@ -48,6 +50,8 @@ const testUser = {
   id: 'user-1',
   username: 'alice',
   email: 'alice@example.com',
+  roles: [Role.User],
+  status: UserStatus.Active,
 } as unknown as User
 
 const testClient = {
