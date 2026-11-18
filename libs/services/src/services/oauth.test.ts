@@ -27,6 +27,7 @@ import {
   OAuthInvalidClientError,
   OAuthInvalidClientMetadataError,
   OAuthInvalidGrantError,
+  OAuthInvalidRedirectUriError,
   OAuthInvalidRequestError,
   OAuthInvalidScopeError,
   OAuthInvalidTargetError,
@@ -1729,20 +1730,20 @@ describe('OAuthService.registerClient', () => {
     expect(hosted.clientId).not.toBe(first.clientId)
   })
 
-  it('refuses a plaintext redirect URI that is not loopback', async () => {
+  it('refuses a plaintext redirect URI that is not loopback as invalid_redirect_uri', async () => {
     await expect(
       ctx.service.registerClient(
         registration({ redirect_uris: ['http://example.com/callback'] })
       )
-    ).rejects.toBeInstanceOf(OAuthInvalidClientMetadataError)
+    ).rejects.toBeInstanceOf(OAuthInvalidRedirectUriError)
   })
 
-  it('refuses a redirect URI with a fragment', async () => {
+  it('refuses a redirect URI with a fragment as invalid_redirect_uri', async () => {
     await expect(
       ctx.service.registerClient(
         registration({ redirect_uris: ['https://example.com/callback#x'] })
       )
-    ).rejects.toBeInstanceOf(OAuthInvalidClientMetadataError)
+    ).rejects.toMatchObject({ code: 'invalid_redirect_uri' })
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
