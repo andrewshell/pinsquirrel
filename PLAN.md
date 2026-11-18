@@ -614,6 +614,23 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     This closes the window Decision 38 left in the code exchange and replaces the read-back
     after a refresh. `revokeSessionsAndTokens` takes the lock after it deletes the sessions,
     the order in which a code being written takes the two rows.
+    A revocation locks only the tokens it changes. It reads the user's token ids through
+    `oauth_tokens_user_client_idx` with `FOR UPDATE` and stamps them by primary key, 500 at a
+    time. A single `UPDATE ... WHERE user_id = ?` was rejected: once one user holds about a
+    fifth of the table MySQL runs it as a scan of the whole table, and the gaps that scan
+    locks are the ones another user's refresh inserts its successors into. The index read
+    still locks the gap on either side of the user's entries, so the user next in id order
+    can wait for the revocation to commit. That wait cannot become a deadlock, because the
+    revocation's token statements never wait on another user's rows. The hourly sweep finds
+    dead tokens with a read that locks nothing and deletes them by primary key in the same
+    batches.
+    A transaction that issues (`rotate`, `exchange`, and the code's `create`) and is rolled
+    back by InnoDB to break a deadlock runs once more from the start, so it reads the
+    session, the code or the token again and still refuses one that was revoked meanwhile.
+    Rolled back a second time, it reports what it reports for a lost race, and the client
+    gets `invalid_grant` or `access_denied` with its code or token unchanged. A revocation
+    also runs once more, but a second deadlock there is an error: a revocation is never
+    reported as done when it was not.
 42. **A refresh can narrow the access token, never the grant.** A `scope` on a refresh request
     applies to the access token in that response. The refresh token that replaces the old one
     keeps the scopes the user approved (RFC 6749 section 6) and is always issued, including
