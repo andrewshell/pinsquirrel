@@ -12,14 +12,19 @@
     "lint": {},
     "format": {},
     "test": {
-      "outputs": ["coverage/**"]
+      // Turbo's strict env mode hides undeclared variables from tasks. Listing
+      // it here passes it through and puts it in the cache key, so a result
+      // from one database is never replayed for another.
+      "env": ["TEST_DATABASE_URL"],
+      "outputs": []
     },
     "@pinsquirrel/hono#test": {
       // Both suites talk to the same test database, and libs/database's setup
       // drops every table before it migrates. Ordering them keeps that drop
       // from landing in the middle of the OAuth end-to-end run.
       "dependsOn": ["@pinsquirrel/database#test"],
-      "outputs": ["coverage/**"]
+      "env": ["TEST_DATABASE_URL"],
+      "outputs": []
     },
     "typecheck": {},
     "start": {

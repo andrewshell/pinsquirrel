@@ -3,6 +3,7 @@
   "version": "3.11.0",
   "description": "A pnpm monorepo",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "turbo build",
     "dev": "pnpm --filter @pinsquirrel/hono dev",
