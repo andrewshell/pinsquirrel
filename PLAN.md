@@ -673,9 +673,11 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     origin, https in production unless loopback. Static clients cannot be retired from the
     config: dropping one needs its row deleted by hand, which revokes its grants, and a
     `disabled` flag waits for a need.
-46. **A refresh or exchange that loses two deadlocks answers `503 temporarily_unavailable`.**
-    The token or code is unchanged, so the answer must be one a client retries without
-    discarding it. The token endpoint answers `503` with `Retry-After: 1` and the body
+46. **A token, revocation or approval request whose write was undone answers
+    `temporarily_unavailable`.** A write is undone when it loses two deadlocks or when its
+    wait for a row lock times out (`ER_LOCK_WAIT_TIMEOUT`). Nothing changed, so the answer
+    must be one a client sends again without discarding its code or token. The token
+    endpoint answers `503` with `Retry-After: 1` and the body
     `{"error":"temporarily_unavailable"}`; `authorize` redirects with the same code, which
     RFC 6749 4.1.2.1 defines for it. RFC 6749 5.2 has no retryable code for the token
     endpoint, so the choice follows what the clients do. The MCP TypeScript SDK (1.32.2,
@@ -685,10 +687,26 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     among them, is thrown to the caller with the tokens kept. The Chrome extension drops
     its tokens on `invalid_grant` only. A client that reads the status alone sees a `503`.
     `invalid_grant`, the earlier answer, was rejected because it ends a working connection,
-    and a plain `500` because the SDK answers it with a new consent. The repository reports
-    the lost write as a `WriteConflictError` and `OAuthService` names the code. The hourly
-    sweep reads dead tokens 500 at a time, each read starting after the last id of the one
-    before, so it holds one batch whatever the backlog.
+    and a plain `500` because the SDK answers it with a new consent.
+    The rule covers every write of those requests, the revocations among them. An exchange
+    or refresh revokes a grant when a spent code or a rotated token is sent again, or when
+    the user is no longer admitted. If that revocation is undone the grant is still live,
+    and the request answers `503` and not `invalid_grant`: the client sends the same
+    request again, the server finds the same condition, and the revocation runs again.
+    `/oauth/revoke` answers the same `503`, on which RFC 7009 2.2.1 has the client assume
+    the token still exists and retry.
+    A deadlock is run again once, because the rival that won has moved on and the second
+    run usually commits at once. A lock wait that timed out is not run again. It has already
+    waited `innodb_lock_wait_timeout` (50 seconds by default) behind a lock that is probably
+    still held, a second run could double a wait that is already longer than most clients
+    allow a request, and the client is told to try again in any case. InnoDB undoes only the
+    statement that timed out; the rest of the transaction is rolled back when the error
+    leaves Drizzle's transaction callback.
+    The repository reports the undone write as a `WriteConflictError` that says which of the
+    two it was, `OAuthService` names the code at its token, revocation and approval entry
+    points, and the routes log the cause at `warn`, since a `503` does not reach the error
+    handler's log. The hourly sweep reads dead tokens 500 at a time, each read starting
+    after the last id of the one before, so it holds one batch whatever the backlog.
 
 ## Reference
 
