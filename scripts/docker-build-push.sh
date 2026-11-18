@@ -1,248 +1,194 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Docker Build and Push Script for PinSquirrel
-# Builds and pushes the Docker image to andrewshell/pinsquirrel on Docker Hub
+readonly IMAGE="ghcr.io/andrewshell/pinsquirrel"
+readonly REGISTRY="ghcr.io"
+readonly PLATFORMS="linux/amd64,linux/arm64"
+readonly BUILDER="multiplatform"
+readonly DOCKERFILE="apps/hono/Dockerfile"
+readonly VERSION_FILE="package.json"
+readonly GATE="quality"
 
-set -e  # Exit on any error
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-# Configuration
-DOCKER_REPO="andrewshell/pinsquirrel"
-DOCKERFILE_PATH="apps/hono/Dockerfile"
-
-# Helper functions
-log_info() {
-    echo -e "${BLUE}ℹ️  $1${NC}"
+log() {
+  printf '\033[1m==> %s\033[0m\n' "$*"
 }
 
-log_success() {
-    echo -e "${GREEN}✅ $1${NC}"
+fail() {
+  printf '\033[31merror:\033[0m %s\n' "$*" >&2
+  exit 1
 }
 
-log_warning() {
-    echo -e "${YELLOW}⚠️  $1${NC}"
+usage() {
+  cat <<EOF
+Usage: scripts/docker-build-push.sh [--dry-run] [--check-only | --skip-gates] [CUSTOM_TAG]
+
+Build ${IMAGE} for ${PLATFORMS} and push it tagged with the version in
+${VERSION_FILE}, latest, and CUSTOM_TAG when one is given.
+
+Options:
+  --dry-run     Print what would be built and pushed without doing any of it
+  --check-only  Run the preflight checks and nothing else
+  --skip-gates  Build and push without running the quality gate. Warning: it
+                assumes the quality gate just passed on this commit. Use it
+                to finish a release whose gate already ran, as
+                scripts/release.ts does
+  -h, --help    Show this help
+
+A normal release pushes the image with pnpm release.
+
+Run it from the repository root, after merging the release pull request and
+pulling main.
+EOF
 }
 
-log_error() {
-    echo -e "${RED}❌ $1${NC}"
+dry_run=false
+custom_tag=""
+mode=full
+
+set_mode() {
+  if [[ "$mode" != full && "$mode" != "$1" ]]; then
+    fail "--check-only and --skip-gates cannot be used together"
+  fi
+  mode="$1"
 }
-
-# Parse command line arguments
-SKIP_QUALITY=false
-CUSTOM_TAG=""
-DRY_RUN=false
-
-# Check for help first
-if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-    show_usage() {
-        echo "Usage: $0 [OPTIONS] [CUSTOM_TAG]"
-        echo ""
-        echo "Options:"
-        echo "  --skip-quality    Skip quality checks (typecheck, lint, test)"
-        echo "  --dry-run         Show what would be done without executing"
-        echo "  -h, --help        Show this help message"
-        echo ""
-        echo "Examples:"
-        echo "  $0                        # Build and push with version + latest tags"
-        echo "  $0 beta                   # Build and push with version + latest + beta tags"
-        echo "  $0 --skip-quality         # Build and push without running quality checks"
-        echo "  $0 --skip-quality v1.2.3  # Build and push with custom tag, skip quality checks"
-        echo ""
-    }
-    show_usage
-    exit 0
-fi
 
 while [[ $# -gt 0 ]]; do
-    case $1 in
-        --skip-quality)
-            SKIP_QUALITY=true
-            shift
-            ;;
-        --dry-run)
-            DRY_RUN=true
-            shift
-            ;;
-        *)
-            CUSTOM_TAG="$1"
-            shift
-            ;;
-    esac
+  case "$1" in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --dry-run)
+      dry_run=true
+      ;;
+    --check-only)
+      set_mode check-only
+      ;;
+    --skip-gates)
+      set_mode skip-gates
+      ;;
+    # pnpm passes the -- in `pnpm docker:build-push -- --skip-gates` through.
+    --) ;;
+    -*)
+      usage >&2
+      fail "unknown option: $1"
+      ;;
+    *)
+      [[ -z "$custom_tag" ]] || fail "only one custom tag may be given (got '$custom_tag' and '$1')"
+      custom_tag="$1"
+      ;;
+  esac
+  shift
 done
 
-# Function to check if Docker is running
-check_docker() {
-    log_info "Checking if Docker is running..."
-    if ! docker info >/dev/null 2>&1; then
-        log_error "Docker is not running. Please start Docker and try again."
-        exit 1
-    fi
-    log_success "Docker is running"
+if [[ -n "$custom_tag" && ! "$custom_tag" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+  fail "'${custom_tag}' is not a valid tag; use letters, digits, '_', '.' and '-'"
+fi
+
+root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+if [[ "$(pwd -P)" != "$root" || ! -f "$DOCKERFILE" || ! -f "$VERSION_FILE" ]]; then
+  fail "run this from the repository root (${root}), for example with pnpm docker:build-push"
+fi
+
+read_version() {
+  node -p "require('./${VERSION_FILE}').version"
 }
 
-# Function to check Docker Hub login
-check_docker_login() {
-    log_info "Checking Docker Hub authentication..."
-    if ! docker info | grep -q "Username:"; then
-        log_warning "Not logged into Docker Hub. Attempting login..."
-        if ! docker login; then
-            log_error "Failed to login to Docker Hub. Please run 'docker login' manually."
-            exit 1
-        fi
-    fi
-    log_success "Docker Hub authentication verified"
-}
-
-# Function to run quality checks
-run_quality_checks() {
-    if [ "$SKIP_QUALITY" = true ]; then
-        log_warning "Skipping quality checks as requested"
-        return 0
-    fi
-
-    log_info "Running quality checks..."
-    
-    log_info "Running TypeScript type checking..."
-    if ! pnpm typecheck; then
-        log_error "TypeScript type checking failed"
-        exit 1
-    fi
-    
-    log_info "Running ESLint..."
-    if ! pnpm lint; then
-        log_error "ESLint checks failed"
-        exit 1
-    fi
-    
-    log_info "Running tests..."
-    if ! pnpm test; then
-        log_error "Tests failed"
-        exit 1
-    fi
-    
-    log_success "All quality checks passed"
-}
-
-# Function to get version from package.json
-get_version() {
-    node -p "require('./package.json').version"
-}
-
-# Function to build Docker image
-build_image() {
-    local version=$(get_version)
-    
-    log_info "Building Docker image..."
-    log_info "Version: $version"
-    
-    if [ "$DRY_RUN" = true ]; then
-        log_info "[DRY RUN] Would build image with tag: ${DOCKER_REPO}:${version}"
-        log_info "[DRY RUN] Would tag as latest: ${DOCKER_REPO}:latest"
-        if [ -n "$CUSTOM_TAG" ]; then
-            log_info "[DRY RUN] Would tag with custom tag: ${DOCKER_REPO}:${CUSTOM_TAG}"
-        fi
-        log_success "[DRY RUN] Docker image build simulation completed"
-        return 0
-    fi
-    
-    # Build multi-platform image with version tag
-    log_info "Building multi-platform image with tag: ${DOCKER_REPO}:${version}"
-    log_info "Building for platforms: linux/amd64,linux/arm64"
-    
-    # Create buildx builder if it doesn't exist
-    if ! docker buildx ls | grep -q multiplatform; then
-        log_info "Creating multiplatform buildx builder..."
-        docker buildx create --name multiplatform --use
-    else
-        docker buildx use multiplatform
-    fi
-    
-    # Build all tags at once
-    local tags="-t ${DOCKER_REPO}:${version} -t ${DOCKER_REPO}:latest"
-    if [ -n "$CUSTOM_TAG" ]; then
-        tags="$tags -t ${DOCKER_REPO}:${CUSTOM_TAG}"
-    fi
-    
-    # Build and push multi-platform image with all tags
-    # Using --no-cache to ensure fresh builds and avoid CJS bundling issues
-    if ! docker buildx build -f "$DOCKERFILE_PATH" \
-        --platform linux/amd64,linux/arm64 \
-        $tags \
-        --no-cache \
-        --push .; then
-        log_error "Docker multi-platform build failed"
-        exit 1
-    fi
-    
-    log_success "Docker image built successfully"
-}
-
-# Function to push Docker image (now handled in build step for multi-platform)
-push_image() {
-    local version=$(get_version)
-    
-    if [ "$DRY_RUN" = true ]; then
-        log_info "[DRY RUN] Would push ${DOCKER_REPO}:${version}"
-        log_info "[DRY RUN] Would push ${DOCKER_REPO}:latest"
-        if [ -n "$CUSTOM_TAG" ]; then
-            log_info "[DRY RUN] Would push ${DOCKER_REPO}:${CUSTOM_TAG}"
-        fi
-        log_success "[DRY RUN] All tags push simulation completed"
-        return 0
-    fi
-    
-    # Multi-platform images are pushed during build step
-    log_success "Multi-platform images already pushed to Docker Hub during build"
-}
-
-
-# Function to display image info
-show_image_info() {
-    local version=$(get_version)
-    
-    echo ""
-    log_success "🐳 Docker image build and push completed!"
-    echo ""
-    echo "📦 Image Repository: ${DOCKER_REPO}"
-    echo "🏷️  Tags pushed:"
-    echo "   • ${DOCKER_REPO}:${version}"
-    echo "   • ${DOCKER_REPO}:latest"
-    if [ -n "$CUSTOM_TAG" ]; then
-        echo "   • ${DOCKER_REPO}:${CUSTOM_TAG}"
-    fi
-    echo ""
-    echo "🚀 To run the image:"
-    echo "   docker run -p 8100:8100 -e DATABASE_URL=your_db_url ${DOCKER_REPO}:latest"
-    echo ""
-}
-
-# Main execution
 main() {
-    echo "🐳 PinSquirrel Docker Build & Push Script"
-    echo "========================================"
-    echo ""
-    
-    
-    # Verify we're in the right directory
-    if [ ! -f "package.json" ] || [ ! -f "$DOCKERFILE_PATH" ]; then
-        log_error "Please run this script from the project root directory"
-        exit 1
-    fi
-    
-    # Run all checks and build steps
-    check_docker
-    check_docker_login
-    run_quality_checks
-    build_image
-    push_image
-    show_image_info
+  local version tag
+  version="$(read_version)"
+
+  local tags=("${IMAGE}:${version}" "${IMAGE}:latest")
+  [[ -z "$custom_tag" ]] || tags+=("${IMAGE}:${custom_tag}")
+
+  if [[ "$dry_run" == true ]]; then
+    log "Dry run: nothing will be built or pushed"
+    echo "Image:     ${IMAGE}"
+    echo "Version:   ${version} (from ${VERSION_FILE})"
+    echo "Platforms: ${PLATFORMS}"
+    case "$mode" in
+      check-only)
+        echo "Would run the preflight checks only: no quality gate, nothing built or pushed"
+        return 0
+        ;;
+      skip-gates) echo "Would skip the quality gate (--skip-gates)" ;;
+      full) echo "Would run the quality gate: pnpm ${GATE}" ;;
+    esac
+    echo "Would build and push:"
+    for tag in "${tags[@]}"; do
+      echo "  ${tag}"
+    done
+    return 0
+  fi
+
+  check_docker
+  check_login
+  case "$mode" in
+    check-only)
+      log "Preflight checks passed: ready to build and push:"
+      for tag in "${tags[@]}"; do
+        echo "  ${tag}"
+      done
+      return 0
+      ;;
+    skip-gates) log "Skipping the quality gate (--skip-gates)" ;;
+    full)
+      log "Quality gate: pnpm ${GATE}"
+      pnpm "$GATE" || fail "quality gate 'pnpm ${GATE}' failed; nothing was built or pushed"
+      ;;
+  esac
+  build_and_push "${tags[@]}"
+
+  log "Pushed ${IMAGE} for ${PLATFORMS}:"
+  for tag in "${tags[@]}"; do
+    echo "  ${tag}"
+  done
+  echo "Confirm both platforms are in the manifest list with:"
+  echo "  docker buildx imagetools inspect ${IMAGE}:${version}"
 }
 
-# Run main function with all arguments
-main "$@"
+check_docker() {
+  log "Checking Docker is running"
+  docker info >/dev/null 2>&1 || fail "Docker is not running; start it and try again"
+}
+
+# `docker login` writes the registry under "auths" in the docker config, even
+# when a credential helper holds the secret itself.
+check_login() {
+  log "Checking ${REGISTRY} login"
+  local config="${DOCKER_CONFIG:-$HOME/.docker}/config.json"
+  if ! grep -q "\"${REGISTRY}\"" "$config" 2>/dev/null; then
+    echo "Not logged in to ${REGISTRY}; running docker login ${REGISTRY}"
+    echo "(use a GitHub personal access token with write:packages as the password)"
+    docker login "$REGISTRY" || fail "could not log in to ${REGISTRY}; run 'docker login ${REGISTRY}' and try again"
+  fi
+}
+
+# The default docker driver cannot build and push multi-platform images
+# without the containerd image store.
+build_and_push() {
+  if docker buildx inspect "$BUILDER" >/dev/null 2>&1; then
+    log "Using buildx builder ${BUILDER}"
+  else
+    log "Creating buildx builder ${BUILDER}"
+    docker buildx create --name "$BUILDER" --driver docker-container >/dev/null
+  fi
+
+  local args=() tag
+  for tag in "$@"; do
+    args+=(--tag "$tag")
+  done
+
+  log "Building and pushing ${PLATFORMS}"
+  docker buildx build \
+    --builder "$BUILDER" \
+    --platform "$PLATFORMS" \
+    --file "$DOCKERFILE" \
+    --pull \
+    --no-cache \
+    "${args[@]}" \
+    --push \
+    . || fail "docker buildx build failed"
+}
+
+main

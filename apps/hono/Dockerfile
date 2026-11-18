@@ -31,6 +31,7 @@ RUN npm_config_ignore_scripts=true pnpm install --frozen-lockfile --prod
 
 # Final runtime image
 FROM node:26.13.1-alpine AS runtime
+LABEL org.opencontainers.image.source="https://github.com/andrewshell/pinsquirrel"
 RUN npm install -g corepack@0.36.0 && corepack enable
 WORKDIR /app
 

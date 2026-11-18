@@ -164,9 +164,10 @@ access** links to `<siteUrl>/signin`.
 # Build production image (run from repository root)
 docker build -f apps/hono/Dockerfile -t your-username/pinsquirrel:latest .
 
-# Or use the convenience script (builds and pushes to Docker Hub)
-pnpm docker:build-push
 ```
+
+Releases publish `ghcr.io/andrewshell/pinsquirrel` automatically. See
+[DEPLOYMENT.md](./DEPLOYMENT.md#publishing-a-release).
 
 ### Deployment Options
 
