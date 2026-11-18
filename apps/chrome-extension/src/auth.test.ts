@@ -404,6 +404,25 @@ describe('getAccessToken', () => {
     expect(server.chrome.local.items.selectedTagIds).toEqual(['tag-1'])
   })
 
+  // The server stays, so every open options page can tell a grant the server
+  // dropped from a Disconnect, and offer to reconnect to the same server.
+  it('remembers the server whose grant was dropped', async () => {
+    const server = stubOAuthServer(connected({ expiresAt: Date.now() - 1000 }))
+    server.answerTokenWith(() => oauthErrorResponse('invalid_grant'))
+
+    await expect(getAccessToken()).rejects.toThrow()
+
+    expect(server.chrome.local.items.baseUrl).toBe(SERVER_BASE_URL)
+  })
+
+  it('asks for consent again, not as a disconnect, once another context lost the grant', async () => {
+    stubOAuthServer({ baseUrl: SERVER_BASE_URL })
+
+    await expect(getAccessToken()).rejects.toMatchObject({
+      name: 'ReauthorizationRequiredError',
+    })
+  })
+
   // Two refreshes of the same token means one loses the rotation race, and a
   // replay outside the server's short grace window revokes the grant.
   it('posts one refresh when two callers want a token at once', async () => {

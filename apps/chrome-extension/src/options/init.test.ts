@@ -49,7 +49,12 @@ interface Harness {
 
 function harness(overrides: Partial<OptionsDeps> = {}): Harness {
   const requestConnect = vi.fn(() => Promise.resolve({ ok: true as const }))
-  const disconnect = vi.fn(() => Promise.resolve())
+  const disconnect = vi.fn(() => {
+    for (const key of Object.keys(chrome.local.items)) {
+      delete chrome.local.items[key]
+    }
+    return Promise.resolve()
+  })
   const getTags = vi.fn(() => Promise.resolve(TAGS))
   const requestSync = vi.fn(() => Promise.resolve({ ok: true as const }))
   const finishedListeners: ((result: ConnectResponse) => void)[] = []
@@ -110,6 +115,13 @@ function selectedOnly(on: boolean): Promise<void> {
   box.checked = on
   box.dispatchEvent(new Event('change', { bubbles: true }))
   return flush()
+}
+
+/** What `invalid_grant` leaves behind: the server, without the grant. */
+function dropGrant(): void {
+  for (const key of ['clientId', 'accessToken', 'refreshToken', 'expiresAt']) {
+    delete chrome.local.items[key]
+  }
 }
 
 const settingsShown = () => !element('#settings-view').hidden
@@ -580,16 +592,35 @@ describe('initOptions, when the grant is gone', () => {
     )
   })
 
+  // The worker's refresh got invalid_grant. Its answer is only text: the
+  // class does not cross the channel, so the page reads what is stored.
   it('asks to reconnect when a sync says the grant is gone', async () => {
-    const requestSync = vi.fn(() =>
-      Promise.reject(new ReauthorizationRequiredError('invalid_grant'))
-    )
+    const requestSync = vi.fn(() => {
+      dropGrant()
+      return Promise.resolve({
+        ok: false as const,
+        error: 'The refresh token is invalid, expired, or revoked',
+      })
+    })
     await initOptions(harness({ requestSync }).deps)
 
     await click('#sync-now')
 
     expect(settingsShown()).toBe(true)
     expect(element('#reconnect-notice').hidden).toBe(false)
+    expect(status()).toBe('')
+  })
+
+  it('opens asking to reconnect, server prefilled, after the worker lost the grant', async () => {
+    dropGrant()
+
+    await initOptions(harness().deps)
+
+    expect(settingsShown()).toBe(true)
+    expect(element('#reconnect-notice').hidden).toBe(false)
+    expect(element<HTMLInputElement>('#base-url').value).toBe(
+      'https://pinsquirrel.com'
+    )
   })
 })
 

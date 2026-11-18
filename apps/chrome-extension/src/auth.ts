@@ -461,6 +461,18 @@ const TOKEN_KEYS = [
   'expiresAt',
 ] as const
 
+/**
+ * What `invalid_grant` removes. `baseUrl` stays: it is how every context tells
+ * a grant the server dropped from a Disconnect, and the server a reconnect
+ * goes back to.
+ */
+const CREDENTIAL_KEYS = [
+  'clientId',
+  'accessToken',
+  'refreshToken',
+  'expiresAt',
+] as const
+
 /** The stored connection, or nothing if the extension is not connected. */
 async function storedTokens(): Promise<StoredTokens | null> {
   const stored = await storage.getMany([...TOKEN_KEYS])
@@ -468,6 +480,37 @@ async function storedTokens(): Promise<StoredTokens | null> {
     if (stored[key] === undefined) return null
   }
   return stored as StoredTokens
+}
+
+/**
+ * The connection as storage holds it: whole, `lost` when the server dropped
+ * the grant and only the server is left, or `none` after a Disconnect or
+ * before the first Connect.
+ */
+export type Connection =
+  | { status: 'connected'; baseUrl: string }
+  | { status: 'lost'; baseUrl: string }
+  | { status: 'none' }
+
+export async function readConnection(): Promise<Connection> {
+  const tokens = await storedTokens()
+  if (tokens) return { status: 'connected', baseUrl: tokens.baseUrl }
+  const baseUrl = await storage.get('baseUrl')
+  return baseUrl === undefined
+    ? { status: 'none' }
+    : { status: 'lost', baseUrl }
+}
+
+/** The stored connection, or the error that says why there is none. */
+async function requireTokens(): Promise<StoredTokens> {
+  const tokens = await storedTokens()
+  if (tokens) return tokens
+  if ((await storage.get('baseUrl')) === undefined) {
+    throw new NotConnectedError()
+  }
+  throw new ReauthorizationRequiredError(
+    'The server no longer accepts this connection'
+  )
 }
 
 /**
@@ -508,10 +551,7 @@ const REFRESH_LOCK = 'pinsquirrel-token-refresh'
  */
 async function refreshTokens(spent: StoredTokens): Promise<StoredTokens> {
   return navigator.locks.request(REFRESH_LOCK, async () => {
-    const current = await storedTokens()
-    if (!current) {
-      throw new NotConnectedError()
-    }
+    const current = await requireTokens()
     if (current.refreshToken !== spent.refreshToken) return current
 
     try {
@@ -537,7 +577,7 @@ async function refreshTokens(spent: StoredTokens): Promise<StoredTokens> {
       ) {
         // Expired, revoked, or already exchanged - the stored refresh token is
         // spent either way, and nothing here can recover it.
-        await storage.remove([...TOKEN_KEYS])
+        await storage.remove([...CREDENTIAL_KEYS])
         throw new ReauthorizationRequiredError(error.message)
       }
       throw error
@@ -552,10 +592,7 @@ async function refreshTokens(spent: StoredTokens): Promise<StoredTokens> {
  * ask whether it is still valid.
  */
 export async function getAccessToken(): Promise<string> {
-  const tokens = await storedTokens()
-  if (!tokens) {
-    throw new NotConnectedError()
-  }
+  const tokens = await requireTokens()
   if (!isSpent(tokens)) return tokens.accessToken
 
   return (await refreshTokens(tokens)).accessToken

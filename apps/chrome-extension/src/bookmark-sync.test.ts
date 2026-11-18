@@ -6,7 +6,7 @@ import {
   syncAll,
   syncTagFolder,
 } from './bookmark-sync.ts'
-import { ReauthorizationRequiredError } from './auth.ts'
+import { NotConnectedError, ReauthorizationRequiredError } from './auth.ts'
 import { stubChrome } from './test/chrome-mock.ts'
 import { jsonResponse, stubFetch } from './test/fetch-mock.ts'
 import type { Pin, Tag } from './types.ts'
@@ -459,6 +459,24 @@ describe('syncAll, reporting to the options page through storage', () => {
       'PinSquirrel needs to be reconnected: The refresh token was revoked'
     )
   })
+
+  // A Disconnect cleared storage while the sync ran. There is no connection
+  // left for a failure to belong to.
+  it('records nothing when the connection was ended mid-sync', async () => {
+    const { local } = stubChrome()
+
+    await expect(
+      syncAll({
+        apiClient: {
+          getTags: () => Promise.reject(new NotConnectedError()),
+          getAllPinsForTag: () => Promise.resolve([]),
+        },
+        selectedTagIds: ['tag-1'],
+      })
+    ).rejects.toBeInstanceOf(NotConnectedError)
+
+    expect(local.items).toEqual({})
+  })
 })
 
 describe('runSync', () => {
@@ -530,6 +548,6 @@ describe('runSync', () => {
   it('asks for a connection rather than syncing when there is none', async () => {
     stubChrome({ selectedTagIds: ['tag-1'] })
 
-    await expect(runSync()).rejects.toBeInstanceOf(ReauthorizationRequiredError)
+    await expect(runSync()).rejects.toBeInstanceOf(NotConnectedError)
   })
 })

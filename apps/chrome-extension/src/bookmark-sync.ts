@@ -8,7 +8,11 @@
  */
 
 import { PinSquirrelApiClient } from './api-client.ts'
-import { authorizedFetch, ReauthorizationRequiredError } from './auth.ts'
+import {
+  authorizedFetch,
+  NotConnectedError,
+  ReauthorizationRequiredError,
+} from './auth.ts'
 import * as storage from './storage.ts'
 import type { Pin, Tag } from './types.ts'
 
@@ -243,7 +247,10 @@ export async function syncAll(input: {
   try {
     await mirrorTags(input)
   } catch (error) {
-    await storage.set({ lastSyncError: syncErrorMessage(error) })
+    // A Disconnect cleared storage under the sync: nothing to report against.
+    if (!(error instanceof NotConnectedError)) {
+      await storage.set({ lastSyncError: syncErrorMessage(error) })
+    }
     throw error
   }
 
@@ -291,15 +298,13 @@ async function mirrorTags(input: {
  *
  * No base URL means the extension was never connected or has been
  * disconnected. That is not a sync failure to record - the options page is
- * showing its Connect view either way - so it is raised as the same
- * `ReauthorizationRequiredError` a dead grant raises and left to the caller.
+ * showing its Connect view either way - so it is raised as
+ * `NotConnectedError` and left to the caller.
  */
 export async function runSync(): Promise<void> {
   const stored = await storage.getMany(['baseUrl', 'selectedTagIds'])
   if (!stored.baseUrl) {
-    throw new ReauthorizationRequiredError(
-      'The extension is not connected to a PinSquirrel server'
-    )
+    throw new NotConnectedError()
   }
 
   await syncAll({

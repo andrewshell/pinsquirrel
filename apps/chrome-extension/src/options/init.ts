@@ -1,4 +1,8 @@
-import { NotConnectedError, ReauthorizationRequiredError } from '../auth.ts'
+import {
+  NotConnectedError,
+  ReauthorizationRequiredError,
+  readConnection,
+} from '../auth.ts'
 import type { ConnectResponse, SyncResponse } from '../messages.ts'
 import * as storage from '../storage.ts'
 import type { TagWithCount } from '../types.ts'
@@ -124,11 +128,15 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
    */
   const selection = new Set<string>()
 
+  /** Which view is on screen, so a repeat of the same state redraws nothing. */
+  let view: 'main' | 'settings' | 'reconnect' | undefined
+
   const setStatus = (text: string): void => {
     ui.status.textContent = text
   }
 
   function showSettings({ reconnect = false } = {}): void {
+    view = reconnect ? 'reconnect' : 'settings'
     ui.settingsView.hidden = false
     ui.mainView.hidden = true
     ui.reconnectNotice.hidden = !reconnect
@@ -136,6 +144,7 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
   }
 
   async function showMain(): Promise<void> {
+    view = 'main'
     ui.settingsView.hidden = true
     ui.mainView.hidden = false
     ui.reconnectNotice.hidden = true
@@ -146,6 +155,34 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
     ui.tagFilter.focus()
     await refreshSyncStatus()
     await loadTags()
+  }
+
+  /**
+   * Show the view the stored connection calls for, if it is not already up.
+   *
+   * Storage is the one record every context shares: the worker connects and
+   * loses grants there, and another options page disconnects there.
+   */
+  async function showConnection(): Promise<void> {
+    const connection = await readConnection()
+    const previous = baseUrl
+    if (connection.status !== 'none') baseUrl = connection.baseUrl
+    switch (connection.status) {
+      case 'connected':
+        if (view === 'main' && baseUrl === previous) return
+        setStatus('')
+        await showMain()
+        return
+      case 'lost':
+        if (view !== 'reconnect') askToReconnect()
+        return
+      case 'none':
+        if (view !== 'settings') {
+          setStatus('')
+          showSettings()
+        }
+        return
+    }
   }
 
   /**
@@ -309,9 +346,7 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
       return
     }
     try {
-      baseUrl = await storage.get('baseUrl')
-      setStatus('')
-      await showMain()
+      await showConnection()
     } catch (error) {
       report(error)
     }
@@ -349,8 +384,14 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
     await whileBusy(ui.syncButton, async () => {
       try {
         const response = await deps.requestSync()
-        setStatus(response.ok ? '' : `Sync failed: ${response.error}`)
         await refreshSyncStatus()
+        if (response.ok) {
+          setStatus('')
+        } else if ((await readConnection()).status === 'connected') {
+          setStatus(`Sync failed: ${response.error}`)
+        } else {
+          await showConnection()
+        }
       } catch (error) {
         report(error)
       }
@@ -361,8 +402,7 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
     await whileBusy(ui.disconnectButton, async () => {
       try {
         await deps.disconnect()
-        setStatus('')
-        showSettings()
+        await showConnection()
       } catch (error) {
         report(error)
       }
@@ -386,16 +426,5 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
     drawTagList()
   })
 
-  const stored = await storage.getMany([
-    'baseUrl',
-    'accessToken',
-    'refreshToken',
-  ])
-  baseUrl = stored.baseUrl
-
-  if (stored.baseUrl && stored.accessToken && stored.refreshToken) {
-    await showMain()
-  } else {
-    showSettings()
-  }
+  await showConnection()
 }
