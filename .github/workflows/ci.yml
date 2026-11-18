@@ -1,15 +1,49 @@
 name: CI
 
 on:
-  pull_request:
-    branches: [main]
   push:
     branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # A pull request run tests GitHub's merge of the branch into its base as the
+  # base stood then. A later run whose commit has the same tree, such as the
+  # push of that merge to main, was already tested byte for byte. [skip ci]
+  # cannot do this: it would skip release-please too.
+  already-tested:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      skip: ${{ steps.look.outputs.skip }}
+    steps:
+      - id: look
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # A fork's pull request runs its own copy of this workflow, so only an
+        # artifact from a run of this repository's own branches counts.
+        run: |
+          tree=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq .commit.tree.sha)
+          found=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=tested-tree-$tree&per_page=100" \
+            --jq '[.artifacts[] | select(.expired | not) | select(.workflow_run.head_repository_id == .workflow_run.repository_id)] | length')
+          echo "tree $tree was tested by $found earlier run(s)"
+          if [ "$found" -gt 0 ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; fi
+
   # `pnpm run quality` ends with `pnpm run audit`, so there is no separate
   # audit job -- see CLAUDE.md's Quality Check Requirements.
   quality:
+    needs: already-tested
+    if: ${{ !cancelled() && needs.already-tested.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     services:
       mysql:
@@ -37,3 +71,19 @@ jobs:
       - run: pnpm run quality
         env:
           TEST_DATABASE_URL: mysql://pinsquirrel:pinsquirrel@localhost:3306/pinsquirrel_test
+
+  record-tested-tree:
+    if: github.event_name == 'pull_request'
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: tree
+        run: |
+          git rev-parse 'HEAD^{tree}' > tested-tree.txt
+          echo "tree=$(cat tested-tree.txt)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tested-tree-${{ steps.tree.outputs.tree }}
+          path: tested-tree.txt
+          retention-days: 30
