@@ -370,7 +370,6 @@ auth.post('/reset-password/:token', async c => {
       return c.html(<ResetPasswordPage invalidToken={true} embed={embed} />)
     }
 
-    // The link is spent only when the reset commits, so the same form works.
     if (error instanceof WriteConflictError) {
       logger.warn(
         { cause: safeError(error.cause) },

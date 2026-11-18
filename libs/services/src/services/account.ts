@@ -391,13 +391,8 @@ export class AccountService {
     // Hash the new password
     const passwordHash = await hashPassword(input.newPassword)
 
-    // The link is spent in the transaction that writes the password, so a
-    // reset that does not commit leaves it working. False means another
-    // request spent it first, or the account was deleted since the reads above.
     const reset = await this.userRepository.setPasswordAndRevoke(user.id, {
       passwordHash,
-      // A brand-new account moves to the waitlist; an active user resetting a
-      // forgotten password keeps their status.
       ...(user.status === UserStatus.Unverified && {
         status: UserStatus.Waitlist,
       }),

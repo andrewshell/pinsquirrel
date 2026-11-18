@@ -233,8 +233,8 @@ export class AuthenticationService {
    * are standing in, and dropping User suspends sign-in altogether — both need
    * a second admin to undo, so neither is offered as a self-service mistake.
    *
-   * Revoking User also ends the account's sessions and OAuth tokens, in the
-   * transaction that removes the role (PLAN.md decision 47).
+   * Revoking User also ends the account's sessions and OAuth tokens, all or
+   * nothing: after a `WriteConflictError` the role is still held.
    *
    * Idempotent; revoking a role the user does not hold writes nothing.
    */
@@ -422,7 +422,7 @@ export class AuthenticationService {
       { passwordHash, keepSessionId: input.keepSessionId }
     )
     if (!changed) {
-      throw new InvalidCredentialsError()
+      throw new UserNotFoundError(input.userId)
     }
   }
 }

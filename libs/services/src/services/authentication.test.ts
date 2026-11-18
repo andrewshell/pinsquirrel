@@ -491,7 +491,7 @@ describe('AuthenticationService', () => {
       expect(result.roles).toEqual([])
     })
 
-    it('removes the User role and ends the sessions and tokens in one repository call', async () => {
+    it('makes no other write when removing the User role is undone by a write conflict', async () => {
       const plainUser = { ...mockUser, roles: [Role.User] }
       vi.mocked(mockUserRepository.findById).mockResolvedValue(plainUser)
       vi.mocked(mockUserRepository.removeRoleAndRevoke).mockRejectedValue(
@@ -888,7 +888,7 @@ describe('AuthenticationService', () => {
       )
     })
 
-    it('writes the password and ends the sessions and tokens in one repository call', async () => {
+    it('makes no other write when the change is undone by a write conflict', async () => {
       vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
       vi.mocked(verifyPassword).mockResolvedValue(true)
       vi.mocked(mockUserRepository.setPasswordAndRevoke).mockRejectedValue(
@@ -919,7 +919,7 @@ describe('AuthenticationService', () => {
           currentPassword: 'currentpass123',
           newPassword: 'newpass1234567',
         })
-      ).rejects.toThrow(InvalidCredentialsError)
+      ).rejects.toThrow(UserNotFoundError)
     })
 
     it("ends the user's other sessions and OAuth tokens but keeps the current session", async () => {

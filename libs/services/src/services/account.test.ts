@@ -1195,7 +1195,7 @@ describe('AccountService', () => {
       )
     })
 
-    it('writes the password, spends the link and ends the sessions and tokens in one repository call', async () => {
+    it('makes no other write when the reset is undone by a write conflict', async () => {
       vi.mocked(mockPasswordResetRepository.findByTokenHash).mockResolvedValue(
         mockPasswordResetToken
       )

@@ -41,14 +41,12 @@ export interface UserRepository extends Repository<
    * one transaction: every web session but `keepSessionId`, every OAuth
    * token and unused authorization code, and the pending email change.
    *
-   * With `resetTokenId` the change also spends that reset token, and the
-   * user's others with it. Resolves false, with nothing changed, when that
-   * token is gone or expired or the user is gone. Of any number of concurrent
-   * calls with one token, one resolves true.
+   * With `resetTokenId` the change also spends that reset token and the
+   * user's others. Resolves false, with nothing changed, when that token is
+   * gone or expired, or when the user is gone. Of concurrent calls with one
+   * token, at most one resolves true.
    *
-   * A `WriteConflictError` means it lost to concurrent writes and nothing
-   * changed: the old password, the reset token, the sessions and the tokens
-   * are as they were, and the same call can be made again.
+   * A `WriteConflictError` means nothing changed and the call can be retried.
    */
   setPasswordAndRevoke(userId: string, change: PasswordChange): Promise<boolean>
   /**
