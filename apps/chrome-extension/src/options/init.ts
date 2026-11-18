@@ -168,7 +168,7 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
    * `ReauthorizationRequiredError` is the one that changes the view: the grant
    * is gone and no retry will bring it back, so the page goes to Connect with
    * the server it was talking to already filled in. `NotConnectedError` goes
-   * there without the notice: another page disconnected, as the user asked.
+   * there with no notice: the user disconnected, possibly from another page.
    */
   function report(error: unknown): void {
     if (error instanceof NotConnectedError) {

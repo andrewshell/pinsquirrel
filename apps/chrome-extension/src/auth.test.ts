@@ -320,7 +320,6 @@ function shortenTimeouts(): number[] {
   return asked
 }
 
-/** A server that took the request and never answers, as `fetch` sees it. */
 function neverAnswers(init: RequestInit | undefined): Promise<Response> {
   return new Promise((_resolve, reject) => {
     const signal = init?.signal
@@ -456,8 +455,6 @@ describe('getAccessToken', () => {
 
 const TAGS_URL = `${SERVER_BASE_URL}/api/v1/tags`
 
-// Every refresh runs under a lock the options page and the worker share, so a
-// token request that hangs would hold up the other context's refreshes too.
 describe('a request the server never answers', () => {
   it('fails a refresh with a clear error and lets the next one through', async () => {
     const server = stubOAuthServer(connected({ expiresAt: Date.now() - 1000 }))
