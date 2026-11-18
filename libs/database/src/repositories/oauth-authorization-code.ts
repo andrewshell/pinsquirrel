@@ -56,6 +56,7 @@ export class DrizzleOAuthAuthorizationCodeRepository implements OAuthAuthorizati
         codeChallenge: data.codeChallenge,
         scopes: data.scopes,
         resource: data.resource,
+        grantId: data.grantId,
         expiresAt: data.expiresAt,
         consumedAt: null,
         createdAt: new Date(),

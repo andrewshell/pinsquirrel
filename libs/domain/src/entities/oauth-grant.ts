@@ -1,6 +1,20 @@
 import type { AccessGateable } from './access.js'
 
 /**
+ * A grant is one approval of the consent screen: one user letting one client
+ * reach one resource with a set of scopes.
+ *
+ * It has no row of its own. `grantId` names it: `authorize` makes the id when
+ * it writes the code, the exchange copies it to the access and refresh
+ * tokens, and every rotation copies it to the successors. The grant's scopes
+ * are the ones on its refresh token, which a rotation never changes.
+ *
+ * A null `grantId` is a row written before grants had ids. Such a row is
+ * revoked together with everything the user holds for that client, and a
+ * refresh token without one is given an id when it rotates.
+ */
+
+/**
  * An issued authorization code, stored hashed.
  *
  * The raw code exists only in the redirect that carried it. Everything here
@@ -27,6 +41,8 @@ export interface AuthorizationCode {
   scopes: string[]
   /** The RFC 8707 `resource` the resulting token will be bound to. */
   resource: string
+  /** The grant this code starts. Null only for a code from before grant ids. */
+  grantId: string | null
   expiresAt: Date
   /**
    * When the code was exchanged. Non-null means spent: codes are single-use,
@@ -44,6 +60,7 @@ export interface CreateAuthorizationCodeData {
   codeChallenge: string
   scopes: string[]
   resource: string
+  grantId: string
   expiresAt: Date
 }
 
@@ -70,6 +87,8 @@ export interface OAuthToken extends AccessGateable {
    * so this is compared, never defaulted.
    */
   resource: string
+  /** The grant this token belongs to. Null only for a token from before grant ids. */
+  grantId: string | null
   expiresAt: Date
   /** Set when a user or client revoked it. Non-null means dead. */
   revokedAt: Date | null
@@ -94,6 +113,7 @@ export interface CreateOAuthTokenData {
   userId: string
   scopes: string[]
   resource: string
+  grantId: string
   expiresAt: Date
   rotatedFrom?: string | null
 }

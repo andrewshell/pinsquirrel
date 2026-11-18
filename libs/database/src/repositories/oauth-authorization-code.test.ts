@@ -37,6 +37,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
     codeChallenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
     scopes: ['pins:read', 'tags:read'],
     resource: 'https://pinsquirrel.com/mcp',
+    grantId: crypto.randomUUID(),
     expiresAt: new Date(Date.now() + 60 * 1000),
     ...overrides,
   })
@@ -99,6 +100,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
         codeChallenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
         scopes: ['pins:read', 'tags:read'],
         resource: 'https://pinsquirrel.com/mcp',
+        grantId: data.grantId,
         consumedAt: null,
       })
       expect(result.id).toBeDefined()

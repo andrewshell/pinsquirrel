@@ -33,6 +33,7 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
     userId,
     scopes: ['pins:read', 'tags:read'],
     resource: MCP,
+    grantId: crypto.randomUUID(),
     expiresAt: new Date(Date.now() + 60 * 60 * 1000),
     ...overrides,
   })
@@ -91,6 +92,7 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
         userId,
         scopes: ['pins:read', 'tags:read'],
         resource: MCP,
+        grantId: data.grantId,
         revokedAt: null,
         rotatedAt: null,
         rotatedFrom: null,
@@ -172,23 +174,6 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
     })
   })
 
-  describe('findByRotatedFrom', () => {
-    it('should find the successor of a rotated refresh token', async () => {
-      const first = await repository.create(token({ kind: 'refresh' }))
-      const second = await repository.create(
-        token({ kind: 'refresh', rotatedFrom: first.id })
-      )
-
-      expect((await repository.findByRotatedFrom(first.id))?.id).toBe(second.id)
-    })
-
-    it('should return null when the token was never rotated', async () => {
-      const only = await repository.create(token({ kind: 'refresh' }))
-
-      expect(await repository.findByRotatedFrom(only.id)).toBeNull()
-    })
-  })
-
   describe('revoke', () => {
     it('should revoke a live token once', async () => {
       const created = await repository.create(token())
@@ -237,6 +222,42 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
       await repository.revoke(already.id)
 
       expect(await repository.revokeByUserAndClient(userId, clientId)).toBe(0)
+    })
+  })
+
+  describe('revokeByGrant', () => {
+    it('should kill the access and refresh tokens of that grant', async () => {
+      const grantId = crypto.randomUUID()
+      const access = await repository.create(token({ grantId }))
+      const refresh = await repository.create(
+        token({ kind: 'refresh', grantId })
+      )
+
+      expect(await repository.revokeByGrant(userId, grantId)).toBe(2)
+      expect((await repository.findById(access.id))?.revokedAt).not.toBeNull()
+      expect((await repository.findById(refresh.id))?.revokedAt).not.toBeNull()
+    })
+
+    it('should leave another grant of the same user and client alone', async () => {
+      const laptop = crypto.randomUUID()
+      const desktop = await repository.create(token({ kind: 'refresh' }))
+      await repository.create(token({ kind: 'refresh', grantId: laptop }))
+
+      await repository.revokeByGrant(userId, laptop)
+
+      expect((await repository.findById(desktop.id))?.revokedAt).toBeNull()
+    })
+
+    it('should not revoke a grant on behalf of another user', async () => {
+      const otherUser = await insertUser(testPool, {
+        emailHash: crypto.randomUUID(),
+      })
+      const created = await repository.create(token())
+
+      expect(
+        await repository.revokeByGrant(otherUser.id, created.grantId ?? '')
+      ).toBe(0)
+      expect((await repository.findById(created.id))?.revokedAt).toBeNull()
     })
   })
 
@@ -326,6 +347,7 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
         'user_id',
         'client_id',
       ])
+      expect(await indexed('oauth_tokens_grant_idx')).toEqual(['grant_id'])
     })
   })
 })

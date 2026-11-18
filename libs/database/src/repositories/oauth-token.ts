@@ -35,15 +35,6 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
       .where(and(eq(oauthTokens.userId, userId), this.stillLive()))
   }
 
-  async findByRotatedFrom(tokenId: string): Promise<OAuthToken | null> {
-    const result = await this.db
-      .select()
-      .from(oauthTokens)
-      .where(eq(oauthTokens.rotatedFrom, tokenId))
-      .limit(1)
-    return result[0] || null
-  }
-
   async create(data: CreateOAuthTokenData): Promise<OAuthToken> {
     const id = crypto.randomUUID()
     const now = new Date()
@@ -56,6 +47,7 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
       userId: data.userId,
       scopes: data.scopes,
       resource: data.resource,
+      grantId: data.grantId,
       expiresAt: data.expiresAt,
       revokedAt: null,
       rotatedAt: null,
@@ -91,6 +83,20 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
         and(
           eq(oauthTokens.userId, userId),
           eq(oauthTokens.clientId, clientId),
+          isNull(oauthTokens.revokedAt)
+        )
+      )
+    return result[0].affectedRows
+  }
+
+  async revokeByGrant(userId: string, grantId: string): Promise<number> {
+    const result = await this.db
+      .update(oauthTokens)
+      .set({ revokedAt: new Date() })
+      .where(
+        and(
+          eq(oauthTokens.grantId, grantId),
+          eq(oauthTokens.userId, userId),
           isNull(oauthTokens.revokedAt)
         )
       )

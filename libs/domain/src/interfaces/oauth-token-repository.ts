@@ -19,20 +19,25 @@ export interface OAuthTokenRepository {
    */
   findActiveByUserId(userId: string): Promise<OAuthToken[]>
 
-  /** The successor of a rotated refresh token, if one was issued. */
-  findByRotatedFrom(tokenId: string): Promise<OAuthToken | null>
-
   create(data: CreateOAuthTokenData): Promise<OAuthToken>
 
   /** Kill one token. False if it was already revoked or does not exist. */
   revoke(id: string): Promise<boolean>
 
   /**
-   * Kill every live token a user holds for one client, and report how many.
-   * Revoking a grant has to take the access token and the refresh token
-   * together, or the client keeps working until the access token expires.
+   * Kill every live token a user holds for one client, whichever grant it
+   * came from, and report how many. What the profile page's Revoke does, and
+   * what stands in for `revokeByGrant` on a token from before grant ids.
    */
   revokeByUserAndClient(userId: string, clientId: string): Promise<number>
+
+  /**
+   * Kill every live token of one grant and report how many. The access token
+   * and the refresh token go together, or the client keeps working until the
+   * access token expires. Another grant of the same user and client, which is
+   * the same application on another device, is left alone.
+   */
+  revokeByGrant(userId: string, grantId: string): Promise<number>
 
   /**
    * Mark a refresh token as exchanged for a successor. Distinct from
