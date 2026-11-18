@@ -609,6 +609,42 @@ describe('audience binding', () => {
   })
 })
 
+describe('consent screen identity', () => {
+  it('names a client registered with an empty name by its client_id, and says the name is unverified', async () => {
+    const registered = await request(
+      pathOf(metadata.registration_endpoint),
+      json({
+        client_name: '',
+        redirect_uris: [REGISTERED_REDIRECT_URI],
+        token_endpoint_auth_method: 'none',
+      })
+    )
+    expect(registered.status).toBe(201)
+    const unnamed = ((await registered.json()) as { client_id: string })
+      .client_id
+    otherClientIds.push(unnamed)
+    const query = {
+      ...authorizationQuery({
+        challenge: pkcePair().challenge,
+        resource: mcpResource,
+        scope: 'pins:read',
+        state: randomUUID(),
+      }),
+      client_id: unnamed,
+    }
+
+    const res = await browserRequest(
+      `${pathOf(metadata.authorization_endpoint)}?${new URLSearchParams(query).toString()}`
+    )
+
+    expect(res.status).toBe(200)
+    // The hidden fields repeat client_id; only what a person reads counts.
+    const page = (await res.text()).replace(/<input[^>]*>/g, '')
+    expect(page).toContain(`Authorize ${unnamed}`)
+    expect(page).toContain('not verified')
+  })
+})
+
 /**
  * RFC 6749 4.1.2.1: once the client and its redirect URI check out, a failure
  * is the client's to hear about, at that redirect URI. Before that there is

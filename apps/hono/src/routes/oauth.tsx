@@ -187,9 +187,7 @@ oauth.get('/authorize', async c => {
   return c.html(
     <OAuthConsentPage
       user={user}
-      // The name the client published, or the identifier it authenticates
-      // as. A client with neither cannot be told apart from an impostor.
-      clientLabel={resolved.client.clientName ?? resolved.client.clientId}
+      client={resolved.client}
       redirectHost={redirectHost(resolved.redirectUri)}
       redirectUri={resolved.redirectUri}
       scopes={resolved.scopes}

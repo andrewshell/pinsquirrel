@@ -275,6 +275,73 @@ describe('oauth authorize routes', () => {
       )
     })
 
+    // The hidden fields repeat client_id; only what a person reads counts.
+    function visible(html: string): string {
+      return html.replace(/<input[^>]*>/g, '')
+    }
+
+    // A CIMD client's name is its own claim; the host serving its document is
+    // the one fact this server checked.
+    it('names the host that published a CIMD client', async () => {
+      mockResolveAuthorizationRequest.mockResolvedValue({
+        ...RESOLVED,
+        client: {
+          ...testClient,
+          clientId: 'https://other.example/c.json',
+          clientName: 'Claude',
+        },
+      })
+
+      const html = visible(await (await get()).text())
+
+      expect(html).toContain('other.example')
+    })
+
+    it('says a dynamically registered name is unverified', async () => {
+      mockResolveAuthorizationRequest.mockResolvedValue({
+        ...RESOLVED,
+        client: {
+          ...testClient,
+          clientId: 'dcr_abc',
+          registrationType: 'dcr',
+        },
+      })
+
+      const html = visible(await (await get()).text())
+
+      expect(html).toContain('not verified')
+    })
+
+    it.each(['', '   ', '\u200B\u200E'])(
+      'names the client by its id when its name is %j',
+      async clientName => {
+        mockResolveAuthorizationRequest.mockResolvedValue({
+          ...RESOLVED,
+          client: {
+            ...testClient,
+            clientId: 'dcr_abc',
+            clientName,
+            registrationType: 'dcr',
+          },
+        })
+
+        const html = visible(await (await get()).text())
+
+        expect(html).toContain('Authorize dcr_abc')
+      }
+    )
+
+    it('drops invisible format characters from a name', async () => {
+      mockResolveAuthorizationRequest.mockResolvedValue({
+        ...RESOLVED,
+        client: { ...testClient, clientName: 'Cla\u200Bude \u202ECode' },
+      })
+
+      const html = visible(await (await get()).text())
+
+      expect(html).toContain('Authorize Claude Code')
+    })
+
     it('offers approve and deny as a plain form posting back here', async () => {
       mockResolveAuthorizationRequest.mockResolvedValue(RESOLVED)
 
