@@ -1221,13 +1221,10 @@ describe('OAuthService grants', () => {
 
   // Revoking has to take the access token and the refresh token together, or
   // the client keeps working until the access token expires.
-  it('revokes every token the grant covers', async () => {
-    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(
-      grantToken({ id: 'access-1' })
-    )
+  it('revokes every token the client holds for the user', async () => {
     vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockResolvedValue(2)
 
-    await ctx.service.revokeGrant(ac, 'access-1')
+    await ctx.service.revokeGrant(ac, user.id, CIMD_URL)
 
     expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
       user.id,
@@ -1235,23 +1232,31 @@ describe('OAuthService grants', () => {
     )
   })
 
-  it("refuses to revoke another user's grant", async () => {
-    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(
-      grantToken({ id: 'access-1', userId: otherUser.id })
-    )
+  // A profile page left open outlives the token it listed: the client
+  // refreshes and the sweep deletes the rotated row. The client is what the
+  // user is revoking, so that must not matter.
+  it('revokes without looking up any single token', async () => {
+    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(null)
+    vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockResolvedValue(2)
 
     await expect(
-      ctx.service.revokeGrant(ac, 'access-1')
+      ctx.service.revokeGrant(ac, user.id, CIMD_URL)
+    ).resolves.toBeUndefined()
+  })
+
+  it("refuses to revoke another user's grant", async () => {
+    await expect(
+      ctx.service.revokeGrant(new AccessControl(otherUser), user.id, CIMD_URL)
     ).rejects.toBeInstanceOf(OAuthAccessDeniedError)
     expect(ctx.tokenRepository.revokeByUserAndClient).not.toHaveBeenCalled()
   })
 
-  it('refuses to revoke a grant that does not exist', async () => {
-    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(null)
+  it('refuses to revoke a client that holds no live token', async () => {
+    vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockResolvedValue(0)
 
-    await expect(ctx.service.revokeGrant(ac, 'nope')).rejects.toBeInstanceOf(
-      OAuthInvalidGrantError
-    )
+    await expect(
+      ctx.service.revokeGrant(ac, user.id, 'dcr_none')
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
   })
 })
 

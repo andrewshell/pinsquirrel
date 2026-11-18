@@ -130,9 +130,11 @@ profile.post('/', async c => {
     // Revoking takes the whole grant family, access token and refresh token
     // together: leaving either alive would let the client carry on.
     if (intent === 'revoke-oauth-grant') {
-      const tokenId = getString(formData['tokenId'])
-
-      await oauthService.revokeGrant(new AccessControl(user), tokenId)
+      await oauthService.revokeGrant(
+        new AccessControl(user),
+        user.id,
+        getString(formData['clientId'])
+      )
 
       sessionManager.setFlash('success', 'Application access revoked!')
       return c.redirect(back)

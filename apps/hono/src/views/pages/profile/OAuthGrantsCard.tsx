@@ -61,7 +61,7 @@ export const OAuthGrantsCard: FC<OAuthGrantsCardProps> = ({
               </div>
               <form method="post" action="/profile">
                 <input type="hidden" name="intent" value="revoke-oauth-grant" />
-                <input type="hidden" name="tokenId" value={grant.tokenId} />
+                <input type="hidden" name="clientId" value={grant.clientId} />
                 {embed && <input type="hidden" name="embed" value="1" />}
                 <button
                   type="submit"

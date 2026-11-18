@@ -35,7 +35,6 @@ const svc = {
 
 function makeGrant(overrides: Record<string, unknown> = {}) {
   return {
-    tokenId: 'token-1',
     clientId: 'https://claude.ai/oauth/claude-code-client-metadata',
     clientName: 'Claude Code',
     scopes: ['pins:read', 'tags:read'],
@@ -437,13 +436,25 @@ describe('profile routes', () => {
       expect(html).toMatch(/no applications|not authorized any/i)
     })
 
+    it('names the client in the revoke form, not one of its tokens', async () => {
+      const html = await (await app.request('/profile')).text()
+
+      expect(cardSection(html, 'Connected Applications')).toContain(
+        'name="clientId" value="https://claude.ai/oauth/claude-code-client-metadata"'
+      )
+    })
+
     it('revokes a grant and confirms it', async () => {
       const res = await app.request(
         '/profile',
-        formBody({ intent: 'revoke-oauth-grant', tokenId: 'token-1' })
+        formBody({ intent: 'revoke-oauth-grant', clientId: 'dcr_abc123' })
       )
 
-      expect(svc.revokeGrant).toHaveBeenCalledWith(expect.anything(), 'token-1')
+      expect(svc.revokeGrant).toHaveBeenCalledWith(
+        expect.anything(),
+        'user-1',
+        'dcr_abc123'
+      )
       expect(await renderedProfile(res)).toMatch(/access revoked/i)
     })
 
@@ -456,7 +467,7 @@ describe('profile routes', () => {
 
       const res = await app.request(
         '/profile',
-        formBody({ intent: 'revoke-oauth-grant', tokenId: 'gone' })
+        formBody({ intent: 'revoke-oauth-grant', clientId: 'dcr_gone' })
       )
 
       expect(res.status).toBe(400)

@@ -129,8 +129,6 @@ export interface IssuedTokens {
 
 /** One application a user has given access to, as the profile page shows it. */
 export interface OAuthGrant {
-  /** The token to hand to `revokeGrant`. */
-  tokenId: string
   clientId: string
   clientName: string | null
   /** Every scope any of the client's live tokens carries. */
@@ -687,7 +685,6 @@ export class OAuthService {
       }
 
       grants.push({
-        tokenId: newest.id,
         clientId: newest.clientId,
         clientName: names.get(newest.clientId) ?? null,
         scopes: [...new Set(group.flatMap(token => token.scopes))],
@@ -710,19 +707,20 @@ export class OAuthService {
    * survived would simply mint another access token, and one whose access
    * token survived keeps working until it expires.
    */
-  async revokeGrant(ac: AccessControl, tokenId: string): Promise<void> {
-    const token = await this.tokenRepository.findById(tokenId)
-    if (!token) {
-      throw new OAuthInvalidGrantError('No such grant')
-    }
-
-    if (!ac.canDelete(token)) {
+  async revokeGrant(
+    ac: AccessControl,
+    userId: string,
+    clientId: string
+  ): Promise<void> {
+    if (!ac.canDelete({ userId })) {
       throw new OAuthAccessDeniedError(
         "Not authorized to revoke another user's grant"
       )
     }
 
-    await this.revokeGrantFamily(token.userId, token.clientId)
+    if ((await this.revokeGrantFamily(userId, clientId)) === 0) {
+      throw new OAuthInvalidGrantError('No such grant')
+    }
   }
 
   /**
