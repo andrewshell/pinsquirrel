@@ -815,6 +815,22 @@ describe('OAuthService.exchangeRefreshToken', () => {
     expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalled()
   })
 
+  // The user revoked between the rotation and the new tokens landing: the
+  // revoke took only the rows that existed, so the new ones must not live on.
+  it('takes back the new tokens when the grant was revoked mid-refresh', async () => {
+    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(
+      storedRefresh({ rotatedAt: new Date(), revokedAt: new Date() })
+    )
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+    expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
+      user.id,
+      CIMD_URL
+    )
+  })
+
   it('refuses a token the user revoked', async () => {
     vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
       storedRefresh({ revokedAt: new Date() })

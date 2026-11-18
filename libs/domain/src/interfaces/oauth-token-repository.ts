@@ -37,7 +37,8 @@ export interface OAuthTokenRepository {
   /**
    * Mark a refresh token as exchanged for a successor. Distinct from
    * `revoke` so that a later presentation of this token is recognisable as a
-   * replay of a rotated token rather than a user revocation.
+   * replay of a rotated token rather than a user revocation. False when the
+   * token was already rotated or revoked.
    */
   markRotated(id: string): Promise<boolean>
 
