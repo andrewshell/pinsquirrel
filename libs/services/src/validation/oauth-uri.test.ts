@@ -135,9 +135,12 @@ describe('redirectUriDedupKey', () => {
     )
   })
 
-  it('normalizes scheme, host case and trailing slash like any OAuth URI', () => {
-    expect(redirectUriDedupKey('HTTPS://Claude.AI/api/mcp/cb/')).toBe(
-      'https://claude.ai/api/mcp/cb'
+  it('keeps everything else as sent, as authorize compares it', () => {
+    expect(redirectUriDedupKey('https://Claude.AI:443/api/mcp/cb/')).toBe(
+      'https://Claude.AI:443/api/mcp/cb/'
+    )
+    expect(redirectUriDedupKey('http://localhost:54321/callback/')).toBe(
+      'http://localhost/callback/'
     )
   })
 })

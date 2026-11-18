@@ -744,6 +744,49 @@ describe('authorization errors', () => {
       )
     }
   )
+
+  it('renders a repeated redirect_uri, and sends nothing to either', async () => {
+    const query = new URLSearchParams(readQuery())
+    query.append('redirect_uri', 'http://127.0.0.1:53211/elsewhere')
+
+    const res = await browserRequest(
+      `${pathOf(metadata.authorization_endpoint)}?${query.toString()}`
+    )
+
+    expect(res.status).toBe(400)
+    expect(res.headers.get('Location')).toBeNull()
+    expect(await res.text()).toContain('invalid_request')
+  })
+
+  it('redirects a repeated resource as invalid_target', async () => {
+    const query = readQuery()
+    const repeated = new URLSearchParams(query)
+    repeated.append('resource', apiResource)
+
+    const res = await browserRequest(
+      `${pathOf(metadata.authorization_endpoint)}?${repeated.toString()}`
+    )
+
+    expectRedirectedError(res, query, 'invalid_target')
+  })
+
+  it('refuses a token request that repeats the code, and the code still works', async () => {
+    const grant = await authorizeForCode({ resource: mcpResource })
+    const body = new URLSearchParams(grant)
+    body.append('code', 'not-a-real-code')
+
+    const refused = await request(pathOf(metadata.token_endpoint), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    })
+
+    expect(refused.status).toBe(400)
+    expect(((await refused.json()) as { error: string }).error).toBe(
+      'invalid_request'
+    )
+    expect((await exchange(grant)).status).toBe(200)
+  })
 })
 
 describe('read scopes', () => {
@@ -1124,6 +1167,37 @@ describe('revocation', () => {
     })
     expect(call.status).toBe(401)
   })
+  it('refuses a revocation with no token as malformed', async () => {
+    const res = await request(
+      pathOf(metadata.revocation_endpoint),
+      form({ client_id: clientId })
+    )
+
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as { error: string }).error).toBe(
+      'invalid_request'
+    )
+  })
+
+  it('refuses to revoke a token for a client it was not issued to, and it keeps working', async () => {
+    const granted = await connect({ resource: mcpResource })
+
+    const res = await request(
+      pathOf(metadata.revocation_endpoint),
+      form({ token: granted.refresh_token ?? '', client_id: 'dcr_another' })
+    )
+
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as { error: string }).error).toBe(
+      'invalid_grant'
+    )
+    const call = await mcpRequest(granted.access_token, {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/list',
+    })
+    expect(call.status).toBe(200)
+  })
 })
 
 describe('two connections of one client', () => {
@@ -1165,6 +1239,7 @@ describe('expiry', () => {
       scopes: ['pins:read', 'tags:read'],
       resource: mcpResource,
       grantId: randomUUID(),
+      grantedAt: new Date(),
       expiresAt: new Date(Date.now() - 1000),
     })
 

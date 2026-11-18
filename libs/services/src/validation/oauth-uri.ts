@@ -69,28 +69,6 @@ export function isLoopbackRedirectHost(hostname: string): boolean {
   return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)
 }
 
-/**
- * The form of a redirect URI the DCR dedup key is built from.
- *
- * Normalized like every other OAuth URI, and with the port dropped when the
- * host is loopback. Claude Code registers a fresh ephemeral port on every
- * connection (RFC 8252 7.3), so byte-equal metadata comparison would store one
- * client row per connection, which is the exact thing dedup exists to
- * prevent.
- */
-export function redirectUriDedupKey(uri: string): string {
-  const normalized = normalizeOAuthUri(uri)
-  const url = new URL(normalized)
-  if (!url.port || !isLoopbackRedirectHost(url.hostname)) {
-    return normalized
-  }
-  url.port = ''
-  const path = url.pathname.endsWith('/')
-    ? url.pathname.slice(0, -1)
-    : url.pathname
-  return `${url.protocol}//${url.host}${path}${url.search}`
-}
-
 const LOOPBACK_AUTHORITY =
   /^(http:\/\/(?:localhost|127\.\d{1,3}\.\d{1,3}\.\d{1,3}|\[::1\]))(?::(\d{1,5}))?(?=[/?]|$)/
 
@@ -101,6 +79,18 @@ function withoutLoopbackPort(uri: string): string {
 function hasUsablePort(uri: string): boolean {
   const port = LOOPBACK_AUTHORITY.exec(uri)?.[2]
   return port === undefined || (Number(port) >= 1 && Number(port) <= 65535)
+}
+
+/**
+ * The form of a redirect URI the DCR dedup key is built from: the URI as
+ * sent, less the port on a loopback host. Claude Code registers a fresh
+ * ephemeral port on every connection (RFC 8252 7.3), so keeping the port would
+ * store one client row per connection. Nothing else is normalized, so two
+ * registrations share a client only when their URIs would match each other at
+ * authorize.
+ */
+export function redirectUriDedupKey(uri: string): string {
+  return withoutLoopbackPort(uri)
 }
 
 /**

@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import type { OAuthClient, User } from '@pinsquirrel/domain'
 import {
+  OAuthInvalidClientError,
   OAuthInvalidRequestError,
   Role,
   UserStatus,
@@ -21,6 +22,12 @@ const mockAuthorize = vi.fn()
 const mockIsValidSession = vi.fn()
 const mockFindSession = vi.fn()
 const mockFindUser = vi.fn()
+const mockLogWarn = vi.fn()
+
+vi.mock('../lib/logger.js', () => ({
+  logger: { info: vi.fn(), error: vi.fn(), debug: vi.fn(), warn: mockLogWarn },
+  safeError: (error: Error) => ({ message: error.message }),
+}))
 
 vi.mock('../lib/services', () => ({
   oauthService: {
@@ -397,6 +404,43 @@ describe('oauth authorize routes', () => {
       expect(location.searchParams.get('iss')).toBe('http://localhost:8100')
     })
 
+    it('logs why a client could not be resolved, without showing it', async () => {
+      mockResolveAuthorizationRequest.mockRejectedValue(
+        new OAuthInvalidClientError(
+          'The client metadata document could not be fetched',
+          { cause: new Error('ECONNREFUSED 10.0.0.1:443') }
+        )
+      )
+
+      const res = await get()
+
+      expect(res.status).toBe(400)
+      expect(await res.text()).not.toContain('ECONNREFUSED')
+      expect(mockLogWarn).toHaveBeenCalledWith(
+        {
+          error: 'invalid_client',
+          cause: { message: 'ECONNREFUSED 10.0.0.1:443' },
+        },
+        'The client metadata document could not be fetched'
+      )
+    })
+
+    it('hands a repeated parameter to the service as every value sent', async () => {
+      mockResolveAuthorizationRequest.mockRejectedValue(
+        new ValidationError({ redirect_uri: ['Expected string'] })
+      )
+
+      const res = await get(
+        `${AUTHORIZE_URL}&redirect_uri=${encodeURIComponent('https://evil.example/cb')}`
+      )
+
+      expect(res.status).toBe(400)
+      expect(mockResolveAuthorizationRequest).toHaveBeenCalledWith({
+        ...REQUEST_PARAMS,
+        redirect_uri: [REQUEST_PARAMS.redirect_uri, 'https://evil.example/cb'],
+      })
+    })
+
     it('renders a validation failure the same way', async () => {
       mockResolveAuthorizationRequest.mockRejectedValue(
         new ValidationError({
@@ -462,6 +506,41 @@ describe('oauth authorize routes', () => {
       expect(location.searchParams.get('iss')).toBe('http://localhost:8100')
     })
 
+    it('hands a repeated field to the service as every value posted', async () => {
+      mockAuthorize.mockResolvedValue({
+        status: 'error',
+        error: 'invalid_request',
+        errorDescription: 'Invalid parameter: scope',
+        redirectUri: 'https://claude.ai/api/mcp/auth_callback',
+        state: 'the-state',
+        issuer: 'http://localhost:8100',
+      })
+      const body = new URLSearchParams({
+        ...REQUEST_PARAMS,
+        decision: 'approve',
+      })
+      body.append('scope', 'pins:write')
+
+      await app.request('/oauth/authorize', {
+        method: 'POST',
+        headers: {
+          Cookie: '__session=session-1',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body.toString(),
+      })
+
+      expect(mockAuthorize).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          params: {
+            ...REQUEST_PARAMS,
+            scope: [REQUEST_PARAMS.scope, 'pins:write'],
+          },
+        })
+      )
+    })
+
     it('hands the decision, the signed-in user and the session to the service', async () => {
       mockAuthorize.mockResolvedValue({
         status: 'approved',
@@ -517,6 +596,35 @@ describe('oauth authorize routes', () => {
       })
 
       await post({ ...REQUEST_PARAMS })
+
+      expect(mockAuthorize).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ approved: false })
+      )
+    })
+
+    it('treats a repeated decision as a denial, even one that says approve', async () => {
+      mockAuthorize.mockResolvedValue({
+        status: 'error',
+        error: 'access_denied',
+        errorDescription: 'The user denied the authorization request',
+        redirectUri: 'https://claude.ai/api/mcp/auth_callback',
+        issuer: 'http://localhost:8100',
+      })
+      const body = new URLSearchParams({
+        ...REQUEST_PARAMS,
+        decision: 'approve',
+      })
+      body.append('decision', 'approve')
+
+      await app.request('/oauth/authorize', {
+        method: 'POST',
+        headers: {
+          Cookie: '__session=session-1',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body.toString(),
+      })
 
       expect(mockAuthorize).toHaveBeenCalledWith(
         expect.anything(),

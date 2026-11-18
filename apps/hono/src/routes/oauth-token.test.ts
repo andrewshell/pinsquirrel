@@ -179,6 +179,36 @@ describe('POST /oauth/token', () => {
     expect((await res.json()).error).toBe('unsupported_grant_type')
   })
 
+  // RFC 6749 3.2: a parameter MUST NOT be included more than once.
+  it('hands a repeated parameter to the service as every value sent', async () => {
+    mockExchangeAuthorizationCode.mockResolvedValue(ISSUED)
+    const body = new URLSearchParams(CODE_GRANT)
+    body.append('code', 'another-code')
+
+    await app.request('/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    })
+
+    expect(mockExchangeAuthorizationCode).toHaveBeenCalledWith({
+      ...CODE_GRANT,
+      code: ['the-code', 'another-code'],
+    })
+  })
+
+  it('answers a repeated grant type with invalid_request', async () => {
+    const res = await app.request('/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=authorization_code&grant_type=refresh_token',
+    })
+
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('invalid_request')
+    expect(mockExchangeAuthorizationCode).not.toHaveBeenCalled()
+  })
+
   it('maps a ValidationError to invalid_request', async () => {
     mockExchangeAuthorizationCode.mockRejectedValue(
       new ValidationError({ code_verifier: ['must be a PKCE value'] })
@@ -343,10 +373,35 @@ describe('POST /oauth/revoke', () => {
     expect(res.status).toBe(200)
   })
 
-  it('answers 200 without calling the service when no token was sent', async () => {
+  it('answers 400 invalid_request when the service finds the request malformed', async () => {
+    mockRevokeToken.mockRejectedValue(
+      new ValidationError({ token: ['Required'] })
+    )
+
     const res = await app.request('/oauth/revoke', form({ client_id: 'c' }))
 
-    expect(res.status).toBe(200)
-    expect(mockRevokeToken).not.toHaveBeenCalled()
+    expect(res.status).toBe(400)
+    expect(res.headers.get('Cache-Control')).toBe('no-store')
+    expect(await res.json()).toEqual({
+      error: 'invalid_request',
+      error_description: 'token: Required',
+    })
+  })
+
+  it('answers 400 with the code the service refuses a token with', async () => {
+    mockRevokeToken.mockRejectedValue(
+      new OAuthInvalidGrantError('The token was issued to another client')
+    )
+
+    const res = await app.request(
+      '/oauth/revoke',
+      form({ token: 'pso_x', client_id: 'other' })
+    )
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({
+      error: 'invalid_grant',
+      error_description: 'The token was issued to another client',
+    })
   })
 })

@@ -33,7 +33,7 @@ interface OAuthConsentPageProps {
   scopes: string[]
   resource: string
   /** The authorization request, echoed back as hidden fields. */
-  params: Record<string, string>
+  params: Record<string, string | string[]>
   /** Presentation only; travels on its own hidden field, not in `params`. */
   embed?: boolean
 }
@@ -146,9 +146,11 @@ export const OAuthConsentPage: FC<OAuthConsentPageProps> = ({
         </p>
 
         <form method="post" action="/oauth/authorize" class="flex gap-3">
-          {Object.entries(params).map(([name, value]) => (
-            <input type="hidden" name={name} value={value} />
-          ))}
+          {Object.entries(params).flatMap(([name, value]) =>
+            [value]
+              .flat()
+              .map(one => <input type="hidden" name={name} value={one} />)
+          )}
           {embed && <input type="hidden" name="embed" value="1" />}
           <Button type="submit" name="decision" value="approve">
             Approve

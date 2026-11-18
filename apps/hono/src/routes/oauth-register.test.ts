@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import type { OAuthClient } from '@pinsquirrel/domain'
 import {
   OAuthInvalidClientMetadataError,
+  OAuthInvalidRedirectUriError,
   ValidationError,
 } from '@pinsquirrel/domain'
 
@@ -121,6 +122,20 @@ describe('POST /oauth/register', () => {
     expect(await res.json()).toEqual({
       error: 'invalid_client_metadata',
       error_description: 'This server registers public clients only',
+    })
+  })
+
+  it('maps an unusable redirect URI to invalid_redirect_uri', async () => {
+    mockRegisterClient.mockRejectedValue(
+      new OAuthInvalidRedirectUriError('redirect_uri must be https')
+    )
+
+    const res = await app.request('/oauth/register', json(METADATA))
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({
+      error: 'invalid_redirect_uri',
+      error_description: 'redirect_uri must be https',
     })
   })
 

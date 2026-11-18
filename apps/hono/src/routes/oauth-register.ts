@@ -1,7 +1,11 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import type { OAuthClient } from '@pinsquirrel/domain'
-import { OAuthError, ValidationError } from '@pinsquirrel/domain'
+import {
+  OAuthError,
+  OAuthInvalidRedirectUriError,
+  ValidationError,
+} from '@pinsquirrel/domain'
 import { oauthService } from '../lib/services.js'
 import { describeValidationError } from '../lib/oauth-error.js'
 import {
@@ -14,11 +18,7 @@ import {
  * RFC 7591 Dynamic Client Registration, the fallback path.
  *
  * CIMD is the preferred one (Decision 13): DCR is deprecated in the current
- * spec and lets an anonymous caller create rows. What bounds the damage lives
- * in the service and the sweep, not here - `registerClient` derives the
- * identifier from a canonicalized copy of the metadata, so re-registering the
- * same client returns the same row, and `MaintenanceService.sweepExpired`
- * removes registrations that never complete an authorization.
+ * spec and lets an anonymous caller create rows.
  *
  * A per-IP quota bounds it further, and it is the tightest limit in the app:
  * the endpoint is unauthenticated and it creates rows, while a real client
@@ -38,13 +38,18 @@ function isJson(c: Context): boolean {
 
 /**
  * Every failure here is `invalid_client_metadata` (RFC 7591 3.2.2), including
- * the schema failures the token endpoint would report as `invalid_request`.
+ * the schema failures the token endpoint would report as `invalid_request`,
+ * except an unusable redirect URI, which RFC 7591 gives its own code.
  */
-function metadataError(c: Context, description: string, status: 400 | 415) {
-  return c.json(
-    { error: 'invalid_client_metadata', error_description: description },
-    status
-  )
+function metadataError(
+  c: Context,
+  description: string,
+  status: 400 | 415,
+  error:
+    | 'invalid_client_metadata'
+    | 'invalid_redirect_uri' = 'invalid_client_metadata'
+) {
+  return c.json({ error, error_description: description }, status)
 }
 
 /** The registered client echoed back as RFC 7591 client information. */
@@ -95,6 +100,9 @@ oauthRegister.post('/register', async c => {
     const client = await oauthService.registerClient(metadata)
     return c.json(clientInformation(client), 201)
   } catch (error) {
+    if (error instanceof OAuthInvalidRedirectUriError) {
+      return metadataError(c, error.message, 400, 'invalid_redirect_uri')
+    }
     if (error instanceof OAuthError) {
       return metadataError(c, error.message, 400)
     }

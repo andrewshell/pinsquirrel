@@ -1,4 +1,5 @@
 import {
+  isLoopbackRedirectHost,
   normalizeOAuthUri,
   protectedResourceMetadataPath,
   staticOAuthClientsSchema,
@@ -53,7 +54,7 @@ export interface OAuthConfig {
  */
 export function resolveBaseUrl(env: NodeJS.ProcessEnv): string {
   const configured = env.BASE_URL?.trim()
-  if (configured) return normalizeOAuthUri(configured)
+  if (configured) return requireOrigin(configured, env)
 
   if (env.NODE_ENV === 'production') {
     throw new Error(
@@ -63,6 +64,33 @@ export function resolveBaseUrl(env: NodeJS.ProcessEnv): string {
   }
 
   return DEV_BASE_URL
+}
+
+// RFC 8414 2: the issuer uses https and has no query or fragment.
+function requireOrigin(configured: string, env: NodeJS.ProcessEnv): string {
+  const normalized = normalizeOAuthUri(configured)
+  const url = new URL(configured)
+  if (
+    url.pathname !== '/' ||
+    url.search !== '' ||
+    url.hash !== '' ||
+    url.username !== '' ||
+    url.password !== ''
+  ) {
+    throw new Error(
+      `BASE_URL must be an origin with no path, query, fragment or userinfo, e.g. https://pinsquirrel.com (got ${configured})`
+    )
+  }
+  if (
+    env.NODE_ENV === 'production' &&
+    url.protocol !== 'https:' &&
+    !isLoopbackRedirectHost(url.hostname)
+  ) {
+    throw new Error(
+      `BASE_URL must use https in production unless it is a loopback address (got ${configured})`
+    )
+  }
+  return normalized
 }
 
 function protectedResource(

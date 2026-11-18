@@ -19,6 +19,7 @@ import {
   OAuthInvalidClientError,
   OAuthInvalidGrantError,
   OAuthInvalidClientMetadataError,
+  OAuthInvalidRedirectUriError,
   OAuthInvalidRequestError,
   OAuthInvalidScopeError,
   OAuthInvalidTargetError,
@@ -41,6 +42,7 @@ import {
   isUsableRedirectUri,
   MAX_CLIENT_ID_LENGTH,
   refreshTokenGrantSchema,
+  revocationRequestSchema,
   type ClientIdMetadataDocument,
 } from '../validation/oauth.js'
 import { validateUrlForFetching } from '../validation/url.js'
@@ -142,7 +144,7 @@ export interface OAuthGrant {
   resources: string[]
   /** When the longest-lived of the client's tokens runs out. */
   expiresAt: Date
-  createdAt: Date
+  grantedAt: Date
 }
 
 /** Who a bearer token turns out to be, once it checks out. */
@@ -283,6 +285,7 @@ export class OAuthService {
     client: OAuthClient,
     params: unknown
   ): ResolvedAuthorizationRequest {
+    refuseSeveralResources(params)
     const parsed = authorizationRequestSchema.safeParse(params)
     if (!parsed.success) {
       throw validationErrorFromZod(parsed.error, {
@@ -298,7 +301,7 @@ export class OAuthService {
     }
 
     const resource = this.requireKnownResource(request.resource)
-    const scopes = grantedScopes(request.scope)
+    const scopes = withoutUnusableRefresh(grantedScopes(request.scope), client)
 
     return {
       status: 'resolved',
@@ -355,6 +358,10 @@ export class OAuthService {
       )
     }
 
+    if (!resolved.client.completedAt) {
+      await this.clientRepository.markCompleted(resolved.client.id, new Date())
+    }
+
     const code = generateSecureToken()
     const expiresAt = new Date(Date.now() + AUTHORIZATION_CODE_TTL_MS)
 
@@ -380,12 +387,6 @@ export class OAuthService {
       )
     }
 
-    if (!resolved.client.completedAt) {
-      // What takes a registration out of the incomplete-DCR sweep. A client
-      // that has authorized somebody is in use, whatever it registered as.
-      await this.clientRepository.markCompleted(resolved.client.id, new Date())
-    }
-
     return {
       status: 'approved',
       code,
@@ -401,18 +402,20 @@ export class OAuthService {
    * Spend an authorization code and mint the tokens it stands for.
    *
    * The code is read and checked first. One that was already spent takes the
-   * tokens it produced down with it. A code that passes is spent and its
-   * tokens are written in one step (`exchange`), so a failure in between
-   * leaves the client a code that still works. A code that fails a check is
-   * spent anyway, because a failed check must not leave a code alive to try
-   * again with a different verifier. A check that could not be made, because
-   * the database was unreachable, spends nothing.
+   * tokens it produced down with it, when the client it was issued to presents
+   * it. A code that passes is spent and its tokens are written in one step
+   * (`exchange`), so a failure in between leaves the client a code that still
+   * works. A code that fails a check is spent anyway, because a failed check
+   * must not leave a code alive to try again with a different verifier. A
+   * check that could not be made, because the database was unreachable, spends
+   * nothing.
    *
    * There is no `AccessControl` here: the caller is a client, not a user, and
    * the code plus the PKCE verifier is the proof. That is the same reason
    * `MaintenanceService` takes none.
    */
   async exchangeAuthorizationCode(params: unknown): Promise<IssuedTokens> {
+    refuseSeveralResources(params)
     const parsed = authorizationCodeGrantSchema.safeParse(params)
     if (!parsed.success) {
       throw validationErrorFromZod(parsed.error, {
@@ -427,6 +430,9 @@ export class OAuthService {
       hashToken(request.code)
     )
     if (code?.consumedAt) {
+      if (code.clientId !== client.clientId) {
+        throw invalidCode()
+      }
       return this.refuseSpentCode(code)
     }
     if (!code || code.expiresAt <= new Date()) {
@@ -455,6 +461,7 @@ export class OAuthService {
       refreshScopes: refreshable ? code.scopes : null,
       resource: code.resource,
       grantId: code.grantId ?? randomUUID(),
+      grantedAt: code.createdAt,
     })
 
     const outcome = await this.codeRepository.exchange(code.id, rows)
@@ -526,6 +533,7 @@ export class OAuthService {
    * back after it was rotated.
    */
   async exchangeRefreshToken(params: unknown): Promise<IssuedTokens> {
+    refuseSeveralResources(params)
     const parsed = refreshTokenGrantSchema.safeParse(params)
     if (!parsed.success) {
       throw validationErrorFromZod(parsed.error, {
@@ -586,6 +594,7 @@ export class OAuthService {
       refreshScopes: token.scopes,
       resource: token.resource,
       grantId: token.grantId ?? randomUUID(),
+      grantedAt: token.grantedAt ?? token.createdAt,
       rotatedFrom: token.id,
     })
 
@@ -694,6 +703,9 @@ export class OAuthService {
 
     const existing = await this.clientRepository.findByClientId(clientId)
     if (existing) {
+      if (!existing.completedAt) {
+        await this.clientRepository.renewRegistration(existing.id, new Date())
+      }
       return existing
     }
 
@@ -723,6 +735,9 @@ export class OAuthService {
    * codes and tokens that reference it - an operator editing a name should not
    * be able to sign every user of that connector out by fat-fingering a
    * different identifier.
+   *
+   * Each entry is reconciled on its own, so one bad entry does not keep the
+   * rest out of the table. The failures come back for the caller to log.
    */
   async reconcileStaticClients(
     clients: {
@@ -730,43 +745,55 @@ export class OAuthService {
       clientName: string | null
       redirectUris: string[]
     }[]
-  ): Promise<void> {
+  ): Promise<{ clientId: string; error: unknown }[]> {
+    const failures: { clientId: string; error: unknown }[] = []
     for (const client of clients) {
-      const { redirectUris, grantTypes, authMethod } = requireClientRules({
-        redirect_uris: client.redirectUris,
-      })
-
-      const existing = await this.clientRepository.findByClientId(
-        client.clientId
-      )
-
-      if (!existing) {
-        await this.clientRepository.create({
-          clientId: client.clientId,
-          clientName: client.clientName,
-          redirectUris,
-          grantTypes,
-          tokenEndpointAuthMethod: authMethod,
-          registrationType: 'static',
-          metadataUrl: null,
-          metadataFetchedAt: null,
-        })
-        continue
+      try {
+        await this.reconcileStaticClient(client)
+      } catch (error) {
+        failures.push({ clientId: client.clientId, error })
       }
+    }
+    return failures
+  }
 
-      if (
-        existing.clientName === client.clientName &&
-        sameUriList(existing.redirectUris, redirectUris)
-      ) {
-        // Nothing to say. Every boot would otherwise write the same row back.
-        continue
-      }
+  private async reconcileStaticClient(client: {
+    clientId: string
+    clientName: string | null
+    redirectUris: string[]
+  }): Promise<void> {
+    const { redirectUris, grantTypes, authMethod } = requireClientRules({
+      redirect_uris: client.redirectUris,
+    })
 
-      await this.clientRepository.update(existing.id, {
+    const existing = await this.clientRepository.findByClientId(client.clientId)
+
+    if (!existing) {
+      await this.clientRepository.create({
+        clientId: client.clientId,
         clientName: client.clientName,
         redirectUris,
+        grantTypes,
+        tokenEndpointAuthMethod: authMethod,
+        registrationType: 'static',
+        metadataUrl: null,
+        metadataFetchedAt: null,
       })
+      return
     }
+
+    if (
+      existing.clientName === client.clientName &&
+      sameUriList(existing.redirectUris, redirectUris)
+    ) {
+      // Nothing to say. Every boot would otherwise write the same row back.
+      return
+    }
+
+    await this.clientRepository.update(existing.id, {
+      clientName: client.clientName,
+      redirectUris,
+    })
   }
 
   /**
@@ -819,7 +846,13 @@ export class OAuthService {
         expiresAt: new Date(
           Math.max(...group.map(token => token.expiresAt.getTime()))
         ),
-        createdAt: newest.createdAt,
+        grantedAt: new Date(
+          Math.min(
+            ...group.map(token =>
+              (token.grantedAt ?? token.createdAt).getTime()
+            )
+          )
+        ),
       })
     }
 
@@ -856,24 +889,33 @@ export class OAuthService {
   /**
    * Hand a token back (RFC 7009).
    *
-   * Always succeeds, whatever was presented. An unknown token, an already dead
-   * one and one belonging to a different client all answer the same way,
-   * because a revocation endpoint that reported which was which would be a way
-   * to find out whether a token exists.
+   * An unknown token succeeds, because a revocation endpoint that reported it
+   * would be a way to find out whether a token exists. A token issued to
+   * another client than the one named is refused (RFC 7009 2.1). Only a live
+   * or rotated refresh token takes its grant with it; one that has expired or
+   * was revoked does not.
    */
-  async revokeToken(input: {
-    token: string
-    client_id?: string
-    token_type_hint?: string
-  }): Promise<void> {
+  async revokeToken(params: unknown): Promise<void> {
+    const parsed = revocationRequestSchema.safeParse(params)
+    if (!parsed.success) {
+      throw validationErrorFromZod(parsed.error, {
+        fallbackField: 'revocation_request',
+      })
+    }
+    const request = parsed.data
+
     const token = await this.tokenRepository.findByTokenHash(
-      hashToken(input.token)
+      hashToken(request.token)
     )
     if (!token) {
       return
     }
 
-    if (input.client_id && token.clientId !== input.client_id) {
+    if (request.client_id && token.clientId !== request.client_id) {
+      throw new OAuthInvalidGrantError('The token was issued to another client')
+    }
+
+    if (token.revokedAt || token.expiresAt <= new Date()) {
       return
     }
 
@@ -1111,7 +1153,8 @@ export class OAuthService {
       // Whatever went wrong out there, the client_id is unusable here. The
       // reason is not echoed back: it describes somebody else's server.
       throw new OAuthInvalidClientError(
-        'The client metadata document could not be fetched'
+        'The client metadata document could not be fetched',
+        { cause: error }
       )
     }
 
@@ -1146,21 +1189,30 @@ export class OAuthService {
 /** The grant types a client gets if its metadata does not say. */
 const DEFAULT_GRANT_TYPES = ['authorization_code', 'refresh_token']
 
+/**
+ * RFC 8707 lets a request name several resources. This server binds each
+ * token to one, so several is `invalid_target` rather than a malformed
+ * request. Every other repeated parameter fails its schema, which wants a
+ * single string, as `invalid_request` (RFC 6749 3.1, 3.2).
+ */
+function refuseSeveralResources(params: unknown): void {
+  if (
+    typeof params === 'object' &&
+    params !== null &&
+    Array.isArray((params as { resource?: unknown }).resource)
+  ) {
+    throw new OAuthInvalidTargetError(
+      'Name one resource: this server binds each token to a single resource'
+    )
+  }
+}
+
 function invalidCode(): OAuthInvalidGrantError {
   return new OAuthInvalidGrantError(
     'The authorization code is invalid, expired, or already used'
   )
 }
 
-/**
- * The scopes a request is granted, or a refusal.
- *
- * A request that names no scope gets the read scopes rather than nothing: an
- * empty grant would mint a token that can do nothing, and the client has no
- * way to tell that from one that works. An unknown scope is refused rather
- * than dropped, so a client asking for something it will not get finds out
- * now instead of at the first call.
- */
 /**
  * Does this verifier hash to the challenge the code was issued with?
  *
@@ -1178,10 +1230,17 @@ function pkceVerifies(verifier: string, challenge: string): boolean {
   return timingSafeEqual(computed, expected)
 }
 
+/**
+ * An unknown scope is refused rather than dropped, so a client asking for
+ * something it will not get finds out now instead of at the first call.
+ */
 function grantedScopes(scope: string | undefined): string[] {
   const requested = (scope ?? '').split(/\s+/).filter(Boolean)
-  if (requested.length === 0) {
-    return [...DEFAULT_SCOPES]
+  const asksForNoPermission = requested.every(
+    one => one === OFFLINE_ACCESS_SCOPE
+  )
+  if (asksForNoPermission) {
+    return [...DEFAULT_SCOPES, ...new Set(requested)]
   }
 
   const unknown = requested.filter(one => !SUPPORTED_SCOPES.includes(one))
@@ -1193,6 +1252,16 @@ function grantedScopes(scope: string | undefined): string[] {
   }
 
   return [...new Set(requested)]
+}
+
+/** `offline_access` asks for a refresh token, which needs the refresh grant. */
+function withoutUnusableRefresh(
+  scopes: string[],
+  client: OAuthClient
+): string[] {
+  return client.grantTypes.includes('refresh_token')
+    ? scopes
+    : scopes.filter(scope => scope !== OFFLINE_ACCESS_SCOPE)
 }
 
 /**
@@ -1213,13 +1282,6 @@ function narrowedScopes(scope: string, granted: string[]): string[] {
   return requested.length > 0 ? [...new Set(requested)] : granted
 }
 
-/**
- * Are these two the same resource identifier?
- *
- * Normalized on both sides, so a trailing slash or an upper-case host is not
- * an audience failure. Divergent normalization here looks like random
- * connection breakage from the outside.
- */
 function requireClientRules(metadata: {
   redirect_uris: string[]
   grant_types?: string[]
@@ -1243,7 +1305,7 @@ function requireClientRules(metadata: {
 
   const unusable = metadata.redirect_uris.find(uri => !isUsableRedirectUri(uri))
   if (unusable !== undefined) {
-    throw new OAuthInvalidClientMetadataError(
+    throw new OAuthInvalidRedirectUriError(
       `redirect_uri must be https, or http on loopback, with no fragment or userinfo: ${unusable}`
     )
   }
@@ -1259,10 +1321,7 @@ function requireClientRules(metadata: {
  * The identifier a dynamic registration gets, derived from what it registered.
  *
  * Derived rather than random so that re-registering the same client resolves
- * to the same row. The redirect URIs go in canonicalized, which is what drops
- * the port for loopback hosts only: Claude Code registering a fresh ephemeral
- * port on every connection is one client, and a different path or host is a
- * different one. There is no secret here to protect - a public client's
+ * to the same row. There is no secret here to protect - a public client's
  * identifier is public by definition.
  */
 function dcrClientId(metadata: {
@@ -1283,6 +1342,13 @@ function dcrClientId(metadata: {
   return `dcr_${hashToken(key)}`
 }
 
+/**
+ * Are these two the same resource identifier?
+ *
+ * Normalized on both sides, so a trailing slash or an upper-case host is not
+ * an audience failure. Divergent normalization here looks like random
+ * connection breakage from the outside.
+ */
 function sameResource(one: string, other: string): boolean {
   try {
     return normalizeOAuthUri(one) === normalizeOAuthUri(other)
@@ -1321,6 +1387,7 @@ function mintTokens(grant: {
   refreshScopes: string[] | null
   resource: string
   grantId: string
+  grantedAt: Date
   rotatedFrom?: string
 }): { rows: IssuedTokenData; issued: IssuedTokens } {
   const shared = {
@@ -1328,6 +1395,7 @@ function mintTokens(grant: {
     userId: grant.userId,
     resource: grant.resource,
     grantId: grant.grantId,
+    grantedAt: grant.grantedAt,
   }
 
   const accessToken = ACCESS_TOKEN_PREFIX + generateSecureToken()

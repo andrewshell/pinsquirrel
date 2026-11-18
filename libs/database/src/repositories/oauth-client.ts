@@ -7,6 +7,7 @@ import type {
 import { and, eq, inArray, isNull, lt } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { oauthClients } from '../schema/oauth-clients'
+import { isDuplicateKeyError } from './duplicate-key.js'
 
 export class DrizzleOAuthClientRepository implements OAuthClientRepository {
   constructor(private db: MySql2Database) {}
@@ -33,19 +34,27 @@ export class DrizzleOAuthClientRepository implements OAuthClientRepository {
     const id = crypto.randomUUID()
     const now = new Date()
 
-    await this.db.insert(oauthClients).values({
-      id,
-      clientId: data.clientId,
-      clientName: data.clientName ?? null,
-      redirectUris: data.redirectUris,
-      grantTypes: data.grantTypes,
-      tokenEndpointAuthMethod: data.tokenEndpointAuthMethod,
-      registrationType: data.registrationType,
-      metadataUrl: data.metadataUrl ?? null,
-      metadataFetchedAt: data.metadataFetchedAt ?? null,
-      completedAt: null,
-      createdAt: now,
-    })
+    try {
+      await this.db.insert(oauthClients).values({
+        id,
+        clientId: data.clientId,
+        clientName: data.clientName ?? null,
+        redirectUris: data.redirectUris,
+        grantTypes: data.grantTypes,
+        tokenEndpointAuthMethod: data.tokenEndpointAuthMethod,
+        registrationType: data.registrationType,
+        metadataUrl: data.metadataUrl ?? null,
+        metadataFetchedAt: data.metadataFetchedAt ?? null,
+        completedAt: null,
+        createdAt: now,
+      })
+    } catch (error) {
+      const existing = isDuplicateKeyError(error)
+        ? await this.findByClientId(data.clientId)
+        : null
+      if (existing) return existing
+      throw error
+    }
 
     const [created] = await this.db
       .select()
@@ -90,6 +99,13 @@ export class DrizzleOAuthClientRepository implements OAuthClientRepository {
       .update(oauthClients)
       .set({ completedAt: date })
       .where(eq(oauthClients.id, id))
+  }
+
+  async renewRegistration(id: string, date: Date): Promise<void> {
+    await this.db
+      .update(oauthClients)
+      .set({ createdAt: date })
+      .where(and(eq(oauthClients.id, id), isNull(oauthClients.completedAt)))
   }
 
   async delete(id: string): Promise<boolean> {

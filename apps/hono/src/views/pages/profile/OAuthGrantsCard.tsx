@@ -55,7 +55,7 @@ export const OAuthGrantsCard: FC<OAuthGrantsCardProps> = ({
                   {grant.scopes.join(', ')}
                 </div>
                 <div class="text-xs text-muted-foreground">
-                  Authorized {formatDate(grant.createdAt)} · Expires{' '}
+                  Authorized {formatDate(grant.grantedAt)} · Expires{' '}
                   {formatDate(grant.expiresAt)}
                 </div>
               </div>

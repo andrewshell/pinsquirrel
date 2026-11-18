@@ -1,0 +1,1 @@
+ALTER TABLE `oauth_tokens` ADD `granted_at` timestamp(3);

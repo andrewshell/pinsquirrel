@@ -92,3 +92,11 @@ export const errorSchema = z
     error: z.string().describe('Error message'),
   })
   .describe('Error response')
+
+/** What a 401 or a 403 from the bearer check says (RFC 6750 3.1). */
+export const oauthErrorSchema = z
+  .object({
+    error: z.string().describe('RFC 6750 error code, e.g. insufficient_scope'),
+    error_description: z.string().describe('What went wrong, for a person'),
+  })
+  .describe('OAuth error response')

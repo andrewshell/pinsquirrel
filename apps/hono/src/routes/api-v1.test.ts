@@ -401,3 +401,26 @@ describe('api-v1 routes', () => {
     })
   })
 })
+
+describe('api-v1 OpenAPI document', () => {
+  const document = () =>
+    apiV1Routes.getOpenAPI31Document({
+      openapi: '3.1.0',
+      info: { title: 'PinSquirrel API', version: 'v1' },
+    })
+
+  it.each(['401', '403'])(
+    'describes the %s body with error and error_description',
+    status => {
+      const response = document().paths?.['/pins']?.get?.responses?.[
+        status
+      ] as {
+        content: { 'application/json': { schema: { properties: object } } }
+      }
+
+      expect(
+        Object.keys(response.content['application/json'].schema.properties)
+      ).toEqual(['error', 'error_description'])
+    }
+  )
+})

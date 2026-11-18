@@ -124,6 +124,7 @@ export {
   OAuthInvalidTargetError,
   OAuthAccessDeniedError,
   OAuthInvalidClientMetadataError,
+  OAuthInvalidRedirectUriError,
 } from './errors/oauth.js'
 export {
   isBlockedIpv4,

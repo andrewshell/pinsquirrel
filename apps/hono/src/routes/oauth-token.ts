@@ -3,6 +3,7 @@ import type { Context } from 'hono'
 import { OAuthError, ValidationError } from '@pinsquirrel/domain'
 import { oauthService } from '../lib/services.js'
 import { describeValidationError } from '../lib/oauth-error.js'
+import { protocolParams } from '../lib/form.js'
 import { oauthTokenIpLimiter, rateLimitByIp } from '../middleware/rate-limit.js'
 
 /**
@@ -34,20 +35,10 @@ function isFormEncoded(c: Context): boolean {
   return contentType.split(';')[0].trim().toLowerCase() === FORM_CONTENT_TYPE
 }
 
-/**
- * The posted form as plain strings.
- *
- * `parseBody()` yields `string | File` per field; a File is not a protocol
- * parameter, so dropping it here means the schemas reject a missing field
- * rather than a wrongly typed one.
- */
-async function formParams(c: Context): Promise<Record<string, string>> {
-  const body = await c.req.parseBody()
-  const params: Record<string, string> = {}
-  for (const [key, value] of Object.entries(body)) {
-    if (typeof value === 'string') params[key] = value
-  }
-  return params
+async function formParams(
+  c: Context
+): Promise<Record<string, string | string[]>> {
+  return protocolParams(await c.req.parseBody({ all: true }))
 }
 
 function errorResponse(c: Context, error: string, description: string) {
@@ -86,6 +77,9 @@ oauthToken.post('/token', async c => {
   }
 
   const params = await formParams(c)
+  if (Array.isArray(params.grant_type)) {
+    return errorResponse(c, 'invalid_request', 'grant_type is repeated')
+  }
 
   try {
     // Dispatch on the grant type, then hand the raw parameters to the
@@ -138,9 +132,10 @@ oauthToken.post('/token', async c => {
  * approval, and no other connection of that client. The profile page's Revoke
  * is the wider one, and ends every grant the user gave the client.
  *
- * Always 200. An unknown token, an already dead one, and one belonging to
- * another client all answer identically, because reporting which was which
- * would be a way to find out whether a token exists.
+ * An unknown or already dead token answers 200, as a revoked one does,
+ * because telling them apart would be a way to find out whether a token
+ * exists. A request with no token, or with a `client_id` the token was not
+ * issued to, is refused.
  */
 oauthToken.post('/revoke', async c => {
   if (!isFormEncoded(c)) {
@@ -154,16 +149,16 @@ oauthToken.post('/revoke', async c => {
     )
   }
 
-  const params = await formParams(c)
-
-  if (params.token) {
-    await oauthService.revokeToken({
-      token: params.token,
-      ...(params.client_id ? { client_id: params.client_id } : {}),
-      ...(params.token_type_hint
-        ? { token_type_hint: params.token_type_hint }
-        : {}),
-    })
+  try {
+    await oauthService.revokeToken(await formParams(c))
+  } catch (error) {
+    if (error instanceof OAuthError) {
+      return errorResponse(c, error.code, error.message)
+    }
+    if (error instanceof ValidationError) {
+      return errorResponse(c, 'invalid_request', describeValidationError(error))
+    }
+    throw error
   }
 
   return c.body(null, 200, NO_STORE as Record<string, string>)

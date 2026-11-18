@@ -27,6 +27,7 @@ import {
   OAuthInvalidClientError,
   OAuthInvalidClientMetadataError,
   OAuthInvalidGrantError,
+  OAuthInvalidRedirectUriError,
   OAuthInvalidRequestError,
   OAuthInvalidScopeError,
   OAuthInvalidTargetError,
@@ -140,12 +141,13 @@ function makeCode(
 }
 
 function makeToken(
-  data: Omit<CreateOAuthTokenData, 'grantId'>,
+  data: Omit<CreateOAuthTokenData, 'grantId' | 'grantedAt'>,
   overrides: Partial<OAuthToken> = {}
 ): OAuthToken {
   return {
     id: `token-${data.kind}`,
     grantId: 'grant-1',
+    grantedAt: null,
     revokedAt: null,
     rotatedAt: null,
     rotatedFrom: data.rotatedFrom ?? null,
@@ -191,6 +193,7 @@ function setup() {
     update: vi.fn(),
     delete: vi.fn(),
     markCompleted: vi.fn(),
+    renewRegistration: vi.fn(),
     deleteExpiredIncompleteClients: vi.fn(),
   } as unknown as OAuthClientRepository
 
@@ -504,12 +507,17 @@ describe('OAuthService.resolveClient', () => {
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
-  it('refuses a document it could not fetch at all', async () => {
-    vi.mocked(ctx.fetcher.fetch).mockRejectedValue(new Error('ECONNREFUSED'))
+  it('refuses a document it could not fetch at all, keeping why as the cause', async () => {
+    const failure = new Error('ECONNREFUSED')
+    vi.mocked(ctx.fetcher.fetch).mockRejectedValue(failure)
 
-    await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(
-      OAuthInvalidClientError
-    )
+    const refusal = await ctx.service
+      .resolveClient(CIMD_URL)
+      .catch((error: unknown) => error)
+
+    expect(refusal).toBeInstanceOf(OAuthInvalidClientError)
+    expect((refusal as Error).cause).toBe(failure)
+    expect((refusal as Error).message).not.toContain('ECONNREFUSED')
   })
 })
 
@@ -615,6 +623,59 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
       ).rejects.toBeInstanceOf(OAuthInvalidRequestError)
     }
   )
+
+  // RFC 6749 3.1: a parameter may be sent once.
+  it('refuses a repeated redirect_uri outright, since neither can be trusted', async () => {
+    await expect(
+      ctx.service.resolveAuthorizationRequest(
+        authorizeParams({
+          redirect_uri: [
+            'http://localhost:54321/callback',
+            'http://127.0.0.1/callback',
+          ],
+        })
+      )
+    ).rejects.toBeInstanceOf(ValidationError)
+  })
+
+  it('redirects any other repeated parameter as invalid_request', async () => {
+    await expect(
+      ctx.service.resolveAuthorizationRequest(
+        authorizeParams({ scope: ['pins:read', 'pins:write'] })
+      )
+    ).resolves.toMatchObject(redirectedError('invalid_request'))
+  })
+
+  // RFC 8707 allows several resources; this server binds a token to one.
+  it('redirects a repeated resource as invalid_target', async () => {
+    await expect(
+      ctx.service.resolveAuthorizationRequest(
+        authorizeParams({ resource: [MCP_RESOURCE, API_RESOURCE] })
+      )
+    ).resolves.toMatchObject(redirectedError('invalid_target'))
+  })
+
+  it('grants the read scopes alongside offline_access when that is all a request names', async () => {
+    const resolved = await resolve(authorizeParams({ scope: 'offline_access' }))
+
+    expect(resolved.scopes).toEqual([
+      'pins:read',
+      'tags:read',
+      'offline_access',
+    ])
+  })
+
+  it('drops offline_access for a client not registered for refresh_token', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({ grantTypes: ['authorization_code'] })
+    )
+
+    const resolved = await resolve(
+      authorizeParams({ scope: 'pins:read offline_access' })
+    )
+
+    expect(resolved.scopes).toEqual(['pins:read'])
+  })
 
   it('redirects a resource this server issues no tokens for', async () => {
     await expect(
@@ -772,11 +833,8 @@ describe('OAuthService.authorize', () => {
       redirectUri: 'http://localhost:54321/callback',
       state: 'opaque-state',
     })
-    expect(ctx.clientRepository.markCompleted).not.toHaveBeenCalled()
   })
 
-  // `completed_at` is what keeps a registration out of the incomplete-DCR
-  // sweep, and an authorization is what completes it.
   it('marks the client as having completed an authorization', async () => {
     await ctx.service.authorize(ac, {
       params: authorizeParams(),
@@ -789,6 +847,21 @@ describe('OAuthService.authorize', () => {
       'client-row-1',
       expect.any(Date)
     )
+  })
+
+  it('marks the client before it writes the code', async () => {
+    await ctx.service.authorize(ac, {
+      params: authorizeParams(),
+      userId: user.id,
+      sessionId: SESSION_ID,
+      approved: true,
+    })
+
+    const [marked] = vi.mocked(ctx.clientRepository.markCompleted).mock
+      .invocationCallOrder
+    const [written] = vi.mocked(ctx.codeRepository.create).mock
+      .invocationCallOrder
+    expect(marked).toBeLessThan(written)
   })
 
   it('does not re-mark a client that already completed one', async () => {
@@ -878,6 +951,15 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
       makeClient()
     )
     ctx.store.codes.push(makeCode())
+  })
+
+  it('records when the user approved, which is when the code was written', async () => {
+    const approved = new Date(Date.now() - 30_000)
+    ctx.store.codes[0].createdAt = approved
+
+    await ctx.service.exchangeAuthorizationCode(tokenParams())
+
+    expect(ctx.store.tokens.map(token => token.grantedAt)).toEqual([approved])
   })
 
   it('exchanges a code for an access token bound to the requested resource', async () => {
@@ -1001,6 +1083,22 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
       ])
     })
 
+    it('is refused without ending the grant when another client presents it', async () => {
+      const first = await ctx.service.exchangeAuthorizationCode(tokenParams())
+      const other = 'dcr_another_client'
+      vi.mocked(ctx.clientRepository.findByClientId).mockImplementation(id =>
+        Promise.resolve(makeClient({ clientId: id }))
+      )
+
+      await expect(
+        ctx.service.exchangeAuthorizationCode(tokenParams({ client_id: other }))
+      ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+
+      expect(
+        await ctx.service.verifyAccessToken(first.accessToken, MCP_RESOURCE)
+      ).not.toBeNull()
+    })
+
     it('ends everything the client holds when the code has no grant id', async () => {
       ctx.store.codes[0].grantId = null
       await ctx.service.exchangeAuthorizationCode(tokenParams())
@@ -1116,6 +1214,24 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     expect(ctx.store.tokens).toEqual([])
   })
 
+  it('refuses two resources with invalid_target, and spends nothing', async () => {
+    await expect(
+      ctx.service.exchangeAuthorizationCode(
+        tokenParams({ resource: [MCP_RESOURCE, MCP_RESOURCE] })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidTargetError)
+    expect(ctx.store.codes[0].consumedAt).toBeNull()
+  })
+
+  it('refuses a repeated code as malformed, and spends nothing', async () => {
+    await expect(
+      ctx.service.exchangeAuthorizationCode(
+        tokenParams({ code: ['raw-code', 'raw-code'] })
+      )
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(ctx.store.codes[0].consumedAt).toBeNull()
+  })
+
   it('accepts the resource repeated in a different but equivalent spelling', async () => {
     const issued = await ctx.service.exchangeAuthorizationCode(
       tokenParams({ resource: 'https://pinsquirrel.com/mcp/' })
@@ -1165,6 +1281,27 @@ describe('OAuthService.exchangeRefreshToken', () => {
       makeClient()
     )
     seedDevice(ctx.store, 'laptop')
+  })
+
+  it('carries the time the grant was approved to the successors', async () => {
+    const approved = new Date('2026-11-01T10:00:00Z')
+    presented().grantedAt = approved
+
+    await ctx.service.exchangeRefreshToken(refreshParams())
+
+    expect(successors().map(token => token.grantedAt)).toEqual([
+      approved,
+      approved,
+    ])
+  })
+
+  it('takes a token from before the column as approved when it was made', async () => {
+    const made = new Date('2026-11-01T10:00:00Z')
+    Object.assign(presented(), { grantedAt: null, createdAt: made })
+
+    await ctx.service.exchangeRefreshToken(refreshParams())
+
+    expect(successors().map(token => token.grantedAt)).toEqual([made, made])
   })
 
   // OAuth 2.1 requires rotation for public clients, and both CIMD and DCR
@@ -1437,6 +1574,14 @@ describe('OAuthService.exchangeRefreshToken', () => {
     ).rejects.toBeInstanceOf(OAuthInvalidScopeError)
   })
 
+  it('refuses a refresh that names two resources with invalid_target', async () => {
+    await expect(
+      ctx.service.exchangeRefreshToken(
+        refreshParams({ resource: [MCP_RESOURCE, API_RESOURCE] })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidTargetError)
+  })
+
   it('refuses a refresh aimed at a different audience', async () => {
     await expect(
       ctx.service.exchangeRefreshToken(
@@ -1627,6 +1772,46 @@ describe('OAuthService.registerClient', () => {
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['a trailing slash', 'https://example.com/cb', 'https://example.com/cb/'],
+    ['host case', 'https://example.com/cb', 'https://Example.com/cb'],
+    ['a default port', 'https://example.com/cb', 'https://example.com:443/cb'],
+  ])('keeps registrations apart that differ by %s', async (_, one, other) => {
+    const first = await ctx.service.registerClient(
+      registration({ redirect_uris: [one] })
+    )
+    const second = await ctx.service.registerClient(
+      registration({ redirect_uris: [other] })
+    )
+
+    expect(second.clientId).not.toBe(first.clientId)
+  })
+
+  it('restarts the sweep clock on a registration that has not completed', async () => {
+    const pending = makeClient({
+      id: 'client-row-dcr',
+      registrationType: 'dcr',
+    })
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(pending)
+
+    await ctx.service.registerClient(registration())
+
+    expect(ctx.clientRepository.renewRegistration).toHaveBeenCalledWith(
+      'client-row-dcr',
+      expect.any(Date)
+    )
+  })
+
+  it('leaves a completed registration as it was', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({ registrationType: 'dcr', completedAt: new Date() })
+    )
+
+    await ctx.service.registerClient(registration())
+
+    expect(ctx.clientRepository.renewRegistration).not.toHaveBeenCalled()
+  })
+
   it('keeps different clients apart, port aside', async () => {
     const first = await ctx.service.registerClient(registration())
 
@@ -1641,20 +1826,20 @@ describe('OAuthService.registerClient', () => {
     expect(hosted.clientId).not.toBe(first.clientId)
   })
 
-  it('refuses a plaintext redirect URI that is not loopback', async () => {
+  it('refuses a plaintext redirect URI that is not loopback as invalid_redirect_uri', async () => {
     await expect(
       ctx.service.registerClient(
         registration({ redirect_uris: ['http://example.com/callback'] })
       )
-    ).rejects.toBeInstanceOf(OAuthInvalidClientMetadataError)
+    ).rejects.toBeInstanceOf(OAuthInvalidRedirectUriError)
   })
 
-  it('refuses a redirect URI with a fragment', async () => {
+  it('refuses a redirect URI with a fragment as invalid_redirect_uri', async () => {
     await expect(
       ctx.service.registerClient(
         registration({ redirect_uris: ['https://example.com/callback#x'] })
       )
-    ).rejects.toBeInstanceOf(OAuthInvalidClientMetadataError)
+    ).rejects.toMatchObject({ code: 'invalid_redirect_uri' })
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
@@ -1824,6 +2009,29 @@ describe('OAuthService grants', () => {
     }
   )
 
+  it('reports when the user authorized the client, not when it last refreshed', async () => {
+    const approved = new Date('2026-11-01T10:00:00Z')
+    ctx.store.tokens.push(
+      grantToken({ id: 'a', grantedAt: approved, createdAt: new Date() })
+    )
+
+    const [grant] = await ctx.service.listGrants(ac, user.id)
+
+    expect(grant.grantedAt).toEqual(approved)
+  })
+
+  it('reports the earliest approval when the client has several grants', async () => {
+    const first = new Date('2026-10-01T10:00:00Z')
+    ctx.store.tokens.push(
+      grantToken({ id: 'a', grantedAt: new Date('2026-11-01T10:00:00Z') }),
+      grantToken({ id: 'b', grantId: 'grant-2', grantedAt: first })
+    )
+
+    const [grant] = await ctx.service.listGrants(ac, user.id)
+
+    expect(grant.grantedAt).toEqual(first)
+  })
+
   it('keeps grants for different clients apart', async () => {
     vi.mocked(ctx.tokenRepository.findActiveByUserId).mockResolvedValue([
       grantToken({ id: 'access-1' }),
@@ -1947,14 +2155,68 @@ describe('OAuthService.revokeToken', () => {
     expect(liveTokenIds(ctx.store)).toHaveLength(4)
   })
 
-  it('leaves a token that belongs to another client alone, and still says nothing', async () => {
+  // RFC 7009 2.1: the server checks the token was issued to the client asking.
+  it('refuses a token that belongs to another client, and leaves it alone', async () => {
     await expect(
       ctx.service.revokeToken({
-        token: 'laptop-access',
+        token: 'laptop-refresh',
         client_id: 'dcr_someone_else',
       })
-    ).resolves.toBeUndefined()
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
     expect(liveTokenIds(ctx.store)).toHaveLength(4)
+  })
+
+  it('refuses a request with no token as malformed', async () => {
+    await expect(
+      ctx.service.revokeToken({ client_id: CIMD_URL })
+    ).rejects.toBeInstanceOf(ValidationError)
+  })
+
+  it('refuses a token sent twice as malformed', async () => {
+    await expect(
+      ctx.service.revokeToken({
+        token: ['laptop-access', 'desktop-access'],
+        client_id: CIMD_URL,
+      })
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(liveTokenIds(ctx.store)).toHaveLength(4)
+  })
+
+  it.each([
+    ['expired', { expiresAt: new Date(Date.now() - 1000) }],
+    ['revoked', { revokedAt: new Date(Date.now() - 1000) }],
+  ])(
+    'leaves the grant alone when the refresh token handed back is already %s',
+    async (_, dead) => {
+      Object.assign(
+        ctx.store.tokens.find(token => token.id === 'laptop-refresh')!,
+        dead
+      )
+
+      await ctx.service.revokeToken({
+        token: 'laptop-refresh',
+        client_id: CIMD_URL,
+      })
+
+      expect(liveTokenIds(ctx.store)).toContain('laptop-access')
+    }
+  )
+
+  it('still takes the grant when the refresh token handed back was rotated', async () => {
+    Object.assign(
+      ctx.store.tokens.find(token => token.id === 'laptop-refresh')!,
+      { rotatedAt: new Date(Date.now() - 1000) }
+    )
+
+    await ctx.service.revokeToken({
+      token: 'laptop-refresh',
+      client_id: CIMD_URL,
+    })
+
+    expect(liveTokenIds(ctx.store)).toEqual([
+      'desktop-access',
+      'desktop-refresh',
+    ])
   })
 })
 
@@ -2038,21 +2300,53 @@ describe('OAuthService.reconcileStaticClients', () => {
     expect(ctx.clientRepository.delete).not.toHaveBeenCalled()
   })
 
-  it('refuses a redirect URI with a fragment', async () => {
-    await expect(
-      ctx.service.reconcileStaticClients([
-        { ...acme, redirectUris: ['https://acme.example.com/callback#x'] },
-      ])
-    ).rejects.toThrow(OAuthInvalidClientMetadataError)
+  it('reports a redirect URI with a fragment as that entry failing', async () => {
+    const failures = await ctx.service.reconcileStaticClients([
+      { ...acme, redirectUris: ['https://acme.example.com/callback#x'] },
+    ])
+
+    expect(failures).toEqual([
+      {
+        clientId: 'acme-connector',
+        error: expect.any(OAuthInvalidClientMetadataError) as Error,
+      },
+    ])
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
-  it('refuses a redirect URI this server would never redirect to', async () => {
-    await expect(
-      ctx.service.reconcileStaticClients([
-        { ...acme, redirectUris: ['http://acme.example.com/callback'] },
-      ])
-    ).rejects.toThrow(OAuthInvalidClientMetadataError)
+  it('reports a redirect URI this server would never redirect to', async () => {
+    const failures = await ctx.service.reconcileStaticClients([
+      { ...acme, redirectUris: ['http://acme.example.com/callback'] },
+    ])
+
+    expect(failures.map(failure => failure.error)).toEqual([
+      expect.any(OAuthInvalidClientMetadataError),
+    ])
+  })
+
+  it('still reconciles the entries after one that fails, and names the one that failed', async () => {
+    const broken = new Error('Data too long for column client_id')
+    vi.mocked(ctx.clientRepository.create).mockImplementation(data =>
+      data.clientId === 'broken-connector'
+        ? Promise.reject(broken)
+        : Promise.resolve(makeClient(data as OAuthClient))
+    )
+
+    const failures = await ctx.service.reconcileStaticClients([
+      { ...acme, clientId: 'broken-connector' },
+      acme,
+    ])
+
+    expect(failures).toEqual([{ clientId: 'broken-connector', error: broken }])
+    expect(ctx.clientRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ clientId: 'acme-connector' })
+    )
+  })
+
+  it('reports no failures when every entry reconciles', async () => {
+    await expect(ctx.service.reconcileStaticClients([acme])).resolves.toEqual(
+      []
+    )
   })
 })
 

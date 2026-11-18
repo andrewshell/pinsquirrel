@@ -40,7 +40,7 @@ function makeGrant(overrides: Record<string, unknown> = {}) {
     scopes: ['pins:read', 'tags:read'],
     resources: ['http://localhost:8100/mcp'],
     expiresAt: new Date('2024-02-01'),
-    createdAt: new Date('2024-01-01'),
+    grantedAt: new Date('2024-01-01'),
     ...overrides,
   }
 }

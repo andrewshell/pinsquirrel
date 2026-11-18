@@ -16,9 +16,10 @@
 export class OAuthError extends Error {
   constructor(
     public readonly code: string,
-    message: string
+    message: string,
+    options?: ErrorOptions
   ) {
-    super(message)
+    super(message, options)
     this.name = 'OAuthError'
   }
 }
@@ -33,8 +34,11 @@ export class OAuthInvalidRequestError extends OAuthError {
 
 /** Client authentication failed, or the `client_id` is not registered. */
 export class OAuthInvalidClientError extends OAuthError {
-  constructor(message = 'Client authentication failed') {
-    super('invalid_client', message)
+  constructor(
+    message = 'Client authentication failed',
+    options?: ErrorOptions
+  ) {
+    super('invalid_client', message, options)
     this.name = 'OAuthInvalidClientError'
   }
 }
@@ -104,5 +108,15 @@ export class OAuthInvalidClientMetadataError extends OAuthError {
   constructor(message = 'The client metadata is invalid') {
     super('invalid_client_metadata', message)
     this.name = 'OAuthInvalidClientMetadataError'
+  }
+}
+
+/** A redirect URI this server will not redirect to (RFC 7591 §3.2.2). */
+export class OAuthInvalidRedirectUriError extends OAuthInvalidClientMetadataError {
+  override readonly code = 'invalid_redirect_uri'
+
+  constructor(message = 'A redirect URI is invalid') {
+    super(message)
+    this.name = 'OAuthInvalidRedirectUriError'
   }
 }

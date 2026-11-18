@@ -29,6 +29,22 @@ export function getString(value: FormValue): string {
   return ''
 }
 
+// OAuth refuses a repeated parameter (RFC 6749 3.1, 3.2), which it can only
+// do if the repeat survives parsing.
+export function protocolParams(
+  source: Record<string, unknown>
+): Record<string, string | string[]> {
+  const params: Record<string, string | string[]> = {}
+  for (const [name, value] of Object.entries(source)) {
+    const values = [value]
+      .flat()
+      .filter((one): one is string => typeof one === 'string' && one !== '')
+    if (values.length === 1) params[name] = values[0]
+    else if (values.length > 1) params[name] = values
+  }
+  return params
+}
+
 /** Split a comma-separated tag input, trimming blanks. */
 export function parseTagNames(input: string): string[] {
   return input
