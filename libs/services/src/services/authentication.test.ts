@@ -16,6 +16,7 @@ import {
   AccessControl,
   Role,
   UserStatus,
+  WriteConflictError,
 } from '@pinsquirrel/domain'
 
 // Mock the crypto module (which contains crypto functions)
@@ -483,24 +484,25 @@ describe('AuthenticationService', () => {
         Role.User
       )
 
-      expect(mockUserRepository.removeRole).toHaveBeenCalledWith(
+      expect(mockUserRepository.removeRoleAndRevoke).toHaveBeenCalledWith(
         plainUser.id,
         Role.User
       )
       expect(result.roles).toEqual([])
     })
 
-    it('should revoke the sessions and tokens of a user losing the User role', async () => {
+    it('removes the User role and ends the sessions and tokens in one repository call', async () => {
       const plainUser = { ...mockUser, roles: [Role.User] }
-      vi.mocked(mockUserRepository.findById)
-        .mockResolvedValueOnce(plainUser)
-        .mockResolvedValueOnce({ ...mockUser, roles: [] })
-
-      await authService.revokeRole(adminAc, plainUser.id, Role.User)
-
-      expect(mockUserRepository.revokeSessionsAndTokens).toHaveBeenCalledWith(
-        plainUser.id
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(plainUser)
+      vi.mocked(mockUserRepository.removeRoleAndRevoke).mockRejectedValue(
+        new WriteConflictError()
       )
+
+      await expect(
+        authService.revokeRole(adminAc, plainUser.id, Role.User)
+      ).rejects.toThrow(WriteConflictError)
+
+      expect(mockUserRepository.removeRole).not.toHaveBeenCalled()
     })
 
     it('should leave sessions and tokens alone when only Admin is revoked', async () => {
@@ -511,7 +513,7 @@ describe('AuthenticationService', () => {
 
       await authService.revokeRole(adminAc, adminUser.id, Role.Admin)
 
-      expect(mockUserRepository.revokeSessionsAndTokens).not.toHaveBeenCalled()
+      expect(mockUserRepository.removeRoleAndRevoke).not.toHaveBeenCalled()
     })
 
     it('should be idempotent for a user who does not hold the role', async () => {
@@ -865,7 +867,6 @@ describe('AuthenticationService', () => {
   describe('changePassword', () => {
     it('should update password with valid current password', async () => {
       vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
-      vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
       vi.mocked(verifyPassword).mockResolvedValue(true)
 
       await authService.changePassword(selfAc('123'), {
@@ -881,9 +882,44 @@ describe('AuthenticationService', () => {
       )
       // Only the field this operation owns — not username/emailHash, which a
       // concurrent change could have updated after the findById read.
-      expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
-        passwordHash: 'hashed_newpass1234567',
-      })
+      expect(mockUserRepository.setPasswordAndRevoke).toHaveBeenCalledWith(
+        '123',
+        { passwordHash: 'hashed_newpass1234567', keepSessionId: undefined }
+      )
+    })
+
+    it('writes the password and ends the sessions and tokens in one repository call', async () => {
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
+      vi.mocked(verifyPassword).mockResolvedValue(true)
+      vi.mocked(mockUserRepository.setPasswordAndRevoke).mockRejectedValue(
+        new WriteConflictError()
+      )
+
+      await expect(
+        authService.changePassword(selfAc('123'), {
+          userId: '123',
+          currentPassword: 'currentpass123',
+          newPassword: 'newpass1234567',
+        })
+      ).rejects.toThrow(WriteConflictError)
+
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('refuses when the account is gone by the time the password is written', async () => {
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
+      vi.mocked(verifyPassword).mockResolvedValue(true)
+      vi.mocked(mockUserRepository.setPasswordAndRevoke).mockResolvedValue(
+        false
+      )
+
+      await expect(
+        authService.changePassword(selfAc('123'), {
+          userId: '123',
+          currentPassword: 'currentpass123',
+          newPassword: 'newpass1234567',
+        })
+      ).rejects.toThrow(InvalidCredentialsError)
     })
 
     it("ends the user's other sessions and OAuth tokens but keeps the current session", async () => {
@@ -897,9 +933,12 @@ describe('AuthenticationService', () => {
         keepSessionId: 'session-in-use',
       })
 
-      expect(mockUserRepository.revokeSessionsAndTokens).toHaveBeenCalledWith(
+      expect(mockUserRepository.setPasswordAndRevoke).toHaveBeenCalledWith(
         '123',
-        'session-in-use'
+        {
+          passwordHash: 'hashed_newpass1234567',
+          keepSessionId: 'session-in-use',
+        }
       )
     })
 
@@ -932,7 +971,6 @@ describe('AuthenticationService', () => {
 
     it('accepts a correct current password that predates the 12-character rule', async () => {
       vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
-      vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
       vi.mocked(verifyPassword).mockResolvedValue(true)
 
       await authService.changePassword(selfAc(mockUser.id), {
@@ -941,9 +979,10 @@ describe('AuthenticationService', () => {
         newPassword: 'newpass1234567',
       })
 
-      expect(mockUserRepository.update).toHaveBeenCalledWith(mockUser.id, {
-        passwordHash: 'hashed_newpass1234567',
-      })
+      expect(mockUserRepository.setPasswordAndRevoke).toHaveBeenCalledWith(
+        mockUser.id,
+        { passwordHash: 'hashed_newpass1234567', keepSessionId: undefined }
+      )
     })
 
     it('should throw validation error for an empty current password', async () => {

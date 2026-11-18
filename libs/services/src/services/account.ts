@@ -5,7 +5,6 @@ import type {
   EmailChangeRepository,
   EmailService,
   User,
-  UpdateUserData,
 } from '@pinsquirrel/domain'
 import { Role, UserStatus } from '@pinsquirrel/domain'
 import {
@@ -392,27 +391,21 @@ export class AccountService {
     // Hash the new password
     const passwordHash = await hashPassword(input.newPassword)
 
-    if (!(await this.passwordResetRepository.consume(resetToken.id))) {
+    // The link is spent in the transaction that writes the password, so a
+    // reset that does not commit leaves it working. False means another
+    // request spent it first, or the account was deleted since the reads above.
+    const reset = await this.userRepository.setPasswordAndRevoke(user.id, {
+      passwordHash,
+      // A brand-new account moves to the waitlist; an active user resetting a
+      // forgotten password keeps their status.
+      ...(user.status === UserStatus.Unverified && {
+        status: UserStatus.Waitlist,
+      }),
+      resetTokenId: resetToken.id,
+    })
+    if (!reset) {
       throw new InvalidResetTokenError()
     }
-
-    // Persist only the fields this operation owns: the new password and, for a
-    // brand-new (unverified) account, the verification status transition.
-    // Never write username/emailHash from the stale snapshot, and never demote
-    // an already-active user resetting a forgotten password.
-    const updateData: UpdateUserData = { passwordHash }
-    if (user.status === UserStatus.Unverified) {
-      updateData.status = UserStatus.Waitlist
-    }
-
-    // A stale unverified account can be deleted between the reads above and
-    // this write; its link is then as dead as the account.
-    if (!(await this.userRepository.update(user.id, updateData))) {
-      throw new InvalidResetTokenError()
-    }
-
-    await this.passwordResetRepository.deleteByUserId(user.id)
-    await this.userRepository.revokeSessionsAndTokens(user.id)
   }
 
   async validateResetToken(token: string): Promise<boolean> {

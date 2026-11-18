@@ -7,7 +7,9 @@ import {
 } from '../schema/oauth-tokens'
 import { users } from '../schema/users'
 
-type Transaction = Parameters<Parameters<MySql2Database['transaction']>[0]>[0]
+export type Transaction = Parameters<
+  Parameters<MySql2Database['transaction']>[0]
+>[0]
 
 /**
  * Rows a statement names by primary key at a time. With FORCE INDEX

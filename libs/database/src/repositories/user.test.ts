@@ -10,15 +10,26 @@ import {
 import { drizzle } from 'drizzle-orm/mysql2'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import mysql from 'mysql2/promise'
-import type { Pool } from 'mysql2/promise'
-import { heavyTransaction, insertUser } from '../test-fixtures.js'
+import type { Pool, RowDataPacket } from 'mysql2/promise'
+import {
+  heavyTransaction,
+  impatientDatabase,
+  insertUser,
+  transactionHolding,
+} from '../test-fixtures.js'
 import { DrizzleOAuthAuthorizationCodeRepository } from './oauth-authorization-code.js'
 import { DrizzleOAuthClientRepository } from './oauth-client.js'
 import { DrizzleOAuthTokenRepository } from './oauth-token.js'
+import { DrizzlePasswordResetRepository } from './password-reset.js'
 import { DrizzleSessionRepository } from './session.js'
 import { DrizzleEmailChangeRepository } from './email-change.js'
 import { DrizzleUserRepository } from './user.js'
-import { Role, UserAlreadyExistsError, UserStatus } from '@pinsquirrel/domain'
+import {
+  Role,
+  UserAlreadyExistsError,
+  UserStatus,
+  WriteConflictError,
+} from '@pinsquirrel/domain'
 
 describe('DrizzleUserRepository - Integration Tests', () => {
   let testDb: MySql2Database
@@ -710,8 +721,11 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     })
   })
 
-  describe('revokeSessionsAndTokens', () => {
+  describe('a change that ends what was issued to the user', () => {
     const later = () => new Date(Date.now() + 60 * 60 * 1000)
+    const pause = () => new Promise(resolve => setTimeout(resolve, 200))
+    const holdToken = 'SELECT id FROM oauth_tokens WHERE id = ? FOR UPDATE'
+    const holdUser = 'SELECT id FROM users WHERE id = ? FOR UPDATE'
 
     async function seed(userId: string) {
       const sessions = new DrizzleSessionRepository(testDb)
@@ -756,17 +770,101 @@ describe('DrizzleUserRepository - Integration Tests', () => {
         other.id
       )
       if (!code) throw new Error('The seeded session is missing')
+      await new DrizzleEmailChangeRepository(testDb).save({
+        userId,
+        tokenHash: `change-${userId}`,
+        emailHash: `new-${userId}`,
+        emailEncrypted: null,
+        expiresAt: later(),
+      })
+      await repository.addRole(userId, Role.User)
+      const reset = await new DrizzlePasswordResetRepository(testDb).create({
+        userId,
+        tokenHash: `reset-${userId}`,
+        expiresAt: later(),
+      })
       return {
-        sessions,
-        tokens,
-        codes,
-        code,
+        userId,
+        resetTokenId: reset.id,
         kept,
-        other,
         access: await makeToken('access'),
         refresh: await makeToken('refresh'),
       }
     }
+    type Seeded = Awaited<ReturnType<typeof seed>>
+
+    async function accountState(userId: string) {
+      const count = async (table: string, live = '') => {
+        const [rows] = await testPool.query<RowDataPacket[]>(
+          `SELECT COUNT(*) AS n FROM ${table} WHERE user_id = ? ${live}`,
+          [userId]
+        )
+        return Number(rows[0].n)
+      }
+      const user = await repository.findById(userId)
+      return {
+        passwordHash: user?.passwordHash,
+        status: user?.status,
+        roles: user?.roles,
+        sessions: await count('sessions'),
+        liveTokens: await count('oauth_tokens', 'AND revoked_at IS NULL'),
+        unusedCodes: await count(
+          'oauth_authorization_codes',
+          'AND consumed_at IS NULL'
+        ),
+        emailChanges: await count('email_changes'),
+        resetTokens: await count('password_reset_tokens'),
+      }
+    }
+
+    const untouched = {
+      passwordHash: 'hashed_password',
+      status: UserStatus.Unverified,
+      roles: [Role.User],
+      sessions: 2,
+      liveTokens: 2,
+      unusedCodes: 1,
+      emailChanges: 1,
+      resetTokens: 1,
+    }
+    const ended = {
+      sessions: 0,
+      liveTokens: 0,
+      unusedCodes: 0,
+      emailChanges: 0,
+    }
+
+    const changes: [
+      string,
+      (users: DrizzleUserRepository, seeded: Seeded) => Promise<unknown>,
+      Partial<typeof untouched>,
+    ][] = [
+      [
+        'a password change',
+        (users, { userId }) =>
+          users.setPasswordAndRevoke(userId, { passwordHash: 'new_hash' }),
+        { passwordHash: 'new_hash' },
+      ],
+      [
+        'a password reset',
+        (users, { userId, resetTokenId }) =>
+          users.setPasswordAndRevoke(userId, {
+            passwordHash: 'new_hash',
+            status: UserStatus.Waitlist,
+            resetTokenId,
+          }),
+        {
+          passwordHash: 'new_hash',
+          status: UserStatus.Waitlist,
+          resetTokens: 0,
+        },
+      ],
+      [
+        'removing the User role',
+        (users, { userId }) => users.removeRoleAndRevoke(userId, Role.User),
+        { roles: [] },
+      ],
+    ]
 
     beforeEach(async () => {
       await testPool.query('DELETE FROM oauth_authorization_codes')
@@ -774,101 +872,203 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       await testPool.query('DELETE FROM oauth_clients')
     })
 
-    it('ends every session and OAuth token the user holds', async () => {
-      const { id: userId } = await insertUser(testPool)
-      const { sessions, tokens } = await seed(userId)
+    describe.each(changes)('%s', (_name, change, changed) => {
+      it('makes the change and ends every session, token, unused code and pending email change', async () => {
+        const seeded = await seed((await insertUser(testPool)).id)
 
-      await repository.revokeSessionsAndTokens(userId)
+        await change(repository, seeded)
 
-      expect(await sessions.findByUserId(userId)).toEqual([])
-      expect(await tokens.findActiveByUserId(userId)).toEqual([])
-    })
-
-    it('runs again when it loses a deadlock, and ends them', async () => {
-      const { id: userId } = await insertUser(testPool)
-      const { sessions, tokens, refresh } = await seed(userId)
-      const pause = () => new Promise(resolve => setTimeout(resolve, 200))
-      const rival = await heavyTransaction(testPool)
-      await rival.query('SELECT id FROM oauth_tokens WHERE id = ? FOR UPDATE', [
-        refresh.id,
-      ])
-
-      const revoking = repository.revokeSessionsAndTokens(userId)
-      await pause()
-      await rival.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [
-        userId,
-      ])
-      await pause()
-      await rival.rollback()
-      await revoking
-
-      expect(await sessions.findByUserId(userId)).toEqual([])
-      expect(await tokens.findActiveByUserId(userId)).toEqual([])
-    })
-
-    it('leaves no unused authorization code to exchange', async () => {
-      const { id: userId } = await insertUser(testPool)
-      const { codes, code } = await seed(userId)
-
-      await repository.revokeSessionsAndTokens(userId)
-
-      expect(await codes.consume(code.codeHash)).toBeNull()
-    })
-
-    it('cancels a pending email change, leaving others alone', async () => {
-      const { id: userId } = await insertUser(testPool)
-      const { id: bystanderId } = await insertUser(testPool, {
-        emailHash: 'bystander_email',
+        expect(await accountState(seeded.userId)).toEqual({
+          ...untouched,
+          ...ended,
+          ...changed,
+        })
       })
-      const changes = new DrizzleEmailChangeRepository(testDb)
-      for (const [id, tokenHash] of [
-        [userId, 'pending-change'],
-        [bystanderId, 'bystander-change'],
-      ]) {
-        await changes.save({
-          userId: id,
-          tokenHash,
-          emailHash: `new-${tokenHash}`,
-          emailEncrypted: null,
+
+      it('runs again when it loses a deadlock', async () => {
+        const seeded = await seed((await insertUser(testPool)).id)
+        const rival = await heavyTransaction(testPool)
+        await rival.query(holdToken, [seeded.refresh.id])
+
+        const changing = change(repository, seeded)
+        await pause()
+        await rival.query(holdUser, [seeded.userId])
+        await pause()
+        await rival.rollback()
+        await changing
+
+        expect(await accountState(seeded.userId)).toEqual({
+          ...untouched,
+          ...ended,
+          ...changed,
+        })
+      })
+
+      it('throws a write conflict and changes nothing when it loses a deadlock twice, and succeeds when called again', async () => {
+        const seeded = await seed((await insertUser(testPool)).id)
+        const first = await heavyTransaction(testPool)
+        const second = await heavyTransaction(testPool)
+        await first.query(holdToken, [seeded.refresh.id])
+
+        const changing = change(repository, seeded).catch(
+          (error: unknown) => error
+        )
+        await pause()
+        await first.query(holdUser, [seeded.userId])
+        const secondHoldsToken = second.query(holdToken, [seeded.refresh.id])
+        await pause()
+        await first.rollback()
+        await secondHoldsToken
+        await pause()
+        await second.query(holdUser, [seeded.userId])
+        const thrown = await Promise.race([changing, pause()])
+        await second.rollback()
+
+        expect(thrown).toBeInstanceOf(WriteConflictError)
+        expect(await accountState(seeded.userId)).toEqual(untouched)
+        await change(repository, seeded)
+        expect(await accountState(seeded.userId)).toEqual({
+          ...untouched,
+          ...ended,
+          ...changed,
+        })
+      })
+
+      it('throws a write conflict and changes nothing when its lock wait times out, and succeeds when called again', async () => {
+        const seeded = await seed((await insertUser(testPool)).id)
+        const rival = await transactionHolding(testPool, holdToken, [
+          seeded.refresh.id,
+        ])
+        const impatient = new DrizzleUserRepository(
+          await impatientDatabase(TEST_DATABASE_URL)
+        )
+
+        const thrown: unknown = await change(impatient, seeded).catch(
+          (error: unknown) => error
+        )
+        await rival.rollback()
+
+        expect(thrown).toBeInstanceOf(WriteConflictError)
+        expect(await accountState(seeded.userId)).toEqual(untouched)
+        await change(repository, seeded)
+        expect(await accountState(seeded.userId)).toEqual({
+          ...untouched,
+          ...ended,
+          ...changed,
+        })
+      })
+
+      it("leaves another user's account as it was", async () => {
+        const seeded = await seed((await insertUser(testPool)).id)
+        const bystander = await seed(
+          (await insertUser(testPool, { emailHash: 'bystander_email' })).id
+        )
+
+        await change(repository, seeded)
+
+        expect(await accountState(bystander.userId)).toEqual(untouched)
+      })
+    })
+
+    describe('setPasswordAndRevoke', () => {
+      it('keeps the one session it is told to keep', async () => {
+        const { userId, kept } = await seed((await insertUser(testPool)).id)
+
+        await repository.setPasswordAndRevoke(userId, {
+          passwordHash: 'new_hash',
+          keepSessionId: kept.id,
+        })
+
+        expect(
+          (await new DrizzleSessionRepository(testDb).findByUserId(userId)).map(
+            session => session.id
+          )
+        ).toEqual([kept.id])
+        expect(await accountState(userId)).toMatchObject({ liveTokens: 0 })
+      })
+
+      it('leaves the status alone unless it is given one', async () => {
+        const { userId } = await seed(
+          (await insertUser(testPool, { status: 'active' })).id
+        )
+
+        expect(
+          await repository.setPasswordAndRevoke(userId, {
+            passwordHash: 'new_hash',
+          })
+        ).toBe(true)
+
+        expect(await accountState(userId)).toMatchObject({
+          passwordHash: 'new_hash',
+          status: UserStatus.Active,
+        })
+      })
+
+      it('resolves false for a user that is gone', async () => {
+        expect(
+          await repository.setPasswordAndRevoke(crypto.randomUUID(), {
+            passwordHash: 'new_hash',
+          })
+        ).toBe(false)
+      })
+
+      it('lets exactly one of two concurrent resets spend a reset token', async () => {
+        const { userId, resetTokenId } = await seed(
+          (await insertUser(testPool)).id
+        )
+
+        const results = await Promise.all(
+          ['first_hash', 'second_hash'].map(passwordHash =>
+            repository.setPasswordAndRevoke(userId, {
+              passwordHash,
+              resetTokenId,
+            })
+          )
+        )
+
+        expect(results.filter(Boolean)).toHaveLength(1)
+        expect(await accountState(userId)).toMatchObject({
+          passwordHash: results[0] ? 'first_hash' : 'second_hash',
+          resetTokens: 0,
+        })
+      })
+
+      it('changes nothing for a reset token that has expired', async () => {
+        const { userId, resetTokenId } = await seed(
+          (await insertUser(testPool)).id
+        )
+        await testPool.query(
+          'UPDATE password_reset_tokens SET expires_at = ? WHERE id = ?',
+          [new Date(Date.now() - 1000), resetTokenId]
+        )
+
+        expect(
+          await repository.setPasswordAndRevoke(userId, {
+            passwordHash: 'new_hash',
+            resetTokenId,
+          })
+        ).toBe(false)
+
+        expect(await accountState(userId)).toEqual(untouched)
+      })
+
+      it("spends the user's other reset tokens with the one it was given", async () => {
+        const { userId, resetTokenId } = await seed(
+          (await insertUser(testPool)).id
+        )
+        await new DrizzlePasswordResetRepository(testDb).create({
+          userId,
+          tokenHash: 'an-earlier-link',
           expiresAt: later(),
         })
-      }
 
-      await repository.revokeSessionsAndTokens(userId)
+        await repository.setPasswordAndRevoke(userId, {
+          passwordHash: 'new_hash',
+          resetTokenId,
+        })
 
-      expect(await changes.consume('pending-change')).toBeNull()
-      expect(await changes.consume('bystander-change')).not.toBeNull()
-    })
-
-    it('keeps the one session it is told to keep', async () => {
-      const { id: userId } = await insertUser(testPool)
-      const { sessions, tokens, kept } = await seed(userId)
-
-      await repository.revokeSessionsAndTokens(userId, kept.id)
-
-      expect((await sessions.findByUserId(userId)).map(s => s.id)).toEqual([
-        kept.id,
-      ])
-      expect(await tokens.findActiveByUserId(userId)).toEqual([])
-    })
-
-    it("leaves other users' sessions and tokens alone", async () => {
-      const { id: userId } = await insertUser(testPool)
-      const { id: bystanderId } = await insertUser(testPool, {
-        emailHash: 'bystander_email',
+        expect(await accountState(userId)).toMatchObject({ resetTokens: 0 })
       })
-      await seed(userId)
-      const bystander = await seed(bystanderId)
-
-      await repository.revokeSessionsAndTokens(userId)
-
-      expect(await bystander.sessions.findByUserId(bystanderId)).toHaveLength(2)
-      expect(
-        await bystander.tokens.findActiveByUserId(bystanderId)
-      ).toHaveLength(2)
-      expect(
-        await bystander.codes.consume(bystander.code.codeHash)
-      ).not.toBeNull()
     })
   })
 })

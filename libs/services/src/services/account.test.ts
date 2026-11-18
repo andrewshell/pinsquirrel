@@ -20,6 +20,7 @@ import {
   UnauthorizedUserAccessError,
   AccessControl,
   UserStatus,
+  WriteConflictError,
 } from '@pinsquirrel/domain'
 
 // Mock the crypto module (which contains crypto functions)
@@ -52,7 +53,6 @@ function inMemoryResets(): PasswordResetRepository {
     delete: vi.fn(),
     deleteExpiredTokens: vi.fn(),
     isValidToken: vi.fn(),
-    consume: vi.fn(),
     findByUserId: vi.fn((userId: string) =>
       Promise.resolve(rows.filter(r => r.userId === userId))
     ),
@@ -113,7 +113,6 @@ describe('AccountService', () => {
       deleteByUserId: vi.fn(),
       deleteExpiredTokens: vi.fn(),
       isValidToken: vi.fn(),
-      consume: vi.fn().mockResolvedValue(true),
     }
 
     mockEmailChangeRepository = {
@@ -1175,8 +1174,6 @@ describe('AccountService', () => {
         true
       )
       vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
-      vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
-      vi.mocked(mockPasswordResetRepository.delete).mockResolvedValue(true)
 
       await accountService.resetPassword({
         token: 'mock-token',
@@ -1189,15 +1186,37 @@ describe('AccountService', () => {
       expect(mockPasswordResetRepository.isValidToken).toHaveBeenCalledWith(
         'hashed_mock-token'
       )
-      expect(mockUserRepository.update).toHaveBeenCalledWith(mockUser.id, {
-        passwordHash: 'hashed_newpassword123',
-      })
-      expect(mockPasswordResetRepository.deleteByUserId).toHaveBeenCalledWith(
-        mockPasswordResetToken.userId
+      expect(mockUserRepository.setPasswordAndRevoke).toHaveBeenCalledWith(
+        mockUser.id,
+        {
+          passwordHash: 'hashed_newpassword123',
+          resetTokenId: mockPasswordResetToken.id,
+        }
       )
-      expect(mockUserRepository.revokeSessionsAndTokens).toHaveBeenCalledWith(
-        mockUser.id
+    })
+
+    it('writes the password, spends the link and ends the sessions and tokens in one repository call', async () => {
+      vi.mocked(mockPasswordResetRepository.findByTokenHash).mockResolvedValue(
+        mockPasswordResetToken
       )
+      vi.mocked(mockPasswordResetRepository.isValidToken).mockResolvedValue(
+        true
+      )
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.setPasswordAndRevoke).mockRejectedValue(
+        new WriteConflictError()
+      )
+
+      await expect(
+        accountService.resetPassword({
+          token: 'mock-token',
+          newPassword: 'newpassword123',
+        })
+      ).rejects.toThrow(WriteConflictError)
+
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+      expect(mockPasswordResetRepository.delete).not.toHaveBeenCalled()
+      expect(mockPasswordResetRepository.deleteByUserId).not.toHaveBeenCalled()
     })
 
     it('refuses the link when the account is gone by the time the password is written', async () => {
@@ -1208,7 +1227,9 @@ describe('AccountService', () => {
         true
       )
       vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
-      vi.mocked(mockUserRepository.update).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.setPasswordAndRevoke).mockResolvedValue(
+        false
+      )
 
       await expect(
         accountService.resetPassword({
@@ -1227,19 +1248,18 @@ describe('AccountService', () => {
         true
       )
       vi.mocked(mockUserRepository.findById).mockResolvedValue(unverifiedUser)
-      vi.mocked(mockUserRepository.update).mockResolvedValue(unverifiedUser)
-      vi.mocked(mockPasswordResetRepository.delete).mockResolvedValue(true)
 
       await accountService.resetPassword({
         token: 'mock-token',
         newPassword: 'newpassword123',
       })
 
-      expect(mockUserRepository.update).toHaveBeenCalledWith(
+      expect(mockUserRepository.setPasswordAndRevoke).toHaveBeenCalledWith(
         unverifiedUser.id,
         {
           passwordHash: 'hashed_newpassword123',
           status: UserStatus.Waitlist,
+          resetTokenId: mockPasswordResetToken.id,
         }
       )
     })
@@ -1256,7 +1276,7 @@ describe('AccountService', () => {
         })
       ).rejects.toThrow(InvalidResetTokenError)
 
-      expect(mockUserRepository.update).not.toHaveBeenCalled()
+      expect(mockUserRepository.setPasswordAndRevoke).not.toHaveBeenCalled()
     })
 
     it('should throw error for expired token', async () => {
@@ -1278,7 +1298,7 @@ describe('AccountService', () => {
         })
       ).rejects.toThrow(ResetTokenExpiredError)
 
-      expect(mockUserRepository.update).not.toHaveBeenCalled()
+      expect(mockUserRepository.setPasswordAndRevoke).not.toHaveBeenCalled()
     })
 
     it('changes the password once when one token is submitted twice at once', async () => {
@@ -1289,8 +1309,7 @@ describe('AccountService', () => {
         true
       )
       vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
-      vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
-      vi.mocked(mockPasswordResetRepository.consume)
+      vi.mocked(mockUserRepository.setPasswordAndRevoke)
         .mockResolvedValueOnce(true)
         .mockResolvedValueOnce(false)
 
@@ -1305,7 +1324,6 @@ describe('AccountService', () => {
         }),
       ])
 
-      expect(mockUserRepository.update).toHaveBeenCalledTimes(1)
       const rejected = results.filter(r => r.status === 'rejected')
       expect(rejected).toHaveLength(1)
       expect(rejected[0].reason).toBeInstanceOf(InvalidResetTokenError)
@@ -1337,7 +1355,7 @@ describe('AccountService', () => {
         })
       ).rejects.toThrow(InvalidResetTokenError)
 
-      expect(mockUserRepository.update).not.toHaveBeenCalled()
+      expect(mockUserRepository.setPasswordAndRevoke).not.toHaveBeenCalled()
       expect(mockPasswordResetRepository.delete).not.toHaveBeenCalled()
     })
   })

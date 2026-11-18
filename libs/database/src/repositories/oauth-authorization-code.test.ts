@@ -9,7 +9,7 @@ import type {
   CreateAuthorizationCodeData,
   CreateOAuthTokenData,
 } from '@pinsquirrel/domain'
-import { WriteConflictError } from '@pinsquirrel/domain'
+import { Role, WriteConflictError } from '@pinsquirrel/domain'
 import {
   heavyTransaction,
   impatientDatabase,
@@ -142,9 +142,10 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
       const data = code()
       const creating = repository.create(data, sessionId)
       await new Promise(resolve => setTimeout(resolve, 200))
-      const revoking = new DrizzleUserRepository(
-        testDb
-      ).revokeSessionsAndTokens(userId)
+      const revoking = new DrizzleUserRepository(testDb).removeRoleAndRevoke(
+        userId,
+        Role.User
+      )
       await new Promise(resolve => setTimeout(resolve, 200))
       await stall.commit()
       stall.release()
@@ -380,7 +381,10 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
     it('should say a code the user revoked is gone, and write nothing', async () => {
       const created = await createCode()
       const pair = tokensFor(created)
-      await new DrizzleUserRepository(testDb).revokeSessionsAndTokens(userId)
+      await new DrizzleUserRepository(testDb).removeRoleAndRevoke(
+        userId,
+        Role.User
+      )
 
       expect(await repository.exchange(created.id, pair)).toBe('gone')
       expect(await stored(pair[0])).toBeNull()
@@ -507,9 +511,10 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
       )
       const exchanging = repository.exchange(created.id, [access, refresh])
       await new Promise(resolve => setTimeout(resolve, 200))
-      const revoking = new DrizzleUserRepository(
-        testDb
-      ).revokeSessionsAndTokens(userId)
+      const revoking = new DrizzleUserRepository(testDb).removeRoleAndRevoke(
+        userId,
+        Role.User
+      )
       await new Promise(resolve => setTimeout(resolve, 200))
       await stall.commit()
       stall.release()

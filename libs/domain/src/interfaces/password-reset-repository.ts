@@ -15,9 +15,4 @@ export interface PasswordResetRepository extends Repository<
   /** Delete the tokens that expired before `expiredBefore`. */
   deleteExpiredTokens(expiredBefore: Date): Promise<number>
   isValidToken(tokenHash: string): Promise<boolean>
-  /**
-   * Delete one unexpired token. True only for the call that deleted it, so of
-   * any number of concurrent callers exactly one may act on the token.
-   */
-  consume(id: string): Promise<boolean>
 }

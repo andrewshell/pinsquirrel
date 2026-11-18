@@ -1,20 +1,32 @@
 import type {
   CreateUserData,
+  PasswordChange,
   UpdateUserData,
   User,
   UserRepository,
   Role,
 } from '@pinsquirrel/domain'
 import { UserAlreadyExistsError, UserStatus } from '@pinsquirrel/domain'
-import { and, eq, inArray, isNull, lt, ne, sql } from 'drizzle-orm'
+import {
+  and,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lt,
+  ne,
+  sql,
+  TransactionRollbackError,
+} from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { users } from '../schema/users.js'
 import { userRoles } from '../schema/user-roles.js'
 import { sessions } from '../schema/sessions.js'
 import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes.js'
 import { emailChanges } from '../schema/email-changes.js'
+import { passwordResetTokens } from '../schema/password-reset-tokens.js'
 import { writeOrConflict } from './deadlock.js'
-import { revokeUserTokens } from './oauth-issuance.js'
+import { revokeUserTokens, type Transaction } from './oauth-issuance.js'
 import { isDuplicateKeyError } from './duplicate-key.js'
 
 /**
@@ -273,37 +285,91 @@ export class DrizzleUserRepository implements UserRepository {
     return result[0].affectedRows > 0
   }
 
-  async revokeSessionsAndTokens(
+  async setPasswordAndRevoke(
     userId: string,
-    keepSessionId?: string
-  ): Promise<void> {
-    await writeOrConflict(() =>
-      this.db.transaction(async tx => {
-        await tx
-          .delete(sessions)
+    change: PasswordChange
+  ): Promise<boolean> {
+    return this.revoking(userId, change.keepSessionId, async tx => {
+      if (change.resetTokenId !== undefined) {
+        const [spent] = await tx
+          .delete(passwordResetTokens)
           .where(
             and(
-              eq(sessions.userId, userId),
-              keepSessionId === undefined
-                ? undefined
-                : ne(sessions.id, keepSessionId)
+              eq(passwordResetTokens.id, change.resetTokenId),
+              gt(passwordResetTokens.expiresAt, new Date())
             )
           )
-        // Sessions before the user's row: a code being written holds its
-        // session and then reads the user, and the opposite order here would
-        // deadlock with it. PLAN.md decision 41.
-        await revokeUserTokens(tx, userId)
+        if (spent.affectedRows !== 1) return false
         await tx
-          .delete(oauthAuthorizationCodes)
-          .where(
-            and(
-              eq(oauthAuthorizationCodes.userId, userId),
-              isNull(oauthAuthorizationCodes.consumedAt)
+          .delete(passwordResetTokens)
+          .where(eq(passwordResetTokens.userId, userId))
+      }
+      const [updated] = await tx
+        .update(users)
+        .set({
+          passwordHash: change.passwordHash,
+          status: change.status,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId))
+      return updated.affectedRows === 1
+    })
+  }
+
+  async removeRoleAndRevoke(userId: string, role: Role): Promise<void> {
+    await this.revoking(userId, undefined, async tx => {
+      await tx
+        .delete(userRoles)
+        .where(and(eq(userRoles.userId, userId), eq(userRoles.role, role)))
+      return true
+    })
+  }
+
+  /**
+   * End what was issued to the user and make `change`, in one transaction
+   * that is undone when `change` resolves false.
+   *
+   * The change comes last, so it writes the user's row after the sessions
+   * are deleted and under the lock `revokeUserTokens` took on that row. A
+   * code being written holds its session and then reads the user, and the
+   * opposite order here would deadlock with it. PLAN.md decision 41.
+   */
+  private async revoking(
+    userId: string,
+    keepSessionId: string | undefined,
+    change: (tx: Transaction) => Promise<boolean>
+  ): Promise<boolean> {
+    try {
+      return await writeOrConflict(() =>
+        this.db.transaction(async tx => {
+          await tx
+            .delete(sessions)
+            .where(
+              and(
+                eq(sessions.userId, userId),
+                keepSessionId === undefined
+                  ? undefined
+                  : ne(sessions.id, keepSessionId)
+              )
             )
-          )
-        await tx.delete(emailChanges).where(eq(emailChanges.userId, userId))
-      })
-    )
+          await revokeUserTokens(tx, userId)
+          await tx
+            .delete(oauthAuthorizationCodes)
+            .where(
+              and(
+                eq(oauthAuthorizationCodes.userId, userId),
+                isNull(oauthAuthorizationCodes.consumedAt)
+              )
+            )
+          await tx.delete(emailChanges).where(eq(emailChanges.userId, userId))
+          if (!(await change(tx))) tx.rollback()
+          return true
+        })
+      )
+    } catch (error) {
+      if (error instanceof TransactionRollbackError) return false
+      throw error
+    }
   }
 
   // Role management methods

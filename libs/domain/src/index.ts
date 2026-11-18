@@ -55,7 +55,10 @@ export type { Jsonify } from './jsonify.js'
 
 // Interfaces
 export type { Repository } from './interfaces/repository.js'
-export type { UserRepository } from './interfaces/user-repository.js'
+export type {
+  PasswordChange,
+  UserRepository,
+} from './interfaces/user-repository.js'
 export type { PinRepository, PinFilter } from './interfaces/pin-repository.js'
 export type { TagRepository } from './interfaces/tag-repository.js'
 export type { PasswordResetRepository } from './interfaces/password-reset-repository.js'
