@@ -678,9 +678,10 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     wait for a row lock times out (`ER_LOCK_WAIT_TIMEOUT`). Nothing changed, so the answer
     must be one a client sends again without discarding its code or token. The token
     endpoint answers `503` with `Retry-After: 1` and the body
-    `{"error":"temporarily_unavailable"}`; `authorize` redirects with the same code, which
-    RFC 6749 4.1.2.1 defines for it. RFC 6749 5.2 has no retryable code for the token
-    endpoint, so the choice follows what the clients do. The MCP TypeScript SDK (1.32.2,
+    `{"error":"temporarily_unavailable","error_description":"The server is busy. Send the request again"}`;
+    `authorize` redirects with the same code, which RFC 6749 4.1.2.1 defines for it.
+    RFC 6749 5.2 has no retryable code for the token endpoint, so the choice follows what
+    the clients do. The MCP TypeScript SDK (1.32.2,
     `client/auth.js`) reads the `error` field whatever the status: `invalid_grant` makes it
     drop the stored tokens, `server_error`, an unknown code or a body that is not JSON
     makes it start a new authorization, and any other known code, `temporarily_unavailable`
@@ -728,6 +729,12 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     again; the admin console says that the role was not revoked, beside any role change the
     same form had already made. Removing the Admin role revokes nothing and stays one
     statement.
+    Deleting a user from the admin console keeps the same order. It deletes the user's
+    sessions by statement and then the user's row, whose cascade removes the rest, in one
+    transaction that a deadlock runs again once. Reaching the sessions through the cascade
+    locked the user's row first, the opposite order, so a deletion and a password change
+    could each wait on the other. An undone deletion is a `WriteConflictError` too, and the
+    admin console answers `503` and says that the user was not deleted and to try again.
     Confirming an email change follows the same rule. It used to spend the confirmation link
     and then write the address as a second step, so a write that was undone left the link
     spent and the address unchanged, and the user had to ask for a new email.
