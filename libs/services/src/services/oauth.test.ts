@@ -184,6 +184,7 @@ function setup() {
   } as unknown as OAuthTokenRepository
 
   const userRepository: UserRepository = createMockUserRepository()
+  vi.mocked(userRepository.findById).mockResolvedValue(user)
 
   const fetcher = {
     fetch: vi.fn().mockResolvedValue(JSON.stringify(cimdDocument)),
@@ -763,7 +764,6 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     vi.mocked(ctx.tokenRepository.create).mockImplementation(data =>
       Promise.resolve(makeToken(data))
     )
-    vi.mocked(ctx.userRepository.findById).mockResolvedValue(user)
   })
 
   it('exchanges a code for an access token bound to the requested resource', async () => {
@@ -943,7 +943,6 @@ describe('OAuthService.exchangeRefreshToken', () => {
     vi.mocked(ctx.tokenRepository.create).mockImplementation(data =>
       Promise.resolve(makeToken(data))
     )
-    vi.mocked(ctx.userRepository.findById).mockResolvedValue(user)
   })
 
   // OAuth 2.1 requires rotation for public clients, and both CIMD and DCR

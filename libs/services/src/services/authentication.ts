@@ -233,6 +233,9 @@ export class AuthenticationService {
    * are standing in, and dropping User suspends sign-in altogether — both need
    * a second admin to undo, so neither is offered as a self-service mistake.
    *
+   * Revoking User also ends the account's sessions and OAuth tokens, since
+   * a suspension that left them live would not suspend anything.
+   *
    * Idempotent; revoking a role the user does not hold writes nothing.
    */
   async revokeRole(
@@ -260,6 +263,9 @@ export class AuthenticationService {
     }
 
     await this.userRepository.removeRole(userId, role)
+    if (role === Role.User) {
+      await this.userRepository.revokeSessionsAndTokens(userId)
+    }
 
     return this.rereadUser(userId)
   }

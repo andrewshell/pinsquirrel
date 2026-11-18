@@ -11,6 +11,7 @@ import type {
   UserRepository,
 } from '@pinsquirrel/domain'
 import {
+  isAdmitted,
   OAuthAccessDeniedError,
   OAuthInvalidClientError,
   OAuthInvalidGrantError,
@@ -281,6 +282,9 @@ export class OAuthService {
         'Not authorized to grant access on behalf of another user'
       )
     }
+    if (!ac.user || !isAdmitted(ac.user)) {
+      throw new OAuthAccessDeniedError('This account cannot grant access')
+    }
 
     const resolved = await this.resolveAuthorizationRequest(input.params)
 
@@ -384,6 +388,8 @@ export class OAuthService {
       }
     }
 
+    await this.requireAdmitted(code.userId, client.clientId)
+
     return this.issueTokens({
       client,
       userId: code.userId,
@@ -437,6 +443,8 @@ export class OAuthService {
       )
     }
 
+    await this.requireAdmitted(token.userId, client.clientId)
+
     const scopes = request.scope
       ? narrowedScopes(request.scope, token.scopes)
       : token.scopes
@@ -488,7 +496,9 @@ export class OAuthService {
    * Every failure is the same `null`. A token for the wrong audience, an
    * expired one, a revoked one and one that never existed are indistinguishable
    * from outside on purpose, and a token whose user is gone reads as invalid
-   * too: a distinct answer would confirm the token itself was good.
+   * too: a distinct answer would confirm the token itself was good. So does
+   * one whose user is no longer admitted, which is how a suspension reaches a
+   * token already in a client's hands.
    */
   async verifyAccessToken(
     rawToken: string,
@@ -512,7 +522,7 @@ export class OAuthService {
     }
 
     const user = await this.userRepository.findById(token.userId)
-    if (!user) {
+    if (!user || !isAdmitted(user)) {
       return null
     }
 
@@ -741,6 +751,23 @@ export class OAuthService {
     }
 
     await this.tokenRepository.revoke(token.id)
+  }
+
+  /**
+   * Refuse a grant whose user is no longer admitted, and end it, so a client
+   * that keeps retrying holds nothing live.
+   */
+  private async requireAdmitted(
+    userId: string,
+    clientId: string
+  ): Promise<void> {
+    const user = await this.userRepository.findById(userId)
+    if (!user || !isAdmitted(user)) {
+      await this.revokeGrantFamily(userId, clientId)
+      throw new OAuthInvalidGrantError(
+        'The account behind this grant is not active'
+      )
+    }
   }
 
   /** Kill every live token a user holds for one client. */
