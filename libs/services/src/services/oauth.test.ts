@@ -562,6 +562,32 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
     ).rejects.toBeInstanceOf(OAuthInvalidRequestError)
   })
 
+  it.each([
+    'https://client.example/cb/',
+    'https://u@client.example/cb',
+    'https://client.example/cb#frag',
+    'https://client.example/x/../cb',
+  ])(
+    'rejects %s against a registered https://client.example/cb',
+    async requested => {
+      vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+        makeClient({
+          clientId: 'static_hosted',
+          redirectUris: ['https://client.example/cb'],
+        })
+      )
+
+      await expect(
+        ctx.service.resolveAuthorizationRequest(
+          authorizeParams({
+            client_id: 'static_hosted',
+            redirect_uri: requested,
+          })
+        )
+      ).rejects.toBeInstanceOf(OAuthInvalidRequestError)
+    }
+  )
+
   it('rejects a resource this server issues no tokens for', async () => {
     await expect(
       ctx.service.resolveAuthorizationRequest(
@@ -1018,6 +1044,23 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
     expect(ctx.store.tokens).toEqual([])
   })
+
+  // RFC 6749 4.1.3: identical to the authorization request's, so the loopback
+  // port allowance that applies against a registration does not apply here.
+  it.each([
+    ['another loopback port', 'http://localhost:9999/callback'],
+    ['a trailing slash', 'http://localhost:54321/callback/'],
+  ])(
+    'refuses a redirect URI that differs from the code by %s',
+    async (_label, redirectUri) => {
+      await expect(
+        ctx.service.exchangeAuthorizationCode(
+          tokenParams({ redirect_uri: redirectUri })
+        )
+      ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+      expect(ctx.store.tokens).toEqual([])
+    }
+  )
 
   // RFC 8707: a repeated `resource` has to be the one the code was bound to,
   // or the exchange would be a way to swap audiences after consent.

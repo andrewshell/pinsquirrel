@@ -66,7 +66,6 @@ export {
 export {
   canonicalizeRedirectUri,
   isLoopbackRedirectHost,
-  matchRedirectUri,
   normalizeOAuthUri,
   protectedResourceMetadataPath,
   redirectUriMatches,

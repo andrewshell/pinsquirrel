@@ -28,7 +28,6 @@ import {
 import { generateSecureToken, hashToken } from '../utils/crypto.js'
 import {
   canonicalizeRedirectUri,
-  matchRedirectUri,
   normalizeOAuthUri,
   redirectUriMatches,
 } from '../validation/oauth-uri.js'
@@ -157,8 +156,6 @@ export interface ResolvedAuthorizationRequest {
   client: OAuthClient
   /** Where the browser will be sent, ephemeral loopback port included. */
   redirectUri: string
-  /** The registered URI that matched, which is what the consent screen names. */
-  registeredRedirectUri: string
   scopes: string[]
   resource: string
   codeChallenge: string
@@ -236,11 +233,11 @@ export class OAuthService {
 
     const client = await this.resolveClient(request.client_id)
 
-    const redirectUri = matchRedirectUri(
-      client.redirectUris,
-      request.redirect_uri
-    )
-    if (!redirectUri) {
+    if (
+      !client.redirectUris.some(uri =>
+        redirectUriMatches(uri, request.redirect_uri)
+      )
+    ) {
       throw new OAuthInvalidRequestError(
         'redirect_uri does not match a URI this client registered'
       )
@@ -261,7 +258,6 @@ export class OAuthService {
       // exchange has to repeat. For a loopback client that is the registered
       // URI plus the ephemeral port it happens to be listening on.
       redirectUri: request.redirect_uri,
-      registeredRedirectUri: redirectUri,
       scopes,
       resource,
       codeChallenge: request.code_challenge,
@@ -443,7 +439,7 @@ export class OAuthService {
       )
     }
 
-    if (!redirectUriMatches(code.redirectUri, request.redirect_uri)) {
+    if (request.redirect_uri !== code.redirectUri) {
       throw new OAuthInvalidGrantError(
         'redirect_uri does not match the one the code was issued to'
       )

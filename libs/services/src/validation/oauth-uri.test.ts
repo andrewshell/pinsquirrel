@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   canonicalizeRedirectUri,
   isLoopbackRedirectHost,
-  matchRedirectUri,
   normalizeOAuthUri,
   protectedResourceMetadataPath,
   redirectUriMatches,
@@ -199,29 +198,48 @@ describe('redirectUriMatches', () => {
     ).toBe(false)
   })
 
-  it('reads an unparseable URI as no match rather than throwing', () => {
-    expect(redirectUriMatches('http://localhost/cb', '/cb')).toBe(false)
-    expect(redirectUriMatches('not a uri', 'not a uri')).toBe(false)
+  // RFC 9700 4.1.3: simple string comparison. Every variant here names the
+  // same resource after normalisation, and none of them is what was registered.
+  it.each([
+    ['https://client.example/cb/', 'trailing slash'],
+    ['https://u@client.example/cb', 'userinfo'],
+    ['https://user:pw@client.example/cb', 'userinfo with password'],
+    ['https://client.example/cb#f', 'fragment'],
+    ['https://client.example/x/../cb', 'dot segments'],
+    ['https://CLIENT.example/cb', 'host case'],
+    ['https://client.example:443/cb', 'explicit default port'],
+  ])('does not match %s (%s) against its registration', requested => {
+    expect(redirectUriMatches('https://client.example/cb', requested)).toBe(
+      false
+    )
   })
-})
 
-describe('matchRedirectUri', () => {
-  // Claude Code's registered list, verbatim.
-  const registered = ['http://localhost/callback', 'http://127.0.0.1/callback']
-
-  it('returns the registered entry the request matched', () => {
+  it('compares everything but the port on a loopback redirect', () => {
+    const registered = 'http://127.0.0.1/callback'
     expect(
-      matchRedirectUri(registered, 'http://localhost:54321/callback')
-    ).toBe('http://localhost/callback')
-    expect(matchRedirectUri(registered, 'http://127.0.0.1:1/callback')).toBe(
-      'http://127.0.0.1/callback'
-    )
+      redirectUriMatches(registered, 'http://127.0.0.1:53211/callback/')
+    ).toBe(false)
+    expect(
+      redirectUriMatches(registered, 'http://u@127.0.0.1:53211/callback')
+    ).toBe(false)
+    expect(
+      redirectUriMatches(registered, 'http://127.0.0.1:53211/callback#f')
+    ).toBe(false)
+    expect(
+      redirectUriMatches(registered, 'http://127.0.0.1:53211/x/../callback')
+    ).toBe(false)
   })
 
-  it('returns null when nothing in the list matches', () => {
-    expect(matchRedirectUri(registered, 'http://localhost:54321/evil')).toBe(
-      null
-    )
-    expect(matchRedirectUri([], 'http://localhost/callback')).toBe(null)
+  it('lets a registered loopback port change too', () => {
+    expect(
+      redirectUriMatches(
+        'http://localhost:8080/callback',
+        'http://localhost:53211/callback'
+      )
+    ).toBe(true)
+  })
+
+  it('never matches an unparseable request', () => {
+    expect(redirectUriMatches('http://localhost/cb', '/cb')).toBe(false)
   })
 })
