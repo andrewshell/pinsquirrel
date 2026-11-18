@@ -154,6 +154,31 @@ describe('startConnect', () => {
     })
   })
 
+  it("fails with the server's reason when registration is refused, and can be retried", async () => {
+    const server = stubOAuthServer()
+    let refusals = 1
+    server.fetched.route(`${SERVER_BASE_URL}/oauth/register`, () =>
+      refusals-- > 0
+        ? jsonResponse(
+            {
+              error: 'too_many_requests',
+              error_description: 'Too many client registrations.',
+            },
+            429
+          )
+        : jsonResponse({ client_id: REGISTERED_CLIENT_ID }, 201)
+    )
+
+    await expect(startConnect(SERVER_BASE_URL)).rejects.toThrow(
+      'Too many client registrations.'
+    )
+    expect(server.chrome.local.items.registeredClients).toBeUndefined()
+    expect(server.chrome.local.items.pendingConnect).toBeUndefined()
+
+    const url = new URL(await startConnect(SERVER_BASE_URL))
+    expect(url.searchParams.get('client_id')).toBe(REGISTERED_CLIENT_ID)
+  })
+
   it('reuses a cached registration rather than registering again', async () => {
     const server = stubOAuthServer({
       registeredClients: { [SERVER_BASE_URL]: 'dcr_cached' },
