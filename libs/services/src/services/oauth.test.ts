@@ -626,6 +626,71 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
     }
   )
 
+  // A row stored before the redirect URI rules existed still holds what it
+  // registered, and the request matches it exactly.
+  it.each([
+    ['a fragment', 'https://client.example/cb#frag'],
+    ['userinfo', 'https://u@client.example/cb'],
+    ['plain http off loopback', 'http://client.example/cb'],
+  ])(
+    'refuses a stored client whose redirect URI has %s',
+    async (_, registered) => {
+      vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+        makeClient({
+          clientId: 'dcr_legacy',
+          redirectUris: [registered],
+          registrationType: 'dcr',
+        })
+      )
+
+      await expect(
+        ctx.service.resolveAuthorizationRequest(
+          authorizeParams({ client_id: 'dcr_legacy', redirect_uri: registered })
+        )
+      ).rejects.toBeInstanceOf(OAuthInvalidRequestError)
+    }
+  )
+
+  it('still serves the usable redirect URIs of a stored client that also has an unusable one', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({
+        clientId: 'dcr_legacy',
+        redirectUris: [
+          'https://client.example/cb#frag',
+          'https://client.example/cb',
+        ],
+        registrationType: 'dcr',
+      })
+    )
+
+    const resolved = await resolve(
+      authorizeParams({
+        client_id: 'dcr_legacy',
+        redirect_uri: 'https://client.example/cb',
+      })
+    )
+
+    expect(resolved.redirectUri).toBe('https://client.example/cb')
+  })
+
+  // RFC 6749 4.1.2.1: a response type this server does not issue is its own
+  // error, distinct from a request that names none.
+  it('redirects a response type other than code as unsupported_response_type', async () => {
+    await expect(
+      ctx.service.resolveAuthorizationRequest(
+        authorizeParams({ response_type: 'token' })
+      )
+    ).resolves.toMatchObject(redirectedError('unsupported_response_type'))
+  })
+
+  it('redirects a request with no response type as invalid_request', async () => {
+    await expect(
+      ctx.service.resolveAuthorizationRequest(
+        authorizeParams({ response_type: undefined })
+      )
+    ).resolves.toMatchObject(redirectedError('invalid_request'))
+  })
+
   // RFC 6749 3.1: a parameter may be sent once.
   it('refuses a repeated redirect_uri outright, since neither can be trusted', async () => {
     await expect(

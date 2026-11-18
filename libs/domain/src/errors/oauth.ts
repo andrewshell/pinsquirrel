@@ -63,6 +63,14 @@ export class OAuthUnauthorizedClientError extends OAuthError {
   }
 }
 
+/** A response type other than `code`, the only one this server issues. */
+export class OAuthUnsupportedResponseTypeError extends OAuthError {
+  constructor(message = 'The response type is not supported') {
+    super('unsupported_response_type', message)
+    this.name = 'OAuthUnsupportedResponseTypeError'
+  }
+}
+
 /** A grant type this server does not implement. */
 export class OAuthUnsupportedGrantTypeError extends OAuthError {
   constructor(message = 'The grant type is not supported') {

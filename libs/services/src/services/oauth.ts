@@ -25,6 +25,7 @@ import {
   OAuthInvalidTargetError,
   OAuthTemporarilyUnavailableError,
   OAuthUnauthorizedClientError,
+  OAuthUnsupportedResponseTypeError,
   ResponseTooLargeError,
   ValidationError,
   WriteConflictError,
@@ -263,6 +264,13 @@ export class OAuthService {
         'redirect_uri does not match a URI this client registered'
       )
     }
+    // A client stored before the redirect URI rules existed can still hold
+    // one that breaks them, and the request matched it exactly.
+    if (!isUsableRedirectUri(redirectUri)) {
+      throw new OAuthInvalidRequestError(
+        'redirect_uri must be https, or http on loopback, with no fragment or userinfo'
+      )
+    }
 
     try {
       return this.checkAuthorizationRequest(client, params)
@@ -290,6 +298,7 @@ export class OAuthService {
     params: unknown
   ): ResolvedAuthorizationRequest {
     refuseSeveralResources(params)
+    refuseResponseTypeOtherThanCode(params)
     const parsed = authorizationRequestSchema.safeParse(params)
     if (!parsed.success) {
       throw validationErrorFromZod(parsed.error, {
@@ -1257,6 +1266,26 @@ async function conflictAsTemporarilyUnavailable<T>(
       throw new OAuthTemporarilyUnavailableError(undefined, { cause: error })
     }
     throw error
+  }
+}
+
+/**
+ * RFC 6749 4.1.2.1 gives a response type the server does not issue its own
+ * error. A missing or empty one is a malformed request (RFC 6749 3.1).
+ */
+function refuseResponseTypeOtherThanCode(params: unknown): void {
+  const responseType =
+    typeof params === 'object' && params !== null
+      ? (params as { response_type?: unknown }).response_type
+      : undefined
+  if (
+    typeof responseType === 'string' &&
+    responseType !== '' &&
+    responseType !== 'code'
+  ) {
+    throw new OAuthUnsupportedResponseTypeError(
+      'This server issues authorization codes only (response_type must be code)'
+    )
   }
 }
 
