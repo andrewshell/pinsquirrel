@@ -73,12 +73,16 @@ describe('sendBulk', () => {
     expect(createMock).toHaveBeenNthCalledWith(1, 'mg.test', {
       from: 'Test <no-reply@test>',
       to: ['a@example.com'],
+      'o:tracking-clicks': 'no',
+      'o:tracking-opens': 'no',
       subject: 'Hello',
       text: 'Body text',
     })
     expect(createMock).toHaveBeenNthCalledWith(2, 'mg.test', {
       from: 'Test <no-reply@test>',
       to: ['b@example.com'],
+      'o:tracking-clicks': 'no',
+      'o:tracking-opens': 'no',
       subject: 'Hello',
       text: 'Body text',
     })
@@ -166,6 +170,8 @@ describe('sendPlainText', () => {
     expect(createMock).toHaveBeenCalledWith('mg.test', {
       from: 'Test <no-reply@test>',
       to: ['a@example.com'],
+      'o:tracking-clicks': 'no',
+      'o:tracking-opens': 'no',
       subject: 'Hello',
       text: 'Body text',
     })

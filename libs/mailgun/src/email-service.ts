@@ -63,6 +63,9 @@ export class MailgunEmailService implements EmailService {
       this.mailgun.messages.create(this.config.domain, {
         from,
         to: [to],
+        // Tracking would route each token-bearing link through Mailgun.
+        'o:tracking-clicks': 'no',
+        'o:tracking-opens': 'no',
         ...options.headers,
         subject,
         ...body,
