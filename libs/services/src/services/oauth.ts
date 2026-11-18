@@ -15,6 +15,7 @@ import type {
 import {
   isAdmitted,
   OAuthAccessDeniedError,
+  OAuthError,
   OAuthInvalidClientError,
   OAuthInvalidGrantError,
   OAuthInvalidClientMetadataError,
@@ -366,7 +367,8 @@ export class OAuthService {
    * tokens are written in one step (`exchange`), so a failure in between
    * leaves the client a code that still works. A code that fails a check is
    * spent anyway, because a failed check must not leave a code alive to try
-   * again with a different verifier.
+   * again with a different verifier. A check that could not be made, because
+   * the database was unreachable, spends nothing.
    *
    * There is no `AccessControl` here: the caller is a client, not a user, and
    * the code plus the PKCE verifier is the proof. That is the same reason
@@ -396,7 +398,9 @@ export class OAuthService {
     try {
       await this.requireCodeMatches(code, client, request)
     } catch (error) {
-      await this.codeRepository.consume(code.codeHash)
+      if (error instanceof OAuthError) {
+        await this.codeRepository.consume(code.codeHash)
+      }
       throw error
     }
 
@@ -1108,15 +1112,6 @@ export class OAuthService {
 const DEFAULT_GRANT_TYPES = ['authorization_code', 'refresh_token']
 
 /**
- * The scopes a request is granted, or a refusal.
- *
- * A request that names no scope gets the read scopes rather than nothing: an
- * empty grant would mint a token that can do nothing, and the client has no
- * way to tell that from one that works. An unknown scope is refused rather
- * than dropped, so a client asking for something it will not get finds out
- * now instead of at the first call.
- */
-/**
  * Unknown, expired, or already spent. One answer for all three: telling them
  * apart would say whether a code ever existed.
  */
@@ -1126,6 +1121,15 @@ function invalidCode(): OAuthInvalidGrantError {
   )
 }
 
+/**
+ * The scopes a request is granted, or a refusal.
+ *
+ * A request that names no scope gets the read scopes rather than nothing: an
+ * empty grant would mint a token that can do nothing, and the client has no
+ * way to tell that from one that works. An unknown scope is refused rather
+ * than dropped, so a client asking for something it will not get finds out
+ * now instead of at the first call.
+ */
 /**
  * Does this verifier hash to the challenge the code was issued with?
  *

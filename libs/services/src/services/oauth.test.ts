@@ -967,6 +967,19 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     expect(ctx.store.tokens).toHaveLength(1)
   })
 
+  it('leaves the code usable when the account could not be looked up', async () => {
+    vi.mocked(ctx.userRepository.findById).mockRejectedValueOnce(
+      new Error('lost connection to MySQL')
+    )
+    await expect(
+      ctx.service.exchangeAuthorizationCode(tokenParams())
+    ).rejects.toThrow('lost connection to MySQL')
+
+    const issued = await ctx.service.exchangeAuthorizationCode(tokenParams())
+
+    expect(issued.accessToken).toBeTruthy()
+  })
+
   it.each(notAdmitted)(
     'refuses a code for a user %s and revokes what the client holds',
     async (_label, account) => {
