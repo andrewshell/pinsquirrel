@@ -652,6 +652,32 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
     ).resolves.toMatchObject(redirectedError('invalid_target'))
   })
 
+  // offline_access asks for a refresh token, not a permission. Alone it would
+  // mint a token that can read nothing.
+  it('grants the read scopes alongside offline_access when that is all a request names', async () => {
+    const resolved = await resolve(authorizeParams({ scope: 'offline_access' }))
+
+    expect(resolved.scopes).toEqual([
+      'pins:read',
+      'tags:read',
+      'offline_access',
+    ])
+  })
+
+  // The consent screen promises "stay connected" for offline_access, which a
+  // client without the refresh_token grant can never do.
+  it('drops offline_access for a client not registered for refresh_token', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({ grantTypes: ['authorization_code'] })
+    )
+
+    const resolved = await resolve(
+      authorizeParams({ scope: 'pins:read offline_access' })
+    )
+
+    expect(resolved.scopes).toEqual(['pins:read'])
+  })
+
   it('redirects a resource this server issues no tokens for', async () => {
     await expect(
       ctx.service.resolveAuthorizationRequest(

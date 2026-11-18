@@ -300,7 +300,13 @@ export class OAuthService {
     }
 
     const resource = this.requireKnownResource(request.resource)
-    const scopes = grantedScopes(request.scope)
+    // Without the refresh_token grant there is no refresh token to ask for,
+    // and the consent screen would promise one.
+    const scopes = grantedScopes(request.scope).filter(
+      scope =>
+        scope !== OFFLINE_ACCESS_SCOPE ||
+        client.grantTypes.includes('refresh_token')
+    )
 
     return {
       status: 'resolved',
@@ -1202,15 +1208,6 @@ function invalidCode(): OAuthInvalidGrantError {
 }
 
 /**
- * The scopes a request is granted, or a refusal.
- *
- * A request that names no scope gets the read scopes rather than nothing: an
- * empty grant would mint a token that can do nothing, and the client has no
- * way to tell that from one that works. An unknown scope is refused rather
- * than dropped, so a client asking for something it will not get finds out
- * now instead of at the first call.
- */
-/**
  * Does this verifier hash to the challenge the code was issued with?
  *
  * S256 only, which is all the server metadata advertises. Compared in
@@ -1227,10 +1224,19 @@ function pkceVerifies(verifier: string, challenge: string): boolean {
   return timingSafeEqual(computed, expected)
 }
 
+/**
+ * The scopes a request is granted, or a refusal.
+ *
+ * A request that names no scope, or only `offline_access`, gets the read
+ * scopes rather than no permission: an empty grant would mint a token that
+ * can do nothing, and the client has no way to tell that from one that works. An unknown scope is refused rather
+ * than dropped, so a client asking for something it will not get finds out
+ * now instead of at the first call.
+ */
 function grantedScopes(scope: string | undefined): string[] {
   const requested = (scope ?? '').split(/\s+/).filter(Boolean)
-  if (requested.length === 0) {
-    return [...DEFAULT_SCOPES]
+  if (requested.every(one => one === OFFLINE_ACCESS_SCOPE)) {
+    return [...DEFAULT_SCOPES, ...new Set(requested)]
   }
 
   const unknown = requested.filter(one => !SUPPORTED_SCOPES.includes(one))
@@ -1262,13 +1268,6 @@ function narrowedScopes(scope: string, granted: string[]): string[] {
   return requested.length > 0 ? [...new Set(requested)] : granted
 }
 
-/**
- * Are these two the same resource identifier?
- *
- * Normalized on both sides, so a trailing slash or an upper-case host is not
- * an audience failure. Divergent normalization here looks like random
- * connection breakage from the outside.
- */
 function requireClientRules(metadata: {
   redirect_uris: string[]
   grant_types?: string[]
@@ -1332,6 +1331,13 @@ function dcrClientId(metadata: {
   return `dcr_${hashToken(key)}`
 }
 
+/**
+ * Are these two the same resource identifier?
+ *
+ * Normalized on both sides, so a trailing slash or an upper-case host is not
+ * an audience failure. Divergent normalization here looks like random
+ * connection breakage from the outside.
+ */
 function sameResource(one: string, other: string): boolean {
   try {
     return normalizeOAuthUri(one) === normalizeOAuthUri(other)
