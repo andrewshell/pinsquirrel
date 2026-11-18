@@ -86,21 +86,22 @@ function elements(doc: Document) {
 }
 
 /**
- * Run `work` with the button that started it disabled.
+ * Run `work` with every action button disabled.
  *
- * Every one of these buttons starts something slow and none of them is safe to
- * start twice: a second Connect opens a second consent tab, and a second sync
- * has two runs writing the same bookmark folders.
+ * Every one of these buttons starts something slow, and none is safe to start
+ * while another runs: a second Connect opens a second consent tab, two syncs
+ * write the same bookmark folders, and a Disconnect that overlaps either one
+ * leaves the page drawn by whichever answers last.
  */
 async function whileBusy(
-  button: HTMLButtonElement,
+  buttons: HTMLButtonElement[],
   work: () => Promise<void>
 ): Promise<void> {
-  button.disabled = true
+  for (const button of buttons) button.disabled = true
   try {
     await work()
   } finally {
-    button.disabled = false
+    for (const button of buttons) button.disabled = false
   }
 }
 
@@ -112,6 +113,12 @@ async function whileBusy(
  */
 export async function initOptions(deps: OptionsDeps): Promise<void> {
   const ui = elements(deps.document)
+  const actions = [
+    ui.connectButton,
+    ui.settingsDisconnectButton,
+    ui.syncButton,
+    ui.disconnectButton,
+  ]
 
   /** The server the page is talking to, kept so a reconnect can prefill it. */
   let baseUrl: string | undefined
@@ -314,7 +321,7 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
     }
 
     setStatus('Opening PinSquirrel...')
-    await whileBusy(ui.connectButton, async () => {
+    await whileBusy(actions, async () => {
       try {
         const response = await deps.requestConnect(origin)
         if (!response.ok) {
@@ -380,7 +387,7 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
 
   async function onSyncNow(): Promise<void> {
     setStatus('Syncing...')
-    await whileBusy(ui.syncButton, async () => {
+    await whileBusy(actions, async () => {
       try {
         const response = await deps.requestSync()
         await refreshSyncStatus()
@@ -402,8 +409,8 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
    * nothing to revoke, but `baseUrl` is still stored, and the toolbar button
    * keeps opening that server's pin form until something clears it.
    */
-  async function onDisconnect(button: HTMLButtonElement): Promise<void> {
-    await whileBusy(button, async () => {
+  async function onDisconnect(): Promise<void> {
+    await whileBusy(actions, async () => {
       try {
         const response = await deps.requestDisconnect()
         if (response.ok) await showConnection()
@@ -423,7 +430,7 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
   deps.onConnectFinished(result => void onConnectFinished(result))
   ui.syncButton.addEventListener('click', () => void onSyncNow())
   for (const button of [ui.disconnectButton, ui.settingsDisconnectButton]) {
-    button.addEventListener('click', () => void onDisconnect(button))
+    button.addEventListener('click', () => void onDisconnect())
   }
   // One delegated listener, because the boxes themselves are replaced on
   // every render and per-box listeners would have to be re-attached each time.

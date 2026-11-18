@@ -552,9 +552,32 @@ describe('initOptions, with a connection stored', () => {
     element<HTMLButtonElement>('#sync-now').click()
     await flush()
     expect(element<HTMLButtonElement>('#sync-now').disabled).toBe(true)
+    expect(element<HTMLButtonElement>('#disconnect').disabled).toBe(true)
 
     finish()
     await flush()
+    expect(element<HTMLButtonElement>('#sync-now').disabled).toBe(false)
+    expect(element<HTMLButtonElement>('#disconnect').disabled).toBe(false)
+  })
+
+  it('will not start a sync while a disconnect is running', async () => {
+    let finish = (): void => {}
+    const requestDisconnect = vi.fn(
+      () =>
+        new Promise<{ ok: false; error: string }>(resolve => {
+          finish = () => resolve({ ok: false, error: 'Storage is full' })
+        })
+    )
+    await initOptions(harness({ requestDisconnect }).deps)
+
+    element<HTMLButtonElement>('#disconnect').click()
+    await flush()
+    expect(element<HTMLButtonElement>('#disconnect').disabled).toBe(true)
+    expect(element<HTMLButtonElement>('#sync-now').disabled).toBe(true)
+
+    finish()
+    await flush()
+    expect(element<HTMLButtonElement>('#disconnect').disabled).toBe(false)
     expect(element<HTMLButtonElement>('#sync-now').disabled).toBe(false)
   })
 
@@ -672,6 +695,46 @@ describe('initOptions, asking to reconnect to a kept server', () => {
     expect(element<HTMLButtonElement>('#settings-disconnect').disabled).toBe(
       false
     )
+  })
+
+  it('will not connect while disconnecting, or disconnect while connecting', async () => {
+    Object.assign(chrome.local.items, KEPT)
+    let finishDisconnect = (): void => {}
+    const requestDisconnect = vi.fn(
+      () =>
+        new Promise<{ ok: false; error: string }>(resolve => {
+          finishDisconnect = () =>
+            resolve({ ok: false, error: 'Storage is full' })
+        })
+    )
+    let finishConnect = (): void => {}
+    const requestConnect = vi.fn(
+      () =>
+        new Promise<{ ok: true }>(resolve => {
+          finishConnect = () => resolve({ ok: true })
+        })
+    )
+    await initOptions(harness({ requestConnect, requestDisconnect }).deps)
+    const disabled = (selector: string) =>
+      element<HTMLButtonElement>(selector).disabled
+
+    element<HTMLButtonElement>('#settings-disconnect').click()
+    await flush()
+    expect(disabled('#settings-disconnect')).toBe(true)
+    expect(disabled('#connect')).toBe(true)
+    finishDisconnect()
+    await flush()
+    expect(disabled('#settings-disconnect')).toBe(false)
+    expect(disabled('#connect')).toBe(false)
+
+    element<HTMLButtonElement>('#connect').click()
+    await flush()
+    expect(disabled('#connect')).toBe(true)
+    expect(disabled('#settings-disconnect')).toBe(true)
+    finishConnect()
+    await flush()
+    expect(disabled('#connect')).toBe(false)
+    expect(disabled('#settings-disconnect')).toBe(false)
   })
 
   it('offers nothing to disconnect from when no server is kept', async () => {
