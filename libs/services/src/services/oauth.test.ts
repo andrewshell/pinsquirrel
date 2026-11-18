@@ -1289,12 +1289,62 @@ describe('OAuthService.exchangeRefreshToken', () => {
     ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
   })
 
-  it('lets a client ask for less than it already has', async () => {
-    const issued = await ctx.service.exchangeRefreshToken(
-      refreshParams({ scope: 'pins:read' })
+  // RFC 6749 section 6: a refresh may ask for a narrower access token, and
+  // the refresh token that replaces the old one keeps the grant's scope.
+  describe('a refresh that asks for less than the grant holds', () => {
+    const stored = (raw: string | null) =>
+      ctx.store.tokens.find(token => token.tokenHash === `hashed_${raw ?? ''}`)
+
+    it('narrows the access token and leaves the grant as it was', async () => {
+      const issued = await ctx.service.exchangeRefreshToken(
+        refreshParams({ scope: 'pins:read offline_access' })
+      )
+
+      expect(issued.scopes).toEqual(['pins:read', 'offline_access'])
+      expect(stored(issued.accessToken)?.scopes).toEqual([
+        'pins:read',
+        'offline_access',
+      ])
+      expect(stored(issued.refreshToken)?.scopes).toEqual(refreshScopes)
+    })
+
+    it('still issues a successor when the request leaves out offline_access', async () => {
+      const issued = await ctx.service.exchangeRefreshToken(
+        refreshParams({ scope: 'pins:read' })
+      )
+
+      expect(issued.scopes).toEqual(['pins:read'])
+      expect(stored(issued.accessToken)?.scopes).toEqual(['pins:read'])
+      expect(stored(issued.refreshToken)?.scopes).toEqual(refreshScopes)
+    })
+
+    it('can ask for the whole grant again on the next refresh', async () => {
+      const narrowed = await ctx.service.exchangeRefreshToken(
+        refreshParams({ scope: 'pins:read' })
+      )
+
+      const widened = await ctx.service.exchangeRefreshToken(
+        refreshParams({ refresh_token: narrowed.refreshToken })
+      )
+
+      expect(widened.scopes).toEqual(refreshScopes)
+    })
+  })
+
+  // A CIMD client's document can stop listing the grant. Refusing before the
+  // token is retired leaves it valid for when the registration is put right.
+  it('refuses a client that is no longer registered for refresh_token, and retires nothing', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({ grantTypes: ['authorization_code'] })
     )
 
-    expect(issued.scopes).toEqual(['pins:read'])
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthUnauthorizedClientError)
+
+    expect(presented().rotatedAt).toBeNull()
+    expect(successors()).toEqual([])
+    expect(liveTokenIds(ctx.store)).toEqual(['laptop-access', 'laptop-refresh'])
   })
 
   it('refuses a refresh that asks for more than was granted', async () => {

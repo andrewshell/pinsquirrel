@@ -400,13 +400,17 @@ export class OAuthService {
       throw error
     }
 
+    // `offline_access` is what asks for unattended refresh, and a client not
+    // registered for the grant cannot use one.
+    const refreshable =
+      code.scopes.includes(OFFLINE_ACCESS_SCOPE) &&
+      client.grantTypes.includes('refresh_token')
+
     const { rows, issued } = mintTokens({
-      client,
+      clientId: client.clientId,
       userId: code.userId,
       scopes: code.scopes,
-      refreshScopes: code.scopes.includes(OFFLINE_ACCESS_SCOPE)
-        ? code.scopes
-        : null,
+      refreshScopes: refreshable ? code.scopes : null,
       resource: code.resource,
       grantId: code.grantId ?? randomUUID(),
     })
@@ -511,6 +515,14 @@ export class OAuthService {
       return this.refuseRotatedToken(token, token.rotatedAt)
     }
 
+    if (!client.grantTypes.includes('refresh_token')) {
+      // Refused before the token is retired, so a registration that is put
+      // right finds the grant where it left it.
+      throw new OAuthUnauthorizedClientError(
+        'This client is not registered for the refresh_token grant'
+      )
+    }
+
     await this.revokeGrantUnlessAdmitted(token.userId, client.clientId)
 
     const scopes = request.scope
@@ -526,11 +538,14 @@ export class OAuthService {
       }
     }
 
+    // A narrower `scope` narrows this access token only. The successor keeps
+    // the grant's scopes (RFC 6749 section 6), and there always is one: a
+    // refresh never retires a token without replacing it.
     const { rows, issued } = mintTokens({
-      client,
+      clientId: client.clientId,
       userId: token.userId,
       scopes,
-      refreshScopes: scopes.includes(OFFLINE_ACCESS_SCOPE) ? scopes : null,
+      refreshScopes: token.scopes,
       resource: token.resource,
       grantId: token.grantId ?? randomUUID(),
       rotatedFrom: token.id,
@@ -1264,7 +1279,7 @@ function sameUriList(a: string[], b: string[]): boolean {
  * would walk straight around it.
  */
 function mintTokens(grant: {
-  client: OAuthClient
+  clientId: string
   userId: string
   /** What the access token may do. */
   scopes: string[]
@@ -1275,7 +1290,7 @@ function mintTokens(grant: {
   rotatedFrom?: string
 }): { rows: IssuedTokenData; issued: IssuedTokens } {
   const shared = {
-    clientId: grant.client.clientId,
+    clientId: grant.clientId,
     userId: grant.userId,
     resource: grant.resource,
     grantId: grant.grantId,
@@ -1292,13 +1307,8 @@ function mintTokens(grant: {
     },
   ]
 
-  // `offline_access` is what asks for unattended refresh, and a client not
-  // registered for the grant cannot use one.
   let refreshToken: string | null = null
-  if (
-    grant.refreshScopes &&
-    grant.client.grantTypes.includes('refresh_token')
-  ) {
+  if (grant.refreshScopes) {
     refreshToken = generateSecureToken()
     rows.push({
       ...shared,

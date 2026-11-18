@@ -815,6 +815,31 @@ describe('refresh rotation', () => {
     })
   })
 
+  it('narrows one access token on request and keeps the grant whole', async () => {
+    const original = await connect({ resource: mcpResource })
+
+    const narrowed = await exchange({
+      grant_type: 'refresh_token',
+      refresh_token: original.refresh_token ?? '',
+      client_id: clientId,
+      scope: 'pins:read',
+    })
+    const narrow = (await narrowed.json()) as TokenResponse
+    expect(narrowed.status).toBe(200)
+    expect(narrow.scope).toBe('pins:read')
+    expect(narrow.refresh_token).toBeTruthy()
+
+    const next = await exchange({
+      grant_type: 'refresh_token',
+      refresh_token: narrow.refresh_token ?? '',
+      client_id: clientId,
+    })
+    expect(next.status).toBe(200)
+    expect(((await next.json()) as TokenResponse).scope).toBe(
+      'pins:read tags:read offline_access'
+    )
+  })
+
   it('lets one of two concurrent refreshes win, and its tokens work', async () => {
     const original = await connect({ resource: mcpResource })
     const refresh = () =>
