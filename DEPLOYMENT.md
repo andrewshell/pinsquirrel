@@ -28,7 +28,7 @@ pushes only from a checkout where:
 - the tag `vX.Y.Z` exists and is in the history of HEAD.
 - nothing has changed between the tag and HEAD outside `apps/chrome-extension` and
   `.release-please-manifest.json`, which an extension release rewrites. So the image is what was
-  released. If a later change landed first, merge the next release pull request and release that.
+  released.
 - HEAD is `main`, clean and level with its upstream.
 
 Then it checks Docker and the ghcr.io login, runs `pnpm quality` unless `--skip-gates` is given,
@@ -42,7 +42,12 @@ changelogs. Set `RELEASE_PLEASE_TOKEN` (below) to get CI on it.
 
 To retry a failed publish, re-run the `publish` job, or run the `Release Please` workflow from the
 Actions tab on `main`. A manual run skips release-please and goes straight to `publish`. The
-script pushes only when the registry lacks the version, so a retry is safe.
+script pushes only when the registry lacks the version, so a retry is safe. It works only while
+`main` is still at the release commit. Any later commit, including a `docs:`, `ci:` or `chore:`
+commit that release-please hides and that opens no release pull request, makes the script refuse.
+Then the next root release publishes the version. When only hidden-type commits have landed, force
+a release by adding a `Release-As: X.Y.Z` footer to a commit (see the release-please
+documentation).
 
 ### One-time setup
 
@@ -63,8 +68,11 @@ script pushes only when the registry lacks the version, so a retry is safe.
 ### Moving a server from Docker Hub
 
 Images used to go to Docker Hub as `andrewshell/pinsquirrel`. New versions go only to
-`ghcr.io/andrewshell/pinsquirrel`. A server keeps running the last Docker Hub image until its
-compose file names the new image, as in [Running it](#running-it), and pulls it.
+`ghcr.io/andrewshell/pinsquirrel`. Nothing is on GHCR yet. The package appears when the `publish`
+job pushes the next root release, and `v3.10.1` is never published there. The package starts
+private. Keep running the Docker Hub image until that first image exists and the package is public
+(or the server has `docker login ghcr.io` with a `read:packages` token). Only then change the image
+name in the compose file, as in [Running it](#running-it), and pull it.
 
 ### From your machine
 

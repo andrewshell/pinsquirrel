@@ -163,7 +163,6 @@ access** links to `<siteUrl>/signin`.
 ```bash
 # Build production image (run from repository root)
 docker build -f apps/hono/Dockerfile -t your-username/pinsquirrel:latest .
-
 ```
 
 Releases publish `ghcr.io/andrewshell/pinsquirrel` automatically. See
