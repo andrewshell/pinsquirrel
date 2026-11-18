@@ -634,6 +634,22 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     })
   })
 
+  describe('replacePasswordHash', () => {
+    it('replaces the hash it was given', async () => {
+      const { id } = await insertUser(testPool, { passwordHash: 'old' })
+
+      expect(await repository.replacePasswordHash(id, 'old', 'new')).toBe(true)
+      expect((await repository.findById(id))?.passwordHash).toBe('new')
+    })
+
+    it('leaves a hash that changed since it was read', async () => {
+      const { id } = await insertUser(testPool, { passwordHash: 'changed' })
+
+      expect(await repository.replacePasswordHash(id, 'old', 'new')).toBe(false)
+      expect((await repository.findById(id))?.passwordHash).toBe('changed')
+    })
+  })
+
   describe('revokeSessionsAndTokens', () => {
     const later = () => new Date(Date.now() + 60 * 60 * 1000)
 

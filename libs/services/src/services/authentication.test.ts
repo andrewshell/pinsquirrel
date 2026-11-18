@@ -103,9 +103,12 @@ describe('AuthenticationService', () => {
         password: 'password12345',
       })
 
-      expect(mockUserRepository.update).toHaveBeenCalledWith(mockUser.id, {
-        passwordHash: 'hashed_password12345',
-      })
+      expect(mockUserRepository.replacePasswordHash).toHaveBeenCalledWith(
+        mockUser.id,
+        mockUser.passwordHash,
+        'hashed_password12345'
+      )
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
     })
 
     it('leaves a current password hash alone on sign-in', async () => {
@@ -118,6 +121,7 @@ describe('AuthenticationService', () => {
       })
 
       expect(mockUserRepository.update).not.toHaveBeenCalled()
+      expect(mockUserRepository.replacePasswordHash).not.toHaveBeenCalled()
     })
 
     it('should throw InvalidCredentialsError for non-existent user', async () => {

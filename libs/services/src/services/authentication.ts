@@ -76,9 +76,13 @@ export class AuthenticationService {
     }
 
     if (needsRehash(user.passwordHash)) {
-      await this.userRepository.update(user.id, {
-        passwordHash: await hashPassword(input.password),
-      })
+      // Conditional so a password changed while this one was hashing stays
+      // changed.
+      await this.userRepository.replacePasswordHash(
+        user.id,
+        user.passwordHash,
+        await hashPassword(input.password)
+      )
     }
 
     return user

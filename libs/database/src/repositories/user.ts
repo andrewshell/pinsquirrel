@@ -242,6 +242,18 @@ export class DrizzleUserRepository implements UserRepository {
     return result[0].affectedRows > 0
   }
 
+  async replacePasswordHash(
+    id: string,
+    expected: string,
+    next: string
+  ): Promise<boolean> {
+    const result = await this.db
+      .update(users)
+      .set({ passwordHash: next, updatedAt: new Date() })
+      .where(and(eq(users.id, id), eq(users.passwordHash, expected)))
+    return result[0].affectedRows > 0
+  }
+
   async revokeSessionsAndTokens(
     userId: string,
     keepSessionId?: string
