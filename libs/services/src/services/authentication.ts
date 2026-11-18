@@ -75,8 +75,6 @@ export class AuthenticationService {
       throw new MissingRoleError()
     }
 
-    // The one moment the plaintext is at hand, so the one chance to move a
-    // hash made with older scrypt parameters onto the current ones.
     if (needsRehash(user.passwordHash)) {
       await this.userRepository.update(user.id, {
         passwordHash: await hashPassword(input.password),
@@ -377,8 +375,7 @@ export class AuthenticationService {
       userId: string
       currentPassword: string
       newPassword: string
-      // The session making the change, which stays signed in.
-      currentSessionId?: string
+      keepSessionId?: string
     }
   ): Promise<void> {
     if (!ac.canUpdate({ userId: input.userId })) {
@@ -417,7 +414,7 @@ export class AuthenticationService {
     await this.userRepository.update(input.userId, { passwordHash })
     await this.userRepository.revokeSessionsAndTokens(
       input.userId,
-      input.currentSessionId
+      input.keepSessionId
     )
   }
 }

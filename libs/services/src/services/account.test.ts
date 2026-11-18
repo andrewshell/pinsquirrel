@@ -108,8 +108,6 @@ describe('AccountService', () => {
       expect(mockUserRepository.findByEmailHash).toHaveBeenCalledWith(
         'hashed_test@example.com'
       )
-      // One write for the user and its role, so neither exists without the
-      // other.
       expect(mockUserRepository.create).toHaveBeenCalledWith({
         username: 'testuser',
         passwordHash: null,
@@ -798,7 +796,6 @@ describe('AccountService', () => {
       expect(mockPasswordResetRepository.deleteByUserId).toHaveBeenCalledWith(
         mockPasswordResetToken.userId
       )
-      // Whoever held the old password holds nothing after a reset.
       expect(mockUserRepository.revokeSessionsAndTokens).toHaveBeenCalledWith(
         mockUser.id
       )
@@ -875,7 +872,6 @@ describe('AccountService', () => {
         true
       )
       vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
-      // The store lets one caller use a token; consume reports which one.
       vi.mocked(mockPasswordResetRepository.consume)
         .mockResolvedValueOnce(true)
         .mockResolvedValueOnce(false)

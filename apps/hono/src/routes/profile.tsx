@@ -118,7 +118,7 @@ profile.post('/', async c => {
           userId: user.id,
           currentPassword,
           newPassword,
-          currentSessionId: sessionManager.getSession()?.id,
+          keepSessionId: sessionManager.getSession()?.id,
         })
       } catch (error) {
         if (!(error instanceof InvalidCredentialsError)) attempt.release()

@@ -20,7 +20,6 @@ export interface User {
 // - status is omitted: new users always default to UserStatus.Unverified
 // - emailEncrypted is optional: sealing only happens when a public key is
 //   configured, so callers may omit it (defaults to null)
-// - roles are written with the user, so a user never exists without them
 export type CreateUserData = Omit<
   User,
   'id' | 'roles' | 'status' | 'emailEncrypted' | 'createdAt' | 'updatedAt'
@@ -32,8 +31,7 @@ export type UpdateUserData = Partial<
 
 /**
  * Whether an account may use the app at all: let in off the waitlist and
- * holding the User role. Sign-in admits exactly these accounts, and a signed-in
- * session that stops meeting this rule ends.
+ * holding the User role.
  */
 export function isAdmitted(user: User): boolean {
   return user.status === UserStatus.Active && user.roles.includes(Role.User)

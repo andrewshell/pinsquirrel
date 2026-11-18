@@ -50,14 +50,12 @@ const sessionCookieOptions = () => ({
 })
 
 // `__Host-` makes the browser refuse the cookie unless it is Secure, on
-// Path=/, and set without a Domain, so no sibling subdomain can plant one. It
-// cannot be set over plain http, which is why development keeps the old name.
+// Path=/, and set without a Domain, so no sibling subdomain can plant one.
+// Development omits Secure, so it keeps the old name.
 const sessionCookieName = () =>
   isProduction() ? '__Host-session' : LEGACY_COOKIE_NAME
 
-// The row is stored under the cookie value's SHA-256, so a read of the sessions
-// table yields nothing a browser could present.
-const sessionIdFor = (cookieValue: string) =>
+const hashSessionToken = (cookieValue: string) =>
   createHash('sha256').update(cookieValue).digest('hex')
 
 const persistentCookieOptions = (expiresAt: Date) => ({
@@ -137,8 +135,6 @@ export function sessionMiddleware(): MiddlewareHandler {
   return async (c, next) => {
     const cookieName = sessionCookieName()
     const current = getCookie(c, cookieName)
-    // A session issued before the cookie was renamed arrives under the old
-    // name once, and leaves under the new one.
     const legacy =
       current === undefined && cookieName !== LEGACY_COOKIE_NAME
         ? getCookie(c, LEGACY_COOKIE_NAME)
@@ -151,7 +147,7 @@ export function sessionMiddleware(): MiddlewareHandler {
     let sessionDestroyed = false
 
     if (cookieValue) {
-      const sessionId = sessionIdFor(cookieValue)
+      const sessionId = hashSessionToken(cookieValue)
       const isValid = await sessionRepository.isValidSession(sessionId)
       if (isValid) {
         session = await sessionRepository.findById(sessionId)
@@ -221,7 +217,7 @@ export function sessionMiddleware(): MiddlewareHandler {
 
         const token = randomBytes(32).toString('base64url')
         session = await sessionRepository.create({
-          id: sessionIdFor(token),
+          id: hashSessionToken(token),
           userId,
           data: newSessionData,
           expiresAt,
@@ -360,7 +356,6 @@ export function requireAuth(redirectTo = '/signin'): MiddlewareHandler {
       return redirectToSignin()
     }
 
-    // Access revoked after sign-in ends the session, not just this request.
     if (!isAdmitted(user)) {
       await sessionManager.destroy()
       return redirectToSignin()

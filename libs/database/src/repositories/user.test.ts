@@ -248,7 +248,6 @@ describe('DrizzleUserRepository - Integration Tests', () => {
           username,
           passwordHash: null,
           emailHash: null,
-          // Longer than the role column, so the second insert fails.
           roles: ['x'.repeat(300) as Role],
         })
       ).rejects.toThrow()

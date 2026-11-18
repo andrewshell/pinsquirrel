@@ -64,7 +64,6 @@ function formatHash(
   ].join('$')
 }
 
-// Stored as `scrypt$N$r$p$salt$key`, or the legacy `salt:key`.
 function parseHash(hash: string): ParsedHash | null {
   const parts = hash.split('$')
   if (parts[0] === 'scrypt' && parts.length === 6) {
@@ -121,7 +120,6 @@ export async function verifyPassword(
   }
 }
 
-/** True when a hash was made with weaker parameters than hashPassword uses now. */
 export function needsRehash(hash: string): boolean {
   const parsed = parseHash(hash)
   if (!parsed) return false

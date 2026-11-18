@@ -16,7 +16,6 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  // Sessions cascade from users.id.
   if (userId) await userRepository.delete(userId)
   await (db as unknown as { $client: { end(): Promise<void> } }).$client.end()
 })
@@ -37,7 +36,6 @@ function buildApp(): Hono {
   return app
 }
 
-/** Every Set-Cookie on a response, as name -> raw header. */
 function setCookies(res: Response): Map<string, string> {
   return new Map(
     res.headers.getSetCookie().map(header => [header.split('=')[0], header])
@@ -81,8 +79,6 @@ describe('session storage', () => {
 
   it('accepts a session from before ids were hashed and reissues it under __Host-session', async () => {
     process.env.NODE_ENV = 'production'
-    // What the migration leaves for a session made before it: the old cookie
-    // value was the row id, and the row id is now its SHA-256.
     const legacyValue = randomUUID()
     await sessionRepository.create({
       id: createHash('sha256').update(legacyValue).digest('hex'),

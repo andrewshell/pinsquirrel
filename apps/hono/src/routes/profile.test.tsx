@@ -251,7 +251,7 @@ describe('profile routes', () => {
 
       expect(svc.changePassword).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ currentSessionId: 'session-in-use' })
+        expect.objectContaining({ keepSessionId: 'session-in-use' })
       )
     })
 

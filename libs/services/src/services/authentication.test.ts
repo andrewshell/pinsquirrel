@@ -876,7 +876,7 @@ describe('AuthenticationService', () => {
         userId: '123',
         currentPassword: 'currentpass123',
         newPassword: 'newpass1234567',
-        currentSessionId: 'session-in-use',
+        keepSessionId: 'session-in-use',
       })
 
       expect(mockUserRepository.revokeSessionsAndTokens).toHaveBeenCalledWith(
