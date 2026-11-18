@@ -74,8 +74,11 @@ const TOO_MANY_REQUESTS =
   'Too many token requests. Please try again later.' as const
 
 // Revocation shares the per-IP budget: it is the same unauthenticated surface,
-// and a caller grinding it is doing so to find out which tokens exist.
-oauthToken.use('*', rateLimitByIp(oauthTokenIpLimiter, TOO_MANY_REQUESTS))
+// and a caller grinding it is doing so to find out which tokens exist. Named
+// routes, not '*': this app mounts at `/oauth` beside the consent screen.
+const tokenIpLimit = rateLimitByIp(oauthTokenIpLimiter, TOO_MANY_REQUESTS)
+oauthToken.use('/token', tokenIpLimit)
+oauthToken.use('/revoke', tokenIpLimit)
 oauthToken.use(
   '/token',
   rateLimitByClientId(oauthTokenClientLimiter, TOO_MANY_REQUESTS)

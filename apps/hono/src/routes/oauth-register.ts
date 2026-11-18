@@ -63,8 +63,10 @@ function clientInformation(client: OAuthClient) {
 
 const oauthRegister = new Hono()
 
+// Scoped to the route, not '*': this app mounts at `/oauth` beside the
+// consent screen, and a wildcard would count every page under that prefix.
 oauthRegister.use(
-  '*',
+  '/register',
   rateLimitByIp(
     oauthRegisterLimiter,
     'Too many client registrations. Please try again later.'
