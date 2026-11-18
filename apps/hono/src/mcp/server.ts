@@ -31,11 +31,9 @@ function getUserFromExtra(extra: {
  * request (see `routes/mcp.ts`): a server shared across callers is a session
  * shared across callers, and this process serves every client at once.
  *
- * Every tool calls `requireScope(extra, …)` from `./scopes.js` before it
- * touches a service (Decision 39): a read needs the read scope the consent
- * screen listed, a write its write scope. The check is inside the `try`, so
- * the refusal travels back through `mapDomainErrorToMcp` as a tool error the
- * model can act on rather than as a transport failure it will retry.
+ * `requireScope` runs inside each tool's `try`, so the refusal travels back
+ * through `mapDomainErrorToMcp` as a tool error the model can act on rather
+ * than as a transport failure it will retry.
  *
  * Every tool is a public-pins-only surface, reads and writes alike:
  * `pinFilterFromInput` forces `isPrivate: false`, `get_pin` goes through

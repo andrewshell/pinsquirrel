@@ -65,13 +65,7 @@ export type AuthorizationRequestParams = z.infer<
   typeof authorizationRequestSchema
 >
 
-/**
- * The part of an authorization request that says where to send the answer.
- *
- * Parsed on its own and first: until these check out there is nowhere to send
- * an error, so a failure here is shown to the user, and every failure after
- * them is redirected to the client (RFC 6749 4.1.2.1).
- */
+/** The part of an authorization request that says where to send the answer. */
 export const authorizationRedirectSchema = authorizationRequestSchema.pick({
   client_id: true,
   redirect_uri: true,

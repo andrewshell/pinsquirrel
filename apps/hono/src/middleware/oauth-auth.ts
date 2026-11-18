@@ -116,11 +116,6 @@ export function oauthAuth(
 /**
  * Require one granted scope on the route behind it.
  *
- * Applied per route and never globally (Decisions 20 and 39): the check
- * belongs to the operation, so each read asks for its read scope and a write
- * for its write scope. Mounted globally it would lock every route behind one
- * scope.
- *
  * 403 rather than 401, because the token is valid and re-presenting or
  * refreshing it changes nothing. What the client has to do is send the user
  * back through `/oauth/authorize` naming the wider scope, and the

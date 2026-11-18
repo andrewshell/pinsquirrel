@@ -28,7 +28,7 @@ const apiV1 = new OpenAPIHono()
 // --- OpenAPI route specs (for spec generation only) -------------------------
 
 // One credential form: an OAuth access token in `Authorization: Bearer`
-// (Decision 10), carrying the read scope the route checks (Decision 39).
+// (Decision 10).
 function security(scope: string): Record<string, string[]>[] {
   return [{ bearerAuth: [scope] }]
 }

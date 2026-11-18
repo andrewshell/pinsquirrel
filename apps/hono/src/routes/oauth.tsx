@@ -76,8 +76,7 @@ function redirectHost(redirectUri: string): string {
  * The service throws only what fails before the redirect URI is established
  * as this client's, so there is no address that has been shown to belong to
  * the client. Redirecting an error to an unvalidated URI is how an open
- * redirector gets built. Everything later comes back as an outcome for
- * `redirectToClient`.
+ * redirector gets built.
  */
 function renderRequestError(
   c: Context,
@@ -110,10 +109,6 @@ function renderRequestError(
   throw error
 }
 
-/**
- * Send the answer to the client's validated redirect URI: the code, or an
- * RFC 6749 4.1.2.1 error.
- */
 function redirectToClient(c: Context, outcome: AuthorizationOutcome) {
   const location = new URL(outcome.redirectUri)
   if (outcome.status === 'approved') {
@@ -147,8 +142,7 @@ const oauth = new Hono()
  * exactly this URL - so it has to stay stable.
  *
  * The page only tells the person what happened. The code is the extension's
- * to spend and is never read here, and `error_description` is not shown:
- * anybody can write this URL, and the page speaks with the site's voice.
+ * to spend and is never read here.
  */
 oauth.get('/extension/callback', async c => {
   const sessionManager = getSessionManager(c)

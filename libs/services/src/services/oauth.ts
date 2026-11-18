@@ -28,7 +28,7 @@ import {
 } from '@pinsquirrel/domain'
 import { generateSecureToken, hashToken } from '../utils/crypto.js'
 import {
-  canonicalizeRedirectUri,
+  redirectUriDedupKey,
   normalizeOAuthUri,
   redirectUriMatches,
 } from '../validation/oauth-uri.js'
@@ -171,7 +171,6 @@ export interface ResolvedAuthorizationRequest {
  */
 export interface AuthorizationErrorRedirect {
   status: 'error'
-  /** The RFC 6749 error code. */
   error: string
   errorDescription: string
   redirectUri: string
@@ -180,7 +179,6 @@ export interface AuthorizationErrorRedirect {
   issuer: string
 }
 
-/** What a request resolves to once it is known where to send the answer. */
 export type AuthorizationRequestResolution =
   ResolvedAuthorizationRequest | AuthorizationErrorRedirect
 
@@ -281,7 +279,6 @@ export class OAuthService {
     }
   }
 
-  /** The checks that run once the client and its redirect URI check out. */
   private checkAuthorizationRequest(
     client: OAuthClient,
     params: unknown
@@ -1187,8 +1184,6 @@ function grantedScopes(scope: string | undefined): string[] {
     return [...DEFAULT_SCOPES]
   }
 
-  // The count and never the scopes themselves: the request is the client's
-  // text, and this message is shown under this server's name.
   const unknown = requested.filter(one => !SUPPORTED_SCOPES.includes(one))
   if (unknown.length > 0) {
     const noun = unknown.length === 1 ? 'scope' : 'scopes'
@@ -1279,7 +1274,7 @@ function dcrClientId(metadata: {
   const key = JSON.stringify({
     clientName: metadata.clientName,
     redirectUris: metadata.redirectUris
-      .map(uri => canonicalizeRedirectUri(uri))
+      .map(uri => redirectUriDedupKey(uri))
       .sort(),
     grantTypes: [...metadata.grantTypes].sort(),
     authMethod: metadata.authMethod,

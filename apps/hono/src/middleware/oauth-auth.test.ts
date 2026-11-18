@@ -206,8 +206,6 @@ describe('requireScope', () => {
     )
   })
 
-  // The check sits on the operation and not on the resource (Decision 20), so
-  // a route without the guard is not affected by it.
   it('leaves an unguarded route alone', async () => {
     withScopes(['pins:read'])
     const app = new Hono()

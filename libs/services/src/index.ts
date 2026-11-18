@@ -64,7 +64,7 @@ export {
 
 // OAuth URI rules (shared by the service layer and the app's metadata routes)
 export {
-  canonicalizeRedirectUri,
+  redirectUriDedupKey,
   isLoopbackRedirectHost,
   normalizeOAuthUri,
   protectedResourceMetadataPath,

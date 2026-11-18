@@ -534,8 +534,6 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
     expect(resolved.state).toBe('opaque-state')
   })
 
-  // RFC 6749 4.1.2.1: once the redirect URI is known to be the client's, the
-  // client is told, rather than the user being left on an error page.
   function redirectedError(error: string) {
     return {
       status: 'error',

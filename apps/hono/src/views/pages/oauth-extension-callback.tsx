@@ -17,16 +17,11 @@ import { Card, CardHeader, CardTitle, CardContent } from '@pinsquirrel/ui'
 
 interface OAuthExtensionCallbackPageProps {
   user: User | null
-  /** The `error` query parameter, if the authorization failed. */
   error?: string
   embed?: boolean
 }
 
-/**
- * What each RFC 6749 4.1.2.1 code (and RFC 8707's `invalid_target`) means to
- * the person connecting. The page shows only these: its URL is anybody's to
- * write, so text from the query string would be a message in the site's name.
- */
+/** The RFC 6749 4.1.2.1 error codes, plus RFC 8707's `invalid_target`. */
 const ERROR_MESSAGES = new Map<string, string>([
   [
     'access_denied',

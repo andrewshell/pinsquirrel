@@ -182,8 +182,6 @@ describe('oauth authorize routes', () => {
       expect(body).toContain('access_denied')
     })
 
-    // The query string is anybody's to write, and this page speaks with the
-    // site's voice: only messages the site wrote may appear on it.
     it('does not render the error_description from the query string', async () => {
       const res = await app.request(
         `/oauth/extension/callback?${new URLSearchParams({
@@ -275,13 +273,10 @@ describe('oauth authorize routes', () => {
       )
     })
 
-    // The hidden fields repeat client_id; only what a person reads counts.
     function visible(html: string): string {
       return html.replace(/<input[^>]*>/g, '')
     }
 
-    // A CIMD client's name is its own claim; the host serving its document is
-    // the one fact this server checked.
     it('names the host that published a CIMD client', async () => {
       mockResolveAuthorizationRequest.mockResolvedValue({
         ...RESOLVED,

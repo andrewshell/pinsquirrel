@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  canonicalizeRedirectUri,
+  redirectUriDedupKey,
   isLoopbackRedirectHost,
   normalizeOAuthUri,
   protectedResourceMetadataPath,
@@ -114,29 +114,29 @@ describe('isLoopbackRedirectHost', () => {
   })
 })
 
-describe('canonicalizeRedirectUri', () => {
+describe('redirectUriDedupKey', () => {
   // RFC 8252 7.3: a native client listens on an ephemeral port it cannot know
   // at registration time, so the port is not part of its identity.
   it('drops the port for loopback hosts', () => {
-    expect(canonicalizeRedirectUri('http://localhost:54321/callback')).toBe(
+    expect(redirectUriDedupKey('http://localhost:54321/callback')).toBe(
       'http://localhost/callback'
     )
-    expect(canonicalizeRedirectUri('http://127.0.0.1:8912/callback')).toBe(
+    expect(redirectUriDedupKey('http://127.0.0.1:8912/callback')).toBe(
       'http://127.0.0.1/callback'
     )
-    expect(canonicalizeRedirectUri('http://[::1]:8912/callback')).toBe(
+    expect(redirectUriDedupKey('http://[::1]:8912/callback')).toBe(
       'http://[::1]/callback'
     )
   })
 
   it('keeps the port for every other host', () => {
-    expect(canonicalizeRedirectUri('https://claude.ai:8443/cb')).toBe(
+    expect(redirectUriDedupKey('https://claude.ai:8443/cb')).toBe(
       'https://claude.ai:8443/cb'
     )
   })
 
   it('normalizes scheme, host case and trailing slash like any OAuth URI', () => {
-    expect(canonicalizeRedirectUri('HTTPS://Claude.AI/api/mcp/cb/')).toBe(
+    expect(redirectUriDedupKey('HTTPS://Claude.AI/api/mcp/cb/')).toBe(
       'https://claude.ai/api/mcp/cb'
     )
   })
@@ -198,8 +198,7 @@ describe('redirectUriMatches', () => {
     ).toBe(false)
   })
 
-  // RFC 9700 4.1.3: simple string comparison. Every variant here names the
-  // same resource after normalisation, and none of them is what was registered.
+  // RFC 9700 4.1.3: simple string comparison.
   it.each([
     ['https://client.example/cb/', 'trailing slash'],
     ['https://u@client.example/cb', 'userinfo'],

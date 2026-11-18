@@ -51,9 +51,8 @@ const SCOPE_DESCRIPTIONS: Record<string, string> = {
 }
 
 /**
- * The client's name as the page shows it: the registrant's own text, without
- * the invisible format characters (Unicode Cf) that can reorder or hide part
- * of it, and the identifier instead when nothing visible is left.
+ * Unicode format characters (Cf), such as bidi overrides and zero-width
+ * characters, can reorder or hide part of the registrant's text.
  */
 function displayName(client: OAuthConsentPageProps['client']): string {
   const name = client.clientName?.replace(/\p{Cf}/gu, '').trim()
@@ -61,10 +60,8 @@ function displayName(client: OAuthConsentPageProps['client']): string {
 }
 
 /**
- * Who stands behind the name. A CIMD client is identified by a URL this server
- * fetched its metadata from, so its host is checked even though its name is
- * not. A DCR name is whatever was posted. A static client was registered by
- * the operator, which needs no caveat.
+ * A CIMD client is identified by a URL this server fetched its metadata from,
+ * so its host is checked even though its name is not.
  */
 function provenance(client: OAuthConsentPageProps['client']): string | null {
   if (client.registrationType === 'cimd') {

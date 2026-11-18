@@ -141,7 +141,6 @@ function authorizationQuery(input: {
   }
 }
 
-/** Check an error was sent to the client's callback, and return where it went. */
 function expectRedirectedError(
   res: Response,
   query: Record<string, string>,
@@ -638,18 +637,12 @@ describe('consent screen identity', () => {
     )
 
     expect(res.status).toBe(200)
-    // The hidden fields repeat client_id; only what a person reads counts.
     const page = (await res.text()).replace(/<input[^>]*>/g, '')
     expect(page).toContain(`Authorize ${unnamed}`)
     expect(page).toContain('not verified')
   })
 })
 
-/**
- * RFC 6749 4.1.2.1: once the client and its redirect URI check out, a failure
- * is the client's to hear about, at that redirect URI. Before that there is
- * nowhere trustworthy to send it, so the person in the browser sees a page.
- */
 describe('authorization errors', () => {
   function getAuthorize(query: Record<string, string>): Promise<Response> {
     return browserRequest(
@@ -724,11 +717,6 @@ describe('authorization errors', () => {
   })
 })
 
-/**
- * The read scopes mean what the consent screen says (Decision 20, as revised
- * by Decision 39). A grant without `pins:read` is not "Read your bookmarks",
- * so it cannot list them, on either resource.
- */
 describe('read scopes', () => {
   async function callTool(
     token: string,

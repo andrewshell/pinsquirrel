@@ -5,9 +5,6 @@
  * authorization request and the audience stored on a token all have to compare
  * as the same string, so they all pass through one normalization here rather
  * than each caller deciding what a trailing slash means.
- *
- * Redirect URIs are the exception: they are compared as strings
- * (`redirectUriMatches`), and canonicalized only for the DCR dedup key.
  */
 
 const WELL_KNOWN_PROTECTED_RESOURCE = '/.well-known/oauth-protected-resource'
@@ -79,10 +76,9 @@ export function isLoopbackRedirectHost(hostname: string): boolean {
  * host is loopback. Claude Code registers a fresh ephemeral port on every
  * connection (RFC 8252 7.3), so byte-equal metadata comparison would store one
  * client row per connection, which is the exact thing dedup exists to
- * prevent. Every other host keeps its port. This is a dedup key only; a
- * request's `redirect_uri` is compared by `redirectUriMatches`.
+ * prevent.
  */
-export function canonicalizeRedirectUri(uri: string): string {
+export function redirectUriDedupKey(uri: string): string {
   const normalized = normalizeOAuthUri(uri)
   const url = new URL(normalized)
   if (!url.port || !isLoopbackRedirectHost(url.hostname)) {
@@ -95,14 +91,6 @@ export function canonicalizeRedirectUri(uri: string): string {
   return `${url.protocol}//${url.host}${path}${url.search}`
 }
 
-/**
- * The scheme and host of a loopback redirect, and its port if it has one.
- *
- * Matched on the raw string: `localhost`, `127.x.x.x` or `[::1]`, written
- * exactly so, straight after `http://`. A userinfo part, an upper-case host or
- * anything else `URL` parsing would tidy away is not a loopback authority here
- * and so gets no port allowance.
- */
 const LOOPBACK_AUTHORITY =
   /^(http:\/\/(?:localhost|127\.\d{1,3}\.\d{1,3}\.\d{1,3}|\[::1\]))(?::\d{1,5})?(?=[/?]|$)/
 
