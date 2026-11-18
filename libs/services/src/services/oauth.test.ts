@@ -696,6 +696,17 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
   })
 
   // RFC 6749 3.1: a parameter may be sent once.
+  it.each([[['code', 'code']], [['token', 'token']], [['code', 'token']]])(
+    'redirects a repeated response type %j as invalid_request',
+    async responseType => {
+      await expect(
+        ctx.service.resolveAuthorizationRequest(
+          authorizeParams({ response_type: responseType })
+        )
+      ).resolves.toMatchObject(redirectedError('invalid_request'))
+    }
+  )
+
   it('refuses a repeated redirect_uri outright, since neither can be trusted', async () => {
     await expect(
       ctx.service.resolveAuthorizationRequest(
