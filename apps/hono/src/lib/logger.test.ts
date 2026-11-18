@@ -13,7 +13,6 @@ class QueryError extends Error {
   }
 }
 
-/** What mysql2 rejects with: the server's message, code and number. */
 function mysqlError(code: string, errno: number, message: string): Error {
   return Object.assign(new Error(message), { code, errno })
 }
@@ -64,8 +63,6 @@ describe('safeError', () => {
     expect(JSON.stringify(logged)).not.toContain('alice')
   })
 
-  // Logged under `err`, it passes through pino's error serializer, which
-  // folds an error-shaped cause into the message and drops its fields.
   it('keeps the MySQL error code through the logger error serializer', () => {
     const serialized = pino.stdSerializers.err(
       safeError(deadlock()) as unknown as Error
@@ -79,8 +76,6 @@ describe('safeError', () => {
     })
   })
 
-  // MySQL repeats the offending value in some messages, which is the same
-  // data the bound parameters are cut for.
   it.each([
     [
       'ER_DUP_ENTRY',

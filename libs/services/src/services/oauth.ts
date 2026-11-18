@@ -264,8 +264,6 @@ export class OAuthService {
         'redirect_uri does not match a URI this client registered'
       )
     }
-    // A client stored before the redirect URI rules existed can still hold
-    // one that breaks them, and the request matched it exactly.
     if (!isUsableRedirectUri(redirectUri)) {
       throw new OAuthInvalidRequestError(
         'redirect_uri must be https, or http on loopback, with no fragment or userinfo'

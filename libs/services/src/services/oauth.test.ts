@@ -626,8 +626,6 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
     }
   )
 
-  // A row stored before the redirect URI rules existed still holds what it
-  // registered, and the request matches it exactly.
   it.each([
     ['a fragment', 'https://client.example/cb#frag'],
     ['userinfo', 'https://u@client.example/cb'],
@@ -673,8 +671,6 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
     expect(resolved.redirectUri).toBe('https://client.example/cb')
   })
 
-  // RFC 6749 4.1.2.1: a response type this server does not issue is its own
-  // error, distinct from a request that names none.
   it('redirects a response type other than code as unsupported_response_type', async () => {
     await expect(
       ctx.service.resolveAuthorizationRequest(

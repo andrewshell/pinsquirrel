@@ -180,8 +180,8 @@ export function isUsableRedirectUri(uri: string): boolean {
 }
 
 /**
- * An `@` in the authority, read from the string because `URL` reports an
- * empty userinfo (`http://@host/`) the same as none.
+ * Read from the string because `URL` reports an empty userinfo
+ * (`http://@host/`) the same as none.
  */
 function hasUserinfo(uri: string): boolean {
   return /^[^:]*:[/\\]*[^/\\?#]*@/.test(uri)

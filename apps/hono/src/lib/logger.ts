@@ -23,19 +23,14 @@ export const logger = pino({
 interface LoggedError {
   message: string
   stack?: string
-  /** The driver's code and number, such as mysql2's `ER_LOCK_DEADLOCK` and 1213. */
   code?: string
   errno?: number
-  /** The messages of the errors behind this one, outermost first. */
   cause?: string
 }
 
 const MAX_CAUSE_DEPTH = 3
 
 /**
- * An error in a form fit to log, with what caused it, which for a failed
- * query is the MySQL error that says why.
- *
  * Drizzle appends a failed query's bound values to its message (usernames,
  * email hashes), so that tail is cut from the message and from the stack that
  * repeats it. MySQL repeats the offending value in a duplicate-key or

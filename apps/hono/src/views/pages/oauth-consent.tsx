@@ -91,7 +91,6 @@ export const OAuthConsentPage: FC<OAuthConsentPageProps> = ({
   >
     <Card>
       <CardHeader>
-        {/* A client with no name shows its identifier, one long unbroken word. */}
         <CardTitle class="wrap-anywhere">
           Authorize {displayName(client)}
         </CardTitle>
