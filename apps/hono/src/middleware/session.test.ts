@@ -31,7 +31,41 @@ const mockFindById = vi.fn()
 const mockCreate = vi.fn()
 const mockUpdate = vi.fn()
 const mockDelete = vi.fn()
+const mockPatchData = vi.fn()
 const mockFindUserById = vi.fn()
+
+/**
+ * A session row that the fake repository reads and writes, so a test can
+ * assert what ends up stored whichever write method the middleware uses.
+ */
+function storedSession(data: Record<string, unknown>) {
+  const row = {
+    id: 'session-123',
+    userId: 'user-456',
+    data,
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    createdAt: new Date(),
+  }
+  mockIsValidSession.mockResolvedValue(true)
+  mockFindById.mockImplementation(() =>
+    Promise.resolve({ ...row, data: { ...row.data } })
+  )
+  mockUpdate.mockImplementation(
+    (_id: string, update: { data?: Record<string, unknown> }) => {
+      if (update.data) row.data = { ...update.data }
+      return Promise.resolve(row)
+    }
+  )
+  mockPatchData.mockImplementation(
+    (_id: string, patch: { set: Record<string, unknown>; unset: string[] }) => {
+      const next: Record<string, unknown> = { ...row.data, ...patch.set }
+      for (const key of patch.unset) delete next[key]
+      row.data = next
+      return Promise.resolve()
+    }
+  )
+  return row
+}
 
 // Mock the database module
 vi.mock('../lib/db', () => ({
@@ -46,6 +80,8 @@ vi.mock('../lib/db', () => ({
       mockUpdate(...args) as Promise<unknown>,
     delete: (...args: unknown[]): Promise<boolean> =>
       mockDelete(...args) as Promise<boolean>,
+    patchData: (...args: unknown[]): Promise<void> =>
+      mockPatchData(...args) as Promise<void>,
   },
   userRepository: {
     findById: (...args: unknown[]): Promise<unknown> =>
@@ -305,6 +341,7 @@ describe('Session Middleware', () => {
     })
 
     it('sets flash message', async () => {
+      const row = storedSession({ userId: 'user-456', keepSignedIn: true })
       app.post('/action', c => {
         const manager = getSessionManager(c)
         manager.setFlash('success', 'Action completed!')
@@ -318,23 +355,18 @@ describe('Session Middleware', () => {
         },
       })
 
-      expect(mockUpdate).toHaveBeenCalledWith('session-123', {
-        data: expect.objectContaining({
-          flash: { type: 'success', message: 'Action completed!' },
-        }),
+      expect(row.data.flash).toEqual({
+        type: 'success',
+        message: 'Action completed!',
       })
     })
 
     it('gets and clears flash message', async () => {
-      const sessionWithFlash = {
-        ...mockSession,
-        data: {
-          userId: 'user-456',
-          keepSignedIn: true,
-          flash: { type: 'success' as const, message: 'Welcome back!' },
-        },
-      }
-      mockFindById.mockResolvedValue(sessionWithFlash)
+      const row = storedSession({
+        userId: 'user-456',
+        keepSignedIn: true,
+        flash: { type: 'success', message: 'Welcome back!' },
+      })
 
       app.get('/page', c => {
         const manager = getSessionManager(c)
@@ -354,12 +386,7 @@ describe('Session Middleware', () => {
         message: 'Welcome back!',
       })
 
-      // Flash should be cleared from session
-      expect(mockUpdate).toHaveBeenCalledWith('session-123', {
-        data: expect.objectContaining({
-          flash: undefined,
-        }),
-      })
+      expect(row.data).not.toHaveProperty('flash')
     })
   })
 })
@@ -611,6 +638,7 @@ describe('Private Mode', () => {
   })
 
   it('should unlock private mode and persist to session', async () => {
+    const row = storedSession({ userId: 'user-456', keepSignedIn: true })
     app.post('/unlock', c => {
       const manager = getSessionManager(c)
       manager.unlockPrivateMode()
@@ -626,26 +654,15 @@ describe('Private Mode', () => {
     const json = await res.json()
 
     expect(json.isPrivateUnlocked).toBe(true)
-    expect(mockUpdate).toHaveBeenCalledWith(
-      'session-123',
-      expect.objectContaining({
-        data: expect.objectContaining({
-          privateUnlockedAt: expect.any(Number),
-        }),
-      })
-    )
+    expect(row.data.privateUnlockedAt).toEqual(expect.any(Number))
   })
 
   it('should lock private mode and clear the timestamp', async () => {
-    const sessionWithPrivate = {
-      ...mockSession,
-      data: {
-        userId: 'user-456',
-        keepSignedIn: true,
-        privateUnlockedAt: Date.now(),
-      },
-    }
-    mockFindById.mockResolvedValue(sessionWithPrivate)
+    const row = storedSession({
+      userId: 'user-456',
+      keepSignedIn: true,
+      privateUnlockedAt: Date.now(),
+    })
 
     app.post('/lock', c => {
       const manager = getSessionManager(c)
@@ -662,14 +679,43 @@ describe('Private Mode', () => {
     const json = await res.json()
 
     expect(json.isPrivateUnlocked).toBe(false)
-    expect(mockUpdate).toHaveBeenCalledWith(
-      'session-123',
-      expect.objectContaining({
-        data: expect.objectContaining({
-          privateUnlockedAt: undefined,
-        }),
-      })
-    )
+    expect(row.data).not.toHaveProperty('privateUnlockedAt')
+  })
+
+  // A save in one tab and a lock (or the tab-close beacon) in another overlap
+  // on one session. The save started while private mode was unlocked; it must
+  // not write that back over the lock.
+  it('keeps a lock made while another request on the session was in flight', async () => {
+    const row = storedSession({
+      userId: 'user-456',
+      keepSignedIn: true,
+      privateUnlockedAt: Date.now(),
+    })
+    let saveLoaded!: () => void
+    const loaded = new Promise<void>(resolve => (saveLoaded = resolve))
+    let finishSave!: () => void
+    const saving = new Promise<void>(resolve => (finishSave = resolve))
+
+    app.post('/save', async c => {
+      getSessionManager(c).setFlash('success', 'Pin saved')
+      saveLoaded()
+      await saving
+      return c.text('ok')
+    })
+    app.post('/lock', c => {
+      getSessionManager(c).lockPrivateMode()
+      return c.text('ok')
+    })
+    const cookie = { headers: { Cookie: '__session=session-123' } }
+
+    const save = app.request('/save', { method: 'POST', ...cookie })
+    await loaded
+    await app.request('/lock', { method: 'POST', ...cookie })
+    finishSave()
+    await save
+
+    expect(row.data).not.toHaveProperty('privateUnlockedAt')
+    expect(row.data.flash).toEqual({ type: 'success', message: 'Pin saved' })
   })
 
   it('should report expired private mode as locked after 15 minutes', async () => {

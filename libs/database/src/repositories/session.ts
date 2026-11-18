@@ -2,9 +2,10 @@ import type {
   Session,
   CreateSessionData,
   UpdateSessionData,
+  SessionDataPatch,
   SessionRepository,
 } from '@pinsquirrel/domain'
-import { eq, lt } from 'drizzle-orm'
+import { eq, lt, sql } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { sessions } from '../schema/sessions'
 
@@ -71,6 +72,24 @@ export class DrizzleSessionRepository implements SessionRepository {
       .limit(1)
 
     return updated || null
+  }
+
+  async patchData(id: string, patch: SessionDataPatch): Promise<void> {
+    const path = (key: string) => `$.${JSON.stringify(key)}`
+    let data = sql`COALESCE(${sessions.data}, JSON_OBJECT())`
+    const entries = Object.entries(patch.set)
+    if (entries.length > 0) {
+      const pairs = entries.map(
+        ([key, value]) =>
+          sql`${path(key)}, CAST(${JSON.stringify(value)} AS JSON)`
+      )
+      data = sql`JSON_SET(${data}, ${sql.join(pairs, sql`, `)})`
+    }
+    if (patch.unset.length > 0) {
+      const paths = patch.unset.map(key => sql`${path(key)}`)
+      data = sql`JSON_REMOVE(${data}, ${sql.join(paths, sql`, `)})`
+    }
+    await this.db.update(sessions).set({ data }).where(eq(sessions.id, id))
   }
 
   async delete(id: string): Promise<boolean> {

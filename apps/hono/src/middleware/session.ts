@@ -26,7 +26,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import type { Context, MiddlewareHandler } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import { isAdmitted } from '@pinsquirrel/domain'
-import type { Session, User } from '@pinsquirrel/domain'
+import type { Session, SessionDataPatch, User } from '@pinsquirrel/domain'
 import { sessionRepository, userRepository } from '../lib/db'
 import { isEmbedRequest, withEmbed } from '../lib/embed'
 
@@ -152,8 +152,8 @@ export function sessionMiddleware(): MiddlewareHandler {
     const cookieValue = current ?? legacy
     let session: Session | null = null
     let sessionData: SessionData | null = null
+    const changes = new Map<'flash' | 'privateUnlockedAt', unknown>()
     let pendingFlash: { type: FlashType; message: string } | null = null
-    let sessionModified = false
     let sessionDestroyed = false
 
     if (cookieValue) {
@@ -256,31 +256,28 @@ export function sessionMiddleware(): MiddlewareHandler {
 
       setFlash(type: FlashType, message: string) {
         pendingFlash = { type, message }
-        sessionModified = true
       },
 
       getFlash() {
         if (!sessionData?.flash) return null
         const flash = sessionData.flash
-        // Mark for removal after reading
-        if (sessionData) {
-          sessionData = { ...sessionData, flash: undefined }
-          sessionModified = true
-        }
+        sessionData = { ...sessionData, flash: undefined }
+        changes.set('flash', undefined)
         return flash
       },
 
       unlockPrivateMode() {
         if (sessionData) {
-          sessionData = { ...sessionData, privateUnlockedAt: Date.now() }
-          sessionModified = true
+          const privateUnlockedAt = Date.now()
+          sessionData = { ...sessionData, privateUnlockedAt }
+          changes.set('privateUnlockedAt', privateUnlockedAt)
         }
       },
 
       lockPrivateMode() {
         if (sessionData) {
           sessionData = { ...sessionData, privateUnlockedAt: undefined }
-          sessionModified = true
+          changes.set('privateUnlockedAt', undefined)
         }
       },
 
@@ -305,16 +302,14 @@ export function sessionMiddleware(): MiddlewareHandler {
       return
     }
 
-    // If there's a pending flash or session was modified, update the database
-    if (session && (sessionModified || pendingFlash)) {
-      const updatedData: SessionData = {
-        ...sessionData!,
-        ...(pendingFlash ? { flash: pendingFlash } : {}),
+    if (pendingFlash) changes.set('flash', pendingFlash)
+    if (session && changes.size > 0) {
+      const patch: SessionDataPatch = { set: {}, unset: [] }
+      for (const [key, value] of changes) {
+        if (value === undefined) patch.unset.push(key)
+        else patch.set[key] = value
       }
-
-      await sessionRepository.update(session.id, {
-        data: updatedData,
-      })
+      await sessionRepository.patchData(session.id, patch)
     }
   }
 }
