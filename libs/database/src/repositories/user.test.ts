@@ -12,6 +12,7 @@ import type { MySql2Database } from 'drizzle-orm/mysql2'
 import mysql from 'mysql2/promise'
 import type { Pool } from 'mysql2/promise'
 import { insertUser } from '../test-fixtures.js'
+import { DrizzleOAuthAuthorizationCodeRepository } from './oauth-authorization-code.js'
 import { DrizzleOAuthClientRepository } from './oauth-client.js'
 import { DrizzleOAuthTokenRepository } from './oauth-token.js'
 import { DrizzleSessionRepository } from './session.js'
@@ -647,6 +648,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
         tokenEndpointAuthMethod: 'none',
         registrationType: 'dcr',
       })
+      const codes = new DrizzleOAuthAuthorizationCodeRepository(testDb)
       const makeSession = () =>
         sessions.create({ id: crypto.randomUUID(), userId, expiresAt: later() })
       const makeToken = (kind: 'access' | 'refresh') =>
@@ -659,9 +661,21 @@ describe('DrizzleUserRepository - Integration Tests', () => {
           resource: 'https://example.test/mcp',
           expiresAt: later(),
         })
+      const code = await codes.create({
+        codeHash: crypto.randomUUID().replace(/-/g, '').repeat(2),
+        clientId: client.clientId,
+        userId,
+        redirectUri: 'https://example.test/cb',
+        codeChallenge: 'challenge',
+        scopes: ['pins:read'],
+        resource: 'https://example.test/mcp',
+        expiresAt: later(),
+      })
       return {
         sessions,
         tokens,
+        codes,
+        code,
         kept: await makeSession(),
         other: await makeSession(),
         access: await makeToken('access'),
@@ -670,6 +684,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
     }
 
     beforeEach(async () => {
+      await testPool.query('DELETE FROM oauth_authorization_codes')
       await testPool.query('DELETE FROM oauth_tokens')
       await testPool.query('DELETE FROM oauth_clients')
     })
@@ -682,6 +697,15 @@ describe('DrizzleUserRepository - Integration Tests', () => {
 
       expect(await sessions.findByUserId(userId)).toEqual([])
       expect(await tokens.findActiveByUserId(userId)).toEqual([])
+    })
+
+    it('leaves no unused authorization code to exchange', async () => {
+      const { id: userId } = await insertUser(testPool)
+      const { codes, code } = await seed(userId)
+
+      await repository.revokeSessionsAndTokens(userId)
+
+      expect(await codes.consume(code.codeHash)).toBeNull()
     })
 
     it('keeps the one session it is told to keep', async () => {
@@ -710,6 +734,9 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       expect(
         await bystander.tokens.findActiveByUserId(bystanderId)
       ).toHaveLength(2)
+      expect(
+        await bystander.codes.consume(bystander.code.codeHash)
+      ).not.toBeNull()
     })
   })
 })

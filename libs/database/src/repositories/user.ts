@@ -12,6 +12,7 @@ import { users } from '../schema/users.js'
 import { userRoles } from '../schema/user-roles.js'
 import { sessions } from '../schema/sessions.js'
 import { oauthTokens } from '../schema/oauth-tokens.js'
+import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes.js'
 import { isDuplicateKeyError } from './duplicate-key.js'
 
 /**
@@ -261,6 +262,14 @@ export class DrizzleUserRepository implements UserRepository {
         .set({ revokedAt: new Date() })
         .where(
           and(eq(oauthTokens.userId, userId), isNull(oauthTokens.revokedAt))
+        )
+      await tx
+        .delete(oauthAuthorizationCodes)
+        .where(
+          and(
+            eq(oauthAuthorizationCodes.userId, userId),
+            isNull(oauthAuthorizationCodes.consumedAt)
+          )
         )
     })
   }
