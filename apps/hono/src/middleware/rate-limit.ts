@@ -96,9 +96,21 @@ export function getClientIp(c: Context): string {
 export function clientAddressKey(c: Context): string {
   const address = getClientIp(c)
   if (isIP(address) !== 6) return address
+  try {
+    return ipv6Key(address)
+  } catch {
+    // A key the limiter cannot canonicalise still has to count, never 500.
+    return address
+  }
+}
+
+function ipv6Key(address: string): string {
+  // Zone ids (`fe80::1%eth0`) name a local interface, not a different peer,
+  // and the URL parser rejects them.
+  const bare = address.split('%')[0]
   // The URL parser rewrites every spelling into one compressed hex form, so
   // `::ffff:1.2.3.4` and `::ffff:102:304` arrive here identical.
-  const canonical = new URL(`http://[${address}]`).hostname.slice(1, -1)
+  const canonical = new URL(`http://[${bare}]`).hostname.slice(1, -1)
   if (canonical === '::1' || canonical === '::') return canonical
   const mapped = /^::ffff:([\da-f]{1,4}):([\da-f]{1,4})$/.exec(canonical)
   if (mapped) {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { Hono } from 'hono'
 import { RateLimiter } from './rate-limiter'
 import {
@@ -316,6 +316,11 @@ describe('signinRateLimitKey', () => {
     ['::', '::'],
     ['2001:db8:1:2:3:4:5:6', '2001:db8:1:2::/64'],
     ['2001:db8::ffff:102:304', '2001:db8:0:0::/64'],
+    ['fe80::1%eth0', 'fe80:0:0:0::/64'],
+    ['fe80::1%25eth0', 'fe80:0:0:0::/64'],
+    ['2001:db8:1:2::%x', '2001:db8:1:2::/64'],
+    ['::ffff:1.2.3.4%x', '1.2.3.4'],
+    ['::1%lo', '::1'],
   ])('keys %s as %s', async (address, expected) => {
     const app = new Hono()
     let key = ''
@@ -327,6 +332,36 @@ describe('signinRateLimitKey', () => {
     await app.request('/test', undefined, from(address))
 
     expect(key).toBe(expected)
+  })
+
+  it('falls back to the raw address when canonicalisation fails', async () => {
+    const RealURL = URL
+    vi.stubGlobal(
+      'URL',
+      class extends RealURL {
+        constructor(input: string | URL, base?: string | URL) {
+          if (String(input).startsWith('http://[')) {
+            throw new TypeError('Invalid URL')
+          }
+          super(input, base)
+        }
+      }
+    )
+    try {
+      const app = new Hono()
+      let key = ''
+      app.get('/test', c => {
+        key = clientAddressKey(c)
+        return c.text('ok')
+      })
+
+      const res = await app.request('/test', undefined, from('2001:db8::1'))
+
+      expect(res.status).toBe(200)
+      expect(key).toBe('2001:db8::1')
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('keys an IPv6 caller on its /64', async () => {
