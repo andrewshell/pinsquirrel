@@ -755,12 +755,13 @@ describe('revocation', () => {
     expect(html).toContain(CLIENT_NAME)
 
     // The form the page actually renders, read the way a browser posts it.
-    const tokenId = /name="tokenId" value="([^"]+)"/.exec(html)?.[1] ?? ''
-    expect(tokenId).not.toBe('')
+    const grantClientId =
+      /name="clientId" value="([^"]+)"/.exec(html)?.[1] ?? ''
+    expect(grantClientId).not.toBe('')
 
     const revoked = await browserRequest(
       '/profile',
-      form({ intent: 'revoke-oauth-grant', tokenId })
+      form({ intent: 'revoke-oauth-grant', clientId: grantClientId })
     )
     expect(revoked.status).toBe(302)
 

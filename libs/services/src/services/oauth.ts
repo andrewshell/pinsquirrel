@@ -129,14 +129,13 @@ export interface IssuedTokens {
 
 /** One application a user has given access to, as the profile page shows it. */
 export interface OAuthGrant {
-  /** The token to hand to `revokeGrant`. */
-  tokenId: string
   clientId: string
   clientName: string | null
   /** Every scope any of the client's live tokens carries. */
   scopes: string[]
   /** Every audience the client holds a live token for. */
   resources: string[]
+  /** When the longest-lived of the client's tokens runs out. */
   expiresAt: Date
   createdAt: Date
 }
@@ -462,13 +461,23 @@ export class OAuthService {
       )
     }
 
-    return this.issueTokens({
+    const issued = await this.issueTokens({
       client,
       userId: token.userId,
       scopes,
       resource: token.resource,
       rotatedFrom: token.id,
     })
+
+    const parent = await this.tokenRepository.findById(token.id)
+    if (parent?.revokedAt) {
+      await this.revokeGrantFamily(token.userId, token.clientId)
+      throw new OAuthInvalidGrantError(
+        'The grant was revoked during the refresh'
+      )
+    }
+
+    return issued
   }
 
   /**
@@ -686,12 +695,13 @@ export class OAuthService {
       }
 
       grants.push({
-        tokenId: newest.id,
         clientId: newest.clientId,
         clientName: names.get(newest.clientId) ?? null,
         scopes: [...new Set(group.flatMap(token => token.scopes))],
         resources: [...new Set(group.map(token => token.resource))],
-        expiresAt: newest.expiresAt,
+        expiresAt: new Date(
+          Math.max(...group.map(token => token.expiresAt.getTime()))
+        ),
         createdAt: newest.createdAt,
       })
     }
@@ -707,19 +717,20 @@ export class OAuthService {
    * survived would simply mint another access token, and one whose access
    * token survived keeps working until it expires.
    */
-  async revokeGrant(ac: AccessControl, tokenId: string): Promise<void> {
-    const token = await this.tokenRepository.findById(tokenId)
-    if (!token) {
-      throw new OAuthInvalidGrantError('No such grant')
-    }
-
-    if (!ac.canDelete(token)) {
+  async revokeGrant(
+    ac: AccessControl,
+    userId: string,
+    clientId: string
+  ): Promise<void> {
+    if (!ac.canDelete({ userId })) {
       throw new OAuthAccessDeniedError(
         "Not authorized to revoke another user's grant"
       )
     }
 
-    await this.revokeGrantFamily(token.userId, token.clientId)
+    if ((await this.revokeGrantFamily(userId, clientId)) === 0) {
+      throw new OAuthInvalidGrantError('No such grant')
+    }
   }
 
   /**

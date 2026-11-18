@@ -87,6 +87,38 @@ describe('MailgunEmailService', () => {
     })
   })
 
+  describe('tracking', () => {
+    const base = 'https://app.pinsquirrel.com'
+    const sends: [string, (service: MailgunEmailService) => Promise<void>][] = [
+      ['password reset', s => s.sendPasswordResetEmail('a@b.c', 't', base)],
+      ['verification', s => s.sendVerificationEmail('a@b.c', 't', base)],
+      [
+        'email change confirmation',
+        s => s.sendEmailChangeConfirmationEmail('a@b.c', 't', base),
+      ],
+      [
+        'already registered',
+        s => s.sendEmailAlreadyRegisteredEmail('a@b.c', base, 't', base),
+      ],
+      ['username taken', s => s.sendUsernameTakenEmail('a@b.c', 'u', base)],
+      ['access granted', s => s.sendAccessGrantedEmail('a@b.c', 'u', base)],
+    ]
+
+    it.each(sends)('turns tracking off on the %s mail', async (_name, send) => {
+      mockCreateMessage.mockResolvedValue({ id: 'x' })
+
+      await send(emailService)
+
+      expect(mockCreateMessage).toHaveBeenCalledWith(
+        mockConfig.domain,
+        expect.objectContaining({
+          'o:tracking-clicks': 'no',
+          'o:tracking-opens': 'no',
+        })
+      )
+    })
+  })
+
   describe('sendPasswordResetEmail', () => {
     const testEmail = 'user@example.com'
     const testToken = 'reset-token-123'

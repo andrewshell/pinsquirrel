@@ -35,7 +35,6 @@ const svc = {
 
 function makeGrant(overrides: Record<string, unknown> = {}) {
   return {
-    tokenId: 'token-1',
     clientId: 'https://claude.ai/oauth/claude-code-client-metadata',
     clientName: 'Claude Code',
     scopes: ['pins:read', 'tags:read'],
@@ -109,6 +108,22 @@ describe('profile routes', () => {
       return (await app.request('/profile')).text()
     }
     return res.text()
+  }
+
+  function cardSection(html: string, title: string): string {
+    const titles = [
+      'Account Information',
+      'Update Email',
+      'Change Password',
+      'Connected Applications',
+      'Quick Pin Bookmarklet',
+    ]
+    const start = html.indexOf(title)
+    expect(start).toBeGreaterThanOrEqual(0)
+    const ends = titles
+      .map(t => html.indexOf(t, start + title.length))
+      .filter(i => i > start)
+    return html.slice(start, ends.length ? Math.min(...ends) : undefined)
   }
 
   describe('embed mode', () => {
@@ -334,11 +349,33 @@ describe('profile routes', () => {
     })
   })
 
-  it('rejects an unknown intent', async () => {
+  it('rejects an unknown intent without hiding the connected applications', async () => {
     const res = await app.request('/profile', formBody({ intent: 'nonsense' }))
 
     expect(res.status).toBe(400)
-    expect(await res.text()).toContain('Invalid action')
+    const html = await res.text()
+    expect(html).toContain('Invalid action')
+    expect(cardSection(html, 'Update Email')).not.toContain('Invalid action')
+    expect(cardSection(html, 'Connected Applications')).toContain('Claude Code')
+  })
+
+  it('shows an unexpected failure in the card of the form that failed', async () => {
+    svc.changePassword.mockRejectedValue(new Error('database down'))
+
+    const res = await app.request(
+      '/profile',
+      formBody({
+        intent: 'change-password',
+        currentPassword: 'current',
+        newPassword: 'newpassword123',
+      })
+    )
+
+    expect(res.status).toBe(500)
+    const html = await res.text()
+    const message = 'An unexpected error occurred'
+    expect(cardSection(html, 'Change Password')).toContain(message)
+    expect(cardSection(html, 'Update Email')).not.toContain(message)
   })
 
   describe('OAuth grants', () => {
@@ -398,13 +435,25 @@ describe('profile routes', () => {
       expect(html).toMatch(/no applications|not authorized any/i)
     })
 
+    it('names the client in the revoke form, not one of its tokens', async () => {
+      const html = await (await app.request('/profile')).text()
+
+      expect(cardSection(html, 'Connected Applications')).toContain(
+        'name="clientId" value="https://claude.ai/oauth/claude-code-client-metadata"'
+      )
+    })
+
     it('revokes a grant and confirms it', async () => {
       const res = await app.request(
         '/profile',
-        formBody({ intent: 'revoke-oauth-grant', tokenId: 'token-1' })
+        formBody({ intent: 'revoke-oauth-grant', clientId: 'dcr_abc123' })
       )
 
-      expect(svc.revokeGrant).toHaveBeenCalledWith(expect.anything(), 'token-1')
+      expect(svc.revokeGrant).toHaveBeenCalledWith(
+        expect.anything(),
+        'user-1',
+        'dcr_abc123'
+      )
       expect(await renderedProfile(res)).toMatch(/access revoked/i)
     })
 
@@ -417,10 +466,14 @@ describe('profile routes', () => {
 
       const res = await app.request(
         '/profile',
-        formBody({ intent: 'revoke-oauth-grant', tokenId: 'gone' })
+        formBody({ intent: 'revoke-oauth-grant', clientId: 'dcr_gone' })
       )
 
       expect(res.status).toBe(400)
+      const html = await res.text()
+      const message = 'That application access is no longer active.'
+      expect(cardSection(html, 'Connected Applications')).toContain(message)
+      expect(cardSection(html, 'Update Email')).not.toContain(message)
     })
 
     it('keeps the grants on screen when another action fails', async () => {

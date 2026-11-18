@@ -534,6 +534,15 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     unknown address then take the same time and get the same answer, whatever the mail
     provider does. The cost is that a database failure during sign-up is logged instead of
     shown, and the user sees the usual "check your email".
+31. **An IP-keyed limit counts an IPv6 caller by its /64.** One subscriber usually holds a
+    whole /64, so keying on the full address gave each address its own budget. A provider
+    that puts several customers in one /64 makes them share a budget; the per-IP limits are
+    loose enough that this should not trip for real users. An IPv4-mapped address counts
+    as its IPv4 address.
+32. **Revoking a connected application is addressed by the client, not by one token.** The
+    profile form posts the client id and the service revokes every live token the user
+    holds for it. A token id in the form went stale once the client refreshed and the
+    sweep removed that row.
 
 ## Reference
 

@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { Hono } from 'hono'
 import { RateLimiter } from './rate-limiter'
 import {
   apiV1Limiter,
+  clientAddressKey,
   getClientIp,
   mcpLimiter,
   rateLimitByClientId,
@@ -251,6 +252,38 @@ describe('rateLimitByIp', () => {
     expect(res.headers.get('Retry-After')).toBeTruthy()
   })
 
+  it('counts every address in one IPv6 /64 as one caller', async () => {
+    await app.request('/test', { method: 'POST' }, from('2001:db8:1:2::1'))
+    await app.request('/test', { method: 'POST' }, from('2001:db8:1:2:ffff::9'))
+
+    const res = await app.request(
+      '/test',
+      { method: 'POST' },
+      from('2001:0db8:0001:0002:abcd:1:2:3')
+    )
+    expect(res.status).toBe(429)
+  })
+
+  it('keeps different IPv6 /64s apart', async () => {
+    await app.request('/test', { method: 'POST' }, from('2001:db8:1:2::1'))
+    await app.request('/test', { method: 'POST' }, from('2001:db8:1:2::2'))
+
+    const res = await app.request(
+      '/test',
+      { method: 'POST' },
+      from('2001:db8:1:3::1')
+    )
+    expect(res.status).toBe(200)
+  })
+
+  it('counts an IPv4-mapped address as the IPv4 address', async () => {
+    await app.request('/test', { method: 'POST' }, from('1.2.3.4'))
+    await app.request('/test', { method: 'POST' }, from('::ffff:1.2.3.4'))
+
+    const res = await app.request('/test', { method: 'POST' }, from('1.2.3.4'))
+    expect(res.status).toBe(429)
+  })
+
   it('allows different IPs independently', async () => {
     await app.request('/test', { method: 'POST' }, from('1.1.1.1'))
     await app.request('/test', { method: 'POST' }, from('1.1.1.1'))
@@ -272,6 +305,76 @@ describe('signinRateLimitKey', () => {
     await app.request('/test', undefined, from('1.2.3.4'))
 
     expect(key).toBe('1.2.3.4:username')
+  })
+
+  it.each([
+    ['1.2.3.4', '1.2.3.4'],
+    ['::ffff:1.2.3.4', '1.2.3.4'],
+    ['::ffff:102:304', '1.2.3.4'],
+    ['::FFFF:0102:0304', '1.2.3.4'],
+    ['::1', '::1'],
+    ['::', '::'],
+    ['2001:db8:1:2:3:4:5:6', '2001:db8:1:2::/64'],
+    ['2001:db8::ffff:102:304', '2001:db8:0:0::/64'],
+    ['fe80::1%eth0', 'fe80:0:0:0::/64'],
+    ['fe80::1%25eth0', 'fe80:0:0:0::/64'],
+    ['2001:db8:1:2::%x', '2001:db8:1:2::/64'],
+    ['::ffff:1.2.3.4%x', '1.2.3.4'],
+    ['::1%lo', '::1'],
+  ])('keys %s as %s', async (address, expected) => {
+    const app = new Hono()
+    let key = ''
+    app.get('/test', c => {
+      key = clientAddressKey(c)
+      return c.text('ok')
+    })
+
+    await app.request('/test', undefined, from(address))
+
+    expect(key).toBe(expected)
+  })
+
+  it('falls back to the raw address when canonicalisation fails', async () => {
+    const RealURL = URL
+    vi.stubGlobal(
+      'URL',
+      class extends RealURL {
+        constructor(input: string | URL, base?: string | URL) {
+          if (String(input).startsWith('http://[')) {
+            throw new TypeError('Invalid URL')
+          }
+          super(input, base)
+        }
+      }
+    )
+    try {
+      const app = new Hono()
+      let key = ''
+      app.get('/test', c => {
+        key = clientAddressKey(c)
+        return c.text('ok')
+      })
+
+      const res = await app.request('/test', undefined, from('2001:db8::1'))
+
+      expect(res.status).toBe(200)
+      expect(key).toBe('2001:db8::1')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('keys an IPv6 caller on its /64', async () => {
+    const app = new Hono()
+    let key = ''
+    app.get('/test', c => {
+      key = signinRateLimitKey(c, 'alice')
+      return c.text('ok')
+    })
+
+    await app.request('/test', undefined, from('2001:db8:1:2:3:4:5:6'))
+
+    expect(key).toBe('2001:db8:1:2::/64:alice')
   })
 })
 

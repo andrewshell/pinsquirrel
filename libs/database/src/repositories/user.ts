@@ -111,14 +111,15 @@ export class DrizzleUserRepository implements UserRepository {
   }
 
   async findByUsername(username: string): Promise<User | null> {
-    const result = await this.db
-      .select()
+    const rows = await this.db
+      .select({ user: users, role: userRoles.role })
       .from(users)
+      .leftJoin(userRoles, eq(userRoles.userId, users.id))
       .where(eq(users.username, username))
-      .limit(1)
 
-    if (!result[0]) return null
-    return await this.attachRoles(result[0])
+    if (!rows[0]) return null
+    const roles = rows.flatMap(row => (row.role ? [row.role as Role] : []))
+    return this.mapToUser(rows[0].user, roles)
   }
 
   async findByStatus(status: UserStatus): Promise<User[]> {

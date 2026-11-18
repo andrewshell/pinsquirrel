@@ -88,6 +88,47 @@ export function getClientIp(c: Context): string {
   return peer ?? 'unknown'
 }
 
+/**
+ * The caller an IP-keyed limit counts. One IPv6 subscriber holds a whole /64,
+ * so the key is that prefix, and an IPv4-mapped address is its IPv4 address.
+ * Loopback and the unspecified address are single hosts, not subscribers.
+ */
+export function clientAddressKey(c: Context): string {
+  const address = getClientIp(c)
+  if (isIP(address) !== 6) return address
+  try {
+    return ipv6Key(address)
+  } catch {
+    // A key the limiter cannot canonicalise still has to count, never 500.
+    return address
+  }
+}
+
+function ipv6Key(address: string): string {
+  // Zone ids (`fe80::1%eth0`) name a local interface, not a different peer,
+  // and the URL parser rejects them.
+  const bare = address.split('%')[0]
+  // The URL parser rewrites every spelling into one compressed hex form, so
+  // `::ffff:1.2.3.4` and `::ffff:102:304` arrive here identical.
+  const canonical = new URL(`http://[${bare}]`).hostname.slice(1, -1)
+  if (canonical === '::1' || canonical === '::') return canonical
+  const mapped = /^::ffff:([\da-f]{1,4}):([\da-f]{1,4})$/.exec(canonical)
+  if (mapped) {
+    const high = parseInt(mapped[1], 16)
+    const low = parseInt(mapped[2], 16)
+    return `${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`
+  }
+  const [head, tail] = canonical.split('::')
+  const leading = head === '' ? [] : head.split(':')
+  const trailing = tail === undefined || tail === '' ? [] : tail.split(':')
+  const groups = [
+    ...leading,
+    ...Array<string>(8 - leading.length - trailing.length).fill('0'),
+    ...trailing,
+  ]
+  return `${groups.slice(0, 4).join(':')}::/64`
+}
+
 export const signinLimiter = new RateLimiter({
   maxAttempts: 5,
   windowMs: 15 * 60 * 1000,
@@ -227,8 +268,7 @@ export function rateLimitByIp(
   message = 'Too many requests. Please try again later.'
 ): MiddlewareHandler {
   return async (c, next) => {
-    const ip = getClientIp(c)
-    const result = limiter.hit(ip)
+    const result = limiter.hit(clientAddressKey(c))
     if (result.limited) {
       return refuse(c, message, result.retryAfterMs)
     }
@@ -278,5 +318,5 @@ export function rateLimitByClientId(
 }
 
 export function signinRateLimitKey(c: Context, username: string): string {
-  return `${getClientIp(c)}:${username.toLowerCase()}`
+  return `${clientAddressKey(c)}:${username.toLowerCase()}`
 }

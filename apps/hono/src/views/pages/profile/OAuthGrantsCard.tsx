@@ -1,11 +1,13 @@
 import type { OAuthGrant } from '@pinsquirrel/services'
 import type { FC } from 'hono/jsx'
 import { resourceLabel } from '../../../lib/config'
+import { ErrorMessage } from '../../components/FlashMessage'
 import { Card, CardContent, CardHeader, CardTitle } from '@pinsquirrel/ui'
 import { formatDate } from './format-date'
 
 type OAuthGrantsCardProps = {
   grants?: OAuthGrant[]
+  formError?: string
   /** Carried on a hidden field so a rejected revoke comes back in embed. */
   embed?: boolean
 }
@@ -22,6 +24,7 @@ type OAuthGrantsCardProps = {
  */
 export const OAuthGrantsCard: FC<OAuthGrantsCardProps> = ({
   grants,
+  formError,
   embed = false,
 }) => (
   <Card>
@@ -33,6 +36,8 @@ export const OAuthGrantsCard: FC<OAuthGrantsCardProps> = ({
         Applications you have authorized to reach your PinSquirrel data.
         Revoking one signs it out immediately and it has to ask again.
       </p>
+
+      {formError && <ErrorMessage message={formError} />}
 
       {grants && grants.length > 0 ? (
         <div class="space-y-3">
@@ -56,7 +61,7 @@ export const OAuthGrantsCard: FC<OAuthGrantsCardProps> = ({
               </div>
               <form method="post" action="/profile">
                 <input type="hidden" name="intent" value="revoke-oauth-grant" />
-                <input type="hidden" name="tokenId" value={grant.tokenId} />
+                <input type="hidden" name="clientId" value={grant.clientId} />
                 {embed && <input type="hidden" name="embed" value="1" />}
                 <button
                   type="submit"

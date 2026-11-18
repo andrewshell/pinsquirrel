@@ -815,6 +815,20 @@ describe('OAuthService.exchangeRefreshToken', () => {
     expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalled()
   })
 
+  it('takes back the new tokens when the grant was revoked mid-refresh', async () => {
+    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(
+      storedRefresh({ rotatedAt: new Date(), revokedAt: new Date() })
+    )
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+    expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
+      user.id,
+      CIMD_URL
+    )
+  })
+
   it('refuses a token the user revoked', async () => {
     vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
       storedRefresh({ revokedAt: new Date() })
@@ -1175,6 +1189,34 @@ describe('OAuthService grants', () => {
     })
   })
 
+  it.each([
+    ['access first', ['access', 'refresh']],
+    ['refresh first', ['refresh', 'access']],
+  ] as const)(
+    'reports when the longest-lived token expires (%s)',
+    async (_order, kinds) => {
+      const createdAt = new Date()
+      const accessExpiry = new Date(createdAt.getTime() + 60 * 60 * 1000)
+      const refreshExpiry = new Date(
+        createdAt.getTime() + 30 * 24 * 60 * 60 * 1000
+      )
+      vi.mocked(ctx.tokenRepository.findActiveByUserId).mockResolvedValue(
+        kinds.map(kind =>
+          grantToken({
+            id: `${kind}-1`,
+            kind,
+            createdAt,
+            expiresAt: kind === 'refresh' ? refreshExpiry : accessExpiry,
+          })
+        )
+      )
+
+      const [grant] = await ctx.service.listGrants(ac, user.id)
+
+      expect(grant.expiresAt).toEqual(refreshExpiry)
+    }
+  )
+
   it('keeps grants for different clients apart', async () => {
     vi.mocked(ctx.tokenRepository.findActiveByUserId).mockResolvedValue([
       grantToken({ id: 'access-1' }),
@@ -1193,13 +1235,10 @@ describe('OAuthService grants', () => {
 
   // Revoking has to take the access token and the refresh token together, or
   // the client keeps working until the access token expires.
-  it('revokes every token the grant covers', async () => {
-    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(
-      grantToken({ id: 'access-1' })
-    )
+  it('revokes every token the client holds for the user', async () => {
     vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockResolvedValue(2)
 
-    await ctx.service.revokeGrant(ac, 'access-1')
+    await ctx.service.revokeGrant(ac, user.id, CIMD_URL)
 
     expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
       user.id,
@@ -1207,23 +1246,28 @@ describe('OAuthService grants', () => {
     )
   })
 
-  it("refuses to revoke another user's grant", async () => {
-    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(
-      grantToken({ id: 'access-1', userId: otherUser.id })
-    )
+  it('revokes without looking up any single token', async () => {
+    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(null)
+    vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockResolvedValue(2)
 
     await expect(
-      ctx.service.revokeGrant(ac, 'access-1')
+      ctx.service.revokeGrant(ac, user.id, CIMD_URL)
+    ).resolves.toBeUndefined()
+  })
+
+  it("refuses to revoke another user's grant", async () => {
+    await expect(
+      ctx.service.revokeGrant(new AccessControl(otherUser), user.id, CIMD_URL)
     ).rejects.toBeInstanceOf(OAuthAccessDeniedError)
     expect(ctx.tokenRepository.revokeByUserAndClient).not.toHaveBeenCalled()
   })
 
-  it('refuses to revoke a grant that does not exist', async () => {
-    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(null)
+  it('refuses to revoke a client that holds no live token', async () => {
+    vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockResolvedValue(0)
 
-    await expect(ctx.service.revokeGrant(ac, 'nope')).rejects.toBeInstanceOf(
-      OAuthInvalidGrantError
-    )
+    await expect(
+      ctx.service.revokeGrant(ac, user.id, 'dcr_none')
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
   })
 })
 

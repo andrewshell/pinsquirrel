@@ -145,6 +145,53 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
     })
   })
 
+  describe('patchData', () => {
+    async function sessionWith(data: Record<string, unknown> | null) {
+      const { id: userId } = await insertUser(testPool)
+      return repository.create({
+        id: crypto.randomUUID(),
+        userId,
+        data,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      })
+    }
+
+    it('sets and removes the named keys and leaves the rest as stored', async () => {
+      const session = await sessionWith({
+        userId: 'u1',
+        privateUnlockedAt: 1,
+        flash: { type: 'success', message: 'old' },
+      })
+      await repository.update(session.id, {
+        data: { userId: 'u1', privateUnlockedAt: 2, keepSignedIn: true },
+      })
+
+      await repository.patchData(session.id, {
+        set: { flash: { type: 'error', message: 'new' } },
+        unset: ['keepSignedIn'],
+      })
+
+      expect((await repository.findById(session.id))?.data).toEqual({
+        userId: 'u1',
+        privateUnlockedAt: 2,
+        flash: { type: 'error', message: 'new' },
+      })
+    })
+
+    it('starts from an empty object when the session has no data', async () => {
+      const session = await sessionWith(null)
+
+      await repository.patchData(session.id, {
+        set: { privateUnlockedAt: 5 },
+        unset: ['flash'],
+      })
+
+      expect((await repository.findById(session.id))?.data).toEqual({
+        privateUnlockedAt: 5,
+      })
+    })
+  })
+
   describe('update', () => {
     it('should update session data', async () => {
       const { id: userId } = await insertUser(testPool)

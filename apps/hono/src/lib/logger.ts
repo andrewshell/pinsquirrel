@@ -16,9 +16,15 @@ export const logger = pino({
   },
 })
 
+/**
+ * An error in a form fit to log. Drizzle appends a failed query's bound
+ * values to its message (usernames, email hashes), so that tail is cut from
+ * the message and from the stack that repeats it.
+ */
 export function safeError(err: unknown): { message: string; stack?: string } {
   if (err instanceof Error) {
-    return { message: err.message, stack: err.stack }
+    const [message = ''] = err.message.split('\nparams: ')
+    return { message, stack: err.stack?.replace(err.message, message) }
   }
   return { message: String(err) }
 }

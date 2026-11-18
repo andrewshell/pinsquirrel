@@ -25,6 +25,7 @@ export type {
   Session,
   CreateSessionData,
   UpdateSessionData,
+  SessionDataPatch,
 } from './entities/session.js'
 export type {
   OAuthClient,

@@ -259,6 +259,13 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
 
       expect(await repository.markRotated(created.id)).toBe(false)
     })
+
+    it('should return false for a token revoked after it was read', async () => {
+      const created = await repository.create(token({ kind: 'refresh' }))
+      await repository.revokeByUserAndClient(userId, clientId)
+
+      expect(await repository.markRotated(created.id)).toBe(false)
+    })
   })
 
   describe('deleteExpiredTokens', () => {

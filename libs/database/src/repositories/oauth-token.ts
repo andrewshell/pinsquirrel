@@ -101,7 +101,13 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
     const result = await this.db
       .update(oauthTokens)
       .set({ rotatedAt: new Date() })
-      .where(and(eq(oauthTokens.id, id), isNull(oauthTokens.rotatedAt)))
+      .where(
+        and(
+          eq(oauthTokens.id, id),
+          isNull(oauthTokens.rotatedAt),
+          isNull(oauthTokens.revokedAt)
+        )
+      )
     return result[0].affectedRows > 0
   }
 
