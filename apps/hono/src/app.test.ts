@@ -28,6 +28,11 @@ vi.mock('./lib/logger.js', () => ({
 }))
 
 import { app } from './app'
+import {
+  oauthRegisterLimiter,
+  oauthTokenIpLimiter,
+} from './middleware/rate-limit'
+import { exhaust, TEST_CLIENT_IP } from './test-support/rate-limit'
 
 describe('request log', () => {
   beforeEach(() => {
@@ -109,5 +114,71 @@ describe('request body limit', () => {
     const res = await post('/import', body, 'application/x-www-form-urlencoded')
 
     expect(res.status).toBe(413)
+  })
+})
+
+// The token and registration routes mount at `/oauth`, the same prefix as the
+// consent screen, so a limiter they apply to every path would also count the
+// pages a signed-in person loads.
+describe('OAuth endpoint rate limits', () => {
+  const consentForm = {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Sec-Fetch-Site': 'same-origin',
+    },
+    body: 'decision=approve',
+  }
+
+  beforeEach(() => {
+    oauthRegisterLimiter.reset(TEST_CLIENT_IP)
+    oauthTokenIpLimiter.reset(TEST_CLIENT_IP)
+  })
+
+  it('serves the consent screen and extension callback once the registration budget is spent', async () => {
+    exhaust(oauthRegisterLimiter, TEST_CLIENT_IP)
+
+    const statuses = [
+      (await app.request('/oauth/authorize?client_id=x')).status,
+      (await app.request('/oauth/authorize', consentForm)).status,
+      (await app.request('/oauth/extension/callback?code=x')).status,
+    ]
+
+    expect(statuses).not.toContain(429)
+  })
+
+  it('serves the consent screen and extension callback once the token budget is spent', async () => {
+    exhaust(oauthTokenIpLimiter, TEST_CLIENT_IP)
+
+    const statuses = [
+      (await app.request('/oauth/authorize?client_id=x')).status,
+      (await app.request('/oauth/authorize', consentForm)).status,
+      (await app.request('/oauth/extension/callback?code=x')).status,
+    ]
+
+    expect(statuses).not.toContain(429)
+  })
+
+  it('leaves the registration and token budgets to their own endpoints', async () => {
+    // More page loads than either budget allows an address.
+    for (let i = 0; i < 31; i++) {
+      await app.request('/oauth/authorize?client_id=x')
+      await app.request('/oauth/extension/callback?code=x')
+    }
+
+    // A wrong content type is answered after the limiter, so a status other
+    // than 429 shows the budget is still there.
+    const register = await app.request('/oauth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: 'x',
+    })
+    const revoke = await app.request('/oauth/revoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: 'x',
+    })
+
+    expect([register.status, revoke.status]).toEqual([415, 415])
   })
 })
