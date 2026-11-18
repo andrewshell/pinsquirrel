@@ -26,13 +26,13 @@ vi.mock('../utils/crypto.js', () => ({
       Promise.resolve(`hashed_${password}`)
     ),
   verifyPassword: vi.fn(),
+  needsRehash: vi.fn().mockReturnValue(false),
   hashEmail: vi.fn().mockImplementation((email: string) => `hashed_${email}`),
   generateSecureToken: vi.fn().mockReturnValue('mock-token'),
   hashToken: vi.fn().mockImplementation((token: string) => `hashed_${token}`),
-  getDummyHash: vi.fn().mockReturnValue('dummy_salt:dummy_key'),
 }))
 
-import { verifyPassword } from '../utils/crypto.js'
+import { needsRehash, verifyPassword } from '../utils/crypto.js'
 
 describe('AuthenticationService', () => {
   let authService: AuthenticationService
@@ -92,6 +92,37 @@ describe('AuthenticationService', () => {
       expect(result).toEqual(userWithPassword)
     })
 
+    it('rehashes a password stored with older parameters on sign-in', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(mockUser)
+      vi.mocked(verifyPassword).mockResolvedValue(true)
+      vi.mocked(needsRehash).mockReturnValueOnce(true)
+
+      await authService.login({
+        username: 'testuser',
+        password: 'password12345',
+      })
+
+      expect(mockUserRepository.replacePasswordHash).toHaveBeenCalledWith(
+        mockUser.id,
+        mockUser.passwordHash,
+        'hashed_password12345'
+      )
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('leaves a current password hash alone on sign-in', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(mockUser)
+      vi.mocked(verifyPassword).mockResolvedValue(true)
+
+      await authService.login({
+        username: 'testuser',
+        password: 'password12345',
+      })
+
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
+      expect(mockUserRepository.replacePasswordHash).not.toHaveBeenCalled()
+    })
+
     it('should throw InvalidCredentialsError for non-existent user', async () => {
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
       vi.mocked(verifyPassword).mockResolvedValue(false)
@@ -105,10 +136,7 @@ describe('AuthenticationService', () => {
         InvalidCredentialsError
       )
       // verifyPassword should still be called (timing side-channel mitigation)
-      expect(verifyPassword).toHaveBeenCalledWith(
-        'password12345',
-        'dummy_salt:dummy_key'
-      )
+      expect(verifyPassword).toHaveBeenCalledWith('password12345', null)
     })
 
     it('should throw InvalidCredentialsError for user without password hash', async () => {
@@ -127,10 +155,7 @@ describe('AuthenticationService', () => {
         InvalidCredentialsError
       )
       // Should use dummy hash when passwordHash is null
-      expect(verifyPassword).toHaveBeenCalledWith(
-        'password12345',
-        'dummy_salt:dummy_key'
-      )
+      expect(verifyPassword).toHaveBeenCalledWith('password12345', null)
     })
 
     it('should throw InvalidCredentialsError for wrong password', async () => {
@@ -628,10 +653,7 @@ describe('AuthenticationService', () => {
       await expect(authService.loginForBootstrap(credentials)).rejects.toThrow(
         InvalidCredentialsError
       )
-      expect(verifyPassword).toHaveBeenCalledWith(
-        'password12345',
-        'dummy_salt:dummy_key'
-      )
+      expect(verifyPassword).toHaveBeenCalledWith('password12345', null)
     })
 
     // The credentials are checked first, so the route cannot be used to ask
@@ -838,6 +860,23 @@ describe('AuthenticationService', () => {
       expect(mockUserRepository.update).toHaveBeenCalledWith('123', {
         passwordHash: 'hashed_newpass1234567',
       })
+    })
+
+    it("ends the user's other sessions and OAuth tokens but keeps the current session", async () => {
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
+      vi.mocked(verifyPassword).mockResolvedValue(true)
+
+      await authService.changePassword(selfAc('123'), {
+        userId: '123',
+        currentPassword: 'currentpass123',
+        newPassword: 'newpass1234567',
+        keepSessionId: 'session-in-use',
+      })
+
+      expect(mockUserRepository.revokeSessionsAndTokens).toHaveBeenCalledWith(
+        '123',
+        'session-in-use'
+      )
     })
 
     it('should throw InvalidCredentialsError for wrong current password', async () => {

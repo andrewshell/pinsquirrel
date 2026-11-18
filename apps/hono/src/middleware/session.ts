@@ -22,14 +22,21 @@
  * If sessions ever need to be readable from outside this app, that is the
  * point to revisit this.
  */
+import { createHash, randomBytes } from 'node:crypto'
 import type { Context, MiddlewareHandler } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
+import { isAdmitted } from '@pinsquirrel/domain'
 import type { Session, User } from '@pinsquirrel/domain'
 import { sessionRepository, userRepository } from '../lib/db'
 import { isEmbedRequest, withEmbed } from '../lib/embed'
 
 // Session configuration
-const SESSION_COOKIE_NAME = '__session'
+const LEGACY_COOKIE_NAME = '__session'
+// Session ids from before they were hashed were `crypto.randomUUID()`. In
+// production `__session` is only honoured with that shape, so the fallback
+// dies with the last of those sessions and cannot carry a current token.
+const PRE_HASHING_SESSION_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const SESSION_DURATION_PERSISTENT = 30 * 24 * 60 * 60 * 1000 // 30 days
 const SESSION_DURATION_TEMPORARY = 24 * 60 * 60 * 1000 // 24 hours (for browser session)
 const PRIVATE_MODE_DURATION = 15 * 60 * 1000 // 15 minutes
@@ -38,11 +45,27 @@ const PRIVATE_MODE_DURATION = 15 * 60 * 1000 // 15 minutes
 // destroy — has to agree on these, or a cookie set one way is not the cookie
 // deleted the other way. `secure` is read per call rather than at module load
 // so tests can vary NODE_ENV.
+const isProduction = () => process.env.NODE_ENV === 'production'
+
 const sessionCookieOptions = () => ({
   path: '/',
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
+  secure: isProduction(),
   sameSite: 'Lax' as const,
+})
+
+// `__Host-` makes the browser refuse the cookie unless it is Secure, on
+// Path=/, and set without a Domain, so no sibling subdomain can plant one.
+// Development omits Secure, so it keeps the old name.
+const sessionCookieName = () =>
+  isProduction() ? '__Host-session' : LEGACY_COOKIE_NAME
+
+const hashSessionToken = (cookieValue: string) =>
+  createHash('sha256').update(cookieValue).digest('hex')
+
+const persistentCookieOptions = (expiresAt: Date) => ({
+  ...sessionCookieOptions(),
+  maxAge: Math.floor((expiresAt.getTime() - Date.now()) / 1000),
 })
 
 // Flash message types
@@ -115,25 +138,48 @@ declare module 'hono' {
 // Create session middleware
 export function sessionMiddleware(): MiddlewareHandler {
   return async (c, next) => {
-    // Load session from cookie
-    const sessionId = getCookie(c, SESSION_COOKIE_NAME)
+    const cookieName = sessionCookieName()
+    const current = getCookie(c, cookieName)
+    const legacyCandidate =
+      current === undefined && cookieName !== LEGACY_COOKIE_NAME
+        ? getCookie(c, LEGACY_COOKIE_NAME)
+        : undefined
+    const legacy =
+      legacyCandidate !== undefined &&
+      PRE_HASHING_SESSION_ID.test(legacyCandidate)
+        ? legacyCandidate
+        : undefined
+    const cookieValue = current ?? legacy
     let session: Session | null = null
     let sessionData: SessionData | null = null
     let pendingFlash: { type: FlashType; message: string } | null = null
     let sessionModified = false
     let sessionDestroyed = false
 
-    if (sessionId) {
-      // Load session from database
+    if (cookieValue) {
+      const sessionId = hashSessionToken(cookieValue)
       const isValid = await sessionRepository.isValidSession(sessionId)
       if (isValid) {
         session = await sessionRepository.findById(sessionId)
         if (session) {
           sessionData = session.data as SessionData | null
         }
-      } else {
-        // Session expired or invalid - clear the cookie
-        deleteCookie(c, SESSION_COOKIE_NAME, sessionCookieOptions())
+      }
+
+      if (legacy !== undefined) {
+        deleteCookie(c, LEGACY_COOKIE_NAME, sessionCookieOptions())
+        if (session) {
+          setCookie(
+            c,
+            cookieName,
+            cookieValue,
+            sessionData?.keepSignedIn
+              ? persistentCookieOptions(session.expiresAt)
+              : sessionCookieOptions()
+          )
+        }
+      } else if (!session) {
+        deleteCookie(c, cookieName, sessionCookieOptions())
       }
     }
 
@@ -179,7 +225,9 @@ export function sessionMiddleware(): MiddlewareHandler {
           keepSignedIn,
         }
 
+        const token = randomBytes(32).toString('base64url')
         session = await sessionRepository.create({
+          id: hashSessionToken(token),
           userId,
           data: newSessionData,
           expiresAt,
@@ -187,8 +235,7 @@ export function sessionMiddleware(): MiddlewareHandler {
 
         sessionData = newSessionData
 
-        // Set the session cookie
-        setCookie(c, SESSION_COOKIE_NAME, session.id, {
+        setCookie(c, sessionCookieName(), token, {
           ...sessionCookieOptions(),
           ...(keepSignedIn
             ? { maxAge: SESSION_DURATION_PERSISTENT / 1000 }
@@ -204,8 +251,7 @@ export function sessionMiddleware(): MiddlewareHandler {
           sessionDestroyed = true
         }
 
-        // Clear the cookie
-        deleteCookie(c, SESSION_COOKIE_NAME, sessionCookieOptions())
+        deleteCookie(c, sessionCookieName(), sessionCookieOptions())
       },
 
       setFlash(type: FlashType, message: string) {
@@ -278,8 +324,10 @@ export function sessionMiddleware(): MiddlewareHandler {
  * Gate a route on a signed-in user, and resolve that user once for the whole
  * request.
  *
- * Two ways to fail, both ending in the same redirect: there is no session at
- * all, or the session names a user that no longer exists (deleted mid-session).
+ * Three ways to fail, all ending in the same redirect: there is no session at
+ * all, the session names a user that no longer exists (deleted mid-session),
+ * or the user is no longer admitted (see `isAdmitted`), which also ends the
+ * session.
  * The second used to fall through to the handlers, which each coped with it
  * differently — some redirected, some returned `HX-Redirect` with a 204 — so
  * the same condition produced eight different responses across the app.
@@ -315,6 +363,11 @@ export function requireAuth(redirectTo = '/signin'): MiddlewareHandler {
 
     const user = await sessionManager.getUser()
     if (!user) {
+      return redirectToSignin()
+    }
+
+    if (!isAdmitted(user)) {
+      await sessionManager.destroy()
       return redirectToSignin()
     }
 

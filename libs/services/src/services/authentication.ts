@@ -12,7 +12,7 @@ import {
   UnauthorizedUserAccessError,
   AdminAlreadyExistsError,
 } from '@pinsquirrel/domain'
-import { hashPassword, verifyPassword, getDummyHash } from '../utils/crypto.js'
+import { hashPassword, verifyPassword, needsRehash } from '../utils/crypto.js'
 import { credentialsSchema, passwordChangeSchema } from '../validation/user.js'
 import { validationErrorFromZod } from '../validation/zod-error.js'
 
@@ -58,8 +58,10 @@ export class AuthenticationService {
     }
 
     const user = await this.userRepository.findByUsername(input.username)
-    const passwordHash = user?.passwordHash ?? getDummyHash()
-    const isValidPassword = await verifyPassword(input.password, passwordHash)
+    const isValidPassword = await verifyPassword(
+      input.password,
+      user?.passwordHash ?? null
+    )
 
     if (!user || !user.passwordHash || !isValidPassword) {
       throw new InvalidCredentialsError()
@@ -68,6 +70,16 @@ export class AuthenticationService {
     // Check if user has the User role
     if (!user.roles.includes(Role.User)) {
       throw new MissingRoleError()
+    }
+
+    if (needsRehash(user.passwordHash)) {
+      // Conditional so a password changed while this one was hashing stays
+      // changed.
+      await this.userRepository.replacePasswordHash(
+        user.id,
+        user.passwordHash,
+        await hashPassword(input.password)
+      )
     }
 
     return user
@@ -364,6 +376,7 @@ export class AuthenticationService {
       userId: string
       currentPassword: string
       newPassword: string
+      keepSessionId?: string
     }
   ): Promise<void> {
     if (!ac.canUpdate({ userId: input.userId })) {
@@ -400,5 +413,9 @@ export class AuthenticationService {
     // Persist only the field this operation owns to avoid clobbering a
     // concurrent username/email change made after the findById read.
     await this.userRepository.update(input.userId, { passwordHash })
+    await this.userRepository.revokeSessionsAndTokens(
+      input.userId,
+      input.keepSessionId
+    )
   }
 }

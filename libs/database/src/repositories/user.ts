@@ -6,10 +6,13 @@ import type {
   Role,
 } from '@pinsquirrel/domain'
 import { UserAlreadyExistsError, UserStatus } from '@pinsquirrel/domain'
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { users } from '../schema/users.js'
 import { userRoles } from '../schema/user-roles.js'
+import { sessions } from '../schema/sessions.js'
+import { oauthTokens } from '../schema/oauth-tokens.js'
+import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes.js'
 import { isDuplicateKeyError } from './duplicate-key.js'
 
 /**
@@ -150,16 +153,24 @@ export class DrizzleUserRepository implements UserRepository {
   async create(data: CreateUserData): Promise<User> {
     const id = crypto.randomUUID()
     const now = new Date()
+    const roles = data.roles ?? []
 
     try {
-      await this.db.insert(users).values({
-        id,
-        username: data.username,
-        passwordHash: data.passwordHash,
-        emailHash: data.emailHash || null,
-        emailEncrypted: data.emailEncrypted ?? null,
-        createdAt: now,
-        updatedAt: now,
+      await this.db.transaction(async tx => {
+        await tx.insert(users).values({
+          id,
+          username: data.username,
+          passwordHash: data.passwordHash,
+          emailHash: data.emailHash || null,
+          emailEncrypted: data.emailEncrypted ?? null,
+          createdAt: now,
+          updatedAt: now,
+        })
+        if (roles.length > 0) {
+          await tx
+            .insert(userRoles)
+            .values(roles.map(role => ({ userId: id, role, createdAt: now })))
+        }
       })
     } catch (error) {
       this.rethrowConflict(error, data.username)
@@ -171,8 +182,7 @@ export class DrizzleUserRepository implements UserRepository {
       .where(eq(users.id, id))
       .limit(1)
 
-    // New users start with empty roles array
-    return this.mapToUser(created, [])
+    return this.mapToUser(created, roles)
   }
 
   async update(id: string, data: UpdateUserData): Promise<User | null> {
@@ -230,6 +240,50 @@ export class DrizzleUserRepository implements UserRepository {
   async delete(id: string): Promise<boolean> {
     const result = await this.db.delete(users).where(eq(users.id, id))
     return result[0].affectedRows > 0
+  }
+
+  async replacePasswordHash(
+    id: string,
+    expected: string,
+    next: string
+  ): Promise<boolean> {
+    const result = await this.db
+      .update(users)
+      .set({ passwordHash: next, updatedAt: new Date() })
+      .where(and(eq(users.id, id), eq(users.passwordHash, expected)))
+    return result[0].affectedRows > 0
+  }
+
+  async revokeSessionsAndTokens(
+    userId: string,
+    keepSessionId?: string
+  ): Promise<void> {
+    await this.db.transaction(async tx => {
+      await tx
+        .delete(sessions)
+        .where(
+          and(
+            eq(sessions.userId, userId),
+            keepSessionId === undefined
+              ? undefined
+              : ne(sessions.id, keepSessionId)
+          )
+        )
+      await tx
+        .update(oauthTokens)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(eq(oauthTokens.userId, userId), isNull(oauthTokens.revokedAt))
+        )
+      await tx
+        .delete(oauthAuthorizationCodes)
+        .where(
+          and(
+            eq(oauthAuthorizationCodes.userId, userId),
+            isNull(oauthAuthorizationCodes.consumedAt)
+          )
+        )
+    })
   }
 
   // Role management methods

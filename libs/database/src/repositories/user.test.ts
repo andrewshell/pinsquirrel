@@ -12,6 +12,10 @@ import type { MySql2Database } from 'drizzle-orm/mysql2'
 import mysql from 'mysql2/promise'
 import type { Pool } from 'mysql2/promise'
 import { insertUser } from '../test-fixtures.js'
+import { DrizzleOAuthAuthorizationCodeRepository } from './oauth-authorization-code.js'
+import { DrizzleOAuthClientRepository } from './oauth-client.js'
+import { DrizzleOAuthTokenRepository } from './oauth-token.js'
+import { DrizzleSessionRepository } from './session.js'
 import { DrizzleUserRepository } from './user.js'
 import { Role, UserAlreadyExistsError, UserStatus } from '@pinsquirrel/domain'
 
@@ -223,6 +227,33 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       // Verify it was actually saved to database
       const saved = await repository.findById(result.id)
       expect(saved?.emailHash).toBeNull()
+    })
+
+    it('creates the user with the roles it is given', async () => {
+      const result = await repository.create({
+        username: `newuser-${crypto.randomUUID().slice(0, 8)}`,
+        passwordHash: null,
+        emailHash: null,
+        roles: [Role.User],
+      })
+
+      expect(result.roles).toEqual([Role.User])
+      expect((await repository.findById(result.id))?.roles).toEqual([Role.User])
+    })
+
+    it('leaves no user behind when a role cannot be written', async () => {
+      const username = `newuser-${crypto.randomUUID().slice(0, 8)}`
+
+      await expect(
+        repository.create({
+          username,
+          passwordHash: null,
+          emailHash: null,
+          roles: ['x'.repeat(300) as Role],
+        })
+      ).rejects.toThrow()
+
+      expect(await repository.findByUsername(username)).toBeNull()
     })
 
     it('should default new users to unverified status', async () => {
@@ -600,6 +631,128 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       })
 
       expect(second.emailHash).toBeNull()
+    })
+  })
+
+  describe('replacePasswordHash', () => {
+    it('replaces the hash it was given', async () => {
+      const { id } = await insertUser(testPool, { passwordHash: 'old' })
+
+      expect(await repository.replacePasswordHash(id, 'old', 'new')).toBe(true)
+      expect((await repository.findById(id))?.passwordHash).toBe('new')
+    })
+
+    it('leaves a hash that changed since it was read', async () => {
+      const { id } = await insertUser(testPool, { passwordHash: 'changed' })
+
+      expect(await repository.replacePasswordHash(id, 'old', 'new')).toBe(false)
+      expect((await repository.findById(id))?.passwordHash).toBe('changed')
+    })
+  })
+
+  describe('revokeSessionsAndTokens', () => {
+    const later = () => new Date(Date.now() + 60 * 60 * 1000)
+
+    async function seed(userId: string) {
+      const sessions = new DrizzleSessionRepository(testDb)
+      const tokens = new DrizzleOAuthTokenRepository(testDb)
+      const client = await new DrizzleOAuthClientRepository(testDb).create({
+        clientId: `client-${crypto.randomUUID()}`,
+        clientName: 'test',
+        redirectUris: ['https://example.test/cb'],
+        grantTypes: ['authorization_code', 'refresh_token'],
+        tokenEndpointAuthMethod: 'none',
+        registrationType: 'dcr',
+      })
+      const codes = new DrizzleOAuthAuthorizationCodeRepository(testDb)
+      const makeSession = () =>
+        sessions.create({ id: crypto.randomUUID(), userId, expiresAt: later() })
+      const makeToken = (kind: 'access' | 'refresh') =>
+        tokens.create({
+          tokenHash: crypto.randomUUID().replace(/-/g, '').repeat(2),
+          kind,
+          clientId: client.clientId,
+          userId,
+          scopes: ['pins:read'],
+          resource: 'https://example.test/mcp',
+          expiresAt: later(),
+        })
+      const code = await codes.create({
+        codeHash: crypto.randomUUID().replace(/-/g, '').repeat(2),
+        clientId: client.clientId,
+        userId,
+        redirectUri: 'https://example.test/cb',
+        codeChallenge: 'challenge',
+        scopes: ['pins:read'],
+        resource: 'https://example.test/mcp',
+        expiresAt: later(),
+      })
+      return {
+        sessions,
+        tokens,
+        codes,
+        code,
+        kept: await makeSession(),
+        other: await makeSession(),
+        access: await makeToken('access'),
+        refresh: await makeToken('refresh'),
+      }
+    }
+
+    beforeEach(async () => {
+      await testPool.query('DELETE FROM oauth_authorization_codes')
+      await testPool.query('DELETE FROM oauth_tokens')
+      await testPool.query('DELETE FROM oauth_clients')
+    })
+
+    it('ends every session and OAuth token the user holds', async () => {
+      const { id: userId } = await insertUser(testPool)
+      const { sessions, tokens } = await seed(userId)
+
+      await repository.revokeSessionsAndTokens(userId)
+
+      expect(await sessions.findByUserId(userId)).toEqual([])
+      expect(await tokens.findActiveByUserId(userId)).toEqual([])
+    })
+
+    it('leaves no unused authorization code to exchange', async () => {
+      const { id: userId } = await insertUser(testPool)
+      const { codes, code } = await seed(userId)
+
+      await repository.revokeSessionsAndTokens(userId)
+
+      expect(await codes.consume(code.codeHash)).toBeNull()
+    })
+
+    it('keeps the one session it is told to keep', async () => {
+      const { id: userId } = await insertUser(testPool)
+      const { sessions, tokens, kept } = await seed(userId)
+
+      await repository.revokeSessionsAndTokens(userId, kept.id)
+
+      expect((await sessions.findByUserId(userId)).map(s => s.id)).toEqual([
+        kept.id,
+      ])
+      expect(await tokens.findActiveByUserId(userId)).toEqual([])
+    })
+
+    it("leaves other users' sessions and tokens alone", async () => {
+      const { id: userId } = await insertUser(testPool)
+      const { id: bystanderId } = await insertUser(testPool, {
+        emailHash: 'bystander_email',
+      })
+      await seed(userId)
+      const bystander = await seed(bystanderId)
+
+      await repository.revokeSessionsAndTokens(userId)
+
+      expect(await bystander.sessions.findByUserId(bystanderId)).toHaveLength(2)
+      expect(
+        await bystander.tokens.findActiveByUserId(bystanderId)
+      ).toHaveLength(2)
+      expect(
+        await bystander.codes.consume(bystander.code.codeHash)
+      ).not.toBeNull()
     })
   })
 })

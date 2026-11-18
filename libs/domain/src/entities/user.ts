@@ -1,5 +1,5 @@
-import type { Role } from './role.js'
-import type { UserStatus } from './user-status.js'
+import { Role } from './role.js'
+import { UserStatus } from './user-status.js'
 
 export interface User {
   id: string
@@ -23,8 +23,16 @@ export interface User {
 export type CreateUserData = Omit<
   User,
   'id' | 'roles' | 'status' | 'emailEncrypted' | 'createdAt' | 'updatedAt'
-> & { emailEncrypted?: string | null }
+> & { emailEncrypted?: string | null; roles?: Role[] }
 
 export type UpdateUserData = Partial<
   Omit<User, 'id' | 'roles' | 'createdAt' | 'updatedAt'>
 >
+
+/**
+ * Whether an account may use the app at all: let in off the waitlist and
+ * holding the User role.
+ */
+export function isAdmitted(user: User): boolean {
+  return user.status === UserStatus.Active && user.roles.includes(Role.User)
+}

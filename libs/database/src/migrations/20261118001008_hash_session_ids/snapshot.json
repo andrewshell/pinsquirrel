@@ -1,0 +1,1518 @@
+{
+  "version": "6",
+  "dialect": "mysql",
+  "id": "b818a634-f13a-4842-a5b3-f35369785245",
+  "prevIds": ["06fe1540-af64-4927-9516-de65fe3abc64"],
+  "ddl": [
+    {
+      "name": "oauth_authorization_codes",
+      "entityType": "tables"
+    },
+    {
+      "name": "oauth_clients",
+      "entityType": "tables"
+    },
+    {
+      "name": "oauth_tokens",
+      "entityType": "tables"
+    },
+    {
+      "name": "password_reset_tokens",
+      "entityType": "tables"
+    },
+    {
+      "name": "pins_tags",
+      "entityType": "tables"
+    },
+    {
+      "name": "pins",
+      "entityType": "tables"
+    },
+    {
+      "name": "sessions",
+      "entityType": "tables"
+    },
+    {
+      "name": "tags",
+      "entityType": "tables"
+    },
+    {
+      "name": "user_roles",
+      "entityType": "tables"
+    },
+    {
+      "name": "users",
+      "entityType": "tables"
+    },
+    {
+      "table": "oauth_authorization_codes",
+      "name": "id",
+      "type": "varchar(36)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_authorization_codes",
+      "name": "code_hash",
+      "type": "varchar(64)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_authorization_codes",
+      "name": "client_id",
+      "type": "varchar(255)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_authorization_codes",
+      "name": "user_id",
+      "type": "varchar(36)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_authorization_codes",
+      "name": "redirect_uri",
+      "type": "varchar(512)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_authorization_codes",
+      "name": "code_challenge",
+      "type": "varchar(128)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_authorization_codes",
+      "name": "scopes",
+      "type": "json",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_authorization_codes",
+      "name": "resource",
+      "type": "varchar(255)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_authorization_codes",
+      "name": "expires_at",
+      "type": "timestamp(3)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_authorization_codes",
+      "name": "consumed_at",
+      "type": "timestamp(3)",
+      "notNull": false,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_authorization_codes",
+      "name": "created_at",
+      "type": "timestamp(3)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": "(now())",
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_clients",
+      "name": "id",
+      "type": "varchar(36)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_clients",
+      "name": "client_id",
+      "type": "varchar(255)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_clients",
+      "name": "client_name",
+      "type": "varchar(255)",
+      "notNull": false,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_clients",
+      "name": "redirect_uris",
+      "type": "json",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_clients",
+      "name": "grant_types",
+      "type": "json",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_clients",
+      "name": "token_endpoint_auth_method",
+      "type": "varchar(64)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_clients",
+      "name": "registration_type",
+      "type": "enum('cimd','dcr','static')",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_clients",
+      "name": "metadata_url",
+      "type": "varchar(512)",
+      "notNull": false,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_clients",
+      "name": "metadata_fetched_at",
+      "type": "timestamp(3)",
+      "notNull": false,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_clients",
+      "name": "completed_at",
+      "type": "timestamp(3)",
+      "notNull": false,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_clients",
+      "name": "created_at",
+      "type": "timestamp(3)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": "(now())",
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "id",
+      "type": "varchar(36)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "token_hash",
+      "type": "varchar(64)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "kind",
+      "type": "enum('access','refresh')",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "client_id",
+      "type": "varchar(255)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "user_id",
+      "type": "varchar(36)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "scopes",
+      "type": "json",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "resource",
+      "type": "varchar(255)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "expires_at",
+      "type": "timestamp(3)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "revoked_at",
+      "type": "timestamp(3)",
+      "notNull": false,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "rotated_at",
+      "type": "timestamp(3)",
+      "notNull": false,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "rotated_from",
+      "type": "varchar(36)",
+      "notNull": false,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "created_at",
+      "type": "timestamp(3)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": "(now())",
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "password_reset_tokens",
+      "name": "id",
+      "type": "varchar(36)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "password_reset_tokens",
+      "name": "user_id",
+      "type": "varchar(36)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "password_reset_tokens",
+      "name": "token_hash",
+      "type": "varchar(255)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "password_reset_tokens",
+      "name": "expires_at",
+      "type": "timestamp(3)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "password_reset_tokens",
+      "name": "created_at",
+      "type": "timestamp(3)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": "(now())",
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "pins_tags",
+      "name": "pin_id",
+      "type": "varchar(36)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "pins_tags",
+      "name": "tag_id",
+      "type": "varchar(36)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "pins",
+      "name": "id",
+      "type": "varchar(36)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "pins",
+      "name": "user_id",
+      "type": "varchar(36)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "pins",
+      "name": "url",
+      "type": "text",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "pins",
+      "name": "url_hash",
+      "type": "varchar(32)",
+      "notNull": false,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "pins",
+      "name": "title",
+      "type": "varchar(255)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "pins",
+      "name": "description",
+      "type": "text",
+      "notNull": false,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "pins",
+      "name": "read_later",
+      "type": "boolean",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": "false",
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "pins",
+      "name": "is_private",
+      "type": "boolean",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": "false",
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "pins",
+      "name": "created_at",
+      "type": "timestamp(3)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": "(now())",
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "pins",
+      "name": "updated_at",
+      "type": "timestamp(3)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": "(now())",
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "sessions",
+      "name": "id",
+      "type": "varchar(64)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "sessions",
+      "name": "user_id",
+      "type": "varchar(36)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "sessions",
+      "name": "data",
+      "type": "json",
+      "notNull": false,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "sessions",
+      "name": "expires_at",
+      "type": "timestamp(3)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "sessions",
+      "name": "created_at",
+      "type": "timestamp(3)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": "(now())",
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tags",
+      "name": "id",
+      "type": "varchar(36)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tags",
+      "name": "user_id",
+      "type": "varchar(36)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tags",
+      "name": "name",
+      "type": "varchar(255)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tags",
+      "name": "created_at",
+      "type": "timestamp(3)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": "(now())",
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tags",
+      "name": "updated_at",
+      "type": "timestamp(3)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": "(now())",
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "user_roles",
+      "name": "user_id",
+      "type": "varchar(36)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "user_roles",
+      "name": "role",
+      "type": "varchar(255)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "user_roles",
+      "name": "created_at",
+      "type": "timestamp(3)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": "(now())",
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "users",
+      "name": "id",
+      "type": "varchar(36)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "users",
+      "name": "username",
+      "type": "varchar(255)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "users",
+      "name": "password_hash",
+      "type": "varchar(255)",
+      "notNull": false,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "users",
+      "name": "email_hash",
+      "type": "varchar(255)",
+      "notNull": false,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "users",
+      "name": "email_encrypted",
+      "type": "text",
+      "notNull": false,
+      "autoIncrement": false,
+      "default": null,
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "users",
+      "name": "status",
+      "type": "enum('unverified','waitlist','active')",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": "'unverified'",
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "users",
+      "name": "created_at",
+      "type": "timestamp(3)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": "(now())",
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "users",
+      "name": "updated_at",
+      "type": "timestamp(3)",
+      "notNull": true,
+      "autoIncrement": false,
+      "default": "(now())",
+      "onUpdateNow": false,
+      "onUpdateNowFsp": null,
+      "charSet": null,
+      "collation": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "pins_tags",
+      "name": "PRIMARY",
+      "columns": ["pin_id", "tag_id"],
+      "entityType": "pks"
+    },
+    {
+      "table": "user_roles",
+      "name": "PRIMARY",
+      "columns": ["user_id", "role"],
+      "entityType": "pks"
+    },
+    {
+      "table": "oauth_authorization_codes",
+      "name": "PRIMARY",
+      "columns": ["id"],
+      "entityType": "pks"
+    },
+    {
+      "table": "oauth_clients",
+      "name": "PRIMARY",
+      "columns": ["id"],
+      "entityType": "pks"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "PRIMARY",
+      "columns": ["id"],
+      "entityType": "pks"
+    },
+    {
+      "table": "password_reset_tokens",
+      "name": "PRIMARY",
+      "columns": ["id"],
+      "entityType": "pks"
+    },
+    {
+      "table": "pins",
+      "name": "PRIMARY",
+      "columns": ["id"],
+      "entityType": "pks"
+    },
+    {
+      "table": "sessions",
+      "name": "PRIMARY",
+      "columns": ["id"],
+      "entityType": "pks"
+    },
+    {
+      "table": "tags",
+      "name": "PRIMARY",
+      "columns": ["id"],
+      "entityType": "pks"
+    },
+    {
+      "table": "users",
+      "name": "PRIMARY",
+      "columns": ["id"],
+      "entityType": "pks"
+    },
+    {
+      "table": "oauth_authorization_codes",
+      "name": "oauth_authorization_codes_dNKAO9Tc2g7T_fkey",
+      "columns": ["client_id"],
+      "tableTo": "oauth_clients",
+      "columnsTo": ["client_id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "oauth_authorization_codes",
+      "name": "oauth_authorization_codes_user_id_users_id_fkey",
+      "columns": ["user_id"],
+      "tableTo": "users",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "oauth_tokens_client_id_oauth_clients_client_id_fkey",
+      "columns": ["client_id"],
+      "tableTo": "oauth_clients",
+      "columnsTo": ["client_id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "oauth_tokens_user_id_users_id_fkey",
+      "columns": ["user_id"],
+      "tableTo": "users",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "password_reset_tokens",
+      "name": "password_reset_tokens_user_id_users_id_fk",
+      "columns": ["user_id"],
+      "tableTo": "users",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "pins_tags",
+      "name": "pins_tags_pin_id_pins_id_fk",
+      "columns": ["pin_id"],
+      "tableTo": "pins",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "pins_tags",
+      "name": "pins_tags_tag_id_tags_id_fk",
+      "columns": ["tag_id"],
+      "tableTo": "tags",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "pins",
+      "name": "pins_user_id_users_id_fk",
+      "columns": ["user_id"],
+      "tableTo": "users",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "sessions",
+      "name": "sessions_user_id_users_id_fk",
+      "columns": ["user_id"],
+      "tableTo": "users",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "tags",
+      "name": "tags_user_id_users_id_fk",
+      "columns": ["user_id"],
+      "tableTo": "users",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "user_roles",
+      "name": "user_roles_user_id_users_id_fk",
+      "columns": ["user_id"],
+      "tableTo": "users",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "oauth_authorization_codes",
+      "name": "code_hash_unique",
+      "columns": [
+        {
+          "value": "code_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "using": null,
+      "algorithm": null,
+      "lock": null,
+      "nameExplicit": false,
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_clients",
+      "name": "client_id_unique",
+      "columns": [
+        {
+          "value": "client_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "using": null,
+      "algorithm": null,
+      "lock": null,
+      "nameExplicit": false,
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "token_hash_unique",
+      "columns": [
+        {
+          "value": "token_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "using": null,
+      "algorithm": null,
+      "lock": null,
+      "nameExplicit": false,
+      "entityType": "indexes"
+    },
+    {
+      "table": "password_reset_tokens",
+      "name": "password_reset_tokens_token_hash_unique",
+      "columns": [
+        {
+          "value": "token_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "using": null,
+      "algorithm": null,
+      "lock": null,
+      "nameExplicit": false,
+      "entityType": "indexes"
+    },
+    {
+      "table": "users",
+      "name": "users_username_unique",
+      "columns": [
+        {
+          "value": "username",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "using": null,
+      "algorithm": null,
+      "lock": null,
+      "nameExplicit": false,
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_authorization_codes",
+      "name": "oauth_authorization_codes_expires_at_idx",
+      "columns": [
+        {
+          "value": "expires_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "using": null,
+      "algorithm": null,
+      "lock": null,
+      "nameExplicit": true,
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_clients",
+      "name": "oauth_clients_incomplete_idx",
+      "columns": [
+        {
+          "value": "registration_type",
+          "isExpression": false
+        },
+        {
+          "value": "completed_at",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "using": null,
+      "algorithm": null,
+      "lock": null,
+      "nameExplicit": true,
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "oauth_tokens_expires_at_idx",
+      "columns": [
+        {
+          "value": "expires_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "using": null,
+      "algorithm": null,
+      "lock": null,
+      "nameExplicit": true,
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "oauth_tokens_user_client_idx",
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false
+        },
+        {
+          "value": "client_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "using": null,
+      "algorithm": null,
+      "lock": null,
+      "nameExplicit": true,
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_tokens",
+      "name": "oauth_tokens_rotated_from_idx",
+      "columns": [
+        {
+          "value": "rotated_from",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "using": null,
+      "algorithm": null,
+      "lock": null,
+      "nameExplicit": true,
+      "entityType": "indexes"
+    },
+    {
+      "table": "password_reset_tokens",
+      "name": "password_reset_tokens_expires_at_idx",
+      "columns": [
+        {
+          "value": "expires_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "using": null,
+      "algorithm": null,
+      "lock": null,
+      "nameExplicit": true,
+      "entityType": "indexes"
+    },
+    {
+      "table": "pins",
+      "name": "pins_user_id_url_hash_idx",
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false
+        },
+        {
+          "value": "url_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "using": null,
+      "algorithm": null,
+      "lock": null,
+      "nameExplicit": true,
+      "entityType": "indexes"
+    },
+    {
+      "table": "pins",
+      "name": "pins_user_id_created_at_idx",
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "using": null,
+      "algorithm": null,
+      "lock": null,
+      "nameExplicit": true,
+      "entityType": "indexes"
+    },
+    {
+      "table": "sessions",
+      "name": "sessions_expires_at_idx",
+      "columns": [
+        {
+          "value": "expires_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "using": null,
+      "algorithm": null,
+      "lock": null,
+      "nameExplicit": true,
+      "entityType": "indexes"
+    },
+    {
+      "table": "tags",
+      "name": "tags_user_id_name_idx",
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false
+        },
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "using": null,
+      "algorithm": null,
+      "lock": null,
+      "nameExplicit": true,
+      "entityType": "indexes"
+    },
+    {
+      "table": "users",
+      "name": "users_email_hash_idx",
+      "columns": [
+        {
+          "value": "email_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "using": null,
+      "algorithm": null,
+      "lock": null,
+      "nameExplicit": true,
+      "entityType": "indexes"
+    }
+  ],
+  "renames": []
+}

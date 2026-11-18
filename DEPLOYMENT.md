@@ -27,6 +27,20 @@ The database user needs CREATE, ALTER and DROP. Migrations are idempotent; nothi
 instances migrating at once, so start one instance first after a release that carries a
 migration.
 
+The new container migrates while the old one may still be serving, and the old code runs against
+the migrated schema until it stops. Stop the old container before the new one starts when a
+migration rewrites data the old code reads. `20261118001008_hash_session_ids` is one: it replaces
+each session id with its SHA-256, so the old code no longer finds any session. A user who reaches
+the old container after the migration has their cookie cleared and must sign in again. A session
+the old container creates after the migration is stored under the plain token, and the new code
+cannot find it either. Rolling back to code from before that migration ends every session.
+
+## Memory
+
+Password hashing uses scrypt with N=2^17, which needs about 128 MiB per derivation. Node runs
+derivations on the libuv thread pool, 4 threads by default, so concurrent sign-ins, sign-ups and
+password changes can add about 512 MiB above the baseline. Size the container for that.
+
 ## Environment
 
 `apps/hono/.env.example` is the template; the table below is what each variable does in

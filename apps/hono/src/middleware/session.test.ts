@@ -1,12 +1,29 @@
+import { createHash } from 'node:crypto'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
+import { Role, UserStatus } from '@pinsquirrel/domain'
 import {
   sessionMiddleware,
   requireAuth,
   getSessionManager,
   getAuthUser,
 } from './session'
+
+const alice = {
+  id: 'user-456',
+  username: 'alice',
+  roles: [Role.User],
+  status: UserStatus.Active,
+}
+
+const sha256 = (value: string) =>
+  createHash('sha256').update(value).digest('hex')
+
+function cookieSetBy(res: Response, name: string): string | undefined {
+  const header = res.headers.getSetCookie().find(h => h.startsWith(`${name}=`))
+  return header?.split(';')[0]!.slice(name.length + 1)
+}
 
 // Create mock functions
 const mockIsValidSession = vi.fn()
@@ -101,8 +118,8 @@ describe('Session Middleware', () => {
 
       expect(json.isAuthenticated).toBe(true)
       expect(json.userId).toBe('user-456')
-      expect(mockIsValidSession).toHaveBeenCalledWith('session-123')
-      expect(mockFindById).toHaveBeenCalledWith('session-123')
+      expect(mockIsValidSession).toHaveBeenCalledWith(sha256('session-123'))
+      expect(mockFindById).toHaveBeenCalledWith(sha256('session-123'))
     })
 
     it('returns user from database', async () => {
@@ -186,13 +203,18 @@ describe('Session Middleware', () => {
 
       expect(json.success).toBe(true)
       expect(mockCreate).toHaveBeenCalledWith({
+        id: expect.any(String),
         userId: 'user-456',
         data: { userId: 'user-456', keepSignedIn: true },
         expiresAt: expect.any(Date),
       })
 
+      const token = cookieSetBy(res, '__session')!
+      const { id } = mockCreate.mock.calls[0][0] as { id: string }
+      expect(id).toBe(sha256(token))
+      expect(token).not.toBe(id)
+
       const setCookie = res.headers.get('set-cookie')
-      expect(setCookie).toContain('__session=new-session-789')
       expect(setCookie).toContain('HttpOnly')
       expect(setCookie).toContain('SameSite=Lax')
     })
@@ -216,13 +238,14 @@ describe('Session Middleware', () => {
       const res = await app.request('/login', { method: 'POST' })
 
       expect(mockCreate).toHaveBeenCalledWith({
+        id: expect.any(String),
         userId: 'user-456',
         data: { userId: 'user-456', keepSignedIn: false },
         expiresAt: expect.any(Date),
       })
 
       const setCookie = res.headers.get('set-cookie')
-      expect(setCookie).toContain('__session=new-session-789')
+      expect(cookieSetBy(res, '__session')).toBeTruthy()
       // Should NOT contain Max-Age for session cookies
       expect(setCookie).not.toContain('Max-Age=2592000')
     })
@@ -400,7 +423,7 @@ describe('requireAuth Middleware', () => {
     mockFindById.mockResolvedValue(mockSession)
     // requireAuth now resolves the user as well as checking the session, so a
     // request only counts as authenticated if the user row is actually there.
-    mockFindUserById.mockResolvedValue({ id: 'user-456', username: 'alice' })
+    mockFindUserById.mockResolvedValue(alice)
 
     app.get('/protected', requireAuth(), c => {
       return c.json({ protected: true })
@@ -444,7 +467,7 @@ describe('requireAuth Middleware', () => {
     })
 
     it('exposes the resolved user to handlers via getAuthUser', async () => {
-      mockFindUserById.mockResolvedValue({ id: 'user-456', username: 'alice' })
+      mockFindUserById.mockResolvedValue(alice)
 
       app.get('/protected', requireAuth(), c => {
         return c.json({ username: getAuthUser(c).username })
@@ -457,7 +480,7 @@ describe('requireAuth Middleware', () => {
     })
 
     it('resolves the user exactly once per request', async () => {
-      mockFindUserById.mockResolvedValue({ id: 'user-456', username: 'alice' })
+      mockFindUserById.mockResolvedValue(alice)
 
       app.get('/protected', requireAuth(), c => {
         getAuthUser(c)
@@ -488,12 +511,42 @@ describe('requireAuth Middleware', () => {
       expect(handler).not.toHaveBeenCalled()
     })
 
+    it('ends the session of a user who no longer holds the User role', async () => {
+      mockFindUserById.mockResolvedValue({ ...alice, roles: [] })
+      mockDelete.mockResolvedValue(true)
+
+      const handler = vi.fn((c: Context) => c.json({ reached: true }))
+      app.get('/pins', requireAuth(), handler)
+
+      const res = await app.request('/pins', authedRequest)
+
+      expect(handler).not.toHaveBeenCalled()
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toMatch(/^\/signin/)
+      expect(mockDelete).toHaveBeenCalledWith(validSession.id)
+    })
+
+    it('ends the session of a user who is no longer active', async () => {
+      mockFindUserById.mockResolvedValue({
+        ...alice,
+        status: UserStatus.Waitlist,
+      })
+
+      const handler = vi.fn((c: Context) => c.json({ reached: true }))
+      app.get('/pins', requireAuth(), handler)
+
+      const res = await app.request('/pins', authedRequest)
+
+      expect(handler).not.toHaveBeenCalled()
+      expect(res.headers.get('location')).toMatch(/^\/signin/)
+    })
+
     it('throws rather than returning undefined when requireAuth is missing', async () => {
       // Wiring guard: if a router loses its requireAuth(), handlers calling
       // getAuthUser must fail loudly (500) instead of proceeding with an
       // undefined user, which would read as "no user" and silently skip
       // ownership checks.
-      mockFindUserById.mockResolvedValue({ id: 'user-456', username: 'alice' })
+      mockFindUserById.mockResolvedValue(alice)
 
       app.get('/unguarded', c => c.json({ id: getAuthUser(c).id }))
 

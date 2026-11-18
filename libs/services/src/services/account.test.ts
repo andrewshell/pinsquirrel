@@ -73,6 +73,7 @@ describe('AccountService', () => {
       deleteByUserId: vi.fn(),
       deleteExpiredTokens: vi.fn(),
       isValidToken: vi.fn(),
+      consume: vi.fn().mockResolvedValue(true),
     }
 
     mockEmailService = {
@@ -112,11 +113,9 @@ describe('AccountService', () => {
         passwordHash: null,
         emailHash: 'hashed_test@example.com',
         emailEncrypted: null,
+        roles: [Role.User],
       })
-      expect(mockUserRepository.addRole).toHaveBeenCalledWith(
-        mockUser.id,
-        'User'
-      )
+      expect(mockUserRepository.addRole).not.toHaveBeenCalled()
     })
 
     it('should seal the email when an email sealer is configured', async () => {
@@ -145,6 +144,7 @@ describe('AccountService', () => {
         passwordHash: null,
         emailHash: 'hashed_test@example.com',
         emailEncrypted: 'sealed-email-blob',
+        roles: [Role.User],
       })
     })
 
@@ -796,6 +796,9 @@ describe('AccountService', () => {
       expect(mockPasswordResetRepository.deleteByUserId).toHaveBeenCalledWith(
         mockPasswordResetToken.userId
       )
+      expect(mockUserRepository.revokeSessionsAndTokens).toHaveBeenCalledWith(
+        mockUser.id
+      )
     })
 
     it('should promote an unverified user to the waitlist when they set their password', async () => {
@@ -859,6 +862,35 @@ describe('AccountService', () => {
       ).rejects.toThrow(ResetTokenExpiredError)
 
       expect(mockUserRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('changes the password once when one token is submitted twice at once', async () => {
+      vi.mocked(mockPasswordResetRepository.findByTokenHash).mockResolvedValue(
+        mockPasswordResetToken
+      )
+      vi.mocked(mockPasswordResetRepository.isValidToken).mockResolvedValue(
+        true
+      )
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
+      vi.mocked(mockPasswordResetRepository.consume)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false)
+
+      const results = await Promise.allSettled([
+        accountService.resetPassword({
+          token: 'mock-token',
+          newPassword: 'FirstPassword123!',
+        }),
+        accountService.resetPassword({
+          token: 'mock-token',
+          newPassword: 'SecondPassword456!',
+        }),
+      ])
+
+      expect(mockUserRepository.update).toHaveBeenCalledTimes(1)
+      const rejected = results.filter(r => r.status === 'rejected')
+      expect(rejected).toHaveLength(1)
+      expect(rejected[0].reason).toBeInstanceOf(InvalidResetTokenError)
     })
 
     it('should throw validation error for invalid password', async () => {

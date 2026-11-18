@@ -7,6 +7,7 @@ export interface Session {
 }
 
 export interface CreateSessionData {
+  id: string
   userId: string
   data?: Record<string, unknown> | null
   expiresAt: Date

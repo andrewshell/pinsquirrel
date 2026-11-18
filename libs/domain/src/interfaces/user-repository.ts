@@ -22,4 +22,19 @@ export interface UserRepository extends Repository<
    * asking about.
    */
   countByRole(role: Role): Promise<number>
+  /**
+   * Write `next` as the password hash only if the stored one is still
+   * `expected`. Resolves false when it was changed in the meantime.
+   */
+  replacePasswordHash(
+    id: string,
+    expected: string,
+    next: string
+  ): Promise<boolean>
+  /**
+   * End every web session, OAuth token and unused authorization code issued
+   * to a user, all or nothing, except the one session named by
+   * `keepSessionId`.
+   */
+  revokeSessionsAndTokens(userId: string, keepSessionId?: string): Promise<void>
 }
