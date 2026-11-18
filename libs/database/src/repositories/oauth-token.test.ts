@@ -269,7 +269,7 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
   })
 
   describe('deleteExpiredTokens', () => {
-    it('should delete every token that can never authenticate again', async () => {
+    it('should delete every expired or revoked token', async () => {
       const live = await repository.create(token())
 
       const expired = await repository.create(token())
@@ -278,16 +278,30 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
       const revoked = await repository.create(token())
       await repository.revoke(revoked.id)
 
-      const rotated = await repository.create(token({ kind: 'refresh' }))
-      await repository.markRotated(rotated.id)
+      const rotatedAndExpired = await repository.create(
+        token({ kind: 'refresh' })
+      )
+      await repository.markRotated(rotatedAndExpired.id)
+      await expire(rotatedAndExpired.id)
 
       const deleted = await repository.deleteExpiredTokens()
 
       expect(deleted).toBe(3)
       expect(await repository.findById(live.id)).not.toBeNull()
-      for (const dead of [expired, revoked, rotated]) {
+      for (const dead of [expired, revoked, rotatedAndExpired]) {
         expect(await repository.findById(dead.id)).toBeNull()
       }
+    })
+
+    // A retired refresh token presented again is how a leaked chain is
+    // detected, and that needs the row.
+    it('should keep a rotated refresh token until its own expiry', async () => {
+      const rotated = await repository.create(token({ kind: 'refresh' }))
+      await repository.markRotated(rotated.id)
+
+      await repository.deleteExpiredTokens()
+
+      expect(await repository.findById(rotated.id)).not.toBeNull()
     })
 
     it('should return 0 when every token is still live', async () => {

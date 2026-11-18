@@ -1033,6 +1033,20 @@ describe('OAuthService.exchangeRefreshToken', () => {
     }
   )
 
+  // The retired row is what records a revocation that landed mid-refresh, so
+  // not finding it cannot be read as "not revoked".
+  it('takes back the new tokens when the retired token has gone missing', async () => {
+    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(null)
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+    expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
+      user.id,
+      CIMD_URL
+    )
+  })
+
   it('refuses a token the user revoked', async () => {
     vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
       storedRefresh({ revokedAt: new Date() })
