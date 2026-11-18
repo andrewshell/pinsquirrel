@@ -106,6 +106,39 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       const result = await repository.findByUsername('nonexistent')
       expect(result).toBeNull()
     })
+
+    it('loads the user with all of its roles', async () => {
+      const created = await repository.create({
+        username: `roles-${crypto.randomUUID().slice(0, 8)}`,
+        passwordHash: 'h',
+        emailHash: null,
+        roles: [Role.User, Role.Admin],
+      })
+
+      const found = await repository.findByUsername(created.username)
+
+      expect(found?.roles.sort()).toEqual([Role.Admin, Role.User].sort())
+    })
+
+    // Sign-in looks a username up before it checks the password. A second
+    // query only for names that exist would make response time say which do.
+    it('makes the same number of queries whether or not the user exists', async () => {
+      const { username } = await insertUser(testPool)
+      const queries: string[] = []
+      const counted = new DrizzleUserRepository(
+        drizzle({
+          client: testPool,
+          logger: { logQuery: query => queries.push(query) },
+        })
+      )
+
+      await counted.findByUsername(username)
+      const forExisting = queries.length
+      queries.length = 0
+      await counted.findByUsername(`missing-${crypto.randomUUID()}`)
+
+      expect(queries.length).toBe(forExisting)
+    })
   })
   describe('findByStatus', () => {
     it('returns only users with the given status', async () => {
