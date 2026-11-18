@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { UserStatus } from '@pinsquirrel/domain'
 import { app } from './app'
 import {
@@ -263,9 +263,12 @@ beforeAll(async () => {
 
   // The real signup service, so the user, its `User` role and its email hash
   // are made the way a real account is.
-  await accountService.register({ username, email })
-  const user = await userRepository.findByUsername(username)
-  if (!user) throw new Error('Signup did not create the test user')
+  accountService.register({ username, email })
+  const user = await vi.waitFor(async () => {
+    const created = await userRepository.findByUsername(username)
+    if (!created) throw new Error('Signup did not create the test user')
+    return created
+  })
   userId = user.id
   await userRepository.update(userId, { status: UserStatus.Active })
 

@@ -30,16 +30,23 @@ import type { EmailSealer } from './authentication.js'
 
 export const RESET_REQUEST_WINDOW_MS = 60 * 60 * 1000
 const RESET_REQUESTS_PER_WINDOW = 3
+const RESET_LINK_LIFETIME_MS = 15 * 60 * 1000
 
-/**
- * The account lifecycle operations that depend on the email pipeline:
- * registration, email changes, and password recovery.
- *
- * Split out of AuthenticationService so that service could drop to a single
- * required dependency. Everything here needs the reset-token store and a way
- * to send mail; nothing here is reachable without them.
- */
+export interface RegistrationInput {
+  username: string
+  email: string
+  resetUrl?: string
+  notifyEmail?: string
+  signinUrl?: string
+  signupUrl?: string
+}
+
 export interface AccountServiceOptions {
+  /**
+   * Runs work the caller's response must not wait for or learn the outcome
+   * of. The composition root decides how failures are logged.
+   */
+  defer: (work: () => Promise<void>) => void
   /**
    * Optional by design: an install that keeps no contactable copy of user
    * emails simply has no key, and every use below stores null instead.
@@ -49,7 +56,20 @@ export interface AccountServiceOptions {
   emailHashKey?: string
 }
 
+/**
+ * The account lifecycle operations that depend on the email pipeline:
+ * registration, email changes, and password recovery.
+ *
+ * Split out of AuthenticationService so that service could drop to a single
+ * required dependency. Everything here needs the reset-token store and a way
+ * to send mail; nothing here is reachable without them.
+ *
+ * Registration and reset requests validate their input and defer the rest,
+ * so whether an address is registered changes neither the answer nor how
+ * long it takes, and a mail failure never reaches the caller.
+ */
 export class AccountService {
+  private readonly defer: AccountServiceOptions['defer']
   private readonly emailSealer?: EmailSealer
   private readonly emailHashKey?: string
 
@@ -57,77 +77,58 @@ export class AccountService {
     private readonly userRepository: UserRepository,
     private readonly passwordResetRepository: PasswordResetRepository,
     private readonly emailService: EmailService,
-    options: AccountServiceOptions = {}
+    options: AccountServiceOptions
   ) {
+    this.defer = options.defer
     this.emailSealer = options.emailSealer
     this.emailHashKey = options.emailHashKey
   }
 
-  async register(input: {
-    username: string
-    email: string
-    resetUrl?: string
-    notifyEmail?: string
-    signinUrl?: string
-    signupUrl?: string
-  }): Promise<{ emailFailed: boolean }> {
-    // Validate inputs at service boundary
+  register(input: RegistrationInput): void {
     const result = registrationSchema.safeParse(input)
     if (!result.success) {
       throw validationErrorFromZod(result.error)
     }
 
-    // Check for existing username and email
+    this.defer(() => this.completeRegistration(input))
+  }
+
+  private async completeRegistration(input: RegistrationInput): Promise<void> {
     const existingUserByUsername = await this.userRepository.findByUsername(
       input.username
     )
     const existingUserByEmail = await this.findUserByEmail(input.email)
 
-    // Handle conflicts without revealing which field conflicted
     if (existingUserByEmail) {
-      // Email already registered — notify the email owner privately
       if (input.signinUrl) {
-        try {
-          await this.emailService.sendEmailAlreadyRegisteredEmail(
-            input.email,
-            input.signinUrl
-          )
-        } catch {
-          // Don't fail if notification email fails
-        }
+        await this.emailService.sendEmailAlreadyRegisteredEmail(
+          input.email,
+          input.signinUrl
+        )
       }
-      return { emailFailed: false }
+      return
     }
 
     if (existingUserByUsername) {
-      // Username taken — notify the provided email privately
       if (input.signupUrl) {
-        try {
-          await this.emailService.sendUsernameTakenEmail(
-            input.email,
-            input.username,
-            input.signupUrl
-          )
-        } catch {
-          // Don't fail if notification email fails
-        }
+        await this.emailService.sendUsernameTakenEmail(
+          input.email,
+          input.username,
+          input.signupUrl
+        )
       }
-      return { emailFailed: false }
+      return
     }
 
-    // Seal the email (if a public key is configured) so the waitlist can be
-    // contacted later. The server cannot decrypt this.
     const emailEncrypted = this.emailSealer
       ? await this.emailSealer.seal(input.email)
       : null
 
-    // Create user without password (they'll set it via email verification)
+    let user: User
     try {
-      await this.userRepository.create({
+      user = await this.userRepository.create({
         username: input.username,
-        passwordHash: null, // No password yet - they'll set it via email verification
-        // Hashed here rather than reusing a binding from the duplicate check:
-        // this is the stored value, and the lookup above hides its own hashing.
+        passwordHash: null,
         emailHash: hashEmail(input.email, this.emailHashKey),
         emailEncrypted,
         roles: [Role.User],
@@ -135,42 +136,32 @@ export class AccountService {
     } catch (error) {
       // Two signups for the same username or email can pass the checks above
       // at the same moment; the unique indexes are what actually stop the
-      // second one. Answer exactly as if this signup had lost by a
-      // millisecond and been caught by the check — the alternative is a 500
-      // that tells the caller an account exists.
-      if (error instanceof UserAlreadyExistsError) {
-        return { emailFailed: false }
-      }
+      // second one.
+      if (error instanceof UserAlreadyExistsError) return
       throw error
     }
 
-    // Auto-trigger password reset email for verification if URL provided
-    let emailFailed = false
-    if (input.resetUrl) {
-      try {
-        await this.requestPasswordReset({
-          email: input.email,
-          resetUrl: input.resetUrl,
-        })
-      } catch {
-        emailFailed = true
-      }
-    }
-
-    // Send signup notification email if notifyEmail is provided
-    if (input.notifyEmail) {
-      try {
-        await this.emailService.sendSignupNotificationEmail(
-          input.notifyEmail,
+    const { notifyEmail } = input
+    if (notifyEmail) {
+      this.defer(() =>
+        this.emailService.sendSignupNotificationEmail(
+          notifyEmail,
           input.username,
           input.email
         )
-      } catch {
-        // Don't fail registration if notification email fails
-      }
+      )
     }
 
-    return { emailFailed }
+    if (input.resetUrl) {
+      const token = await this.issueResetToken(user.id, RESET_LINK_LIFETIME_MS)
+      if (token) {
+        await this.emailService.sendPasswordResetEmail(
+          input.email,
+          token,
+          input.resetUrl
+        )
+      }
+    }
   }
 
   /**
@@ -223,11 +214,7 @@ export class AccountService {
     })
   }
 
-  async requestPasswordReset(input: {
-    email: string
-    resetUrl: string
-  }): Promise<string | null> {
-    // Validate email at service boundary
+  requestPasswordReset(input: { email: string; resetUrl: string }): void {
     const emailResult = emailSchema.safeParse(input.email)
     if (!emailResult.success) {
       throw validationErrorFromZod(emailResult.error, {
@@ -235,17 +222,19 @@ export class AccountService {
       })
     }
 
-    const user = await this.findUserByEmail(input.email)
+    this.defer(() => this.sendResetLink(input))
+  }
 
-    // Don't reveal whether the email exists or not for security
-    if (!user) {
-      return null
-    }
+  private async sendResetLink(input: {
+    email: string
+    resetUrl: string
+  }): Promise<void> {
+    const user = await this.findUserByEmail(input.email)
+    if (!user) return
 
     // Opportunistically backfill the sealed email for users created before
-    // sealing existed (their email_encrypted is null). This is the one flow
-    // where we have the plaintext email for an existing account. Best-effort:
-    // a sealing or write failure must never abort the password reset itself.
+    // sealing existed (their email_encrypted is null). This is one of the few
+    // flows where we have the plaintext email for an existing account.
     if (this.emailSealer && !user.emailEncrypted) {
       try {
         const emailEncrypted = await this.emailSealer.seal(input.email)
@@ -255,37 +244,41 @@ export class AccountService {
       }
     }
 
-    const existingTokens = await this.passwordResetRepository.findByUserId(
-      user.id
-    )
-    const windowStart = new Date(Date.now() - RESET_REQUEST_WINDOW_MS)
-    const recentTokens = existingTokens.filter(
-      token => token.createdAt > windowStart
-    )
-    // Over the limit answers exactly like an unknown address.
-    if (recentTokens.length >= RESET_REQUESTS_PER_WINDOW) {
-      return null
-    }
+    const token = await this.issueResetToken(user.id, RESET_LINK_LIFETIME_MS)
+    if (!token) return
 
-    // Generate new token
-    const token = generateSecureToken()
-    const tokenHash = hashToken(token)
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 minutes from now
-
-    // Store the hashed token
-    await this.passwordResetRepository.create({
-      userId: user.id,
-      tokenHash,
-      expiresAt,
-    })
-
-    // Send the email with the plain token
     await this.emailService.sendPasswordResetEmail(
       input.email,
       token,
       input.resetUrl
     )
+  }
 
+  /**
+   * A new set-password token for the user, or null once the user has had
+   * RESET_REQUESTS_PER_WINDOW of them within the window, which bounds the
+   * mail any one address can be sent.
+   */
+  private async issueResetToken(
+    userId: string,
+    lifetimeMs: number
+  ): Promise<string | null> {
+    const existingTokens =
+      await this.passwordResetRepository.findByUserId(userId)
+    const windowStart = new Date(Date.now() - RESET_REQUEST_WINDOW_MS)
+    const recentTokens = existingTokens.filter(
+      token => token.createdAt > windowStart
+    )
+    if (recentTokens.length >= RESET_REQUESTS_PER_WINDOW) {
+      return null
+    }
+
+    const token = generateSecureToken()
+    await this.passwordResetRepository.create({
+      userId,
+      tokenHash: hashToken(token),
+      expiresAt: new Date(Date.now() + lifetimeMs),
+    })
     return token
   }
 

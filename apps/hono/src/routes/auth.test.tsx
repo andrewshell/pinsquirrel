@@ -411,7 +411,7 @@ describe('auth routes', () => {
 
   describe('POST /signup', () => {
     it('registers and reports success', async () => {
-      auth.register.mockResolvedValue({ emailFailed: false })
+      auth.register.mockReturnValue(undefined)
 
       const res = await app.request(
         '/signup',
@@ -426,7 +426,7 @@ describe('auth routes', () => {
     })
 
     it('builds the emailed links from the configured origin, not the request host', async () => {
-      auth.register.mockResolvedValue({ emailFailed: false })
+      auth.register.mockReturnValue(undefined)
 
       await app.request(
         'http://app.test/signup',
@@ -442,19 +442,6 @@ describe('auth routes', () => {
       )
     })
 
-    it('still reports success when the confirmation email fails', async () => {
-      auth.register.mockResolvedValue({ emailFailed: true })
-
-      const res = await app.request(
-        '/signup',
-        form({ username: 'a', email: 'a@example.test' })
-      )
-      const html = await res.text()
-
-      expect(res.status).toBe(200)
-      expect(html).toContain('trouble sending')
-    })
-
     it('returns 429 from the IP limiter without registering', async () => {
       limiter.ipLimited.mockReturnValue(true)
 
@@ -468,9 +455,9 @@ describe('auth routes', () => {
     })
 
     it('surfaces validation errors as 400', async () => {
-      auth.register.mockRejectedValue(
-        new ValidationError({ email: ['invalid'] })
-      )
+      auth.register.mockImplementation(() => {
+        throw new ValidationError({ email: ['invalid'] })
+      })
 
       const res = await app.request(
         '/signup',
@@ -483,7 +470,7 @@ describe('auth routes', () => {
 
   describe('POST /forgot-password', () => {
     it('renders the success state, not merely a 200', async () => {
-      auth.requestPasswordReset.mockResolvedValue(undefined)
+      auth.requestPasswordReset.mockReturnValue(undefined)
 
       const res = await app.request(
         '/forgot-password',
@@ -501,7 +488,7 @@ describe('auth routes', () => {
     ])(
       'builds the reset link from the configured origin for %s (%s)',
       async url => {
-        auth.requestPasswordReset.mockResolvedValue(undefined)
+        auth.requestPasswordReset.mockReturnValue(undefined)
 
         await app.request(url, form({ email: 'a@example.test' }))
 
@@ -518,12 +505,12 @@ describe('auth routes', () => {
       // both, and the route must not branch on the result. Asserting the two
       // bodies are byte-identical is the property; a status-only assertion
       // would pass even if the page said "no such account".
-      auth.requestPasswordReset.mockResolvedValue(undefined)
+      auth.requestPasswordReset.mockReturnValue(undefined)
       const known = await (
         await app.request('/forgot-password', form({ email: 'a@example.test' }))
       ).text()
 
-      auth.requestPasswordReset.mockResolvedValue(undefined)
+      auth.requestPasswordReset.mockReturnValue(undefined)
       const unknown = await (
         await app.request('/forgot-password', form({ email: 'b@example.test' }))
       ).text()
@@ -545,9 +532,9 @@ describe('auth routes', () => {
     })
 
     it('surfaces validation errors as 400', async () => {
-      auth.requestPasswordReset.mockRejectedValue(
-        new ValidationError({ email: ['invalid'] })
-      )
+      auth.requestPasswordReset.mockImplementation(() => {
+        throw new ValidationError({ email: ['invalid'] })
+      })
 
       const res = await app.request('/forgot-password', form({ email: 'nope' }))
 
@@ -555,7 +542,9 @@ describe('auth routes', () => {
     })
 
     it('returns 500 for an unexpected failure', async () => {
-      auth.requestPasswordReset.mockRejectedValue(new Error('smtp down'))
+      auth.requestPasswordReset.mockImplementation(() => {
+        throw new Error('smtp down')
+      })
 
       const res = await app.request(
         '/forgot-password',
@@ -569,9 +558,9 @@ describe('auth routes', () => {
       // The route used to string-match error.message for 'Too many' and answer
       // 429. Rate limiting is the middleware's job - see the IP-limiter case
       // above - so a service error is just an error, whatever it happens to say.
-      auth.requestPasswordReset.mockRejectedValue(
-        new Error('Too many open connections to the mail provider')
-      )
+      auth.requestPasswordReset.mockImplementation(() => {
+        throw new Error('Too many open connections to the mail provider')
+      })
 
       const res = await app.request(
         '/forgot-password',
@@ -823,7 +812,9 @@ describe('auth routes', () => {
     })
 
     it('re-renders a failed sign-up in embed when the form said so', async () => {
-      auth.register.mockRejectedValue(new ValidationError({ email: ['bad'] }))
+      auth.register.mockImplementation(() => {
+        throw new ValidationError({ email: ['bad'] })
+      })
 
       const html = await (
         await app.request(
@@ -837,7 +828,7 @@ describe('auth routes', () => {
     })
 
     it('renders the forgot-password success in embed when the form said so', async () => {
-      auth.requestPasswordReset.mockResolvedValue(undefined)
+      auth.requestPasswordReset.mockReturnValue(undefined)
 
       const html = await (
         await app.request(

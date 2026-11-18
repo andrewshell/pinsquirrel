@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { createMockUserRepository } from '../test-utils.js'
+import { createDeferQueue, createMockUserRepository } from '../test-utils.js'
 import { AccountService } from './account.js'
 import { NullEmailService } from './null-email.js'
 import type {
@@ -40,6 +40,7 @@ describe('AccountService', () => {
   let mockUserRepository: UserRepository
   let mockPasswordResetRepository: PasswordResetRepository
   let mockEmailService: EmailService
+  let queue: ReturnType<typeof createDeferQueue>
 
   const mockUser: User = {
     id: '123e4567-e89b-12d3-a456-426614174000',
@@ -87,10 +88,12 @@ describe('AccountService', () => {
       sendUsernameTakenEmail: vi.fn(),
     }
 
+    queue = createDeferQueue()
     accountService = new AccountService(
       mockUserRepository,
       mockPasswordResetRepository,
-      mockEmailService
+      mockEmailService,
+      { defer: queue.defer }
     )
   })
 
@@ -106,7 +109,8 @@ describe('AccountService', () => {
         email: 'test@example.com',
       }
 
-      await accountService.register(registerInput)
+      accountService.register(registerInput)
+      await queue.flush()
 
       expect(mockUserRepository.findByUsername).toHaveBeenCalledWith('testuser')
       expect(mockUserRepository.findByEmailHash).toHaveBeenCalledWith(
@@ -130,17 +134,18 @@ describe('AccountService', () => {
         mockUserRepository,
         mockPasswordResetRepository,
         mockEmailService,
-        { emailSealer }
+        { defer: queue.defer, emailSealer }
       )
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
       vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
       vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
       vi.mocked(mockUserRepository.addRole).mockResolvedValue()
 
-      await service.register({
+      service.register({
         username: 'testuser',
         email: 'test@example.com',
       })
+      await queue.flush()
 
       expect(emailSealer.seal).toHaveBeenCalledWith('test@example.com')
       expect(mockUserRepository.create).toHaveBeenCalledWith({
@@ -163,7 +168,8 @@ describe('AccountService', () => {
         signupUrl: 'http://localhost/signup',
       }
 
-      await accountService.register(registerInput)
+      accountService.register(registerInput)
+      await queue.flush()
 
       expect(mockEmailService.sendUsernameTakenEmail).toHaveBeenCalledWith(
         'new@example.com',
@@ -186,7 +192,8 @@ describe('AccountService', () => {
         signinUrl: 'http://localhost/signin',
       }
 
-      await accountService.register(registerInput)
+      accountService.register(registerInput)
+      await queue.flush()
 
       expect(
         mockEmailService.sendEmailAlreadyRegisteredEmail
@@ -205,13 +212,13 @@ describe('AccountService', () => {
         new UserAlreadyExistsError('newuser')
       )
 
-      const result = await accountService.register({
+      accountService.register({
         username: 'newuser',
         email: 'test@example.com',
         signinUrl: 'http://localhost/signin',
       })
+      await queue.flush()
 
-      expect(result).toEqual({ emailFailed: false })
       expect(mockUserRepository.addRole).not.toHaveBeenCalled()
     })
 
@@ -228,7 +235,8 @@ describe('AccountService', () => {
         signinUrl: 'http://localhost/signin',
       }
 
-      await accountService.register(registerInput)
+      accountService.register(registerInput)
+      await queue.flush()
 
       expect(
         mockEmailService.sendEmailAlreadyRegisteredEmail
@@ -250,30 +258,30 @@ describe('AccountService', () => {
         signupUrl: 'http://localhost/signup',
       }
 
-      // Should not throw even though email sending fails
-      await accountService.register(registerInput)
+      accountService.register(registerInput)
 
+      await expect(queue.flush()).rejects.toThrow('Email service failed')
       expect(mockUserRepository.create).not.toHaveBeenCalled()
     })
 
-    it('should throw validation error for invalid username', async () => {
+    it('should throw validation error for invalid username', () => {
       const registerInput = {
         username: 'ab', // too short
         email: 'test@example.com',
       }
 
-      await expect(accountService.register(registerInput)).rejects.toThrow(
+      expect(() => accountService.register(registerInput)).toThrow(
         'Username must be at least 3 characters'
       )
     })
 
-    it('should throw validation error for invalid email', async () => {
+    it('should throw validation error for invalid email', () => {
       const registerInput = {
         username: 'testuser',
         email: 'invalid-email',
       }
 
-      await expect(accountService.register(registerInput)).rejects.toThrow(
+      expect(() => accountService.register(registerInput)).toThrow(
         'Invalid email address'
       )
     })
@@ -295,7 +303,8 @@ describe('AccountService', () => {
         notifyEmail: 'admin@example.com',
       }
 
-      await accountService.register(registerInput)
+      accountService.register(registerInput)
+      await queue.flush()
 
       expect(mockEmailService.sendSignupNotificationEmail).toHaveBeenCalledWith(
         'admin@example.com',
@@ -315,28 +324,15 @@ describe('AccountService', () => {
         email: 'test@example.com',
       }
 
-      await accountService.register(registerInput)
+      accountService.register(registerInput)
+      await queue.flush()
 
       expect(
         mockEmailService.sendSignupNotificationEmail
       ).not.toHaveBeenCalled()
     })
 
-    it('should return emailFailed false on successful registration', async () => {
-      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
-      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
-      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
-      vi.mocked(mockUserRepository.addRole).mockResolvedValue()
-
-      const result = await accountService.register({
-        username: 'testuser',
-        email: 'test@example.com',
-      })
-
-      expect(result).toEqual({ emailFailed: false })
-    })
-
-    it('should return emailFailed true when verification email fails', async () => {
+    it('answers a new account the same way when the verification mail fails', async () => {
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
       // First call (register check) returns null, second call (requestPasswordReset) returns user
       vi.mocked(mockUserRepository.findByEmailHash)
@@ -352,13 +348,13 @@ describe('AccountService', () => {
         new Error('Email service unavailable')
       )
 
-      const result = await accountService.register({
+      accountService.register({
         username: 'testuser',
         email: 'test@example.com',
         resetUrl: 'http://localhost/reset-password',
       })
 
-      expect(result).toEqual({ emailFailed: true })
+      await expect(queue.flush()).rejects.toThrow('Email service unavailable')
       expect(mockUserRepository.create).toHaveBeenCalled()
     })
 
@@ -377,59 +373,108 @@ describe('AccountService', () => {
         notifyEmail: 'admin@example.com',
       }
 
-      // Should not throw even though email sending fails
-      await accountService.register(registerInput)
+      accountService.register(registerInput)
 
+      await expect(queue.flush()).rejects.toThrow('Email service failed')
       expect(mockEmailService.sendSignupNotificationEmail).toHaveBeenCalled()
     })
   })
 
   describe('with no email provider configured', () => {
-    it('reports emailFailed rather than claiming the email was sent', async () => {
+    const taken = { ...mockUser, emailHash: 'hashed_someone@example.test' }
+    const signup = {
+      username: 'newperson',
+      email: 'someone@example.test',
+      resetUrl: 'https://x.test/reset-password',
+      signinUrl: 'https://x.test/signin',
+      signupUrl: 'https://x.test/signup',
+    }
+
+    it('answers a new account and a taken email identically', async () => {
       const service = new AccountService(
         mockUserRepository,
         mockPasswordResetRepository,
-        new NullEmailService()
+        new NullEmailService(),
+        { defer: queue.defer }
       )
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
-      // First call is register's duplicate check (no match); the second is the
-      // lookup inside requestPasswordReset, by which point the user exists.
-      vi.mocked(mockUserRepository.findByEmailHash)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValue(mockUser)
-      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
-      vi.mocked(mockUserRepository.addRole).mockResolvedValue()
       vi.mocked(mockPasswordResetRepository.findByUserId).mockResolvedValue([])
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
 
-      const result = await service.register({
-        username: 'testuser',
-        email: 'test@example.com',
-        resetUrl: 'http://localhost/reset-password',
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(taken)
+      expect(() => service.register(signup)).not.toThrow()
+      await expect(queue.flush()).rejects.toThrow(
+        'Email delivery is not configured'
+      )
+
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
+      expect(() => service.register(signup)).not.toThrow()
+      await expect(queue.flush()).rejects.toThrow(
+        'Email delivery is not configured'
+      )
+      expect(mockUserRepository.create).toHaveBeenCalledTimes(1)
+    })
+
+    it('answers forgot-password for a registered and an unknown address alike', async () => {
+      const service = new AccountService(
+        mockUserRepository,
+        mockPasswordResetRepository,
+        new NullEmailService(),
+        { defer: queue.defer }
+      )
+      vi.mocked(mockPasswordResetRepository.findByUserId).mockResolvedValue([])
+      const input = {
+        email: 'someone@example.test',
+        resetUrl: 'https://x.test',
+      }
+
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
+      expect(() => service.requestPasswordReset(input)).not.toThrow()
+      await expect(queue.flush()).resolves.toBeUndefined()
+
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(taken)
+      expect(() => service.requestPasswordReset(input)).not.toThrow()
+      await expect(queue.flush()).rejects.toThrow(
+        'Email delivery is not configured'
+      )
+    })
+
+    it('does not hold forgot-password open on the mail send', async () => {
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(taken)
+      vi.mocked(mockPasswordResetRepository.findByUserId).mockResolvedValue([])
+      vi.mocked(mockEmailService.sendPasswordResetEmail).mockReturnValue(
+        new Promise<void>(() => {})
+      )
+
+      accountService.requestPasswordReset({
+        email: 'someone@example.test',
+        resetUrl: 'https://x.test',
       })
 
-      expect(result.emailFailed).toBe(true)
-      // The account is still created; only delivery failed.
-      expect(mockUserRepository.create).toHaveBeenCalled()
+      await vi.waitFor(() =>
+        expect(mockEmailService.sendPasswordResetEmail).toHaveBeenCalled()
+      )
     })
 
     it('still creates the account when the signup notification cannot send', async () => {
       const service = new AccountService(
         mockUserRepository,
         mockPasswordResetRepository,
-        new NullEmailService()
+        new NullEmailService(),
+        { defer: queue.defer }
       )
       vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
       vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
       vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
       vi.mocked(mockUserRepository.addRole).mockResolvedValue()
 
-      await expect(
-        service.register({
-          username: 'testuser',
-          email: 'test@example.com',
-          notifyEmail: 'ops@example.com',
-        })
-      ).resolves.toBeDefined()
+      service.register({
+        username: 'testuser',
+        email: 'test@example.com',
+        notifyEmail: 'ops@example.com',
+      })
+      await expect(queue.flush()).rejects.toThrow()
+      expect(mockUserRepository.create).toHaveBeenCalled()
     })
   })
 
@@ -476,7 +521,7 @@ describe('AccountService', () => {
         mockUserRepository,
         mockPasswordResetRepository,
         mockEmailService,
-        { emailSealer }
+        { defer: queue.defer, emailSealer }
       )
       vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
       vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
@@ -532,7 +577,7 @@ describe('AccountService', () => {
         mockUserRepository,
         mockPasswordResetRepository,
         mockEmailService,
-        { emailHashKey: 'server-secret' }
+        { defer: queue.defer, emailHashKey: 'server-secret' }
       )
 
     it('stores the keyed hash for a new account', async () => {
@@ -540,10 +585,11 @@ describe('AccountService', () => {
       vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
       vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
 
-      await keyed().register({
+      keyed().register({
         username: 'testuser',
         email: 'test@example.com',
       })
+      await queue.flush()
 
       expect(mockUserRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({ emailHash: 'keyed_test@example.com' })
@@ -560,10 +606,11 @@ describe('AccountService', () => {
         mockPasswordResetToken
       )
 
-      await keyed().requestPasswordReset({
+      keyed().requestPasswordReset({
         email: 'test@example.com',
         resetUrl: 'https://example.com/reset',
       })
+      await queue.flush()
 
       expect(mockUserRepository.update).toHaveBeenCalledWith(legacy.id, {
         emailHash: 'keyed_test@example.com',
@@ -584,10 +631,11 @@ describe('AccountService', () => {
         mockPasswordResetToken
       )
 
-      await keyed().requestPasswordReset({
+      keyed().requestPasswordReset({
         email: 'test@example.com',
         resetUrl: 'https://example.com/reset',
       })
+      await queue.flush()
 
       expect(mockUserRepository.findByEmailHash).toHaveBeenCalledTimes(1)
       expect(mockUserRepository.update).not.toHaveBeenCalled()
@@ -609,10 +657,11 @@ describe('AccountService', () => {
       )
       vi.mocked(mockEmailService.sendPasswordResetEmail).mockResolvedValue()
 
-      const result = await accountService.requestPasswordReset({
+      accountService.requestPasswordReset({
         email: 'test@example.com',
         resetUrl: 'https://example.com/reset',
       })
+      await queue.flush()
 
       expect(mockUserRepository.findByEmailHash).toHaveBeenCalledWith(
         'hashed_test@example.com'
@@ -628,7 +677,6 @@ describe('AccountService', () => {
         'mock-token',
         'https://example.com/reset'
       )
-      expect(result).toBe('mock-token')
     })
 
     it('should backfill the sealed email when missing and a sealer is configured', async () => {
@@ -637,7 +685,7 @@ describe('AccountService', () => {
         mockUserRepository,
         mockPasswordResetRepository,
         mockEmailService,
-        { emailSealer }
+        { defer: queue.defer, emailSealer }
       )
       const userMissingSeal = {
         ...mockUser,
@@ -653,10 +701,11 @@ describe('AccountService', () => {
       )
       vi.mocked(mockEmailService.sendPasswordResetEmail).mockResolvedValue()
 
-      await service.requestPasswordReset({
+      service.requestPasswordReset({
         email: 'test@example.com',
         resetUrl: 'https://example.com/reset',
       })
+      await queue.flush()
 
       expect(emailSealer.seal).toHaveBeenCalledWith('test@example.com')
       expect(mockUserRepository.update).toHaveBeenCalledWith(
@@ -671,7 +720,7 @@ describe('AccountService', () => {
         mockUserRepository,
         mockPasswordResetRepository,
         mockEmailService,
-        { emailSealer }
+        { defer: queue.defer, emailSealer }
       )
       const userWithSeal = {
         ...mockUser,
@@ -687,10 +736,11 @@ describe('AccountService', () => {
       )
       vi.mocked(mockEmailService.sendPasswordResetEmail).mockResolvedValue()
 
-      await service.requestPasswordReset({
+      service.requestPasswordReset({
         email: 'test@example.com',
         resetUrl: 'https://example.com/reset',
       })
+      await queue.flush()
 
       expect(emailSealer.seal).not.toHaveBeenCalled()
       expect(mockUserRepository.update).not.toHaveBeenCalled()
@@ -702,7 +752,7 @@ describe('AccountService', () => {
         mockUserRepository,
         mockPasswordResetRepository,
         mockEmailService,
-        { emailSealer }
+        { defer: queue.defer, emailSealer }
       )
       const userMissingSeal = {
         ...mockUser,
@@ -722,31 +772,31 @@ describe('AccountService', () => {
       )
       vi.mocked(mockEmailService.sendPasswordResetEmail).mockResolvedValue()
 
-      const result = await service.requestPasswordReset({
+      service.requestPasswordReset({
         email: 'test@example.com',
         resetUrl: 'https://example.com/reset',
       })
+      await queue.flush()
 
       expect(mockUserRepository.update).toHaveBeenCalled()
       expect(mockPasswordResetRepository.create).toHaveBeenCalled()
       expect(mockEmailService.sendPasswordResetEmail).toHaveBeenCalled()
-      expect(result).toBe('mock-token')
     })
 
     it('should not reveal if email does not exist', async () => {
       vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
 
-      const result = await accountService.requestPasswordReset({
+      accountService.requestPasswordReset({
         email: 'nonexistent@example.com',
         resetUrl: 'https://example.com/reset',
       })
+      await queue.flush()
 
       expect(mockUserRepository.findByEmailHash).toHaveBeenCalledWith(
         'hashed_nonexistent@example.com'
       )
       expect(mockPasswordResetRepository.create).not.toHaveBeenCalled()
       expect(mockEmailService.sendPasswordResetEmail).not.toHaveBeenCalled()
-      expect(result).toBeNull()
     })
 
     it('answers a request over the limit like an unknown address, sending nothing', async () => {
@@ -775,12 +825,11 @@ describe('AccountService', () => {
         recentTokens
       )
 
-      await expect(
-        accountService.requestPasswordReset({
-          email: 'test@example.com',
-          resetUrl: 'https://example.com/reset',
-        })
-      ).resolves.toBeNull()
+      accountService.requestPasswordReset({
+        email: 'test@example.com',
+        resetUrl: 'https://example.com/reset',
+      })
+      await queue.flush()
 
       expect(mockPasswordResetRepository.create).not.toHaveBeenCalled()
       expect(mockEmailService.sendPasswordResetEmail).not.toHaveBeenCalled()
@@ -811,31 +860,29 @@ describe('AccountService', () => {
       const service = new AccountService(
         mockUserRepository,
         repository,
-        mockEmailService
+        mockEmailService,
+        { defer: queue.defer }
       )
       vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(mockUser)
 
-      const results = []
       for (let i = 0; i < 4; i++) {
-        results.push(
-          await service.requestPasswordReset({
-            email: 'test@example.com',
-            resetUrl: 'https://example.com/reset',
-          })
-        )
+        service.requestPasswordReset({
+          email: 'test@example.com',
+          resetUrl: 'https://example.com/reset',
+        })
+        await queue.flush()
       }
 
       expect(mockEmailService.sendPasswordResetEmail).toHaveBeenCalledTimes(3)
-      expect(results[3]).toBeNull()
     })
 
-    it('should throw validation error for invalid email', async () => {
-      await expect(
+    it('should throw validation error for invalid email', () => {
+      expect(() =>
         accountService.requestPasswordReset({
           email: 'invalid-email',
           resetUrl: 'https://example.com/reset',
         })
-      ).rejects.toThrow('Invalid email address')
+      ).toThrow('Invalid email address')
     })
   })
 

@@ -9,7 +9,6 @@ interface SignUpPageProps {
   email?: string
   success?: boolean
   message?: string
-  showResendLink?: boolean
   embed?: boolean
 }
 
@@ -19,7 +18,6 @@ export const SignUpPage: FC<SignUpPageProps> = ({
   email = '',
   success = false,
   message,
-  showResendLink = false,
   embed = false,
 }) => {
   return (
@@ -56,22 +54,11 @@ export const SignUpPage: FC<SignUpPageProps> = ({
                   <SuccessMessage message={message} className="mb-4" />
                 )}
                 <p class="text-muted-foreground mb-4">
-                  {showResendLink
-                    ? 'If you don\u2019t receive an email, you can request a new one.'
-                    : 'We\u2019ve sent you an email with a link to confirm your spot and set your password. Check your inbox (and spam folder) and click the link. We\u2019re opening access in batches and will let you in soon.'}
+                  We’ve sent you an email with a link to confirm your spot and
+                  set your password. Check your inbox (and spam folder) and
+                  click the link. We’re opening access in batches and will let
+                  you in soon.
                 </p>
-                {showResendLink && (
-                  <a
-                    href={withEmbed('/forgot-password', embed)}
-                    class="block w-full px-4 py-2 mb-4 text-center bg-primary text-primary-foreground font-medium
-                           border-2 border-foreground neobrutalism-shadow
-                           hover:neobrutalism-shadow-hover hover:translate-x-[-2px] hover:translate-y-[-2px]
-                           active:neobrutalism-shadow-pressed active:translate-x-[2px] active:translate-y-[2px]
-                           transition-all"
-                  >
-                    Resend Verification Email
-                  </a>
-                )}
                 <a
                   href={withEmbed('/signin', embed)}
                   class="block w-full px-4 py-2 text-center bg-secondary text-secondary-foreground font-medium

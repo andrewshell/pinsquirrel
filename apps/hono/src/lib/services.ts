@@ -16,6 +16,7 @@ import {
   type EmailSealer,
 } from '@pinsquirrel/services'
 import { oauthConfig } from './config'
+import { logger, safeError } from './logger'
 import {
   userRepository,
   tagRepository,
@@ -80,7 +81,15 @@ export const accountService = new AccountService(
   userRepository,
   passwordResetRepository,
   emailService,
-  { emailSealer, emailHashKey }
+  {
+    defer: work => {
+      work().catch((error: unknown) => {
+        logger.error({ err: safeError(error) }, 'Deferred account work failed')
+      })
+    },
+    emailSealer,
+    emailHashKey,
+  }
 )
 export const pinService = new PinService(pinRepository, tagRepository)
 export const pinboardService = new PinboardService(pinService)

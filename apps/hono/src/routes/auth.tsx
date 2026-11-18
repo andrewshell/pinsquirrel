@@ -177,7 +177,7 @@ auth.post(
     const embed = getString(formData.embed) === '1'
 
     try {
-      const result = await accountService.register({
+      accountService.register({
         username,
         email,
         resetUrl: `${baseUrl}/reset-password`,
@@ -185,18 +185,6 @@ auth.post(
         signinUrl: `${baseUrl}/signin`,
         signupUrl: `${baseUrl}/signup`,
       })
-
-      if (result.emailFailed) {
-        logger.error('Verification email failed to send during signup')
-        return c.html(
-          <SignUpPage
-            success={true}
-            message="You're on the waitlist, but we had trouble sending your confirmation email."
-            showResendLink={true}
-            embed={embed}
-          />
-        )
-      }
 
       // Always show success - conflicts are communicated privately via email
       return c.html(
@@ -263,7 +251,7 @@ auth.post(
 
     try {
       // Request password reset - service handles validation
-      await accountService.requestPasswordReset({
+      accountService.requestPasswordReset({
         email,
         resetUrl: `${baseUrl}/reset-password`,
       })
