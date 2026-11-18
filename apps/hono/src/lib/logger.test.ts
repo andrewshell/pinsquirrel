@@ -1,3 +1,4 @@
+import pino from 'pino'
 import { describe, it, expect } from 'vitest'
 import { safeError } from './logger'
 
@@ -39,26 +40,43 @@ describe('safeError', () => {
     expect(JSON.stringify(logged)).not.toContain('alice')
   })
 
-  it('keeps the MySQL error code and message under a failed query', () => {
-    const logged = safeError(
-      new QueryError(
-        'insert into `oauth_tokens` values (?)',
-        ['alice'],
-        mysqlError(
-          'ER_LOCK_DEADLOCK',
-          1213,
-          'Deadlock found when trying to get lock; try restarting transaction'
-        )
+  const deadlock = () =>
+    new QueryError(
+      'insert into `oauth_tokens` values (?)',
+      ['alice'],
+      mysqlError(
+        'ER_LOCK_DEADLOCK',
+        1213,
+        'Deadlock found when trying to get lock; try restarting transaction'
       )
     )
 
-    expect(logged.cause).toMatchObject({
+  it('keeps the MySQL error code and message under a failed query', () => {
+    const logged = safeError(deadlock())
+
+    expect(logged).toMatchObject({
+      message: 'Failed query: insert into `oauth_tokens` values (?)',
       code: 'ER_LOCK_DEADLOCK',
       errno: 1213,
-      message:
+      cause:
         'Deadlock found when trying to get lock; try restarting transaction',
     })
     expect(JSON.stringify(logged)).not.toContain('alice')
+  })
+
+  // Logged under `err`, it passes through pino's error serializer, which
+  // folds an error-shaped cause into the message and drops its fields.
+  it('keeps the MySQL error code through the logger error serializer', () => {
+    const serialized = pino.stdSerializers.err(
+      safeError(deadlock()) as unknown as Error
+    )
+
+    expect(serialized).toMatchObject({
+      code: 'ER_LOCK_DEADLOCK',
+      errno: 1213,
+      cause:
+        'Deadlock found when trying to get lock; try restarting transaction',
+    })
   })
 
   // MySQL repeats the offending value in some messages, which is the same
@@ -87,7 +105,7 @@ describe('safeError', () => {
         )
       )
 
-      expect(logged.cause?.message).toBe(expected)
+      expect(logged.cause).toBe(expected)
       expect(JSON.stringify(logged)).not.toContain('alice')
     }
   )
