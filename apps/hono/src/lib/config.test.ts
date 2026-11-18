@@ -222,8 +222,25 @@ describe('resolveStaticOAuthClients', () => {
           { client_id: 'acme', client_name: 'Acme', redirect_uris: [uri] },
         ]),
       })
-    ).toThrow(/OAUTH_STATIC_CLIENTS is invalid.*no fragment or userinfo/)
+    ).toThrow(/OAUTH_STATIC_CLIENTS is invalid.*no fragment, userinfo/)
   })
+
+  it.each([
+    ' https://acme.example.com/callback',
+    'https://acme.example.com/callback\t',
+    'https://acme.example.com/call\u0000back',
+  ])(
+    'fails at boot on a redirect URI with whitespace or a control character: %j',
+    uri => {
+      expect(() =>
+        resolveStaticOAuthClients({
+          OAUTH_STATIC_CLIENTS: JSON.stringify([
+            { client_id: 'acme', client_name: 'Acme', redirect_uris: [uri] },
+          ]),
+        })
+      ).toThrow(/OAUTH_STATIC_CLIENTS is invalid.*control characters/)
+    }
+  )
 
   it('fails at boot on a redirect URI longer than 512 characters, naming the redirect URI rule', () => {
     expect(() =>

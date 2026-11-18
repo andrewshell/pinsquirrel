@@ -163,16 +163,20 @@ export type ClientIdMetadataDocument = z.infer<
   typeof clientIdMetadataDocumentSchema
 >
 
-export const REDIRECT_URI_RULE = `must be https, or http on loopback, at most ${String(MAX_REDIRECT_URI_LENGTH)} characters, with no fragment or userinfo`
+export const REDIRECT_URI_RULE = `must be https, or http on loopback, at most ${String(MAX_REDIRECT_URI_LENGTH)} characters, with no fragment, userinfo, control characters or surrounding whitespace`
 
 /**
  * A redirect URI this server is willing to send a browser to: https, or http
  * on a loopback host (RFC 8252 section 7.3). No fragment (RFC 6749 section
  * 3.1.2), no userinfo, which only hides the host from a reader, and no longer
- * than the authorization code's `redirect_uri` column.
+ * than the authorization code's `redirect_uri` column. The string is stored
+ * and matched as sent, and `URL` would strip surrounding whitespace and a tab
+ * or newline before checking, so those and every other control character are
+ * refused here.
  */
 export function isUsableRedirectUri(uri: string): boolean {
   if (uri.length > MAX_REDIRECT_URI_LENGTH) return false
+  if (/^\s|\s$|\p{Cc}/u.test(uri)) return false
   if (uri.includes('#') || hasUserinfo(uri)) return false
   let url: URL
   try {

@@ -747,8 +747,10 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     the link unspent.
 48. **The redirect URI rules hold at authorize, not only when a client is stored.** A redirect
     URI that does not parse, is longer than 512 characters, has a loopback port above 65535,
-    or has userinfo (an empty one included) is refused as `invalid_redirect_uri`, whether a
-    DCR, CIMD or static client carries it. A client row stored
+    has userinfo (an empty one included), or has surrounding whitespace or a control
+    character is refused as `invalid_redirect_uri`, whether a DCR, CIMD or static client
+    carries it. The URI is stored and matched as sent, so one `URL` would quietly trim is
+    refused rather than stored with the padding. A client row stored
     before a rule existed can still hold a URI that breaks it, so `authorize` checks the
     request's `redirect_uri` against the same rules and shows the error page when it fails.
     The refusal is per URI and at authorize only: the client's other redirect URIs keep

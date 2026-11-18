@@ -517,6 +517,20 @@ describe('OAuthService.resolveClient', () => {
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
+  it('refuses a document with a control character in a redirect URI as invalid_redirect_uri and stores nothing', async () => {
+    vi.mocked(ctx.fetcher.fetch).mockResolvedValue(
+      JSON.stringify({
+        ...cimdDocument,
+        redirect_uris: ['https://client.example/c\tb'],
+      })
+    )
+
+    await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(
+      OAuthInvalidRedirectUriError
+    )
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
   it('refuses a document it could not fetch at all, keeping why as the cause', async () => {
     const failure = new Error('ECONNREFUSED')
     vi.mocked(ctx.fetcher.fetch).mockRejectedValue(failure)
@@ -638,6 +652,8 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
     ['a fragment', 'https://client.example/cb#frag'],
     ['userinfo', 'https://u@client.example/cb'],
     ['plain http off loopback', 'http://client.example/cb'],
+    ['a trailing space', 'https://client.example/cb '],
+    ['an embedded newline', 'https://client.example/c\nb'],
   ])(
     'refuses a stored client whose redirect URI has %s',
     async (_, registered) => {
@@ -2103,6 +2119,13 @@ describe('OAuthService.registerClient', () => {
     ['a value that is not a URI', 'not a uri'],
     ['a loopback port above 65535', 'http://127.0.0.1:99999/callback'],
     ['a script scheme', 'javascript:alert(1)'],
+    ['a leading space', ' https://client.example/cb'],
+    ['a trailing space', 'https://client.example/cb '],
+    ['a trailing tab', 'https://client.example/cb\t'],
+    ['an embedded newline', 'https://client.example/c\nb'],
+    ['a NUL', '\0https://client.example/cb'],
+    ['another C0 control character', 'https://client.example/c\u0001b'],
+    ['a DEL', 'https://client.example/c\u007fb'],
   ])('refuses %s as invalid_redirect_uri', async (_, uri) => {
     await expect(
       ctx.service.registerClient(registration({ redirect_uris: [uri] }))
@@ -2615,6 +2638,17 @@ describe('OAuthService.reconcileStaticClients', () => {
         ...acme,
         redirectUris: [`https://acme.example.com/${'a'.repeat(500)}`],
       },
+    ])
+
+    expect(failures.map(failure => failure.error)).toEqual([
+      expect.any(OAuthInvalidRedirectUriError),
+    ])
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('reports a redirect URI with surrounding whitespace as invalid_redirect_uri', async () => {
+    const failures = await ctx.service.reconcileStaticClients([
+      { ...acme, redirectUris: [' https://acme.example.com/callback\n'] },
     ])
 
     expect(failures.map(failure => failure.error)).toEqual([
