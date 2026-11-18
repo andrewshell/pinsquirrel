@@ -413,9 +413,9 @@ export class OAuthService {
    *
    * The code is read and checked first. One that was already spent takes the
    * tokens it produced down with it, when the client it was issued to presents
-   * it. A code that passes is spent and its
-   * tokens are written in one step (`exchange`), so a failure in between
-   * leaves the client a code that still works. A code that fails a check is
+   * it. A code that passes is spent and its tokens are written in one step
+   * (`exchange`), so a failure in between leaves the client a code that still
+   * works. A code that fails a check is
    * spent anyway, because a failed check must not leave a code alive to try
    * again with a different verifier. A check that could not be made, because
    * the database was unreachable, spends nothing.
