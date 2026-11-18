@@ -13,7 +13,11 @@
  */
 
 /**
- * IPv4 ranges that must never be fetched, as [network, prefix length].
+ * IPv4 ranges that must never be fetched, as [network, prefix length]: every
+ * block in the IANA special-purpose registry that is not globally reachable,
+ * and the documentation and benchmarking blocks besides. None of them is
+ * somewhere a public web server lives, and several are somewhere a private
+ * one does.
  *
  * Prefix-string matching cannot express these: it blocks all of `172.*` when
  * only `172.16.0.0/12` is private, and it misses `169.254.169.254` — the cloud
@@ -22,10 +26,19 @@
 const BLOCKED_IPV4_CIDRS: [string, number][] = [
   ['0.0.0.0', 8], // "this network" — 0.0.0.0 reaches the local host
   ['10.0.0.0', 8], // RFC 1918 private
+  ['100.64.0.0', 10], // shared address space: CGNAT, Tailscale, cloud internals
   ['127.0.0.0', 8], // loopback, not just 127.0.0.1
   ['169.254.0.0', 16], // link-local, including cloud metadata
   ['172.16.0.0', 12], // RFC 1918 private — 172.16–172.31 only
+  ['192.0.0.0', 24], // IETF protocol assignments
+  ['192.0.2.0', 24], // documentation
+  ['192.88.99.0', 24], // retired 6to4 relay anycast
   ['192.168.0.0', 16], // RFC 1918 private
+  ['198.18.0.0', 15], // benchmarking
+  ['198.51.100.0', 24], // documentation
+  ['203.0.113.0', 24], // documentation
+  ['224.0.0.0', 4], // multicast
+  ['240.0.0.0', 4], // reserved, and 255.255.255.255 broadcast
 ]
 
 /** Is this four dot-separated decimal octets, each within range? */
@@ -91,31 +104,63 @@ function ipv6ToBytes(address: string): number[] | null {
   return [...headBytes, ...Array<number>(gap).fill(0), ...tailBytes]
 }
 
+/**
+ * Global unicast is `2000::/3`. Everything outside it (loopback, unique local,
+ * link-local, site-local, multicast, local-use NAT64) is somewhere other than
+ * the public internet, so the IPv6 check allows in rather than blocks out.
+ */
+function isGlobalUnicast(bytes: number[]): boolean {
+  return (bytes[0] & 0xe0) === 0x20
+}
+
+/**
+ * The IPv4 address an IPv6 address carries, when it is one of the forms that
+ * route to that IPv4 address: IPv4-mapped (`::ffff:0:0/96`), IPv4-compatible
+ * (`::/96`, which also covers `::` and `::1`), NAT64 (`64:ff9b::/96`) and
+ * 6to4 (`2002::/16`). Deciding on the IPv6 form alone would let
+ * `64:ff9b::a9fe:a9fe` reach `169.254.169.254` through a NAT64 gateway.
+ */
+function embeddedIpv4(bytes: number[]): string | null {
+  const zeros = (from: number, to: number) =>
+    bytes.slice(from, to).every(byte => byte === 0)
+
+  if (zeros(0, 10) && bytes[10] === 0xff && bytes[11] === 0xff) {
+    return bytes.slice(12).join('.')
+  }
+  if (zeros(0, 12)) return bytes.slice(12).join('.')
+  const isNat64 =
+    bytes[0] === 0x00 &&
+    bytes[1] === 0x64 &&
+    bytes[2] === 0xff &&
+    bytes[3] === 0x9b &&
+    zeros(4, 12)
+  if (isNat64) return bytes.slice(12).join('.')
+  if (bytes[0] === 0x20 && bytes[1] === 0x02) return bytes.slice(2, 6).join('.')
+  return null
+}
+
 export function isBlockedIpv6(address: string): boolean {
   const bytes = ipv6ToBytes(address)
   // An address we cannot parse is not an address we are willing to fetch.
   if (bytes === null) return true
 
-  // IPv4-mapped (::ffff:0:0/96): decide on the IPv4 address it carries, or
-  // `::ffff:169.254.169.254` walks straight past the IPv4 list.
-  const isMappedIpv4 =
-    bytes.slice(0, 10).every(byte => byte === 0) &&
-    bytes[10] === 0xff &&
-    bytes[11] === 0xff
-  if (isMappedIpv4) {
-    return isBlockedIpv4(bytes.slice(12).join('.'))
-  }
+  const ipv4 = embeddedIpv4(bytes)
+  if (ipv4 !== null) return isBlockedIpv4(ipv4)
 
-  // ::1 loopback and :: unspecified
-  if (bytes.slice(0, 15).every(byte => byte === 0) && bytes[15] <= 1) {
-    return true
-  }
+  if (!isGlobalUnicast(bytes)) return true
 
-  // fc00::/7 unique local
-  if ((bytes[0] & 0xfe) === 0xfc) return true
+  // 2001::/23 IETF protocol assignments, including Teredo (2001::/32), which
+  // carries an obfuscated IPv4 address of its own.
+  if (bytes[0] === 0x20 && bytes[1] === 0x01 && bytes[2] < 0x02) return true
 
-  // fe80::/10 link-local
-  if (bytes[0] === 0xfe && (bytes[1] & 0xc0) === 0x80) return true
+  // 2001:db8::/32 and 3fff::/20 documentation
+  const isDocumentation2001 =
+    bytes[0] === 0x20 &&
+    bytes[1] === 0x01 &&
+    bytes[2] === 0x0d &&
+    bytes[3] === 0xb8
+  if (isDocumentation2001) return true
+  if (bytes[0] === 0x3f && bytes[1] === 0xff && bytes[2] < 0x10) return true
 
   return false
 }
