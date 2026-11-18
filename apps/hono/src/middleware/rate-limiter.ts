@@ -33,9 +33,12 @@ export function reserve(
   if (retryAfterMs > 0) return { limited: true, retryAfterMs }
 
   for (const [limiter, key] of buckets) limiter.record(key, now)
+  let released = false
   return {
     limited: false,
     release: () => {
+      if (released) return
+      released = true
       for (const [limiter, key] of buckets) limiter.forget(key, now)
     },
   }

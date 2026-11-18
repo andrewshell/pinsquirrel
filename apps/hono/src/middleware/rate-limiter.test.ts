@@ -229,5 +229,16 @@ describe('RateLimiter', () => {
       expect(limiter.hit('a').remaining).toBe(1)
       expect(other.hit('b').remaining).toBe(4)
     })
+
+    it('removes only its own attempt when released twice', () => {
+      const first = reserve([[other, 'b']])
+      const second = reserve([[other, 'b']])
+      if (first.limited || second.limited) throw new Error('expected admits')
+
+      first.release()
+      first.release()
+
+      expect(other.hit('b').remaining).toBe(3)
+    })
   })
 })

@@ -506,6 +506,15 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     `identity` permission is gone from the manifest. Security is unchanged: PKCE and `state`
     bind the answer to the question, not the window it arrived in.
 
+27. **Sign-in is limited per username as well as per address, and the username limit can lock
+    its owner out.** `signinUsernameLimiter` allows 50 failures per 15 minutes per username and
+    refuses before the password is checked, so anyone who knows a username can keep its owner
+    from signing in, from any address, until the window passes. Existing sessions, the private
+    unlock and change-password are unaffected. It was accepted because it bounds password
+    guessing spread across many addresses, which the per-address limit cannot see. The known
+    mitigation not taken yet is a device cookie set at successful sign-in that exempts that
+    browser from the username-wide bucket. Revisit it if lockouts show up in practice.
+
 ## Reference
 
 - [MCP spec: Authorization](https://modelcontextprotocol.io/specification/draft/basic/authorization)
