@@ -23,9 +23,11 @@ import {
   OAuthInvalidRequestError,
   OAuthInvalidScopeError,
   OAuthInvalidTargetError,
+  OAuthTemporarilyUnavailableError,
   OAuthUnauthorizedClientError,
   ResponseTooLargeError,
   ValidationError,
+  WriteConflictError,
 } from '@pinsquirrel/domain'
 import { generateSecureToken, hashToken } from '../utils/crypto.js'
 import {
@@ -365,20 +367,30 @@ export class OAuthService {
     const code = generateSecureToken()
     const expiresAt = new Date(Date.now() + AUTHORIZATION_CODE_TTL_MS)
 
-    const created = await this.codeRepository.create(
-      {
-        codeHash: hashToken(code),
-        clientId: resolved.client.clientId,
-        userId: input.userId,
-        redirectUri: resolved.redirectUri,
-        codeChallenge: resolved.codeChallenge,
-        scopes: resolved.scopes,
-        resource: resolved.resource,
-        grantId: randomUUID(),
-        expiresAt,
-      },
-      input.sessionId
-    )
+    let created: AuthorizationCode | null
+    try {
+      created = await sendAgainOnConflict(
+        this.codeRepository.create(
+          {
+            codeHash: hashToken(code),
+            clientId: resolved.client.clientId,
+            userId: input.userId,
+            redirectUri: resolved.redirectUri,
+            codeChallenge: resolved.codeChallenge,
+            scopes: resolved.scopes,
+            resource: resolved.resource,
+            grantId: randomUUID(),
+            expiresAt,
+          },
+          input.sessionId
+        )
+      )
+    } catch (error) {
+      if (error instanceof OAuthTemporarilyUnavailableError) {
+        return this.errorRedirect(resolved, error.code, error.message)
+      }
+      throw error
+    }
     if (!created) {
       return this.errorRedirect(
         resolved,
@@ -464,7 +476,9 @@ export class OAuthService {
       grantedAt: code.createdAt,
     })
 
-    const outcome = await this.codeRepository.exchange(code.id, rows)
+    const outcome = await sendAgainOnConflict(
+      this.codeRepository.exchange(code.id, rows)
+    )
     if (outcome === 'spent') {
       return this.refuseSpentCode(code)
     }
@@ -598,7 +612,10 @@ export class OAuthService {
       rotatedFrom: token.id,
     })
 
-    if (!(await this.tokenRepository.rotate(token.id, rows))) {
+    const rotated = await sendAgainOnConflict(
+      this.tokenRepository.rotate(token.id, rows)
+    )
+    if (!rotated) {
       const current = await this.tokenRepository.findById(token.id)
       if (current?.rotatedAt && !current.revokedAt) {
         return this.refuseRotatedToken(current, current.rotatedAt)
@@ -1204,6 +1221,22 @@ function refuseSeveralResources(params: unknown): void {
     throw new OAuthInvalidTargetError(
       'Name one resource: this server binds each token to a single resource'
     )
+  }
+}
+
+/**
+ * Answer a write that lost to concurrent writes with `temporarily_unavailable`.
+ * The code or token it was for is unchanged, and `invalid_grant` would have
+ * the client throw a working one away (PLAN.md decision 46).
+ */
+async function sendAgainOnConflict<T>(write: Promise<T>): Promise<T> {
+  try {
+    return await write
+  } catch (error) {
+    if (error instanceof WriteConflictError) {
+      throw new OAuthTemporarilyUnavailableError(undefined, { cause: error })
+    }
+    throw error
   }
 }
 

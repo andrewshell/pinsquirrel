@@ -1,3 +1,4 @@
+import { WriteConflictError } from '@pinsquirrel/domain'
 import { hasDriverErrorCode } from './driver-error.js'
 
 /**
@@ -12,7 +13,7 @@ export function isDeadlockError(error: unknown): boolean {
  * Run a whole transaction, and once more if InnoDB chose it as the victim of
  * a deadlock. The victim has been rolled back in full, so the second run
  * starts from nothing and re-reads everything it decides on. A second
- * deadlock is thrown to the caller.
+ * deadlock, which rolled it back again, is a `WriteConflictError`.
  */
 export async function retryOnDeadlock<T>(
   transaction: () => Promise<T>
@@ -23,6 +24,12 @@ export async function retryOnDeadlock<T>(
     if (!isDeadlockError(error)) {
       throw error
     }
-    return transaction()
+    try {
+      return await transaction()
+    } catch (again) {
+      throw isDeadlockError(again)
+        ? new WriteConflictError({ cause: again })
+        : again
+    }
   }
 }

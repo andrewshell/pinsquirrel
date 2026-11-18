@@ -22,7 +22,6 @@ import {
   changedRows,
   holdUserWhileIssuing,
   insertTokens,
-  issueOrRefuse,
   PRIMARY_KEY_BATCH,
   revokeUserTokens,
 } from './oauth-issuance'
@@ -124,7 +123,7 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
         return true
       })
 
-    return issueOrRefuse(rotation, false)
+    return retryOnDeadlock(rotation)
   }
 
   async deleteExpiredTokens(): Promise<number> {

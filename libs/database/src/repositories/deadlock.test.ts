@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { WriteConflictError } from '@pinsquirrel/domain'
 import { isDeadlockError, retryOnDeadlock } from './deadlock.js'
 
 const deadlock = () =>
@@ -23,16 +24,19 @@ describe('retryOnDeadlock', () => {
     expect(await retryOnDeadlock(transaction)).toBe(2)
   })
 
-  it('throws a second deadlock, after two runs', async () => {
+  it('throws a write conflict for a second deadlock, after two runs', async () => {
     let runs = 0
     const transaction = () => {
       runs++
       return Promise.reject(deadlock())
     }
 
-    await expect(retryOnDeadlock(transaction)).rejects.toSatisfy(
-      isDeadlockError
+    const thrown: unknown = await retryOnDeadlock(transaction).catch(
+      (error: unknown) => error
     )
+
+    expect(thrown).toBeInstanceOf(WriteConflictError)
+    expect((thrown as Error).cause).toSatisfy(isDeadlockError)
     expect(runs).toBe(2)
   })
 

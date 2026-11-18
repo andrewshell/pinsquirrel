@@ -4,6 +4,7 @@ import {
   OAuthInvalidClientError,
   OAuthInvalidGrantError,
   OAuthInvalidTargetError,
+  OAuthTemporarilyUnavailableError,
   OAuthUnauthorizedClientError,
   ValidationError,
 } from '@pinsquirrel/domain'
@@ -270,6 +271,29 @@ describe('POST /oauth/token', () => {
 
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe(code)
+  })
+
+  it('answers a request the server could not finish with 503 and Retry-After', async () => {
+    mockExchangeRefreshToken.mockRejectedValue(
+      new OAuthTemporarilyUnavailableError()
+    )
+
+    const res = await app.request(
+      '/oauth/token',
+      form({
+        grant_type: 'refresh_token',
+        refresh_token: 'still-valid',
+        client_id: 'https://claude.ai/oauth/client',
+      })
+    )
+
+    expect(res.status).toBe(503)
+    expect(res.headers.get('Retry-After')).toBe('1')
+    expect(res.headers.get('Cache-Control')).toBe('no-store')
+    expect(await res.json()).toEqual({
+      error: 'temporarily_unavailable',
+      error_description: 'The server is busy. Send the request again',
+    })
   })
 
   it('marks an error response no-store too', async () => {

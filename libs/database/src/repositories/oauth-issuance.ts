@@ -6,7 +6,6 @@ import {
   oauthTokens,
 } from '../schema/oauth-tokens'
 import { users } from '../schema/users'
-import { isDeadlockError, retryOnDeadlock } from './deadlock'
 
 type Transaction = Parameters<Parameters<MySql2Database['transaction']>[0]>[0]
 
@@ -31,26 +30,6 @@ export async function changedRows(
 ): Promise<number> {
   const [result] = await db.execute(statement)
   return 'affectedRows' in result ? result.affectedRows : 0
-}
-
-/**
- * Run a transaction that issues a code or tokens. One that loses a deadlock
- * runs again from the start, and one that loses twice answers `refused`,
- * which is what its caller already gets for a lost race. Nothing was written
- * either time. PLAN.md decision 41.
- */
-export async function issueOrRefuse<T>(
-  issue: () => Promise<T>,
-  refused: T
-): Promise<T> {
-  try {
-    return await retryOnDeadlock(issue)
-  } catch (error) {
-    if (isDeadlockError(error)) {
-      return refused
-    }
-    throw error
-  }
 }
 
 export async function holdUserWhileIssuing(

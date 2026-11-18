@@ -31,11 +31,13 @@ import {
   OAuthInvalidRequestError,
   OAuthInvalidScopeError,
   OAuthInvalidTargetError,
+  OAuthTemporarilyUnavailableError,
   OAuthUnauthorizedClientError,
   ResponseTooLargeError,
   Role,
   UserStatus,
   ValidationError,
+  WriteConflictError,
 } from '@pinsquirrel/domain'
 import {
   createInMemoryOAuthStore,
@@ -835,6 +837,28 @@ describe('OAuthService.authorize', () => {
     })
   })
 
+  it('redirects temporarily_unavailable when the code could not be written, and approves the same request sent again', async () => {
+    vi.mocked(ctx.codeRepository.create).mockRejectedValueOnce(
+      new WriteConflictError()
+    )
+    const approval = {
+      params: authorizeParams(),
+      userId: user.id,
+      sessionId: SESSION_ID,
+      approved: true,
+    }
+
+    await expect(ctx.service.authorize(ac, approval)).resolves.toMatchObject({
+      status: 'error',
+      error: 'temporarily_unavailable',
+      redirectUri: 'http://localhost:54321/callback',
+      state: 'opaque-state',
+    })
+    await expect(ctx.service.authorize(ac, approval)).resolves.toMatchObject({
+      status: 'approved',
+    })
+  })
+
   it('marks the client as having completed an authorization', async () => {
     await ctx.service.authorize(ac, {
       params: authorizeParams(),
@@ -1118,6 +1142,20 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     await expect(
       ctx.service.exchangeAuthorizationCode(tokenParams())
     ).rejects.toThrow('lost connection to MySQL')
+
+    const issued = await ctx.service.exchangeAuthorizationCode(tokenParams())
+
+    expect(issued.accessToken).toBeTruthy()
+    expect(ctx.store.tokens).toHaveLength(1)
+  })
+
+  it('answers temporarily_unavailable, and leaves the code usable, when its tokens lose to other writes', async () => {
+    vi.mocked(ctx.codeRepository.exchange).mockRejectedValueOnce(
+      new WriteConflictError()
+    )
+    await expect(
+      ctx.service.exchangeAuthorizationCode(tokenParams())
+    ).rejects.toBeInstanceOf(OAuthTemporarilyUnavailableError)
 
     const issued = await ctx.service.exchangeAuthorizationCode(tokenParams())
 
@@ -1433,6 +1471,20 @@ describe('OAuthService.exchangeRefreshToken', () => {
     await expect(
       ctx.service.exchangeRefreshToken(refreshParams())
     ).rejects.toThrow('lost connection to MySQL')
+
+    const issued = await ctx.service.exchangeRefreshToken(refreshParams())
+
+    expect(issued.refreshToken).toBeTruthy()
+    expect(ctx.store.tokens.some(token => token.revokedAt)).toBe(false)
+  })
+
+  it('answers temporarily_unavailable, and leaves the token usable, when its successors lose to other writes', async () => {
+    vi.mocked(ctx.tokenRepository.rotate).mockRejectedValueOnce(
+      new WriteConflictError()
+    )
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthTemporarilyUnavailableError)
 
     const issued = await ctx.service.exchangeRefreshToken(refreshParams())
 

@@ -23,6 +23,10 @@ import { oauthTokenIpLimiter, rateLimitByIp } from '../middleware/rate-limit.js'
  * `Retry-After` rather than an RFC 6749 error object, because every code in
  * that registry describes something wrong with the request, and a client told
  * `invalid_request` would fix its request instead of waiting.
+ *
+ * An exchange or refresh that lost to concurrent writes is a `503` with
+ * `Retry-After` and `temporarily_unavailable` (Decision 46): the code or token
+ * is unchanged, and this is the answer clients retry without dropping it.
  */
 
 const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded'
@@ -42,6 +46,12 @@ async function formParams(
 }
 
 function errorResponse(c: Context, error: string, description: string) {
+  if (error === 'temporarily_unavailable') {
+    return c.json({ error, error_description: description }, 503, {
+      ...NO_STORE,
+      'Retry-After': '1',
+    })
+  }
   // RFC 6749 5.2: invalid_client is the one 401 here, because it is a failure
   // to authenticate rather than a malformed request.
   const status = error === 'invalid_client' ? 401 : 400

@@ -9,11 +9,8 @@ import { and, eq, gt, isNull, lt } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes'
 import { sessions } from '../schema/sessions'
-import {
-  holdUserWhileIssuing,
-  insertTokens,
-  issueOrRefuse,
-} from './oauth-issuance'
+import { retryOnDeadlock } from './deadlock'
+import { holdUserWhileIssuing, insertTokens } from './oauth-issuance'
 
 export class DrizzleOAuthAuthorizationCodeRepository implements OAuthAuthorizationCodeRepository {
   constructor(private db: MySql2Database) {}
@@ -78,7 +75,7 @@ export class DrizzleOAuthAuthorizationCodeRepository implements OAuthAuthorizati
         return created
       })
 
-    return issueOrRefuse(creation, null)
+    return retryOnDeadlock(creation)
   }
 
   async exchange(
@@ -116,7 +113,7 @@ export class DrizzleOAuthAuthorizationCodeRepository implements OAuthAuthorizati
         return 'exchanged'
       })
 
-    return issueOrRefuse(exchange, 'gone')
+    return retryOnDeadlock(exchange)
   }
 
   async consume(codeHash: string): Promise<AuthorizationCode | null> {

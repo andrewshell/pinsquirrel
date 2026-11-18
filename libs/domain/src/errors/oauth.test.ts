@@ -9,6 +9,7 @@ import {
   OAuthInvalidScopeError,
   OAuthInvalidTargetError,
   OAuthAccessDeniedError,
+  OAuthTemporarilyUnavailableError,
   OAuthInvalidClientMetadataError,
 } from './oauth.js'
 
@@ -26,6 +27,7 @@ describe('OAuth errors', () => {
     [OAuthInvalidScopeError, 'invalid_scope'],
     [OAuthInvalidTargetError, 'invalid_target'],
     [OAuthAccessDeniedError, 'access_denied'],
+    [OAuthTemporarilyUnavailableError, 'temporarily_unavailable'],
     [OAuthInvalidClientMetadataError, 'invalid_client_metadata'],
   ]
 

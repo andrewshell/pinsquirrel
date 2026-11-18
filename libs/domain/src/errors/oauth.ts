@@ -100,6 +100,22 @@ export class OAuthAccessDeniedError extends OAuthError {
 }
 
 /**
+ * The server could not finish the request and changed nothing, so the same
+ * request can be sent again. RFC 6749 4.1.2.1 defines the code for the
+ * authorization endpoint; the token endpoint uses it too (PLAN.md decision
+ * 46).
+ */
+export class OAuthTemporarilyUnavailableError extends OAuthError {
+  constructor(
+    message = 'The server is busy. Send the request again',
+    options?: ErrorOptions
+  ) {
+    super('temporarily_unavailable', message, options)
+    this.name = 'OAuthTemporarilyUnavailableError'
+  }
+}
+
+/**
  * Registration metadata that does not validate: a bad `redirect_uris`, a
  * CIMD document whose `client_id` does not match the URL it was fetched
  * from, an unsupported auth method (RFC 7591 §3.2.2).

@@ -4,6 +4,7 @@ import type { MySql2Database } from 'drizzle-orm/mysql2'
 import mysql from 'mysql2/promise'
 import type { Pool, PoolConnection } from 'mysql2/promise'
 import { eq } from 'drizzle-orm'
+import { WriteConflictError } from '@pinsquirrel/domain'
 import type { CreateOAuthTokenData } from '@pinsquirrel/domain'
 import { heavyTransaction, insertUser } from '../test-fixtures.js'
 import { oauthTokens } from '../schema/oauth-tokens.js'
@@ -570,7 +571,7 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
       }
     })
 
-    it('should refuse, with nothing changed, when it loses a deadlock twice', async () => {
+    it('should throw a write conflict, and leave the token to rotate later, when it loses a deadlock twice', async () => {
       const parent = await repository.create(token({ kind: 'refresh' }))
       const successors = successorsOf(parent)
       const rival = await heavierRival()
@@ -584,15 +585,19 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
       await rival.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [
         userId,
       ])
-      const refused = await Promise.race([rotating, pause()])
+      const thrown = await Promise.race([
+        rotating.catch((error: unknown) => error),
+        pause(),
+      ])
       await rival.rollback()
       rival.release()
 
-      expect(refused).toBe(false)
+      expect(thrown).toBeInstanceOf(WriteConflictError)
       expect((await repository.findById(parent.id))?.rotatedAt).toBeNull()
       for (const successor of successors) {
         expect(await repository.findByTokenHash(successor.tokenHash)).toBeNull()
       }
+      expect(await repository.rotate(parent.id, successors)).toBe(true)
     })
 
     it('should not leave live tokens when the client is revoked between the retire and the inserts', async () => {

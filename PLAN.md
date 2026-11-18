@@ -630,10 +630,9 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     A transaction that issues (`rotate`, `exchange`, and the code's `create`) and is rolled
     back by InnoDB to break a deadlock runs once more from the start, so it reads the
     session, the code or the token again and still refuses one that was revoked meanwhile.
-    Rolled back a second time, it reports what it reports for a lost race, and the client
-    gets `invalid_grant` or `access_denied` with its code or token unchanged. A revocation
-    also runs once more, but a second deadlock there is an error: a revocation is never
-    reported as done when it was not.
+    Rolled back a second time, it is an error and nothing was written (Decision 46 gives
+    the answer the client gets). A revocation also runs once more, and a second deadlock
+    there is an error too: a revocation is never reported as done when it was not.
 42. **A refresh can narrow the access token, never the grant.** A `scope` on a refresh request
     applies to the access token in that response. The refresh token that replaces the old one
     keeps the scopes the user approved (RFC 6749 section 6) and is always issued, including
@@ -674,6 +673,22 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     origin, https in production unless loopback. Static clients cannot be retired from the
     config: dropping one needs its row deleted by hand, which revokes its grants, and a
     `disabled` flag waits for a need.
+46. **A refresh or exchange that loses two deadlocks answers `503 temporarily_unavailable`.**
+    The token or code is unchanged, so the answer must be one a client retries without
+    discarding it. The token endpoint answers `503` with `Retry-After: 1` and the body
+    `{"error":"temporarily_unavailable"}`; `authorize` redirects with the same code, which
+    RFC 6749 4.1.2.1 defines for it. RFC 6749 5.2 has no retryable code for the token
+    endpoint, so the choice follows what the clients do. The MCP TypeScript SDK (1.32.2,
+    `client/auth.js`) reads the `error` field whatever the status: `invalid_grant` makes it
+    drop the stored tokens, `server_error`, an unknown code or a body that is not JSON
+    makes it start a new authorization, and any other known code, `temporarily_unavailable`
+    among them, is thrown to the caller with the tokens kept. The Chrome extension drops
+    its tokens on `invalid_grant` only. A client that reads the status alone sees a `503`.
+    `invalid_grant`, the earlier answer, was rejected because it ends a working connection,
+    and a plain `500` because the SDK answers it with a new consent. The repository reports
+    the lost write as a `WriteConflictError` and `OAuthService` names the code. The hourly
+    sweep reads dead tokens 500 at a time, each read starting after the last id of the one
+    before, so it holds one batch whatever the backlog.
 
 ## Reference
 

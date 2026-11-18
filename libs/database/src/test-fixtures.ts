@@ -95,7 +95,8 @@ export async function insertPin(
  * An open transaction that InnoDB will not pick as the victim of a deadlock
  * with a repository call: it has changed more rows than the call will. The
  * caller takes the locks that make the cycle, then rolls it back and releases
- * it.
+ * it. The column it changes has no index, so it locks its own rows and no gap
+ * a second one would insert into.
  */
 export async function heavyTransaction(pool: Pool): Promise<PoolConnection> {
   const bystanders = await Promise.all(
@@ -107,7 +108,7 @@ export async function heavyTransaction(pool: Pool): Promise<PoolConnection> {
   await connection.beginTransaction()
   for (const bystander of bystanders) {
     await connection.query(
-      'UPDATE users SET username = UPPER(username) WHERE id = ?',
+      'UPDATE users SET password_hash = REVERSE(password_hash) WHERE id = ?',
       [bystander.id]
     )
   }

@@ -113,6 +113,7 @@ export {
   ResponseTooLargeError,
 } from './errors/metadata.js'
 export { ValidationError } from './errors/validation.js'
+export { WriteConflictError } from './errors/write-conflict.js'
 export {
   OAuthError,
   OAuthInvalidRequestError,
@@ -123,6 +124,7 @@ export {
   OAuthInvalidScopeError,
   OAuthInvalidTargetError,
   OAuthAccessDeniedError,
+  OAuthTemporarilyUnavailableError,
   OAuthInvalidClientMetadataError,
   OAuthInvalidRedirectUriError,
 } from './errors/oauth.js'

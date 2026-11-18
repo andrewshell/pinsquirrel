@@ -9,6 +9,7 @@ import type {
   CreateAuthorizationCodeData,
   CreateOAuthTokenData,
 } from '@pinsquirrel/domain'
+import { WriteConflictError } from '@pinsquirrel/domain'
 import { heavyTransaction, insertUser } from '../test-fixtures.js'
 import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes.js'
 import { DrizzleOAuthClientRepository } from './oauth-client.js'
@@ -166,6 +167,37 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
       expect(await creating).toBeNull()
       expect(await deleting).toBe(true)
       expect(await repository.findByCodeHash(data.codeHash)).toBeNull()
+    })
+
+    it('should throw a write conflict, and leave the code to create later, when it loses a deadlock twice', async () => {
+      const pause = () => new Promise(resolve => setTimeout(resolve, 200))
+      const holdClient =
+        'SELECT client_id FROM oauth_clients WHERE client_id = ? FOR UPDATE'
+      const holdSession = 'SELECT id FROM sessions WHERE id = ? FOR UPDATE'
+      const first = await heavyTransaction(testPool)
+      const second = await heavyTransaction(testPool)
+      await first.query(holdClient, [clientId])
+      const data = code()
+
+      const creating = repository
+        .create(data, sessionId)
+        .catch((error: unknown) => error)
+      await pause()
+      await first.query(holdSession, [sessionId])
+      const secondHoldsClient = second.query(holdClient, [clientId])
+      await pause()
+      await first.rollback()
+      first.release()
+      await secondHoldsClient
+      await pause()
+      await second.query(holdSession, [sessionId])
+      const thrown = await Promise.race([creating, pause()])
+      await second.rollback()
+      second.release()
+
+      expect(thrown).toBeInstanceOf(WriteConflictError)
+      expect(await repository.findByCodeHash(data.codeHash)).toBeNull()
+      expect(await repository.create(data, sessionId)).not.toBeNull()
     })
 
     it('should create nothing under a session that belongs to another user', async () => {
@@ -394,7 +426,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
     it.each([
       ['run again when it loses a deadlock, and write its tokens', 1],
       [
-        'say the code is gone, and leave it unspent, when it loses a deadlock twice',
+        'throw a write conflict, and leave the code to exchange later, when it loses a deadlock twice',
         2,
       ],
     ])('should %s', async (_name, deadlocks) => {
@@ -406,7 +438,9 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
         [clientId]
       )
 
-      const exchanging = repository.exchange(created.id, [access, refresh])
+      const exchanging = repository
+        .exchange(created.id, [access, refresh])
+        .catch((error: unknown) => error)
       await new Promise(resolve => setTimeout(resolve, 200))
       await rival.query(
         'SELECT id FROM oauth_authorization_codes WHERE id = ? FOR UPDATE',
@@ -427,9 +461,12 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
         expect(await stored(access)).not.toBeNull()
         expect(await stored(refresh)).not.toBeNull()
       } else {
-        expect(await exchanging).toBe('gone')
+        expect(await exchanging).toBeInstanceOf(WriteConflictError)
         expect((await repository.findById(created.id))?.consumedAt).toBeNull()
         expect(await stored(access)).toBeNull()
+        expect(await repository.exchange(created.id, [access, refresh])).toBe(
+          'exchanged'
+        )
       }
     })
 
