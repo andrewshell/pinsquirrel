@@ -19,7 +19,7 @@ import {
   pinFilterFromInput,
 } from '@pinsquirrel/services'
 import { pinService, tagService } from '../lib/services'
-import { oauthAuth, getOAuthUser } from '../middleware/oauth-auth'
+import { oauthAuth, getOAuthUser, requireScope } from '../middleware/oauth-auth'
 import { oauthConfig } from '../lib/config'
 import { apiV1Limiter, rateLimitByIp } from '../middleware/rate-limit'
 
@@ -28,8 +28,17 @@ const apiV1 = new OpenAPIHono()
 // --- OpenAPI route specs (for spec generation only) -------------------------
 
 // One credential form: an OAuth access token in `Authorization: Bearer`
-// (Decision 10).
-const security: Record<string, string[]>[] = [{ bearerAuth: [] }]
+// (Decision 10), carrying the read scope the route checks (Decision 39).
+function security(scope: string): Record<string, string[]>[] {
+  return [{ bearerAuth: [scope] }]
+}
+
+function insufficientScope(scope: string) {
+  return {
+    content: { 'application/json': { schema: errorSchema } },
+    description: `The token was not granted ${scope}`,
+  }
+}
 
 apiV1.openAPIRegistry.registerPath({
   method: 'get',
@@ -38,7 +47,7 @@ apiV1.openAPIRegistry.registerPath({
   summary: 'List pins',
   description:
     'List public pins for the authenticated user with optional filtering and pagination.',
-  security,
+  security: security('pins:read'),
   request: { query: pinListQuerySchema },
   responses: {
     200: {
@@ -53,6 +62,7 @@ apiV1.openAPIRegistry.registerPath({
       content: { 'application/json': { schema: errorSchema } },
       description: 'Unauthorized',
     },
+    403: insufficientScope('pins:read'),
     500: {
       content: { 'application/json': { schema: errorSchema } },
       description: 'Internal server error',
@@ -67,7 +77,7 @@ apiV1.openAPIRegistry.registerPath({
   summary: 'Get a pin',
   description:
     'Get a single pin by ID. Returns 404 for private or non-existent pins.',
-  security,
+  security: security('pins:read'),
   request: {
     params: z.object({
       id: z.string().describe('Pin ID'),
@@ -82,6 +92,7 @@ apiV1.openAPIRegistry.registerPath({
       content: { 'application/json': { schema: errorSchema } },
       description: 'Unauthorized',
     },
+    403: insufficientScope('pins:read'),
     404: {
       content: { 'application/json': { schema: errorSchema } },
       description: 'Pin not found',
@@ -100,7 +111,7 @@ apiV1.openAPIRegistry.registerPath({
   summary: 'List tags',
   description:
     "List the authenticated user's tags, optionally including pin counts.",
-  security,
+  security: security('tags:read'),
   request: { query: tagListQuerySchema },
   responses: {
     200: {
@@ -119,6 +130,7 @@ apiV1.openAPIRegistry.registerPath({
       content: { 'application/json': { schema: errorSchema } },
       description: 'Unauthorized',
     },
+    403: insufficientScope('tags:read'),
     500: {
       content: { 'application/json': { schema: errorSchema } },
       description: 'Internal server error',
@@ -133,7 +145,7 @@ apiV1.openAPIRegistry.registerPath({
   summary: 'List pins for a tag',
   description:
     'Get public pins associated with a specific tag. Returns 404 if the tag does not exist or does not belong to the user.',
-  security,
+  security: security('pins:read'),
   request: {
     params: z.object({
       id: z.string().describe('Tag ID'),
@@ -153,6 +165,7 @@ apiV1.openAPIRegistry.registerPath({
       content: { 'application/json': { schema: errorSchema } },
       description: 'Unauthorized',
     },
+    403: insufficientScope('pins:read'),
     404: {
       content: { 'application/json': { schema: errorSchema } },
       description: 'Tag not found',
@@ -214,7 +227,7 @@ function errorResponse(c: Context, err: unknown) {
 // --- Route handlers ---------------------------------------------------------
 
 // GET /api/v1/pins - list pins (excludes private pins)
-apiV1.get('/pins', async c => {
+apiV1.get('/pins', requireScope('pins:read'), async c => {
   const user = getOAuthUser(c)
   const ac = new AccessControl(user)
 
@@ -237,7 +250,7 @@ apiV1.get('/pins', async c => {
 })
 
 // GET /api/v1/pins/:id - single pin
-apiV1.get('/pins/:id', async c => {
+apiV1.get('/pins/:id', requireScope('pins:read'), async c => {
   const user = getOAuthUser(c)
   const ac = new AccessControl(user)
   const id = c.req.param('id')
@@ -251,7 +264,7 @@ apiV1.get('/pins/:id', async c => {
 })
 
 // GET /api/v1/tags - list user's tags
-apiV1.get('/tags', async c => {
+apiV1.get('/tags', requireScope('tags:read'), async c => {
   const user = getOAuthUser(c)
   const ac = new AccessControl(user)
 
@@ -271,7 +284,7 @@ apiV1.get('/tags', async c => {
 })
 
 // GET /api/v1/tags/:id/pins - pins for a tag (by tag id, excludes private)
-apiV1.get('/tags/:id/pins', async c => {
+apiV1.get('/tags/:id/pins', requireScope('pins:read'), async c => {
   const user = getOAuthUser(c)
   const ac = new AccessControl(user)
   const tagId = c.req.param('id')

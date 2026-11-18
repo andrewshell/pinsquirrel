@@ -31,11 +31,11 @@ function getUserFromExtra(extra: {
  * request (see `routes/mcp.ts`): a server shared across callers is a session
  * shared across callers, and this process serves every client at once.
  *
- * The three reads need no scope beyond a valid token. Each write calls
- * `requireScope(extra, …)` from `./scopes.js` before it touches a service,
- * inside the same `try`, so the refusal travels back through
- * `mapDomainErrorToMcp` as a tool error the model can act on rather than as a
- * transport failure it will retry.
+ * Every tool calls `requireScope(extra, …)` from `./scopes.js` before it
+ * touches a service (Decision 39): a read needs the read scope the consent
+ * screen listed, a write its write scope. The check is inside the `try`, so
+ * the refusal travels back through `mapDomainErrorToMcp` as a tool error the
+ * model can act on rather than as a transport failure it will retry.
  *
  * Every tool is a public-pins-only surface, reads and writes alike:
  * `pinFilterFromInput` forces `isPrivate: false`, `get_pin` goes through
@@ -75,6 +75,7 @@ export function createMcpServer(): McpServer {
     },
     async (args, extra) => {
       try {
+        requireScope(extra, 'pins:read')
         const user = getUserFromExtra(extra)
         const ac = new AccessControl(user)
         const input = args as PinListInput
@@ -102,6 +103,7 @@ export function createMcpServer(): McpServer {
     },
     async ({ id }, extra) => {
       try {
+        requireScope(extra, 'pins:read')
         const user = getUserFromExtra(extra)
         const ac = new AccessControl(user)
         const pin = await pinService.getPublicPin(ac, id)
@@ -128,6 +130,7 @@ export function createMcpServer(): McpServer {
     },
     async ({ withCounts }, extra) => {
       try {
+        requireScope(extra, 'tags:read')
         const user = getUserFromExtra(extra)
         const ac = new AccessControl(user)
         const tags = withCounts

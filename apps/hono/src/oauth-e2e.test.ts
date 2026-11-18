@@ -725,6 +725,89 @@ describe('authorization errors', () => {
 })
 
 /**
+ * The read scopes mean what the consent screen says (Decision 20, as revised
+ * by Decision 39). A grant without `pins:read` is not "Read your bookmarks",
+ * so it cannot list them, on either resource.
+ */
+describe('read scopes', () => {
+  async function callTool(
+    token: string,
+    name: string
+  ): Promise<{ isError?: boolean; content: { text: string }[] }> {
+    await mcpHandshake(token)
+    const res = await mcpRequest(token, {
+      jsonrpc: '2.0',
+      id: 4,
+      method: 'tools/call',
+      params: { name, arguments: {} },
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      result?: { isError?: boolean; content: { text: string }[] }
+    }
+    return body.result!
+  }
+
+  it('refuses list_pins and get_pin over MCP to a grant without pins:read', async () => {
+    const tokens = await connect({ resource: mcpResource, scope: 'tags:read' })
+
+    const listed = await callTool(tokens.access_token, 'list_pins')
+    expect(listed.isError).toBe(true)
+    expect(listed.content[0].text).toContain('pins:read')
+
+    await mcpHandshake(tokens.access_token)
+    const got = await mcpRequest(tokens.access_token, {
+      jsonrpc: '2.0',
+      id: 5,
+      method: 'tools/call',
+      params: { name: 'get_pin', arguments: { id: 'any-pin-id' } },
+    })
+    const body = (await got.json()) as {
+      result: { isError?: boolean; content: { text: string }[] }
+    }
+    expect(body.result.isError).toBe(true)
+    expect(body.result.content[0].text).toContain('pins:read')
+  })
+
+  it('refuses list_tags over MCP to a grant without tags:read', async () => {
+    const tokens = await connect({ resource: mcpResource, scope: 'pins:read' })
+
+    const listed = await callTool(tokens.access_token, 'list_tags')
+    expect(listed.isError).toBe(true)
+    expect(listed.content[0].text).toContain('tags:read')
+  })
+
+  it('answers the REST pin reads with 403 insufficient_scope without pins:read', async () => {
+    const tokens = await connect({ resource: apiResource, scope: 'tags:read' })
+
+    for (const path of [
+      '/api/v1/pins',
+      '/api/v1/pins/any-pin-id',
+      '/api/v1/tags/any-tag-id/pins',
+    ]) {
+      const res = await request(path, {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      })
+      expect(res.status, path).toBe(403)
+      expect(res.headers.get('WWW-Authenticate'), path).toContain(
+        'scope="pins:read"'
+      )
+    }
+  })
+
+  it('answers GET /api/v1/tags with 403 without tags:read', async () => {
+    const tokens = await connect({ resource: apiResource, scope: 'pins:read' })
+
+    const res = await request('/api/v1/tags', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    })
+
+    expect(res.status).toBe(403)
+    expect(res.headers.get('WWW-Authenticate')).toContain('scope="tags:read"')
+  })
+})
+
+/**
  * The scope, end to end: two connections for the same user against the same
  * server, differing only in what the consent screen granted.
  *
