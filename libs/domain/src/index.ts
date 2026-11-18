@@ -108,6 +108,7 @@ export {
   FetchTimeoutError,
   HttpError,
   ParseError,
+  ResponseTooLargeError,
 } from './errors/metadata.js'
 export { ValidationError } from './errors/validation.js'
 export {

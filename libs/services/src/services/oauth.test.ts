@@ -33,6 +33,7 @@ import {
   OAuthInvalidScopeError,
   OAuthInvalidTargetError,
   OAuthUnauthorizedClientError,
+  ResponseTooLargeError,
   Role,
   UserStatus,
   ValidationError,
@@ -236,6 +237,9 @@ describe('OAuthService.resolveClient', () => {
     expect(ctx.fetcher.fetch).toHaveBeenCalledWith(CIMD_URL, {
       // A metadata URL that redirects is a misconfigured client.
       redirect: 'error',
+      // Capped while it is read, so a compressed body cannot decode into a
+      // large string before anything checks it.
+      maxBytes: 16 * 1024,
     })
     expect(ctx.clientRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -302,8 +306,8 @@ describe('OAuthService.resolveClient', () => {
   })
 
   it('refuses a document larger than a client metadata document ever is', async () => {
-    vi.mocked(ctx.fetcher.fetch).mockResolvedValue(
-      JSON.stringify({ ...cimdDocument, padding: 'x'.repeat(20000) })
+    vi.mocked(ctx.fetcher.fetch).mockRejectedValue(
+      new ResponseTooLargeError(CIMD_URL, 16 * 1024)
     )
 
     await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(

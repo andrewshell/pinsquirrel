@@ -10,6 +10,12 @@ export interface HttpFetchOptions {
    * chasing it widens what a caller-supplied URL can reach.
    */
   redirect?: 'follow' | 'error'
+  /**
+   * The most the decoded body may weigh. Enforced while reading, so a small
+   * compressed response cannot become a large string before anyone checks.
+   * Exceeding it rejects with `ResponseTooLargeError`.
+   */
+  maxBytes?: number
 }
 
 export interface HttpFetcher {

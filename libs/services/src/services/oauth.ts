@@ -19,6 +19,7 @@ import {
   OAuthInvalidScopeError,
   OAuthInvalidTargetError,
   OAuthUnauthorizedClientError,
+  ResponseTooLargeError,
 } from '@pinsquirrel/domain'
 import { generateSecureToken, hashToken } from '../utils/crypto.js'
 import {
@@ -100,8 +101,9 @@ const DEFAULT_SCOPES = ['pins:read', 'tags:read']
 const CIMD_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
 /**
- * The most a CIMD document may weigh. Real ones are a few hundred bytes; the
- * cap exists because the fetcher has none and the URL is caller-supplied.
+ * The most a CIMD document may weigh once decoded. Real ones are a few hundred
+ * bytes; the URL is caller-supplied, so the fetcher enforces this while it
+ * reads rather than after.
  */
 const MAX_CIMD_DOCUMENT_BYTES = 16 * 1024
 
@@ -914,7 +916,7 @@ export class OAuthService {
    * `validateUrlForFetching` rejects the obviously bad strings before DNS, and
    * `NodeHttpFetcher` re-checks the address it actually connects to on every
    * hop. Three rules are CIMD's own: https only, a path (an origin names no
-   * document), and a size cap, since the fetcher has none.
+   * document), and a size cap.
    */
   private async resolveClientIdMetadataDocument(
     clientId: string
@@ -992,18 +994,20 @@ export class OAuthService {
   ): Promise<ClientIdMetadataDocument> {
     let body: string
     try {
-      body = await this.httpFetcher.fetch(url, { redirect: 'error' })
-    } catch {
+      body = await this.httpFetcher.fetch(url, {
+        redirect: 'error',
+        maxBytes: MAX_CIMD_DOCUMENT_BYTES,
+      })
+    } catch (error) {
+      if (error instanceof ResponseTooLargeError) {
+        throw new OAuthInvalidClientMetadataError(
+          'The client metadata document is too large'
+        )
+      }
       // Whatever went wrong out there, the client_id is unusable here. The
       // reason is not echoed back: it describes somebody else's server.
       throw new OAuthInvalidClientError(
         'The client metadata document could not be fetched'
-      )
-    }
-
-    if (Buffer.byteLength(body, 'utf8') > MAX_CIMD_DOCUMENT_BYTES) {
-      throw new OAuthInvalidClientMetadataError(
-        'The client metadata document is too large'
       )
     }
 

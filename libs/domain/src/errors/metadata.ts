@@ -39,6 +39,16 @@ export class HttpError extends MetadataError {
   }
 }
 
+export class ResponseTooLargeError extends MetadataError {
+  constructor(url: string, maxBytes: number) {
+    super(
+      `Response from ${url} is larger than ${String(maxBytes)} bytes`,
+      'RESPONSE_TOO_LARGE'
+    )
+    this.name = 'ResponseTooLargeError'
+  }
+}
+
 export class ParseError extends MetadataError {
   constructor(url: string) {
     super(`Failed to parse metadata from: ${url}`, 'PARSE_ERROR')
