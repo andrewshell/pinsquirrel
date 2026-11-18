@@ -33,8 +33,9 @@ const MAX_CAUSE_DEPTH = 3
 /**
  * Drizzle appends a failed query's bound values to its message (usernames,
  * email hashes), so that tail is cut from the message and from the stack that
- * repeats it. MySQL repeats the offending value in a duplicate-key or
- * bad-value message, so that value is cut too.
+ * repeats it. MySQL quotes the value it rejected, so everything quoted is cut
+ * as well, from the first quote to the last, except the key or column named
+ * at the end. A value holding a quote of its own is cut whole that way.
  */
 export function safeError(err: unknown): LoggedError {
   if (!(err instanceof Error)) return { message: String(err) }
@@ -61,10 +62,12 @@ export function safeError(err: unknown): LoggedError {
   return logged
 }
 
+/** The key or column MySQL names after the value it rejected. */
+const NAMED_TAIL = / for (?:key|column) '[^']*'(?: at row \d+)?$/
+
 function redact(message: string): string {
   const [unbound = ''] = message.split('\nparams: ')
-  return unbound.replace(
-    /(Duplicate entry|value:) '.*' for (key|column) /s,
-    '$1 [REDACTED] for $2 '
-  )
+  const tail = NAMED_TAIL.exec(unbound)?.[0] ?? ''
+  const head = unbound.slice(0, unbound.length - tail.length)
+  return head.replace(/'.*'/s, '[REDACTED]') + tail
 }

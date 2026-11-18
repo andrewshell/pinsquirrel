@@ -89,19 +89,45 @@ describe('safeError', () => {
       "Incorrect string value: 'alice' for column 'title' at row 1",
       "Incorrect string value: [REDACTED] for column 'title' at row 1",
     ],
+    [
+      'ER_TRUNCATED_WRONG_VALUE',
+      1292,
+      "Truncated incorrect DOUBLE value: 'alice'",
+      'Truncated incorrect DOUBLE value: [REDACTED]',
+    ],
+    [
+      'ER_WRONG_VALUE',
+      1525,
+      "Incorrect DATETIME value: 'alice'",
+      'Incorrect DATETIME value: [REDACTED]',
+    ],
+    [
+      'ER_CANNOT_CONVERT_STRING',
+      3854,
+      "Cannot convert string 'alice' from binary to utf8mb4",
+      'Cannot convert string [REDACTED] from binary to utf8mb4',
+    ],
+    [
+      'ER_DUP_ENTRY',
+      1062,
+      "Duplicate entry 'o'alice' for key 'x' for key 'users.users_username_unique'",
+      "Duplicate entry [REDACTED] for key 'users.users_username_unique'",
+    ],
   ])(
     'leaves the value a %s message repeats out of the log',
     (code, errno, message, expected) => {
-      const logged = safeError(
-        new QueryError(
-          'insert into `users` values (?)',
-          ['x'],
-          mysqlError(code, errno, message)
-        )
+      const serialized = pino.stdSerializers.err(
+        safeError(
+          new QueryError(
+            'insert into `users` values (?)',
+            ['x'],
+            mysqlError(code, errno, message)
+          )
+        ) as unknown as Error
       )
 
-      expect(logged.cause).toBe(expected)
-      expect(JSON.stringify(logged)).not.toContain('alice')
+      expect(serialized.cause).toBe(expected)
+      expect(JSON.stringify(serialized)).not.toContain('alice')
     }
   )
 })
