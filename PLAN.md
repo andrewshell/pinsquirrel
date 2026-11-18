@@ -55,9 +55,9 @@ is not repeated here. On top of it:
   those strings and never read `process.env`. Never derive an issuer from the request — a
   spoofed `Host` header must not change what the server claims to be.
 - One URI normalization rule, `libs/services/src/validation/oauth-uri.ts`, shared by metadata
-  generation, DCR dedup and the audience check. Divergent normalization produces audience
+  generation and the audience check. Divergent normalization produces audience
   failures that look like random connection breakage. Redirect URIs are the exception: they
-  are compared as strings (Decision 44).
+  are compared as strings, and DCR dedup keys on that string (Decision 44).
 - One Zod-to-`ValidationError` helper, `validationErrorFromZod`
   (`libs/services/src/validation/zod-error.ts`). Routes translate that to RFC 6749 codes, not
   the service.
@@ -548,24 +548,23 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     holds for it. A token id in the form went stale once the client refreshed and the
     sweep removed that row.
 33. **The token endpoint is limited per address only, not per `client_id`.** A `client_id` is
-    public and every user of a client shares it, so a budget keyed on it let requests from
-    other addresses refuse that client's real users. Authorization codes and refresh tokens
-    are 32 random bytes, so there is nothing a distributed caller could guess; the per-/64
-    budget bounds each caller.
+    public and every user of a client shares it, so a budget keyed on it would be one budget
+    for all of them. Authorization codes and refresh tokens are 32 random bytes, so a
+    per-/64 budget is all each caller needs.
 34. **Dynamic client registration is also counted per IPv6 /48, and its metadata is bounded.**
-    A routed /48 holds 65,536 /64s, each with its own budget of ten an hour, so `/register`
-    also allows thirty an hour per /48, checked together with the /64 budget. A registration
+    One site is usually assigned a /48, so `/register` allows ten an hour per /64 and thirty
+    an hour per /48, and a registration has to fit both. A registration
     carries at most ten redirect URIs of at most 512 characters each, the width of the
     column an authorization code stores its redirect URI in.
 35. **Every client is held to one set of rules, and its identifier is an exact string.** DCR,
     CIMD and static clients all pass `requireClientRules` before a row is written: public
     (`none`) only, the implemented grant types only, and redirect URIs that are https or
-    loopback http with no fragment. A CIMD document used to be stored as published, which
-    made it the way around the rules a registration is held to. `client_id` is `utf8mb4_bin`
+    loopback http with no fragment, so a client is held to the same rules whichever way it
+    registered. `client_id` is `utf8mb4_bin`
     on `oauth_clients` and on the codes and tokens that reference it, the service ignores a
     row whose id is not exactly the one asked for, and a CIMD `client_id` must be the
-    spelling `URL` parsing produces. Under the default collation, two URLs that differ in
-    case or accents, and so name different hosts, were one row. The token endpoint never
+    spelling `URL` parsing produces. Client ids are compared byte for byte because two that
+    differ only in case or accents can name different documents. The token endpoint never
     fetches a document: a client with no row has no code or token to exchange, so it gets
     `invalid_client` at once. The incomplete-client sweep takes `cimd` rows as well as `dcr`
     ones, since the consent page creates a `cimd` row before anyone approves; a swept client
@@ -593,7 +592,8 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     consent screen. `authorize` makes a `grant_id` when it writes the code, the exchange copies
     it to the access and refresh tokens, and each rotation copies it to the successors. Handing
     a refresh token to `/oauth/revoke`, presenting a refresh token after its rotation, and
-    presenting a code a second time all revoke that grant and no other, so the same application
+    presenting a code a second time as the client it was issued to all revoke that grant
+    and no other, so the same application
     on another device, which shares the `client_id`, keeps working. The profile page still
     revokes every grant of a client at once (Decision 19). A grant has no table of its own: a
     column is enough to revoke by, and a table would put a join on every bearer check. Rows
@@ -660,6 +660,20 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     matched, every later authorization failure, including an ended approving session, is
     redirected to the client as an RFC 6749 error with `state` and `iss`; only a bad
     `client_id`, `redirect_uri` or `state` is shown as a page.
+45. **The remaining OAuth review items are settled this way.** A request parameter sent twice
+    is `invalid_request`, and a repeated `resource` is `invalid_target`, since a token is bound
+    to one resource. `/oauth/revoke` answers `invalid_request` without a token and
+    `invalid_grant` for a token issued to a client other than the `client_id` sent; an
+    unknown, expired or already revoked token still answers 200, and only a live or rotated
+    refresh token takes its grant with it. `client_id` stays optional there, as RFC 6749 lets
+    a public client leave it out. A lone `offline_access` is granted with the default read
+    scopes, and `offline_access` is dropped for a client not registered for `refresh_token`.
+    A token records when its grant was approved (`granted_at`) and the profile shows that
+    date. A DCR client registering again restarts the incomplete-client clock, and
+    `authorize` marks a client completed before it writes the code. `BASE_URL` must be an
+    origin, https in production unless loopback. Static clients cannot be retired from the
+    config: dropping one needs its row deleted by hand, which revokes its grants, and a
+    `disabled` flag waits for a need.
 
 ## Reference
 
