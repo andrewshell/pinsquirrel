@@ -284,6 +284,7 @@ export class OAuthService {
     client: OAuthClient,
     params: unknown
   ): ResolvedAuthorizationRequest {
+    refuseSeveralResources(params)
     const parsed = authorizationRequestSchema.safeParse(params)
     if (!parsed.success) {
       throw validationErrorFromZod(parsed.error, {
@@ -414,6 +415,7 @@ export class OAuthService {
    * `MaintenanceService` takes none.
    */
   async exchangeAuthorizationCode(params: unknown): Promise<IssuedTokens> {
+    refuseSeveralResources(params)
     const parsed = authorizationCodeGrantSchema.safeParse(params)
     if (!parsed.success) {
       throw validationErrorFromZod(parsed.error, {
@@ -527,6 +529,7 @@ export class OAuthService {
    * back after it was rotated.
    */
   async exchangeRefreshToken(params: unknown): Promise<IssuedTokens> {
+    refuseSeveralResources(params)
     const parsed = refreshTokenGrantSchema.safeParse(params)
     if (!parsed.success) {
       throw validationErrorFromZod(parsed.error, {
@@ -1173,6 +1176,24 @@ export class OAuthService {
 
 /** The grant types a client gets if its metadata does not say. */
 const DEFAULT_GRANT_TYPES = ['authorization_code', 'refresh_token']
+
+/**
+ * RFC 8707 lets a request name several resources. This server binds each
+ * token to one, so several is `invalid_target` rather than a malformed
+ * request. Every other repeated parameter fails its schema, which wants a
+ * single string, as `invalid_request` (RFC 6749 3.1).
+ */
+function refuseSeveralResources(params: unknown): void {
+  if (
+    typeof params === 'object' &&
+    params !== null &&
+    Array.isArray((params as { resource?: unknown }).resource)
+  ) {
+    throw new OAuthInvalidTargetError(
+      'Name one resource: this server binds each token to a single resource'
+    )
+  }
+}
 
 function invalidCode(): OAuthInvalidGrantError {
   return new OAuthInvalidGrantError(

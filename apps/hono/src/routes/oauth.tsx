@@ -7,7 +7,7 @@ import { oauthService } from '../lib/services.js'
 import { describeValidationError } from '../lib/oauth-error.js'
 import { logger, safeError } from '../lib/logger.js'
 import { isEmbedRequest } from '../lib/embed'
-import { getString } from '../lib/form'
+import { getString, protocolParams } from '../lib/form'
 import {
   getAuthUser,
   getSessionManager,
@@ -53,13 +53,14 @@ const AUTHORIZATION_PARAMS = [
 
 function authorizationParams(
   source: Record<string, unknown>
-): Record<string, string> {
-  const params: Record<string, string> = {}
-  for (const name of AUTHORIZATION_PARAMS) {
-    const value = getString(source[name])
-    if (value !== '') params[name] = value
-  }
-  return params
+): Record<string, string | string[]> {
+  const params = protocolParams(source)
+  return Object.fromEntries(
+    AUTHORIZATION_PARAMS.filter(name => name in params).map(name => [
+      name,
+      params[name],
+    ])
+  )
 }
 
 /** The host a user should recognise, or the raw URI if it will not parse. */
@@ -170,7 +171,7 @@ oauth.use('*', requireAuth())
 
 oauth.get('/authorize', async c => {
   const user = getAuthUser(c)
-  const params = authorizationParams(c.req.query())
+  const params = authorizationParams(c.req.queries())
   // Presentation only, and kept apart from `params`: it is not part of the
   // authorization request and must not be echoed back as one.
   const embed = isEmbedRequest(c)
@@ -205,11 +206,11 @@ oauth.post('/authorize', async c => {
   if (!session) {
     throw new Error('POST /oauth/authorize reached without a session')
   }
-  const formData = await c.req.parseBody()
+  const formData = await c.req.parseBody({ all: true })
   const params = authorizationParams(formData)
   // Anything that is not the approve button is a refusal. A malformed or
   // absent decision must never read as consent.
-  const approved = getString(formData['decision']) === 'approve'
+  const approved = formData['decision'] === 'approve'
   const embed = getString(formData['embed']) === '1'
 
   let outcome

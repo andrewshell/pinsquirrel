@@ -179,6 +179,37 @@ describe('POST /oauth/token', () => {
     expect((await res.json()).error).toBe('unsupported_grant_type')
   })
 
+  // RFC 6749 3.1: the schemas refuse a repeated parameter, so the service has
+  // to see every value rather than whichever one the parser kept.
+  it('hands a repeated parameter to the service as every value sent', async () => {
+    mockExchangeAuthorizationCode.mockResolvedValue(ISSUED)
+    const body = new URLSearchParams(CODE_GRANT)
+    body.append('code', 'another-code')
+
+    await app.request('/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    })
+
+    expect(mockExchangeAuthorizationCode).toHaveBeenCalledWith({
+      ...CODE_GRANT,
+      code: ['the-code', 'another-code'],
+    })
+  })
+
+  it('answers a repeated grant type with invalid_request', async () => {
+    const res = await app.request('/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=authorization_code&grant_type=refresh_token',
+    })
+
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('invalid_request')
+    expect(mockExchangeAuthorizationCode).not.toHaveBeenCalled()
+  })
+
   it('maps a ValidationError to invalid_request', async () => {
     mockExchangeAuthorizationCode.mockRejectedValue(
       new ValidationError({ code_verifier: ['must be a PKCE value'] })

@@ -621,6 +621,37 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
     }
   )
 
+  // RFC 6749 3.1: a parameter may be sent once.
+  it('refuses a repeated redirect_uri outright, since neither can be trusted', async () => {
+    await expect(
+      ctx.service.resolveAuthorizationRequest(
+        authorizeParams({
+          redirect_uri: [
+            'http://localhost:54321/callback',
+            'http://127.0.0.1/callback',
+          ],
+        })
+      )
+    ).rejects.toBeInstanceOf(ValidationError)
+  })
+
+  it('redirects any other repeated parameter as invalid_request', async () => {
+    await expect(
+      ctx.service.resolveAuthorizationRequest(
+        authorizeParams({ scope: ['pins:read', 'pins:write'] })
+      )
+    ).resolves.toMatchObject(redirectedError('invalid_request'))
+  })
+
+  // RFC 8707 allows several resources; this server binds a token to one.
+  it('redirects a repeated resource as invalid_target', async () => {
+    await expect(
+      ctx.service.resolveAuthorizationRequest(
+        authorizeParams({ resource: [MCP_RESOURCE, API_RESOURCE] })
+      )
+    ).resolves.toMatchObject(redirectedError('invalid_target'))
+  })
+
   it('redirects a resource this server issues no tokens for', async () => {
     await expect(
       ctx.service.resolveAuthorizationRequest(
@@ -1121,6 +1152,24 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     expect(ctx.store.tokens).toEqual([])
   })
 
+  it('refuses two resources with invalid_target, and spends nothing', async () => {
+    await expect(
+      ctx.service.exchangeAuthorizationCode(
+        tokenParams({ resource: [MCP_RESOURCE, MCP_RESOURCE] })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidTargetError)
+    expect(ctx.store.codes[0].consumedAt).toBeNull()
+  })
+
+  it('refuses a repeated code as malformed, and spends nothing', async () => {
+    await expect(
+      ctx.service.exchangeAuthorizationCode(
+        tokenParams({ code: ['raw-code', 'raw-code'] })
+      )
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(ctx.store.codes[0].consumedAt).toBeNull()
+  })
+
   it('accepts the resource repeated in a different but equivalent spelling', async () => {
     const issued = await ctx.service.exchangeAuthorizationCode(
       tokenParams({ resource: 'https://pinsquirrel.com/mcp/' })
@@ -1440,6 +1489,14 @@ describe('OAuthService.exchangeRefreshToken', () => {
         })
       )
     ).rejects.toBeInstanceOf(OAuthInvalidScopeError)
+  })
+
+  it('refuses a refresh that names two resources with invalid_target', async () => {
+    await expect(
+      ctx.service.exchangeRefreshToken(
+        refreshParams({ resource: [MCP_RESOURCE, API_RESOURCE] })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidTargetError)
   })
 
   it('refuses a refresh aimed at a different audience', async () => {

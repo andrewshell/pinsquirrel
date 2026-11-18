@@ -3,6 +3,7 @@ import type { Context } from 'hono'
 import { OAuthError, ValidationError } from '@pinsquirrel/domain'
 import { oauthService } from '../lib/services.js'
 import { describeValidationError } from '../lib/oauth-error.js'
+import { protocolParams } from '../lib/form.js'
 import { oauthTokenIpLimiter, rateLimitByIp } from '../middleware/rate-limit.js'
 
 /**
@@ -34,20 +35,10 @@ function isFormEncoded(c: Context): boolean {
   return contentType.split(';')[0].trim().toLowerCase() === FORM_CONTENT_TYPE
 }
 
-/**
- * The posted form as plain strings.
- *
- * `parseBody()` yields `string | File` per field; a File is not a protocol
- * parameter, so dropping it here means the schemas reject a missing field
- * rather than a wrongly typed one.
- */
-async function formParams(c: Context): Promise<Record<string, string>> {
-  const body = await c.req.parseBody()
-  const params: Record<string, string> = {}
-  for (const [key, value] of Object.entries(body)) {
-    if (typeof value === 'string') params[key] = value
-  }
-  return params
+async function formParams(
+  c: Context
+): Promise<Record<string, string | string[]>> {
+  return protocolParams(await c.req.parseBody({ all: true }))
 }
 
 function errorResponse(c: Context, error: string, description: string) {
@@ -86,6 +77,9 @@ oauthToken.post('/token', async c => {
   }
 
   const params = await formParams(c)
+  if (Array.isArray(params.grant_type)) {
+    return errorResponse(c, 'invalid_request', 'grant_type is repeated')
+  }
 
   try {
     // Dispatch on the grant type, then hand the raw parameters to the
