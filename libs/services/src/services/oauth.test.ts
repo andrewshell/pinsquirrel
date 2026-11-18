@@ -2312,8 +2312,6 @@ describe('OAuthService.revokeToken', () => {
     expect(liveTokenIds(ctx.store)).toEqual([])
   })
 
-  // RFC 7009 2.2.1: a 503 tells the client the token still exists and to
-  // send the revocation again.
   it.each([
     ['refresh', 'revokeByGrant', ['desktop-access', 'desktop-refresh']],
     [

@@ -3,7 +3,7 @@ import { WriteConflictError } from '@pinsquirrel/domain'
 import {
   isDeadlockError,
   isLockWaitTimeoutError,
-  retryOnDeadlock,
+  writeOrConflict,
 } from './deadlock.js'
 
 const deadlock = () =>
@@ -20,11 +20,11 @@ const lockWaitTimeout = () =>
     }),
   })
 
-describe('retryOnDeadlock', () => {
+describe('writeOrConflict', () => {
   it('returns the result of a transaction that commits', async () => {
     let runs = 0
 
-    expect(await retryOnDeadlock(() => Promise.resolve(++runs))).toBe(1)
+    expect(await writeOrConflict(() => Promise.resolve(++runs))).toBe(1)
   })
 
   it('runs the transaction once more after a deadlock', async () => {
@@ -32,7 +32,7 @@ describe('retryOnDeadlock', () => {
     const transaction = () =>
       ++runs === 1 ? Promise.reject(deadlock()) : Promise.resolve(runs)
 
-    expect(await retryOnDeadlock(transaction)).toBe(2)
+    expect(await writeOrConflict(transaction)).toBe(2)
   })
 
   it('throws a write conflict for a second deadlock, after two runs', async () => {
@@ -42,7 +42,7 @@ describe('retryOnDeadlock', () => {
       return Promise.reject(deadlock())
     }
 
-    const thrown: unknown = await retryOnDeadlock(transaction).catch(
+    const thrown: unknown = await writeOrConflict(transaction).catch(
       (error: unknown) => error
     )
 
@@ -61,7 +61,7 @@ describe('retryOnDeadlock', () => {
       return Promise.reject(lockWaitTimeout())
     }
 
-    const thrown: unknown = await retryOnDeadlock(transaction).catch(
+    const thrown: unknown = await writeOrConflict(transaction).catch(
       (error: unknown) => error
     )
 
@@ -78,7 +78,7 @@ describe('retryOnDeadlock', () => {
     const transaction = () =>
       Promise.reject(++runs === 1 ? deadlock() : lockWaitTimeout())
 
-    await expect(retryOnDeadlock(transaction)).rejects.toBeInstanceOf(
+    await expect(writeOrConflict(transaction)).rejects.toBeInstanceOf(
       WriteConflictError
     )
     expect(runs).toBe(2)
@@ -91,7 +91,7 @@ describe('retryOnDeadlock', () => {
       return Promise.reject(new Error('duplicate key'))
     }
 
-    await expect(retryOnDeadlock(transaction)).rejects.toThrow('duplicate key')
+    await expect(writeOrConflict(transaction)).rejects.toThrow('duplicate key')
     expect(runs).toBe(1)
   })
 })

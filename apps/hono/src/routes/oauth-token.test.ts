@@ -402,8 +402,6 @@ describe('POST /oauth/revoke', () => {
     expect(mockRevokeToken).not.toHaveBeenCalled()
   })
 
-  // RFC 7009 2.2.1: on a 503 the client assumes the token still exists and
-  // sends the revocation again.
   it('answers a revocation the server could not finish with 503 and Retry-After, and logs what it lost to', async () => {
     mockRevokeToken.mockRejectedValue(
       new OAuthTemporarilyUnavailableError(undefined, {

@@ -1243,10 +1243,9 @@ function refuseSeveralResources(params: unknown): void {
 }
 
 /**
- * A write of the request lost to other writes and changed nothing. The
- * client is told to send the request again, which finds what this one found:
- * a working code or token is still working, and a revocation that was due is
- * still due (PLAN.md decision 46).
+ * The client is told to send the request again, which finds what this one
+ * found: a working code or token is still working, and a revocation that was
+ * due is still due (PLAN.md decision 46).
  */
 async function conflictAsTemporarilyUnavailable<T>(
   request: Promise<T>

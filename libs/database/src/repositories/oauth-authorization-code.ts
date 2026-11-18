@@ -9,7 +9,7 @@ import { and, eq, gt, isNull, lt } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes'
 import { sessions } from '../schema/sessions'
-import { retryOnDeadlock } from './deadlock'
+import { writeOrConflict } from './deadlock'
 import { holdUserWhileIssuing, insertTokens } from './oauth-issuance'
 
 export class DrizzleOAuthAuthorizationCodeRepository implements OAuthAuthorizationCodeRepository {
@@ -75,7 +75,7 @@ export class DrizzleOAuthAuthorizationCodeRepository implements OAuthAuthorizati
         return created
       })
 
-    return retryOnDeadlock(creation)
+    return writeOrConflict(creation)
   }
 
   async exchange(
@@ -113,7 +113,7 @@ export class DrizzleOAuthAuthorizationCodeRepository implements OAuthAuthorizati
         return 'exchanged'
       })
 
-    return retryOnDeadlock(exchange)
+    return writeOrConflict(exchange)
   }
 
   async consume(codeHash: string): Promise<AuthorizationCode | null> {
@@ -123,7 +123,7 @@ export class DrizzleOAuthAuthorizationCodeRepository implements OAuthAuthorizati
     // takes is what makes two concurrent exchanges of the same code resolve to
     // one winner. `affectedRows` is 1 only for the call that found the code
     // unspent and unexpired.
-    const result = await retryOnDeadlock(() =>
+    const result = await writeOrConflict(() =>
       this.db
         .update(oauthAuthorizationCodes)
         .set({ consumedAt: now })

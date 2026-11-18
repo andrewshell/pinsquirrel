@@ -121,10 +121,7 @@ export async function heavyTransaction(pool: Pool): Promise<PoolConnection> {
   return connection
 }
 
-/**
- * A database on one connection whose lock waits give up after a second
- * where the server default is fifty. It is closed when the test ends.
- */
+/** Lock waits give up after a second where the server default is fifty. */
 export async function impatientDatabase(url: string): Promise<MySql2Database> {
   const pool = mysql.createPool({ uri: url, connectionLimit: 1 })
   await pool.query('SET SESSION innodb_lock_wait_timeout = 1')
@@ -132,10 +129,7 @@ export async function impatientDatabase(url: string): Promise<MySql2Database> {
   return drizzle({ client: pool })
 }
 
-/**
- * An open transaction holding the rows a locking read names. It is rolled
- * back and released when the test ends, or sooner by the test.
- */
+/** The test may roll it back sooner. */
 export async function transactionHolding(
   pool: Pool,
   lockingRead: string,

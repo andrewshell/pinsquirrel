@@ -17,7 +17,7 @@ import {
 } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { oauthTokens } from '../schema/oauth-tokens'
-import { retryOnDeadlock } from './deadlock'
+import { writeOrConflict } from './deadlock'
 import {
   changedRows,
   holdUserWhileIssuing,
@@ -67,7 +67,7 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
   }
 
   async revoke(id: string): Promise<boolean> {
-    const result = await retryOnDeadlock(() =>
+    const result = await writeOrConflict(() =>
       this.db
         .update(oauthTokens)
         .set({ revokedAt: new Date() })
@@ -80,7 +80,7 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
     userId: string,
     clientId: string
   ): Promise<number> {
-    return retryOnDeadlock(() =>
+    return writeOrConflict(() =>
       this.db.transaction(tx =>
         revokeUserTokens(tx, userId, eq(oauthTokens.clientId, clientId))
       )
@@ -88,7 +88,7 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
   }
 
   async revokeByGrant(userId: string, grantId: string): Promise<number> {
-    return retryOnDeadlock(() =>
+    return writeOrConflict(() =>
       this.db.transaction(tx =>
         revokeUserTokens(tx, userId, eq(oauthTokens.grantId, grantId))
       )
@@ -125,7 +125,7 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
         return true
       })
 
-    return retryOnDeadlock(rotation)
+    return writeOrConflict(rotation)
   }
 
   async deleteExpiredTokens(): Promise<number> {
@@ -150,7 +150,7 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
         return deleted
       }
       const ids = batch.map(row => row.id)
-      deleted += await retryOnDeadlock(() =>
+      deleted += await writeOrConflict(() =>
         changedRows(
           this.db,
           sql`delete ${oauthTokens} from ${oauthTokens} force index (primary) where ${and(inArray(oauthTokens.id, ids), dead)}`

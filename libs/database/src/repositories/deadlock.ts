@@ -9,10 +9,6 @@ export function isDeadlockError(error: unknown): boolean {
   return hasDriverErrorCode(error, 'ER_LOCK_DEADLOCK')
 }
 
-/**
- * Did a statement give up waiting for a row lock (ER_LOCK_WAIT_TIMEOUT,
- * errno 1205)?
- */
 export function isLockWaitTimeoutError(error: unknown): boolean {
   return hasDriverErrorCode(error, 'ER_LOCK_WAIT_TIMEOUT')
 }
@@ -30,7 +26,7 @@ export function isLockWaitTimeoutError(error: unknown): boolean {
  * the statement that timed out; Drizzle rolls back the rest of the
  * transaction when the error leaves its callback.
  */
-export async function retryOnDeadlock<T>(write: () => Promise<T>): Promise<T> {
+export async function writeOrConflict<T>(write: () => Promise<T>): Promise<T> {
   try {
     return await write()
   } catch (error) {

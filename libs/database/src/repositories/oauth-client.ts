@@ -7,7 +7,7 @@ import type {
 import { and, eq, inArray, isNull, lt } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { oauthClients } from '../schema/oauth-clients'
-import { retryOnDeadlock } from './deadlock.js'
+import { writeOrConflict } from './deadlock.js'
 import { isDuplicateKeyError } from './duplicate-key.js'
 
 export class DrizzleOAuthClientRepository implements OAuthClientRepository {
@@ -96,7 +96,7 @@ export class DrizzleOAuthClientRepository implements OAuthClientRepository {
   }
 
   async markCompleted(id: string, date: Date): Promise<void> {
-    await retryOnDeadlock(() =>
+    await writeOrConflict(() =>
       this.db
         .update(oauthClients)
         .set({ completedAt: date })

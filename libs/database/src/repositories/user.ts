@@ -13,7 +13,7 @@ import { userRoles } from '../schema/user-roles.js'
 import { sessions } from '../schema/sessions.js'
 import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes.js'
 import { emailChanges } from '../schema/email-changes.js'
-import { retryOnDeadlock } from './deadlock.js'
+import { writeOrConflict } from './deadlock.js'
 import { revokeUserTokens } from './oauth-issuance.js'
 import { isDuplicateKeyError } from './duplicate-key.js'
 
@@ -277,7 +277,7 @@ export class DrizzleUserRepository implements UserRepository {
     userId: string,
     keepSessionId?: string
   ): Promise<void> {
-    await retryOnDeadlock(() =>
+    await writeOrConflict(() =>
       this.db.transaction(async tx => {
         await tx
           .delete(sessions)
