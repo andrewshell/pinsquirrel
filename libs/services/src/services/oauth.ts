@@ -364,6 +364,13 @@ export class OAuthService {
       )
     }
 
+    if (!resolved.client.completedAt) {
+      // What takes a client out of the incomplete-client sweep: one that has
+      // authorized somebody is in use, however it registered. Marked before
+      // the code is written, which the sweep would otherwise take with it.
+      await this.clientRepository.markCompleted(resolved.client.id, new Date())
+    }
+
     const code = generateSecureToken()
     const expiresAt = new Date(Date.now() + AUTHORIZATION_CODE_TTL_MS)
 
@@ -387,12 +394,6 @@ export class OAuthService {
         'access_denied',
         'The session that approved this request has ended'
       )
-    }
-
-    if (!resolved.client.completedAt) {
-      // What takes a registration out of the incomplete-DCR sweep. A client
-      // that has authorized somebody is in use, whatever it registered as.
-      await this.clientRepository.markCompleted(resolved.client.id, new Date())
     }
 
     return {
@@ -709,6 +710,11 @@ export class OAuthService {
 
     const existing = await this.clientRepository.findByClientId(clientId)
     if (existing) {
+      if (!existing.completedAt) {
+        // The sweep counts from registration. A client registering again is
+        // about to send a user to consent, which must not outlive the row.
+        await this.clientRepository.renewRegistration(existing.id, new Date())
+      }
       return existing
     }
 

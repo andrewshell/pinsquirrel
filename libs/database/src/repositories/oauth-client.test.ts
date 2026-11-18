@@ -275,6 +275,25 @@ describe('DrizzleOAuthClientRepository - Integration Tests', () => {
       expect(await repository.findById(completed)).not.toBeNull()
     })
 
+    it('should keep an incomplete registration whose clock was restarted', async () => {
+      const renewed = await createdAgo(dcrClient(), 2 * 60 * 60 * 1000)
+      await repository.renewRegistration(renewed, new Date())
+
+      await repository.deleteExpiredIncompleteClients(anHourAgo())
+
+      expect(await repository.findById(renewed)).not.toBeNull()
+    })
+
+    it('should leave a completed registration where it was when asked to restart it', async () => {
+      const completed = await createdAgo(dcrClient(), 2 * 60 * 60 * 1000)
+      await repository.markCompleted(completed, new Date())
+      const before = (await repository.findById(completed))!.createdAt
+
+      await repository.renewRegistration(completed, new Date())
+
+      expect((await repository.findById(completed))!.createdAt).toEqual(before)
+    })
+
     it('should never touch a static registration', async () => {
       const staticClient = await createdAgo(
         dcrClient({ registrationType: 'static' }),

@@ -103,6 +103,13 @@ export class DrizzleOAuthClientRepository implements OAuthClientRepository {
       .where(eq(oauthClients.id, id))
   }
 
+  async renewRegistration(id: string, date: Date): Promise<void> {
+    await this.db
+      .update(oauthClients)
+      .set({ createdAt: date })
+      .where(and(eq(oauthClients.id, id), isNull(oauthClients.completedAt)))
+  }
+
   async delete(id: string): Promise<boolean> {
     const result = await this.db
       .delete(oauthClients)

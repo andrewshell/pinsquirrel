@@ -192,6 +192,7 @@ function setup() {
     update: vi.fn(),
     delete: vi.fn(),
     markCompleted: vi.fn(),
+    renewRegistration: vi.fn(),
     deleteExpiredIncompleteClients: vi.fn(),
   } as unknown as OAuthClientRepository
 
@@ -835,10 +836,9 @@ describe('OAuthService.authorize', () => {
       redirectUri: 'http://localhost:54321/callback',
       state: 'opaque-state',
     })
-    expect(ctx.clientRepository.markCompleted).not.toHaveBeenCalled()
   })
 
-  // `completed_at` is what keeps a registration out of the incomplete-DCR
+  // `completed_at` is what keeps a registration out of the incomplete-client
   // sweep, and an authorization is what completes it.
   it('marks the client as having completed an authorization', async () => {
     await ctx.service.authorize(ac, {
@@ -852,6 +852,23 @@ describe('OAuthService.authorize', () => {
       'client-row-1',
       expect.any(Date)
     )
+  })
+
+  // The sweep deletes incomplete clients, and the code's row cascades from
+  // its client: marked after the insert, a sweep in between takes the code.
+  it('marks the client before it writes the code', async () => {
+    await ctx.service.authorize(ac, {
+      params: authorizeParams(),
+      userId: user.id,
+      sessionId: SESSION_ID,
+      approved: true,
+    })
+
+    const [marked] = vi.mocked(ctx.clientRepository.markCompleted).mock
+      .invocationCallOrder
+    const [written] = vi.mocked(ctx.codeRepository.create).mock
+      .invocationCallOrder
+    expect(marked).toBeLessThan(written)
   })
 
   it('does not re-mark a client that already completed one', async () => {
@@ -1749,6 +1766,33 @@ describe('OAuthService.registerClient', () => {
     )
 
     expect(second.clientId).not.toBe(first.clientId)
+  })
+
+  // The sweep counts from registration, and a client registers again when it
+  // reconnects; the clock restarts so a user on its consent page keeps it.
+  it('restarts the sweep clock on a registration that has not completed', async () => {
+    const pending = makeClient({
+      id: 'client-row-dcr',
+      registrationType: 'dcr',
+    })
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(pending)
+
+    await ctx.service.registerClient(registration())
+
+    expect(ctx.clientRepository.renewRegistration).toHaveBeenCalledWith(
+      'client-row-dcr',
+      expect.any(Date)
+    )
+  })
+
+  it('leaves a completed registration as it was', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({ registrationType: 'dcr', completedAt: new Date() })
+    )
+
+    await ctx.service.registerClient(registration())
+
+    expect(ctx.clientRepository.renewRegistration).not.toHaveBeenCalled()
   })
 
   it('keeps different clients apart, port aside', async () => {

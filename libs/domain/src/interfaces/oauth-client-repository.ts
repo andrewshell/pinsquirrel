@@ -23,6 +23,12 @@ export interface OAuthClientRepository extends Repository<
   markCompleted(id: string, date: Date): Promise<void>
 
   /**
+   * Restart the sweep's clock on a registration that has not completed an
+   * authorization, as of `date`. A completed one is left alone.
+   */
+  renewRegistration(id: string, date: Date): Promise<void>
+
+  /**
    * Delete `dcr` and `cimd` registrations created before `registeredBefore`
    * that never completed an authorization, and report how many that was.
    *
