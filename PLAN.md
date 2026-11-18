@@ -573,8 +573,8 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     User role) is checked by `authorize`, by both token exchanges and by `verifyAccessToken`,
     so a token stops working the moment its account stops being admitted. An exchange for an
     account that is not admitted also revokes the account's tokens for that client.
-    Revoking the User role calls `revokeSessionsAndTokens`, as a password reset does, so a
-    suspension also clears what the checks would refuse anyway.
+    Revoking the User role ends the account's sessions and tokens, as a password reset does,
+    so a suspension also clears what the checks would refuse anyway.
 37. **A rotated refresh token is kept until its own expiry.** Presenting a retired token again
     is how a copied refresh chain is noticed, and that needs the row, so the sweep removes
     only expired and revoked tokens. The cost is one row per refresh for up to thirty days.
@@ -615,8 +615,8 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     revocation therefore finishes before an issuance, which then finds its code deleted or its
     token revoked, or starts after the issuance commits and takes the new tokens with the rest.
     This closes the window Decision 38 left in the code exchange and replaces the read-back
-    after a refresh. `revokeSessionsAndTokens` takes the lock after it deletes the sessions,
-    the order in which a code being written takes the two rows.
+    after a refresh. A revocation of everything a user holds takes the lock after it deletes
+    the sessions, the order in which a code being written takes the two rows.
     A revocation locks only the tokens it changes. It reads the user's token ids through
     `oauth_tokens_user_client_idx` with `FOR UPDATE` and stamps them by primary key, 500 at a
     time. A single `UPDATE ... WHERE user_id = ?` was rejected: once one user holds about a
@@ -707,6 +707,27 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     points, and the routes log the cause at `warn`, since a `503` does not reach the error
     handler's log. The hourly sweep reads dead tokens 500 at a time, each read starting
     after the last id of the one before, so it holds one batch whatever the backlog.
+47. **A password change, a password reset and the removal of the User role commit with the
+    revocation they call for, or not at all.** Each used to write the password or remove the
+    role and then revoke the sessions and tokens as a second step. A revocation that was
+    undone (Decision 46) then left the new password or the suspension in place beside
+    sessions, tokens and unused codes that still worked, and a second attempt at a password
+    change was refused because the "current password" had already changed. The user
+    repository now has `setPasswordAndRevoke` and `removeRoleAndRevoke`, each one
+    transaction, and no revocation of a whole account outside them. The order inside is
+    that of Decision 41: the sessions, then the lock on the user's row, the tokens, the
+    unused codes and the pending email change, and last the password or the role, written
+    under that lock. A deadlock runs the whole transaction again once.
+    A password reset spends its link in the same transaction, so a reset that does not
+    commit leaves the link working and the form can be sent again. Spending the link first
+    was rejected: the user would have to ask for a new email after a failure that changed
+    nothing. The link is still spent once, since of two requests with one link the second
+    waits for the user's row, finds the link gone and is undone.
+    An undone change is a `WriteConflictError` to the caller. The profile and reset pages
+    answer `503` with `Retry-After: 1` and say that the password was not changed and to try
+    again; the admin console says that the role was not revoked, beside any role change the
+    same form had already made. Removing the Admin role revokes nothing and stays one
+    statement.
 
 ## Reference
 
