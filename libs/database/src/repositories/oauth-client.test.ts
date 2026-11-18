@@ -86,11 +86,20 @@ describe('DrizzleOAuthClientRepository - Integration Tests', () => {
       expect(result.metadataFetchedAt?.getTime()).toBe(fetchedAt.getTime())
     })
 
-    it('should reject a duplicate client id', async () => {
+    // Two first registrations of one client, or two first fetches of one
+    // CIMD document, race to the insert. The loser gets the winner's row.
+    it('should return the existing row when the client id is already taken', async () => {
       const data = dcrClient()
-      await repository.create(data)
 
-      await expect(repository.create(data)).rejects.toThrow()
+      const [first, second] = await Promise.all([
+        repository.create(data),
+        repository.create(data),
+      ])
+
+      expect(second.id).toBe(first.id)
+      expect(await repository.findByClientId(data.clientId)).toMatchObject({
+        id: first.id,
+      })
     })
   })
 
