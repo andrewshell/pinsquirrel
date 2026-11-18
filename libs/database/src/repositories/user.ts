@@ -13,6 +13,7 @@ import { userRoles } from '../schema/user-roles.js'
 import { sessions } from '../schema/sessions.js'
 import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes.js'
 import { emailChanges } from '../schema/email-changes.js'
+import { retryOnDeadlock } from './deadlock.js'
 import { revokeUserTokens } from './oauth-issuance.js'
 import { isDuplicateKeyError } from './duplicate-key.js'
 
@@ -276,28 +277,33 @@ export class DrizzleUserRepository implements UserRepository {
     userId: string,
     keepSessionId?: string
   ): Promise<void> {
-    await this.db.transaction(async tx => {
-      await tx
-        .delete(sessions)
-        .where(
-          and(
-            eq(sessions.userId, userId),
-            keepSessionId === undefined
-              ? undefined
-              : ne(sessions.id, keepSessionId)
+    await retryOnDeadlock(() =>
+      this.db.transaction(async tx => {
+        await tx
+          .delete(sessions)
+          .where(
+            and(
+              eq(sessions.userId, userId),
+              keepSessionId === undefined
+                ? undefined
+                : ne(sessions.id, keepSessionId)
+            )
           )
-        )
-      await revokeUserTokens(tx, userId)
-      await tx
-        .delete(oauthAuthorizationCodes)
-        .where(
-          and(
-            eq(oauthAuthorizationCodes.userId, userId),
-            isNull(oauthAuthorizationCodes.consumedAt)
+        // Sessions before the user's row: a code being written holds its
+        // session and then reads the user, and the opposite order here would
+        // deadlock with it. PLAN.md decision 41.
+        await revokeUserTokens(tx, userId)
+        await tx
+          .delete(oauthAuthorizationCodes)
+          .where(
+            and(
+              eq(oauthAuthorizationCodes.userId, userId),
+              isNull(oauthAuthorizationCodes.consumedAt)
+            )
           )
-        )
-      await tx.delete(emailChanges).where(eq(emailChanges.userId, userId))
-    })
+        await tx.delete(emailChanges).where(eq(emailChanges.userId, userId))
+      })
+    )
   }
 
   // Role management methods

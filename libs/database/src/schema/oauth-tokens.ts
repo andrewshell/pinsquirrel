@@ -9,6 +9,9 @@ import {
 import { oauthClients } from './oauth-clients'
 import { users } from './users'
 
+// Named here because revoking a user's tokens forces its read onto this index.
+export const OAUTH_TOKENS_USER_CLIENT_INDEX = 'oauth_tokens_user_client_idx'
+
 export const oauthTokens = mysqlTable(
   'oauth_tokens',
   {
@@ -46,7 +49,7 @@ export const oauthTokens = mysqlTable(
     expiresAtIdx: index('oauth_tokens_expires_at_idx').on(table.expiresAt),
     // Serves both the grants list (user alone, on the index prefix) and
     // revoking one grant (user and client together).
-    userClientIdx: index('oauth_tokens_user_client_idx').on(
+    userClientIdx: index(OAUTH_TOKENS_USER_CLIENT_INDEX).on(
       table.userId,
       table.clientId
     ),

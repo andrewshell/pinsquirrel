@@ -4,13 +4,27 @@ import type {
   IssuedTokenData,
   OAuthTokenRepository,
 } from '@pinsquirrel/domain'
-import { and, eq, gt, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
+import {
+  and,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  or,
+  sql,
+} from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { oauthTokens } from '../schema/oauth-tokens'
+import { retryOnDeadlock } from './deadlock'
 import {
+  changedRows,
   holdUserWhileIssuing,
-  revokeUserTokens,
+  inBatches,
   insertTokens,
+  issueOrRefuse,
+  revokeUserTokens,
 } from './oauth-issuance'
 
 export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
@@ -65,57 +79,78 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
     userId: string,
     clientId: string
   ): Promise<number> {
-    return this.db.transaction(tx =>
-      revokeUserTokens(tx, userId, eq(oauthTokens.clientId, clientId))
+    return retryOnDeadlock(() =>
+      this.db.transaction(tx =>
+        revokeUserTokens(tx, userId, eq(oauthTokens.clientId, clientId))
+      )
     )
   }
 
   async revokeByGrant(userId: string, grantId: string): Promise<number> {
-    return this.db.transaction(tx =>
-      revokeUserTokens(tx, userId, eq(oauthTokens.grantId, grantId))
+    return retryOnDeadlock(() =>
+      this.db.transaction(tx =>
+        revokeUserTokens(tx, userId, eq(oauthTokens.grantId, grantId))
+      )
     )
   }
 
   async rotate(tokenId: string, successors: IssuedTokenData): Promise<boolean> {
     const [{ userId, grantId }] = successors
 
-    return this.db.transaction(async tx => {
-      if (!(await holdUserWhileIssuing(tx, userId))) {
-        return false
-      }
+    const rotation = () =>
+      this.db.transaction(async tx => {
+        if (!(await holdUserWhileIssuing(tx, userId))) {
+          return false
+        }
 
-      const result = await tx
-        .update(oauthTokens)
-        .set({
-          rotatedAt: new Date(),
-          grantId: sql`coalesce(${oauthTokens.grantId}, ${grantId})`,
-        })
-        .where(
-          and(
-            eq(oauthTokens.id, tokenId),
-            isNull(oauthTokens.rotatedAt),
-            isNull(oauthTokens.revokedAt)
+        const result = await tx
+          .update(oauthTokens)
+          .set({
+            rotatedAt: new Date(),
+            grantId: sql`coalesce(${oauthTokens.grantId}, ${grantId})`,
+          })
+          .where(
+            and(
+              eq(oauthTokens.id, tokenId),
+              isNull(oauthTokens.rotatedAt),
+              isNull(oauthTokens.revokedAt)
+            )
           )
-        )
-      if (result[0].affectedRows === 0) {
-        return false
-      }
+        if (result[0].affectedRows === 0) {
+          return false
+        }
 
-      await insertTokens(tx, successors)
-      return true
-    })
+        await insertTokens(tx, successors)
+        return true
+      })
+
+    return issueOrRefuse(rotation, false)
   }
 
   async deleteExpiredTokens(): Promise<number> {
-    const result = await this.db
-      .delete(oauthTokens)
-      .where(
-        or(
-          lt(oauthTokens.expiresAt, new Date()),
-          isNotNull(oauthTokens.revokedAt)
+    const dead = or(
+      lt(oauthTokens.expiresAt, new Date()),
+      isNotNull(oauthTokens.revokedAt)
+    )
+    // Found with a read that locks nothing, then deleted by primary key. One
+    // DELETE over the whole table locks every gap in it, and a refresh that
+    // has retired its token cannot then insert the successors. PLAN.md
+    // decision 41.
+    const found = await this.db
+      .select({ id: oauthTokens.id })
+      .from(oauthTokens)
+      .where(dead)
+
+    let deleted = 0
+    for (const batch of inBatches(found.map(row => row.id))) {
+      deleted += await retryOnDeadlock(() =>
+        changedRows(
+          this.db,
+          sql`delete ${oauthTokens} from ${oauthTokens} force index (primary) where ${and(inArray(oauthTokens.id, batch), dead)}`
         )
       )
-    return result[0].affectedRows
+    }
+    return deleted
   }
 
   /** Not expired, not revoked, not already exchanged for a successor. */
