@@ -147,29 +147,20 @@ const oauth = new Hono()
  * exactly this URL - so it has to stay stable.
  *
  * The page only tells the person what happened. The code is the extension's
- * to spend and is never read here.
+ * to spend and is never read here, and `error_description` is not shown:
+ * anybody can write this URL, and the page speaks with the site's voice.
  */
 oauth.get('/extension/callback', async c => {
   const sessionManager = getSessionManager(c)
   const user = sessionManager.isAuthenticated()
     ? await sessionManager.getUser()
     : null
-  const error = c.req.query('error')
 
   return c.html(
     <OAuthExtensionCallbackPage
       user={user}
       embed={isEmbedRequest(c)}
-      {...(error
-        ? {
-            error: {
-              code: error,
-              description:
-                c.req.query('error_description') ??
-                `The server answered ${error}`,
-            },
-          }
-        : {})}
+      error={c.req.query('error')}
     />
   )
 })

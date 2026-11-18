@@ -178,8 +178,43 @@ describe('oauth authorize routes', () => {
       expect(res.status).toBe(200)
       const body = await res.text()
       expect(body).toContain('Extension not connected')
-      expect(body).toContain('You said no')
+      expect(body).toContain('You declined the connection')
       expect(body).toContain('access_denied')
+    })
+
+    // The query string is anybody's to write, and this page speaks with the
+    // site's voice: only messages the site wrote may appear on it.
+    it('does not render the error_description from the query string', async () => {
+      const res = await app.request(
+        `/oauth/extension/callback?${new URLSearchParams({
+          error: 'access_denied',
+          error_description: 'Your account is suspended, call 555 0100',
+        }).toString()}`
+      )
+
+      expect(await res.text()).not.toContain('suspended')
+    })
+
+    it('shows neither an unknown error code nor its text', async () => {
+      const res = await app.request(
+        `/oauth/extension/callback?${new URLSearchParams({
+          error: 'Your account is suspended',
+        }).toString()}`
+      )
+
+      const body = await res.text()
+      expect(body).toContain('Extension not connected')
+      expect(body).not.toContain('suspended')
+    })
+
+    it('does not read an error code off the object prototype', async () => {
+      const res = await app.request(
+        '/oauth/extension/callback?error=constructor'
+      )
+
+      const body = await res.text()
+      expect(body).toContain('The connection did not complete.')
+      expect(body).not.toContain('constructor')
     })
   })
 
