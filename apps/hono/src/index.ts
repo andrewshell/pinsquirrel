@@ -3,7 +3,8 @@ import { serve } from '@hono/node-server'
 import { app } from './app.js'
 import { staticOAuthClients } from './lib/config.js'
 import { startExpirySweep } from './lib/expiry-sweep.js'
-import { logger, safeError } from './lib/logger.js'
+import { reconcileStaticClients } from './lib/static-clients.js'
+import { logger } from './lib/logger.js'
 import {
   deferredWork,
   maintenanceService,
@@ -44,23 +45,7 @@ startExpirySweep(maintenanceService)
 // here rather than at `lib/services.ts` module load, so importing a service in
 // a test does not reach for the database.
 if (staticOAuthClients.length > 0) {
-  void oauthService
-    .reconcileStaticClients(staticOAuthClients)
-    .then(failures => {
-      for (const { clientId, error } of failures) {
-        logger.error(
-          { clientId, error: safeError(error) },
-          'Could not reconcile a static OAuth client'
-        )
-      }
-      logger.info(
-        {
-          clients: staticOAuthClients.length,
-          failed: failures.length,
-        },
-        'Reconciled static OAuth clients'
-      )
-    })
+  void reconcileStaticClients(oauthService, staticOAuthClients)
 }
 
 logger.info({ port }, 'Hono server is running')

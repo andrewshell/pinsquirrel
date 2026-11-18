@@ -212,6 +212,20 @@ describe('resolveStaticOAuthClients', () => {
   })
 
   it.each([
+    'https://u:p@acme.example.com/callback',
+    'https://u@acme.example.com/callback',
+    'http://@127.0.0.1/callback',
+  ])('fails at boot on a redirect URI with userinfo: %s', uri => {
+    expect(() =>
+      resolveStaticOAuthClients({
+        OAUTH_STATIC_CLIENTS: JSON.stringify([
+          { client_id: 'acme', client_name: 'Acme', redirect_uris: [uri] },
+        ]),
+      })
+    ).toThrow(/OAUTH_STATIC_CLIENTS is invalid.*no fragment or userinfo/)
+  })
+
+  it.each([
     ['client_id', { client_id: 'a'.repeat(256) }],
     ['client_name', { client_name: 'a'.repeat(256) }],
     [
