@@ -237,7 +237,7 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
         expiresAt: new Date(Date.now() + 15 * 60 * 1000),
       })
 
-      const deletedCount = await repository.deleteExpiredTokens()
+      const deletedCount = await repository.deleteExpiredTokens(new Date())
       expect(deletedCount).toBe(1)
 
       const validToken = await repository.findByTokenHash('valid_token')
@@ -247,8 +247,25 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
       expect(expiredToken).toBeNull()
     })
 
+    it('keeps a token that expired after the cutoff', async () => {
+      const { id: userId } = await insertUser(testPool)
+      await repository.create({
+        userId,
+        tokenHash: 'recently_expired_token',
+        expiresAt: new Date(Date.now() - 60 * 1000),
+      })
+
+      await repository.deleteExpiredTokens(
+        new Date(Date.now() - 60 * 60 * 1000)
+      )
+
+      expect(
+        await repository.findByTokenHash('recently_expired_token')
+      ).not.toBeNull()
+    })
+
     it('should return 0 when no expired tokens exist', async () => {
-      const deletedCount = await repository.deleteExpiredTokens()
+      const deletedCount = await repository.deleteExpiredTokens(new Date())
       expect(deletedCount).toBe(0)
     })
 

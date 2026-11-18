@@ -112,6 +112,17 @@ describe('MaintenanceService', () => {
     expect(age).toBeLessThan(25 * 60 * 60 * 1000)
   })
 
+  it('keeps expired reset tokens for the hour the request limit counts', async () => {
+    const ctx = makeService()
+
+    await ctx.service.sweepExpired()
+
+    const [cutoff] = vi.mocked(ctx.passwordResetRepository.deleteExpiredTokens)
+      .mock.calls[0] as unknown as [Date | undefined]
+    const age = Date.now() - (cutoff?.getTime() ?? Date.now())
+    expect(age).toBeGreaterThanOrEqual(60 * 60 * 1000)
+  })
+
   // The counts are what the caller logs, so a sweep that removed nothing has
   // to be distinguishable from one that removed everything.
   it('reports nothing swept when nothing has expired', async () => {

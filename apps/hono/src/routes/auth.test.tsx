@@ -40,13 +40,7 @@ const session = {
 }
 
 const limiter = {
-  isLimited: vi.fn(),
-  hit: vi.fn(),
-  reset: vi.fn(),
   ipLimited: vi.fn(),
-  ipIsLimited: vi.fn(),
-  ipHit: vi.fn(),
-  ipReset: vi.fn(),
 }
 
 vi.mock('../lib/services', () => ({
@@ -75,27 +69,8 @@ vi.mock('../middleware/session', () => ({
   }),
 }))
 
-// The RateLimiter class has its own unit tests; what matters here is that the
-// routes consult it and honour the answer, so the seam is driven directly.
-vi.mock('../middleware/rate-limit', () => ({
-  signinLimiter: {
-    isLimited: (...a: unknown[]): boolean => limiter.isLimited(...a) as boolean,
-    hit: (...a: unknown[]): unknown => limiter.hit(...a) as unknown,
-    reset: (...a: unknown[]): unknown => limiter.reset(...a) as unknown,
-  },
-  signinIpLimiter: {
-    isLimited: (...a: unknown[]): boolean =>
-      limiter.ipIsLimited(...a) as boolean,
-    hit: (...a: unknown[]): unknown => limiter.ipHit(...a) as unknown,
-    reset: (...a: unknown[]): unknown => limiter.ipReset(...a) as unknown,
-  },
-  signupLimiter: {},
-  forgotPasswordLimiter: {},
-  // Lowercased like the real one: it is what turns a non-string username into
-  // a 500, so a fake that skipped it would hide the bug.
-  signinRateLimitKey: (_c: unknown, username: string) =>
-    `ip:${username.toLowerCase()}`,
-  getClientIp: () => 'ip',
+vi.mock('../middleware/rate-limit', async importOriginal => ({
+  ...(await importOriginal<typeof import('../middleware/rate-limit')>()),
   rateLimitByIp: (): MiddlewareHandler => async (c, next) => {
     if (limiter.ipLimited() as boolean) return c.text('Too many requests', 429)
     await next()
@@ -110,6 +85,14 @@ vi.mock('../lib/logger.js', () => ({
 }))
 
 import { authRoutes } from './auth'
+import {
+  signinIpLimiter,
+  signinLimiter,
+  signinUsernameLimiter,
+} from '../middleware/rate-limit'
+import { TEST_CLIENT_IP, exhaust } from '../test-support/rate-limit'
+
+const SIGNIN_USERNAMES = ['a', 'alice', 'bob', 'spread-target']
 
 function form(fields: Record<string, string>): RequestInit {
   return {
@@ -126,9 +109,12 @@ describe('auth routes', () => {
     vi.resetAllMocks()
     session.isAuthenticated.mockReturnValue(false)
     session.getFlash.mockReturnValue(null)
-    limiter.isLimited.mockReturnValue(false)
     limiter.ipLimited.mockReturnValue(false)
-    limiter.ipIsLimited.mockReturnValue(false)
+    for (const username of SIGNIN_USERNAMES) {
+      signinLimiter.reset(`${TEST_CLIENT_IP}:${username}`)
+      signinUsernameLimiter.reset(username)
+    }
+    signinIpLimiter.reset(TEST_CLIENT_IP)
     app = new Hono()
     app.route('/', authRoutes)
   })
@@ -254,110 +240,121 @@ describe('auth routes', () => {
     })
 
     describe('rate limiting', () => {
-      it('returns 429 without attempting a login when limited', async () => {
-        limiter.isLimited.mockReturnValue(true)
+      const ACCOUNT_KEY = `${TEST_CLIENT_IP}:alice`
 
-        const res = await app.request(
-          '/signin',
-          form({ username: 'alice', password: 'pw' })
-        )
+      async function signin(password = 'pw', username = 'alice') {
+        return app.request('/signin', form({ username, password }))
+      }
+
+      async function failTimes(n: number, username = 'alice') {
+        for (let i = 0; i < n; i++) await signin(`wrong-${i}`, username)
+      }
+
+      it('returns 429 without attempting a login once the account budget is spent', async () => {
+        exhaust(signinLimiter, ACCOUNT_KEY)
+
+        const res = await signin()
 
         expect(res.status).toBe(429)
+        expect(Number(res.headers.get('Retry-After'))).toBeGreaterThan(0)
         expect(auth.login).not.toHaveBeenCalled()
       })
 
-      it('keys the limiter on the submitted username', async () => {
+      it('keys the account budget on the submitted username, case-insensitively', async () => {
+        exhaust(signinLimiter, ACCOUNT_KEY)
         auth.login.mockResolvedValue({ id: 'user-1' })
 
-        await app.request('/signin', form({ username: 'alice', password: 'p' }))
-
-        expect(limiter.isLimited).toHaveBeenCalledWith('ip:alice')
+        expect((await signin('pw', 'ALICE')).status).toBe(429)
+        expect((await signin('pw', 'bob')).status).toBe(302)
       })
 
-      it('clears the limiter on a successful sign-in', async () => {
-        auth.login.mockResolvedValue({ id: 'user-1' })
+      it('lets at most the account budget reach the password check when attempts arrive together', async () => {
+        auth.login.mockImplementation(
+          () =>
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new InvalidCredentialsError()), 10)
+            )
+        )
 
-        await app.request('/signin', form({ username: 'alice', password: 'p' }))
+        const responses = await Promise.all(
+          Array.from({ length: 10 }, (_, i) => signin(`guess-${i}`))
+        )
 
-        expect(limiter.reset).toHaveBeenCalledWith('ip:alice')
-        expect(limiter.hit).not.toHaveBeenCalled()
+        expect(auth.login).toHaveBeenCalledTimes(5)
+        expect(responses.filter(r => r.status === 429)).toHaveLength(5)
       })
 
-      it('counts a failed attempt only for wrong credentials', async () => {
+      it('gives the account its budget back on a successful sign-in', async () => {
         auth.login.mockRejectedValue(new InvalidCredentialsError())
+        await failTimes(4)
+        auth.login.mockResolvedValueOnce({ id: 'user-1' })
+        await signin()
 
-        await app.request('/signin', form({ username: 'alice', password: 'x' }))
+        await failTimes(4)
+        const res = await signin()
 
-        expect(limiter.hit).toHaveBeenCalledWith('ip:alice')
+        expect(res.status).toBe(400)
+        expect(auth.login).toHaveBeenCalledTimes(10)
       })
 
       it.each([
         ['validation error', () => new ValidationError({ username: ['bad'] })],
         ['unexpected error', () => new Error('boom')],
-      ])('does not count a failed attempt for a %s', async (_label, make) => {
-        // Only wrong credentials should burn an attempt. Counting validation or
-        // infrastructure failures would let a broken dependency lock users out.
+        ['waitlisted account', () => new AccessNotGrantedError()],
+      ])('does not spend the budget on a %s', async (_label, make) => {
         auth.login.mockRejectedValue(make())
+        await failTimes(25)
+        auth.login.mockResolvedValue({ id: 'user-1' })
 
-        await app.request('/signin', form({ username: 'alice', password: 'x' }))
-
-        expect(limiter.hit).not.toHaveBeenCalled()
+        expect((await signin()).status).toBe(302)
       })
 
-      // The IP:username key stops guessing at one account but never fires
-      // against an attacker who sprays one password across many usernames -
-      // every guess lands in a fresh bucket. The looser IP-only limiter is
-      // what covers that, so both are consulted on every attempt.
-      it('returns 429 without attempting a login when the IP limiter is tripped', async () => {
-        limiter.ipIsLimited.mockReturnValue(true)
+      it('returns 429 without attempting a login once the address budget is spent', async () => {
+        exhaust(signinIpLimiter, TEST_CLIENT_IP)
 
-        const res = await app.request(
-          '/signin',
-          form({ username: 'alice', password: 'pw' })
-        )
+        const res = await signin()
 
         expect(res.status).toBe(429)
         expect(auth.login).not.toHaveBeenCalled()
       })
 
-      it('keys the IP limiter on the address alone, not the username', async () => {
-        auth.login.mockResolvedValue({ id: 'user-1' })
+      it('spends the address budget across usernames', async () => {
+        auth.login.mockRejectedValue(new InvalidCredentialsError())
+        for (let i = 0; i < 20; i++) {
+          await signin('wrong', SIGNIN_USERNAMES[i % SIGNIN_USERNAMES.length])
+        }
 
-        await app.request('/signin', form({ username: 'alice', password: 'p' }))
-
-        expect(limiter.ipIsLimited).toHaveBeenCalledWith('ip')
+        expect((await signin('pw', 'bob')).status).toBe(429)
       })
 
-      it('counts a wrong-credentials failure against both limiters', async () => {
+      it('limits failed sign-ins for one username spread across many addresses', async () => {
         auth.login.mockRejectedValue(new InvalidCredentialsError())
 
-        await app.request('/signin', form({ username: 'alice', password: 'x' }))
+        const statuses: number[] = []
+        for (let i = 0; i < 100; i++) {
+          const res = await app.request(
+            '/signin',
+            form({ username: 'spread-target', password: `guess-${i}` }),
+            { incoming: { socket: { remoteAddress: `198.51.100.${i}` } } }
+          )
+          statuses.push(res.status)
+        }
 
-        expect(limiter.hit).toHaveBeenCalledWith('ip:alice')
-        expect(limiter.ipHit).toHaveBeenCalledWith('ip')
+        expect(auth.login.mock.calls.length).toBeLessThan(100)
+        expect(statuses).toContain(429)
       })
 
-      it('does not clear the IP limiter on a successful sign-in', async () => {
-        // Deliberate asymmetry with signinLimiter.reset above: an attacker who
-        // owns one valid account could otherwise wipe their spray budget at
-        // will by signing into it between rounds.
-        auth.login.mockResolvedValue({ id: 'user-1' })
+      it('does not give the address budget back on a successful sign-in', async () => {
+        auth.login.mockRejectedValue(new InvalidCredentialsError())
+        for (let i = 0; i < 19; i++) {
+          await signin('wrong', SIGNIN_USERNAMES[i % SIGNIN_USERNAMES.length])
+        }
+        auth.login.mockResolvedValueOnce({ id: 'user-1' })
+        await signin('pw', 'bob')
 
-        await app.request('/signin', form({ username: 'alice', password: 'p' }))
+        await signin('wrong', 'bob')
 
-        expect(limiter.reset).toHaveBeenCalledWith('ip:alice')
-        expect(limiter.ipReset).not.toHaveBeenCalled()
-      })
-
-      it.each([
-        ['validation error', () => new ValidationError({ username: ['bad'] })],
-        ['unexpected error', () => new Error('boom')],
-      ])('does not count a %s against the IP limiter', async (_label, make) => {
-        auth.login.mockRejectedValue(make())
-
-        await app.request('/signin', form({ username: 'alice', password: 'x' }))
-
-        expect(limiter.ipHit).not.toHaveBeenCalled()
+        expect((await signin('pw', 'bob')).status).toBe(429)
       })
     })
 

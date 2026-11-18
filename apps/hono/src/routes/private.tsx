@@ -10,7 +10,11 @@ import {
   requireAuth,
 } from '../middleware/session'
 import { requirePrivateUnlock } from '../middleware/private-mode'
-import { privateUnlockLimiter } from '../middleware/rate-limit'
+import {
+  privateUnlockLimiter,
+  retryAfterSeconds,
+} from '../middleware/rate-limit'
+import { reserve } from '../middleware/rate-limiter'
 import { PrivateUnlockPage } from '../views/pages/private-unlock'
 import { createPinRoutes } from './pin-routes'
 
@@ -73,7 +77,9 @@ privateRouter.post('/unlock', async c => {
 
   // This checks the account password on every POST, so unlimited it is a
   // password-guessing oracle for anyone who has got hold of the session.
-  if (privateUnlockLimiter.isLimited(user.id)) {
+  const attempt = reserve([[privateUnlockLimiter, user.id]])
+  if (attempt.limited) {
+    c.header('Retry-After', retryAfterSeconds(attempt.retryAfterMs))
     return rerender(
       'Too many failed attempts. Please try again in 15 minutes.',
       429
@@ -86,15 +92,11 @@ privateRouter.post('/unlock', async c => {
     sessionManager.unlockPrivateMode()
     return c.redirect(safeRedirect(redirectTo, c.req.url, BASE_URL))
   } catch (error) {
+    if (!(error instanceof InvalidCredentialsError)) attempt.release()
     if (
       error instanceof InvalidCredentialsError ||
       error instanceof ValidationError
     ) {
-      // Only a wrong password burns an attempt. ValidationError here means an
-      // empty or malformed field, which never reached a credential check.
-      if (error instanceof InvalidCredentialsError) {
-        privateUnlockLimiter.hit(user.id)
-      }
       return rerender('Invalid password.')
     }
     throw error

@@ -18,12 +18,15 @@ import { getSessionManager } from '../middleware/session'
 import {
   signinLimiter,
   signinIpLimiter,
+  signinUsernameLimiter,
   signinRateLimitKey,
   getClientIp,
   signupLimiter,
   forgotPasswordLimiter,
   rateLimitByIp,
+  retryAfterSeconds,
 } from '../middleware/rate-limit'
+import { reserve } from '../middleware/rate-limiter'
 import { SignInPage } from '../views/pages/signin'
 import { SignUpPage } from '../views/pages/signup'
 import { ForgotPasswordPage } from '../views/pages/forgot-password'
@@ -70,16 +73,15 @@ auth.post('/signin', async c => {
   const redirectTo = getString(formData.redirectTo) || undefined
   const embed = getString(formData.embed) === '1'
 
-  // Two keys, two attacks. The IP:username key stops guessing at one account;
-  // the IP-only key stops one address spraying a password across many
-  // usernames, which the first never sees because every guess lands in a fresh
-  // bucket.
   const rateLimitKey = signinRateLimitKey(c, username || '')
-  const ipKey = getClientIp(c)
-  if (
-    signinLimiter.isLimited(rateLimitKey) ||
-    signinIpLimiter.isLimited(ipKey)
-  ) {
+  const usernameKey = username.toLowerCase()
+  const attempt = reserve([
+    [signinLimiter, rateLimitKey],
+    [signinIpLimiter, getClientIp(c)],
+    [signinUsernameLimiter, usernameKey],
+  ])
+  if (attempt.limited) {
+    c.header('Retry-After', retryAfterSeconds(attempt.retryAfterMs))
     return c.html(
       <SignInPage
         errors={{
@@ -98,10 +100,9 @@ auth.post('/signin', async c => {
   try {
     const user = await authService.login({ username, password })
 
-    // Only the per-account counter is cleared. Clearing the IP counter too
-    // would let an attacker who owns one valid account wipe their spray budget
-    // by signing into it between rounds.
+    attempt.release()
     signinLimiter.reset(rateLimitKey)
+    signinUsernameLimiter.reset(usernameKey)
 
     // Create session
     await sessionManager.create(user.id, keepSignedIn)
@@ -112,13 +113,13 @@ auth.post('/signin', async c => {
       safeRedirect(redirectTo, c.req.url, withEmbed('/pins', embed))
     )
   } catch (error) {
+    if (!(error instanceof InvalidCredentialsError)) attempt.release()
+
     let errors: Record<string, string[]>
 
     if (error instanceof ValidationError) {
       errors = error.fields
     } else if (error instanceof InvalidCredentialsError) {
-      signinLimiter.hit(rateLimitKey)
-      signinIpLimiter.hit(ipKey)
       errors = { _form: ['Invalid username or password'] }
     } else if (error instanceof EmailVerificationRequiredError) {
       errors = { _form: [error.message] }

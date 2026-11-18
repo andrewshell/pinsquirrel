@@ -11,7 +11,6 @@ import {
   InvalidCredentialsError,
   InvalidResetTokenError,
   ResetTokenExpiredError,
-  TooManyResetRequestsError,
   UserAlreadyExistsError,
   UnauthorizedUserAccessError,
 } from '@pinsquirrel/domain'
@@ -28,6 +27,9 @@ import {
 } from '../validation/user.js'
 import { validationErrorFromZod } from '../validation/zod-error.js'
 import type { EmailSealer } from './authentication.js'
+
+export const RESET_REQUEST_WINDOW_MS = 60 * 60 * 1000
+const RESET_REQUESTS_PER_WINDOW = 3
 
 /**
  * The account lifecycle operations that depend on the email pipeline:
@@ -241,21 +243,17 @@ export class AccountService {
       }
     }
 
-    // Check rate limiting - max 3 requests per hour
     const existingTokens = await this.passwordResetRepository.findByUserId(
       user.id
     )
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+    const windowStart = new Date(Date.now() - RESET_REQUEST_WINDOW_MS)
     const recentTokens = existingTokens.filter(
-      token => token.createdAt > oneHourAgo
+      token => token.createdAt > windowStart
     )
-
-    if (recentTokens.length >= 3) {
-      throw new TooManyResetRequestsError()
+    // Over the limit answers exactly like an unknown address.
+    if (recentTokens.length >= RESET_REQUESTS_PER_WINDOW) {
+      return null
     }
-
-    // Delete any existing tokens for this user
-    await this.passwordResetRepository.deleteByUserId(user.id)
 
     // Generate new token
     const token = generateSecureToken()
@@ -326,8 +324,7 @@ export class AccountService {
 
     await this.userRepository.update(user.id, updateData)
 
-    // Delete the used token
-    await this.passwordResetRepository.delete(resetToken.id)
+    await this.passwordResetRepository.deleteByUserId(user.id)
   }
 
   async validateResetToken(token: string): Promise<boolean> {

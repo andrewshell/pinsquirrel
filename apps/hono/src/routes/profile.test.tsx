@@ -85,6 +85,7 @@ vi.mock('../middleware/session', () => ({
 }))
 
 const { profileRoutes } = await import('./profile')
+const { privateUnlockLimiter } = await import('../middleware/rate-limit')
 
 describe('profile routes', () => {
   let app: Hono
@@ -92,6 +93,7 @@ describe('profile routes', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     flash = null
+    privateUnlockLimiter.reset(testUser.id)
     svc.listGrants.mockResolvedValue([makeGrant()])
     app = new Hono()
     app.route('/profile', profileRoutes)
@@ -263,6 +265,31 @@ describe('profile routes', () => {
 
       expect(res.status).toBe(400)
       expect(await res.text()).toContain('Current password is incorrect')
+    })
+
+    describe('wrong current passwords', () => {
+      async function changePassword(currentPassword: string) {
+        return app.request(
+          '/profile',
+          formBody({
+            intent: 'change-password',
+            currentPassword,
+            newPassword: 'a-new-password-123',
+          })
+        )
+      }
+
+      it('are refused without checking the password once the budget is spent', async () => {
+        svc.changePassword.mockRejectedValue(new InvalidCredentialsError())
+
+        let last: Response | undefined
+        for (let i = 0; i < 20; i++) last = await changePassword(`wrong-${i}`)
+
+        expect(svc.changePassword.mock.calls.length).toBeLessThan(20)
+        expect(last?.status).toBe(429)
+        expect(Number(last?.headers.get('Retry-After'))).toBeGreaterThan(0)
+        expect(await last?.text()).toContain('Claude Code')
+      })
     })
   })
 

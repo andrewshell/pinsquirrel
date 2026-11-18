@@ -1,3 +1,4 @@
+import { BlockList, isIP } from 'node:net'
 import type { Context, MiddlewareHandler } from 'hono'
 import { getConnInfo } from '@hono/node-server/conninfo'
 import { RateLimiter } from './rate-limiter'
@@ -14,14 +15,65 @@ function socketAddress(c: Context): string | undefined {
   }
 }
 
+type Family = 'ipv4' | 'ipv6'
+
+function family(address: string): Family | undefined {
+  const version = isIP(address)
+  if (version === 4) return 'ipv4'
+  if (version === 6) return 'ipv6'
+  return undefined
+}
+
+const PRIVATE_NETWORKS: ReadonlyArray<readonly [string, number, Family]> = [
+  ['127.0.0.0', 8, 'ipv4'],
+  ['10.0.0.0', 8, 'ipv4'],
+  ['172.16.0.0', 12, 'ipv4'],
+  ['192.168.0.0', 16, 'ipv4'],
+  ['::1', 128, 'ipv6'],
+  ['fc00::', 7, 'ipv6'],
+]
+
+function parseTrustedPeers(setting: string): BlockList {
+  const peers = new BlockList()
+  for (const entry of setting.split(',')) {
+    const [address = '', prefix] = entry.trim().split('/')
+    const type = family(address)
+    if (!type) continue
+    if (prefix === undefined) {
+      peers.addAddress(address, type)
+      continue
+    }
+    const bits = Number(prefix)
+    const maxBits = type === 'ipv4' ? 32 : 128
+    if (/^\d+$/.test(prefix) && bits <= maxBits) {
+      peers.addSubnet(address, bits, type)
+    }
+  }
+  if (peers.rules.length > 0) return peers
+
+  for (const [network, prefix, type] of PRIVATE_NETWORKS) {
+    peers.addSubnet(network, prefix, type)
+  }
+  return peers
+}
+
+const trustedPeersCache = new Map<string, BlockList>()
+
+function isTrustedPeer(address: string, setting: string): boolean {
+  const type = family(address)
+  if (!type) return false
+  let peers = trustedPeersCache.get(setting)
+  if (!peers) {
+    peers = parseTrustedPeers(setting)
+    trustedPeersCache.set(setting, peers)
+  }
+  return peers.check(address, type)
+}
+
 export function getClientIp(c: Context): string {
-  // Forwarding headers are only worth anything when something the operator
-  // controls writes them. Without TRUST_PROXY the app is reachable directly,
-  // so a caller can set x-forwarded-for itself and rotate it per request to
-  // get a fresh budget from every IP-keyed limiter - the socket peer is the
-  // only thing it cannot forge. Read per call rather than at module load so
-  // the deployment's env is what decides, not import order.
-  if (process.env.TRUST_PROXY) {
+  const peer = socketAddress(c)
+  const setting = process.env.TRUST_PROXY
+  if (setting && peer && isTrustedPeer(peer, setting)) {
     const xff = c.req.header('x-forwarded-for')
     if (xff) {
       // The last entry, not the first: a single trusted proxy appends the peer
@@ -30,14 +82,10 @@ export function getClientIp(c: Context): string {
       const parts = xff.split(',')
       return parts[parts.length - 1].trim()
     }
-    // No proxy header means the request did not come through the reverse proxy.
-    // Falling back to the socket peer keeps each such caller in its own bucket;
-    // a single shared literal here would let one attacker exhaust the limit for
-    // everyone else at once.
     const realIp = c.req.header('x-real-ip')
     if (realIp) return realIp
   }
-  return socketAddress(c) ?? 'unknown'
+  return peer ?? 'unknown'
 }
 
 export const signinLimiter = new RateLimiter({
@@ -50,6 +98,11 @@ export const signinLimiter = new RateLimiter({
 // or CGNAT puts real users behind one address, and this must not trip for them.
 export const signinIpLimiter = new RateLimiter({
   maxAttempts: 20,
+  windowMs: 15 * 60 * 1000,
+})
+
+export const signinUsernameLimiter = new RateLimiter({
+  maxAttempts: 50,
   windowMs: 15 * 60 * 1000,
 })
 
@@ -147,8 +200,12 @@ export const apiV1Limiter = new RateLimiter({
  * registered OAuth error code meaning "later", so `too_many_requests` is a
  * plain description rather than a claim to be one.
  */
+export function retryAfterSeconds(retryAfterMs: number): string {
+  return String(Math.ceil(retryAfterMs / 1000))
+}
+
 function refuse(c: Context, message: string, retryAfterMs: number) {
-  c.header('Retry-After', String(Math.ceil(retryAfterMs / 1000)))
+  c.header('Retry-After', retryAfterSeconds(retryAfterMs))
 
   if (expectsJsonError(c.req.path)) {
     return c.json(

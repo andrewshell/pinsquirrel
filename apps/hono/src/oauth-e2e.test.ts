@@ -30,12 +30,6 @@ import { accountService } from './lib/services'
  * worth asserting: a token minted in one step is used two steps later.
  */
 
-/**
- * A documentation address (RFC 5737), so every rate limiter in the app buckets
- * this file's requests apart from the `unknown` key the other route tests
- * share. `getClientIp` only reads the header when `TRUST_PROXY` is set, which
- * `beforeAll` does.
- */
 const CLIENT_IP = '198.51.100.17'
 
 /** The MCP resource as a user types it into a client. */
@@ -77,9 +71,9 @@ async function request(
   path: string,
   init: RequestInit = {}
 ): Promise<Response> {
-  const headers = new Headers(init.headers)
-  headers.set('x-forwarded-for', CLIENT_IP)
-  return app.request(path, { ...init, headers })
+  return app.request(path, init, {
+    incoming: { socket: { remoteAddress: CLIENT_IP } },
+  })
 }
 
 /** A request from the signed-in browser: session cookie, and an Origin CSRF accepts. */
@@ -263,10 +257,6 @@ let apiTokens: TokenResponse
 let mcpInitialized = false
 
 beforeAll(async () => {
-  // The IP-keyed limiters read the forwarding header only when a proxy is
-  // trusted, which is how this file gets a bucket of its own.
-  process.env.TRUST_PROXY = '1'
-
   const username = `e2e${randomBytes(6).toString('hex')}`
   const email = `${username}@example.test`
 
@@ -291,8 +281,6 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  delete process.env.TRUST_PROXY
-
   // Deleting the user takes its session, authorization codes and tokens with
   // it: all three cascade from `users.id`. The client this run registered has
   // nothing to cascade from, so it goes explicitly.

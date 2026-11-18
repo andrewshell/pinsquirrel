@@ -58,13 +58,6 @@ export class ResetTokenExpiredError extends PasswordResetError {
   }
 }
 
-export class TooManyResetRequestsError extends PasswordResetError {
-  constructor() {
-    super('Too many password reset requests. Please try again later.')
-    this.name = 'TooManyResetRequestsError'
-  }
-}
-
 export class EmailSendError extends PasswordResetError {
   /**
    * @param options carries the provider's own error as `cause`, so a caller

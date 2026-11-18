@@ -5,6 +5,7 @@ import type {
   PasswordResetRepository,
   SessionRepository,
 } from '@pinsquirrel/domain'
+import { RESET_REQUEST_WINDOW_MS } from './account.js'
 
 /**
  * How long a dynamic registration has to be used before it is swept.
@@ -63,7 +64,9 @@ export class MaintenanceService {
       oauthClients,
     ] = await Promise.all([
       this.sessionRepository.deleteExpiredSessions(),
-      this.passwordResetRepository.deleteExpiredTokens(),
+      this.passwordResetRepository.deleteExpiredTokens(
+        new Date(Date.now() - RESET_REQUEST_WINDOW_MS)
+      ),
       // Spent codes are kept until they expire, so a replay is still
       // recognisable while the code could plausibly be presented again.
       this.oauthCodeRepository.deleteExpiredCodes(),

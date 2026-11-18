@@ -62,7 +62,8 @@ is not repeated here. On top of it:
   the service.
 - Rate limiting is `RateLimiter` (`middleware/rate-limiter.ts`) plus `rateLimitByIp()` /
   `rateLimitByClientId()` (`middleware/rate-limit.ts`), applied inside the route file. `getClientIp`
-  honours forwarding headers only when `TRUST_PROXY` is set; production sets it.
+  honours forwarding headers only when `TRUST_PROXY` is set and the socket peer is a trusted proxy;
+  production sets it.
 - `/mcp` builds an `McpServer` and a `StreamableHTTPTransport` per request and closes both
   afterwards. Do not reintroduce a shared transport: it caps the process at one MCP session and
   maps responses back to requests by JSON-RPC id across every caller.
@@ -504,6 +505,15 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     the worker that opens the tab is unloaded before the user has read the screen. The
     `identity` permission is gone from the manifest. Security is unchanged: PKCE and `state`
     bind the answer to the question, not the window it arrived in.
+
+27. **Sign-in is limited per username as well as per address, and the username limit can lock
+    its owner out.** `signinUsernameLimiter` allows 50 failures per 15 minutes per username and
+    refuses before the password is checked, so anyone who knows a username can keep its owner
+    from signing in, from any address, until the window passes. Existing sessions, the private
+    unlock and change-password are unaffected. It was accepted because it bounds password
+    guessing spread across many addresses, which the per-address limit cannot see. The known
+    mitigation not taken yet is a device cookie set at successful sign-in that exempts that
+    browser from the username-wide bucket. Revisit it if lockouts show up in practice.
 
 ## Reference
 
