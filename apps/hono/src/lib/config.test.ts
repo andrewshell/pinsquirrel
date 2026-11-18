@@ -225,13 +225,23 @@ describe('resolveStaticOAuthClients', () => {
     ).toThrow(/OAUTH_STATIC_CLIENTS is invalid.*no fragment or userinfo/)
   })
 
+  it('fails at boot on a redirect URI longer than 512 characters, naming the redirect URI rule', () => {
+    expect(() =>
+      resolveStaticOAuthClients({
+        OAUTH_STATIC_CLIENTS: JSON.stringify([
+          {
+            client_id: 'acme',
+            client_name: 'Acme',
+            redirect_uris: [`https://acme.example.com/${'a'.repeat(500)}`],
+          },
+        ]),
+      })
+    ).toThrow(/OAUTH_STATIC_CLIENTS is invalid.*at most 512 characters/)
+  })
+
   it.each([
     ['client_id', { client_id: 'a'.repeat(256) }],
     ['client_name', { client_name: 'a'.repeat(256) }],
-    [
-      'redirect URI',
-      { redirect_uris: [`https://acme.example.com/${'a'.repeat(500)}`] },
-    ],
   ])('fails at boot on a %s longer than its column', (_, patch) => {
     expect(() =>
       resolveStaticOAuthClients({

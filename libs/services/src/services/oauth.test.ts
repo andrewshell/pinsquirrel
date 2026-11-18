@@ -492,19 +492,27 @@ describe('OAuthService.resolveClient', () => {
     expect(ctx.clientRepository.findByClientId).not.toHaveBeenCalled()
   })
 
-  it.each([
-    ['a client_name longer than its column', { client_name: 'n'.repeat(256) }],
-    [
-      'a redirect URI longer than its column',
-      { redirect_uris: [`https://client.example/${'a'.repeat(500)}`] },
-    ],
-  ])('refuses a document with %s and stores nothing', async (_, patch) => {
+  it('refuses a document with a client_name longer than its column and stores nothing', async () => {
     vi.mocked(ctx.fetcher.fetch).mockResolvedValue(
-      JSON.stringify({ ...cimdDocument, ...patch })
+      JSON.stringify({ ...cimdDocument, client_name: 'n'.repeat(256) })
     )
 
     await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(
       OAuthInvalidClientMetadataError
+    )
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses a document with a redirect URI longer than 512 characters as invalid_redirect_uri and stores nothing', async () => {
+    vi.mocked(ctx.fetcher.fetch).mockResolvedValue(
+      JSON.stringify({
+        ...cimdDocument,
+        redirect_uris: [`https://client.example/${'a'.repeat(500)}`],
+      })
+    )
+
+    await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(
+      OAuthInvalidRedirectUriError
     )
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
@@ -2114,14 +2122,25 @@ describe('OAuthService.registerClient', () => {
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
-  it('refuses a redirect URI longer than its column before creating a row', async () => {
+  it('refuses a redirect URI longer than 512 characters as invalid_redirect_uri before creating a row', async () => {
     const prefix = 'http://localhost:54321/'
     const uri = prefix + 'a'.repeat(513 - prefix.length)
 
     await expect(
       ctx.service.registerClient(registration({ redirect_uris: [uri] }))
-    ).rejects.toBeInstanceOf(ValidationError)
+    ).rejects.toBeInstanceOf(OAuthInvalidRedirectUriError)
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('accepts a redirect URI of exactly 512 characters', async () => {
+    const prefix = 'http://localhost:54321/'
+    const uri = prefix + 'a'.repeat(512 - prefix.length)
+
+    await ctx.service.registerClient(registration({ redirect_uris: [uri] }))
+
+    expect(ctx.clientRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ redirectUris: [uri] })
+    )
   })
 
   it('rejects a malformed registration as a validation failure', async () => {
@@ -2138,15 +2157,6 @@ describe('OAuthService.registerClient', () => {
 
     await expect(
       ctx.service.registerClient(registration({ redirect_uris: redirectUris }))
-    ).rejects.toBeInstanceOf(ValidationError)
-    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
-  })
-
-  it('refuses a redirect URI longer than 512 characters', async () => {
-    const longUri = `https://client.example/${'a'.repeat(600)}`
-
-    await expect(
-      ctx.service.registerClient(registration({ redirect_uris: [longUri] }))
     ).rejects.toBeInstanceOf(ValidationError)
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
@@ -2586,6 +2596,20 @@ describe('OAuthService.reconcileStaticClients', () => {
     expect(failures.map(failure => failure.error)).toEqual([
       expect.any(OAuthInvalidClientMetadataError),
     ])
+  })
+
+  it('reports a redirect URI longer than 512 characters as invalid_redirect_uri', async () => {
+    const failures = await ctx.service.reconcileStaticClients([
+      {
+        ...acme,
+        redirectUris: [`https://acme.example.com/${'a'.repeat(500)}`],
+      },
+    ])
+
+    expect(failures.map(failure => failure.error)).toEqual([
+      expect.any(OAuthInvalidRedirectUriError),
+    ])
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
   it('still reconciles the entries after one that fails, and names the one that failed', async () => {

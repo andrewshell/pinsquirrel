@@ -115,13 +115,14 @@ export type TokenRequestParams = z.infer<typeof tokenRequestSchema>
 const MAX_REDIRECT_URIS = 10
 
 /**
- * `redirect_uris` are strings here rather than the SDK's URL schema, so that a
- * value that does not parse is refused by `isUsableRedirectUri` as
- * `invalid_redirect_uri` (RFC 7591 3.2.2), not as a malformed body.
+ * `redirect_uris` are unbounded strings here rather than the SDK's URL schema,
+ * so that a value that does not parse, or is too long, is refused by
+ * `isUsableRedirectUri` as `invalid_redirect_uri` (RFC 7591 3.2.2), not as a
+ * malformed body.
  */
 const clientMetadataSchema = OAuthClientMetadataSchema.extend({
   client_name: z.string().max(MAX_CLIENT_NAME_LENGTH).optional(),
-  redirect_uris: z.array(redirectUriValue),
+  redirect_uris: z.array(z.string()),
 })
 
 /**
@@ -162,12 +163,16 @@ export type ClientIdMetadataDocument = z.infer<
   typeof clientIdMetadataDocumentSchema
 >
 
+export const REDIRECT_URI_RULE = `must be https, or http on loopback, at most ${String(MAX_REDIRECT_URI_LENGTH)} characters, with no fragment or userinfo`
+
 /**
  * A redirect URI this server is willing to send a browser to: https, or http
  * on a loopback host (RFC 8252 section 7.3). No fragment (RFC 6749 section
- * 3.1.2), and no userinfo, which only hides the host from a reader.
+ * 3.1.2), no userinfo, which only hides the host from a reader, and no longer
+ * than the authorization code's `redirect_uri` column.
  */
 export function isUsableRedirectUri(uri: string): boolean {
+  if (uri.length > MAX_REDIRECT_URI_LENGTH) return false
   if (uri.includes('#') || hasUserinfo(uri)) return false
   let url: URL
   try {
@@ -210,10 +215,7 @@ export const staticOAuthClientsSchema = z
       client_name: z.string().min(1).max(MAX_CLIENT_NAME_LENGTH).optional(),
       redirect_uris: z
         .array(
-          redirectUriValue.refine(isUsableRedirectUri, {
-            message:
-              'must be https, or http on loopback, with no fragment or userinfo',
-          })
+          z.string().refine(isUsableRedirectUri, { message: REDIRECT_URI_RULE })
         )
         .min(1, 'at least one redirect_uri is required'),
     })

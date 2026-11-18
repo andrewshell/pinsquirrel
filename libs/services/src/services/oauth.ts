@@ -44,6 +44,7 @@ import {
   clientRegistrationSchema,
   isUsableRedirectUri,
   MAX_CLIENT_ID_LENGTH,
+  REDIRECT_URI_RULE,
   refreshTokenGrantSchema,
   revocationRequestSchema,
   type ClientIdMetadataDocument,
@@ -265,9 +266,7 @@ export class OAuthService {
       )
     }
     if (!isUsableRedirectUri(redirectUri)) {
-      throw new OAuthInvalidRequestError(
-        'redirect_uri must be https, or http on loopback, with no fragment or userinfo'
-      )
+      throw new OAuthInvalidRequestError(`redirect_uri ${REDIRECT_URI_RULE}`)
     }
 
     try {
@@ -1386,7 +1385,7 @@ function requireClientRules(metadata: {
   const unusable = metadata.redirect_uris.find(uri => !isUsableRedirectUri(uri))
   if (unusable !== undefined) {
     throw new OAuthInvalidRedirectUriError(
-      `redirect_uri must be https, or http on loopback, with no fragment or userinfo: ${unusable}`
+      `redirect_uri ${REDIRECT_URI_RULE}: ${unusable}`
     )
   }
 
