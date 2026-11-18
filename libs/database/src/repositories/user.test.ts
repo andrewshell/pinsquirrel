@@ -225,6 +225,34 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       expect(saved?.emailHash).toBeNull()
     })
 
+    it('creates the user with the roles it is given', async () => {
+      const result = await repository.create({
+        username: `newuser-${crypto.randomUUID().slice(0, 8)}`,
+        passwordHash: null,
+        emailHash: null,
+        roles: [Role.User],
+      })
+
+      expect(result.roles).toEqual([Role.User])
+      expect((await repository.findById(result.id))?.roles).toEqual([Role.User])
+    })
+
+    it('leaves no user behind when a role cannot be written', async () => {
+      const username = `newuser-${crypto.randomUUID().slice(0, 8)}`
+
+      await expect(
+        repository.create({
+          username,
+          passwordHash: null,
+          emailHash: null,
+          // Longer than the role column, so the second insert fails.
+          roles: ['x'.repeat(300) as Role],
+        })
+      ).rejects.toThrow()
+
+      expect(await repository.findByUsername(username)).toBeNull()
+    })
+
     it('should default new users to unverified status', async () => {
       const createData = {
         username: `newuser-${crypto.randomUUID().slice(0, 8)}`,

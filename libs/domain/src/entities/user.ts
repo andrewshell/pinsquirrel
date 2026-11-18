@@ -20,10 +20,11 @@ export interface User {
 // - status is omitted: new users always default to UserStatus.Unverified
 // - emailEncrypted is optional: sealing only happens when a public key is
 //   configured, so callers may omit it (defaults to null)
+// - roles are written with the user, so a user never exists without them
 export type CreateUserData = Omit<
   User,
   'id' | 'roles' | 'status' | 'emailEncrypted' | 'createdAt' | 'updatedAt'
-> & { emailEncrypted?: string | null }
+> & { emailEncrypted?: string | null; roles?: Role[] }
 
 export type UpdateUserData = Partial<
   Omit<User, 'id' | 'roles' | 'createdAt' | 'updatedAt'>

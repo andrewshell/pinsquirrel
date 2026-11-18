@@ -150,16 +150,24 @@ export class DrizzleUserRepository implements UserRepository {
   async create(data: CreateUserData): Promise<User> {
     const id = crypto.randomUUID()
     const now = new Date()
+    const roles = data.roles ?? []
 
     try {
-      await this.db.insert(users).values({
-        id,
-        username: data.username,
-        passwordHash: data.passwordHash,
-        emailHash: data.emailHash || null,
-        emailEncrypted: data.emailEncrypted ?? null,
-        createdAt: now,
-        updatedAt: now,
+      await this.db.transaction(async tx => {
+        await tx.insert(users).values({
+          id,
+          username: data.username,
+          passwordHash: data.passwordHash,
+          emailHash: data.emailHash || null,
+          emailEncrypted: data.emailEncrypted ?? null,
+          createdAt: now,
+          updatedAt: now,
+        })
+        if (roles.length > 0) {
+          await tx
+            .insert(userRoles)
+            .values(roles.map(role => ({ userId: id, role, createdAt: now })))
+        }
       })
     } catch (error) {
       this.rethrowConflict(error, data.username)
@@ -171,8 +179,7 @@ export class DrizzleUserRepository implements UserRepository {
       .where(eq(users.id, id))
       .limit(1)
 
-    // New users start with empty roles array
-    return this.mapToUser(created, [])
+    return this.mapToUser(created, roles)
   }
 
   async update(id: string, data: UpdateUserData): Promise<User | null> {

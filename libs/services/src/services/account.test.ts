@@ -107,16 +107,16 @@ describe('AccountService', () => {
       expect(mockUserRepository.findByEmailHash).toHaveBeenCalledWith(
         'hashed_test@example.com'
       )
+      // One write for the user and its role, so neither exists without the
+      // other.
       expect(mockUserRepository.create).toHaveBeenCalledWith({
         username: 'testuser',
         passwordHash: null,
         emailHash: 'hashed_test@example.com',
         emailEncrypted: null,
+        roles: [Role.User],
       })
-      expect(mockUserRepository.addRole).toHaveBeenCalledWith(
-        mockUser.id,
-        'User'
-      )
+      expect(mockUserRepository.addRole).not.toHaveBeenCalled()
     })
 
     it('should seal the email when an email sealer is configured', async () => {
@@ -145,6 +145,7 @@ describe('AccountService', () => {
         passwordHash: null,
         emailHash: 'hashed_test@example.com',
         emailEncrypted: 'sealed-email-blob',
+        roles: [Role.User],
       })
     })
 

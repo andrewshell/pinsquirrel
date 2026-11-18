@@ -109,15 +109,15 @@ export class AccountService {
       : null
 
     // Create user without password (they'll set it via email verification)
-    let user: User
     try {
-      user = await this.userRepository.create({
+      await this.userRepository.create({
         username: input.username,
         passwordHash: null, // No password yet - they'll set it via email verification
         // Hashed here rather than reusing a binding from the duplicate check:
         // this is the stored value, and the lookup above hides its own hashing.
         emailHash: hashEmail(input.email),
         emailEncrypted,
+        roles: [Role.User],
       })
     } catch (error) {
       // Two signups for the same username or email can pass the checks above
@@ -130,9 +130,6 @@ export class AccountService {
       }
       throw error
     }
-
-    // Immediately assign User role
-    await this.userRepository.addRole(user.id, Role.User)
 
     // Auto-trigger password reset email for verification if URL provided
     let emailFailed = false
