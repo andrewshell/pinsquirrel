@@ -509,8 +509,8 @@ async function refreshTokens(current: StoredTokens): Promise<StoredTokens> {
         error instanceof OAuthProtocolError &&
         error.code === 'invalid_grant'
       ) {
-        // Expired, revoked from the profile page, or replayed - the server
-        // took the whole family either way. Nothing here can recover it.
+        // Expired, revoked, or already exchanged - the stored refresh token is
+        // spent either way, and nothing here can recover it.
         await storage.remove([...TOKEN_KEYS])
         throw new ReauthorizationRequiredError(error.message)
       }
@@ -618,9 +618,9 @@ export async function disconnect(): Promise<void> {
         }).toString(),
       })
     } catch {
-      // RFC 7009 answers 200 for an unknown or already-dead token, so the only
-      // failures here are transport ones, and none of them is a reason to
-      // leave a disconnected extension holding credentials.
+      // A transport failure is no reason to leave a disconnected extension
+      // holding credentials. Neither is a refusal, which `fetch` resolves
+      // with rather than throwing: the stored token is cleared regardless.
     }
   }
 
