@@ -94,6 +94,12 @@ function makeUser(id: string, username: string): User {
 const user = makeUser('user-1', 'squirrel')
 const otherUser = makeUser('user-2', 'intruder')
 
+/** The two ways an account stops being admitted (see `isAdmitted`). */
+const notAdmitted: [string, User][] = [
+  ['without the User role', { ...user, roles: [] }],
+  ['on the waitlist', { ...user, status: UserStatus.Waitlist }],
+]
+
 function makeClient(overrides: Partial<OAuthClient> = {}): OAuthClient {
   return {
     id: 'client-row-1',
@@ -706,6 +712,20 @@ describe('OAuthService.authorize', () => {
     expect(ctx.codeRepository.create).not.toHaveBeenCalled()
   })
 
+  it.each(notAdmitted)(
+    'refuses to issue a code to a user %s',
+    async (_label, account) => {
+      await expect(
+        ctx.service.authorize(new AccessControl(account), {
+          params: authorizeParams(),
+          userId: account.id,
+          approved: true,
+        })
+      ).rejects.toBeInstanceOf(OAuthAccessDeniedError)
+      expect(ctx.codeRepository.create).not.toHaveBeenCalled()
+    }
+  )
+
   it('refuses to issue a code on behalf of another user', async () => {
     await expect(
       ctx.service.authorize(new AccessControl(otherUser), {
@@ -743,6 +763,7 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     vi.mocked(ctx.tokenRepository.create).mockImplementation(data =>
       Promise.resolve(makeToken(data))
     )
+    vi.mocked(ctx.userRepository.findById).mockResolvedValue(user)
   })
 
   it('exchanges a code for an access token bound to the requested resource', async () => {
@@ -802,6 +823,23 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
     expect(ctx.tokenRepository.create).not.toHaveBeenCalled()
   })
+
+  // A code minted before the account was suspended or waitlisted.
+  it.each(notAdmitted)(
+    'refuses a code for a user %s and revokes the grant',
+    async (_label, account) => {
+      vi.mocked(ctx.userRepository.findById).mockResolvedValue(account)
+
+      await expect(
+        ctx.service.exchangeAuthorizationCode(tokenParams())
+      ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+      expect(ctx.tokenRepository.create).not.toHaveBeenCalled()
+      expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
+        user.id,
+        CIMD_URL
+      )
+    }
+  )
 
   it('refuses a verifier that does not hash to the stored challenge', async () => {
     await expect(
@@ -905,6 +943,7 @@ describe('OAuthService.exchangeRefreshToken', () => {
     vi.mocked(ctx.tokenRepository.create).mockImplementation(data =>
       Promise.resolve(makeToken(data))
     )
+    vi.mocked(ctx.userRepository.findById).mockResolvedValue(user)
   })
 
   // OAuth 2.1 requires rotation for public clients, and both CIMD and DCR
@@ -975,6 +1014,25 @@ describe('OAuthService.exchangeRefreshToken', () => {
       CIMD_URL
     )
   })
+
+  // Refresh tokens slide, so without this a suspended account's grant would
+  // never end on its own.
+  it.each(notAdmitted)(
+    'refuses a user %s and revokes the grant',
+    async (_label, account) => {
+      vi.mocked(ctx.userRepository.findById).mockResolvedValue(account)
+
+      await expect(
+        ctx.service.exchangeRefreshToken(refreshParams())
+      ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+      expect(ctx.tokenRepository.create).not.toHaveBeenCalled()
+      expect(ctx.tokenRepository.markRotated).not.toHaveBeenCalled()
+      expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
+        user.id,
+        CIMD_URL
+      )
+    }
+  )
 
   it('refuses a token the user revoked', async () => {
     vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
@@ -1155,6 +1213,17 @@ describe('OAuthService.verifyAccessToken', () => {
       null
     )
   })
+
+  it.each(notAdmitted)(
+    'refuses a token whose user is %s',
+    async (_label, account) => {
+      vi.mocked(ctx.userRepository.findById).mockResolvedValue(account)
+
+      expect(await ctx.service.verifyAccessToken('pso_raw', MCP_RESOURCE)).toBe(
+        null
+      )
+    }
+  )
 
   // A distinct answer would confirm the token itself was good.
   it('reads a token whose user is gone as an invalid token', async () => {
