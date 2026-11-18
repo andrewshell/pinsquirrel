@@ -1,4 +1,4 @@
-import { ReauthorizationRequiredError } from '../auth.ts'
+import { NotConnectedError, ReauthorizationRequiredError } from '../auth.ts'
 import type { ConnectResponse, SyncResponse } from '../messages.ts'
 import * as storage from '../storage.ts'
 import type { TagWithCount } from '../types.ts'
@@ -167,9 +167,15 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
    *
    * `ReauthorizationRequiredError` is the one that changes the view: the grant
    * is gone and no retry will bring it back, so the page goes to Connect with
-   * the server it was talking to already filled in.
+   * the server it was talking to already filled in. `NotConnectedError` goes
+   * there without the notice: another page disconnected, as the user asked.
    */
   function report(error: unknown): void {
+    if (error instanceof NotConnectedError) {
+      setStatus('')
+      showSettings()
+      return
+    }
     if (error instanceof ReauthorizationRequiredError) {
       askToReconnect()
       return

@@ -84,6 +84,20 @@ export class ReauthorizationRequiredError extends Error {
   }
 }
 
+/**
+ * Nothing is stored: never connected, or the user disconnected.
+ *
+ * A `ReauthorizationRequiredError`, because only the user can connect again,
+ * but one the options page shows without the notice that the server dropped
+ * the grant.
+ */
+export class NotConnectedError extends ReauthorizationRequiredError {
+  constructor() {
+    super('The extension is not connected to a PinSquirrel server')
+    this.name = 'NotConnectedError'
+  }
+}
+
 /** The authorization request, as a URL for `launchWebAuthFlow` to open. */
 export function buildAuthorizationUrl(input: {
   endpoints: OAuthEndpoints
@@ -496,9 +510,7 @@ async function refreshTokens(spent: StoredTokens): Promise<StoredTokens> {
   return navigator.locks.request(REFRESH_LOCK, async () => {
     const current = await storedTokens()
     if (!current) {
-      throw new ReauthorizationRequiredError(
-        'The extension is not connected to a PinSquirrel server'
-      )
+      throw new NotConnectedError()
     }
     if (current.refreshToken !== spent.refreshToken) return current
 
@@ -542,9 +554,7 @@ async function refreshTokens(spent: StoredTokens): Promise<StoredTokens> {
 export async function getAccessToken(): Promise<string> {
   const tokens = await storedTokens()
   if (!tokens) {
-    throw new ReauthorizationRequiredError(
-      'The extension is not connected to a PinSquirrel server'
-    )
+    throw new NotConnectedError()
   }
   if (!isSpent(tokens)) return tokens.accessToken
 

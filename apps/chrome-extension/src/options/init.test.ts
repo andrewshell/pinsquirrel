@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ReauthorizationRequiredError } from '../auth.ts'
+import { getAccessToken, ReauthorizationRequiredError } from '../auth.ts'
 import type { ConnectResponse } from '../messages.ts'
 import { stubChrome, type ChromeStub } from '../test/chrome-mock.ts'
 import { loadOptionsDocument } from '../test/options-dom.ts'
@@ -590,5 +590,28 @@ describe('initOptions, when the grant is gone', () => {
 
     expect(settingsShown()).toBe(true)
     expect(element('#reconnect-notice').hidden).toBe(false)
+  })
+})
+
+describe('initOptions, when another page disconnected', () => {
+  beforeEach(() => {
+    Object.assign(chrome.local.items, CONNECTED)
+  })
+
+  // Disconnect in one options page empties storage under every other open
+  // one. That is the user's choice, not a grant the server dropped.
+  it('goes to the settings view without the reconnect notice', async () => {
+    const getTags = vi.fn(async () => {
+      for (const key of Object.keys(chrome.local.items)) {
+        delete chrome.local.items[key]
+      }
+      await getAccessToken()
+      return TAGS
+    })
+    await initOptions(harness({ createApiClient: () => ({ getTags }) }).deps)
+
+    expect(settingsShown()).toBe(true)
+    expect(element('#reconnect-notice').hidden).toBe(true)
+    expect(status()).toBe('')
   })
 })

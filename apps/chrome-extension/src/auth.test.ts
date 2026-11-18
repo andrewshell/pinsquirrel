@@ -620,6 +620,33 @@ describe('disconnect', () => {
     expect(server.chrome.local.items).toEqual({})
   })
 
+  // The user chose to end the connection, so a call that finds it gone is
+  // not a grant the server dropped and gets no reconnect notice.
+  it('ends a refresh queued behind it as not connected, sending nothing', async () => {
+    const server = stubOAuthServer(connected({ expiresAt: Date.now() - 1000 }))
+    let answer = () => {}
+    const answered = new Promise<void>(resolve => {
+      answer = resolve
+    })
+    server.fetched.route(REVOKE_URL, async () => {
+      await answered
+      return new Response(null, { status: 200 })
+    })
+
+    const disconnecting = disconnect()
+    await vi.waitFor(() => {
+      expect(server.fetched.urls).toContain(REVOKE_URL)
+    })
+    const refreshing = getAccessToken()
+    answer()
+    await disconnecting
+
+    await expect(refreshing).rejects.toMatchObject({
+      name: 'NotConnectedError',
+    })
+    expect(server.tokenRequests).toEqual([])
+  })
+
   it('does nothing to revoke when there is no connection to end', async () => {
     const server = stubOAuthServer()
 
