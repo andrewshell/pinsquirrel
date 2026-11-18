@@ -56,14 +56,14 @@ describe('createSignupNotificationEmailTemplate', () => {
 
 describe('createEmailAlreadyRegisteredTemplate', () => {
   it('escapes the sign-in URL in the href', () => {
-    const { html } = createEmailAlreadyRegisteredTemplate(HOSTILE)
+    const { html } = createEmailAlreadyRegisteredTemplate(HOSTILE, HOSTILE)
 
     expect(html).not.toContain('<script>')
     expect(html).toContain('href="&quot;&gt;&lt;script&gt;')
   })
 
   it('leaves the plain-text body alone', () => {
-    const { text } = createEmailAlreadyRegisteredTemplate(HOSTILE)
+    const { text } = createEmailAlreadyRegisteredTemplate(HOSTILE, HOSTILE)
 
     expect(text).toContain(`Sign in: ${HOSTILE}`)
   })

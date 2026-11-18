@@ -199,7 +199,10 @@ This is an automated notification from PinSquirrel.
   return { html, text }
 }
 
-export function createEmailAlreadyRegisteredTemplate(signinUrl: string): {
+export function createEmailAlreadyRegisteredTemplate(
+  signinUrl: string,
+  resetUrl: string
+): {
   html: string
   text: string
 } {
@@ -257,6 +260,8 @@ export function createEmailAlreadyRegisteredTemplate(signinUrl: string): {
             <a href="${escapeHtml(signinUrl)}" class="button">Sign In</a>
         </p>
 
+        <p>Forgot your password? <a href="${escapeHtml(resetUrl)}">Set a new one</a>. That link expires in 15 minutes.</p>
+
         <p>If you didn't attempt to register, you can safely ignore this email.</p>
 
         <div class="footer">
@@ -275,6 +280,8 @@ Hello,
 Someone tried to create a new PinSquirrel account using your email address. If this was you, you already have an account. You can sign in or reset your password instead.
 
 Sign in: ${signinUrl}
+
+Forgot your password? Set a new one (the link expires in 15 minutes): ${resetUrl}
 
 If you didn't attempt to register, you can safely ignore this email.
 

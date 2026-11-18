@@ -100,10 +100,19 @@ export class AccountService {
     const existingUserByEmail = await this.findUserByEmail(input.email)
 
     if (existingUserByEmail) {
-      if (input.signinUrl) {
+      if (!input.signinUrl || !input.resetUrl) return
+      // Issued as a reset token so it counts toward the same per-account
+      // limit, which bounds how often sign-ups can mail this address.
+      const token = await this.issueResetToken(
+        existingUserByEmail.id,
+        RESET_LINK_LIFETIME_MS
+      )
+      if (token) {
         await this.emailService.sendEmailAlreadyRegisteredEmail(
           input.email,
-          input.signinUrl
+          input.signinUrl,
+          token,
+          input.resetUrl
         )
       }
       return

@@ -18,7 +18,8 @@ describe('NullEmailService', () => {
     ],
     [
       'sendEmailAlreadyRegisteredEmail',
-      () => service.sendEmailAlreadyRegisteredEmail('a@b.com', 'url'),
+      () =>
+        service.sendEmailAlreadyRegisteredEmail('a@b.com', 'url', 't', 'url'),
     ],
     [
       'sendUsernameTakenEmail',

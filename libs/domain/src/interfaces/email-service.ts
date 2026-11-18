@@ -11,9 +11,12 @@ export interface EmailService {
     userEmail: string
   ): Promise<void>
 
+  /** Carries a set-password link built like sendPasswordResetEmail's. */
   sendEmailAlreadyRegisteredEmail(
     email: string,
-    signinUrl: string
+    signinUrl: string,
+    token: string,
+    resetUrl: string
   ): Promise<void>
 
   sendUsernameTakenEmail(

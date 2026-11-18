@@ -35,6 +35,33 @@ vi.mock('../utils/crypto.js', () => ({
   hashToken: vi.fn().mockImplementation((token: string) => `hashed_${token}`),
 }))
 
+/** A reset-token store that keeps its rows, so per-account counts are real. */
+function inMemoryResets(): PasswordResetRepository {
+  const rows: PasswordResetToken[] = []
+  return {
+    findById: vi.fn(),
+    findByTokenHash: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    deleteExpiredTokens: vi.fn(),
+    isValidToken: vi.fn(),
+    consume: vi.fn(),
+    findByUserId: vi.fn((userId: string) =>
+      Promise.resolve(rows.filter(r => r.userId === userId))
+    ),
+    create: vi.fn((data: Omit<PasswordResetToken, 'id' | 'createdAt'>) => {
+      const row = { id: `reset-${rows.length}`, createdAt: new Date(), ...data }
+      rows.push(row)
+      return Promise.resolve(row)
+    }),
+    deleteByUserId: vi.fn((userId: string) => {
+      const before = rows.length
+      rows.splice(0, rows.length, ...rows.filter(r => r.userId !== userId))
+      return Promise.resolve(rows.length < before)
+    }),
+  }
+}
+
 describe('AccountService', () => {
   let accountService: AccountService
   let mockUserRepository: UserRepository
@@ -71,7 +98,7 @@ describe('AccountService', () => {
     mockPasswordResetRepository = {
       findById: vi.fn(),
       findByTokenHash: vi.fn(),
-      findByUserId: vi.fn(),
+      findByUserId: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
@@ -190,6 +217,7 @@ describe('AccountService', () => {
         username: 'newuser',
         email: 'test@example.com',
         signinUrl: 'http://localhost/signin',
+        resetUrl: 'http://localhost/reset-password',
       }
 
       accountService.register(registerInput)
@@ -197,7 +225,12 @@ describe('AccountService', () => {
 
       expect(
         mockEmailService.sendEmailAlreadyRegisteredEmail
-      ).toHaveBeenCalledWith('test@example.com', 'http://localhost/signin')
+      ).toHaveBeenCalledWith(
+        'test@example.com',
+        'http://localhost/signin',
+        'mock-token',
+        'http://localhost/reset-password'
+      )
       expect(mockUserRepository.create).not.toHaveBeenCalled()
     })
 
@@ -233,6 +266,7 @@ describe('AccountService', () => {
         username: 'testuser',
         email: 'test@example.com',
         signinUrl: 'http://localhost/signin',
+        resetUrl: 'http://localhost/reset-password',
       }
 
       accountService.register(registerInput)
@@ -240,7 +274,12 @@ describe('AccountService', () => {
 
       expect(
         mockEmailService.sendEmailAlreadyRegisteredEmail
-      ).toHaveBeenCalledWith('test@example.com', 'http://localhost/signin')
+      ).toHaveBeenCalledWith(
+        'test@example.com',
+        'http://localhost/signin',
+        'mock-token',
+        'http://localhost/reset-password'
+      )
       expect(mockEmailService.sendUsernameTakenEmail).not.toHaveBeenCalled()
       expect(mockUserRepository.create).not.toHaveBeenCalled()
     })
@@ -835,28 +874,33 @@ describe('AccountService', () => {
       expect(mockEmailService.sendPasswordResetEmail).not.toHaveBeenCalled()
     })
 
+    it('sends at most three already-registered mails to one address within an hour', async () => {
+      const service = new AccountService(
+        mockUserRepository,
+        inMemoryResets(),
+        mockEmailService,
+        { defer: queue.defer }
+      )
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(mockUser)
+
+      for (let i = 0; i < 4; i++) {
+        service.register({
+          username: `newuser${i}`,
+          email: 'test@example.com',
+          signinUrl: 'https://example.com/signin',
+          resetUrl: 'https://example.com/reset',
+        })
+        await queue.flush()
+      }
+
+      expect(
+        mockEmailService.sendEmailAlreadyRegisteredEmail
+      ).toHaveBeenCalledTimes(3)
+    })
+
     it('sends no mail for a fourth request for one account within an hour', async () => {
-      const rows: PasswordResetToken[] = []
-      const repository = {
-        ...mockPasswordResetRepository,
-        findByUserId: vi.fn((userId: string) =>
-          Promise.resolve(rows.filter(r => r.userId === userId))
-        ),
-        create: vi.fn((data: Omit<PasswordResetToken, 'id' | 'createdAt'>) => {
-          const row = {
-            id: `reset-${rows.length}`,
-            createdAt: new Date(),
-            ...data,
-          }
-          rows.push(row)
-          return Promise.resolve(row)
-        }),
-        deleteByUserId: vi.fn((userId: string) => {
-          const before = rows.length
-          rows.splice(0, rows.length, ...rows.filter(r => r.userId !== userId))
-          return Promise.resolve(rows.length < before)
-        }),
-      } as PasswordResetRepository
+      const repository = inMemoryResets()
       const service = new AccountService(
         mockUserRepository,
         repository,

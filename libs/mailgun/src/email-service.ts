@@ -180,18 +180,20 @@ export class MailgunEmailService implements EmailService {
 
   async sendEmailAlreadyRegisteredEmail(
     email: string,
-    signinUrl: string
+    signinUrl: string,
+    token: string,
+    resetUrl: string
   ): Promise<void> {
-    if (!email || !signinUrl) {
+    if (!email || !signinUrl || !token || !resetUrl) {
       throw new EmailSendError(
-        'Invalid email parameters: email and signinUrl are required'
+        'Invalid email parameters: email, signinUrl, token, and resetUrl are required'
       )
     }
 
     await this.send(
       email,
       'PinSquirrel Account Already Exists',
-      createEmailAlreadyRegisteredTemplate(signinUrl),
+      createEmailAlreadyRegisteredTemplate(signinUrl, `${resetUrl}/${token}`),
       { description: 'already-registered email' }
     )
   }
