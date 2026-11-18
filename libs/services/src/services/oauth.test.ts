@@ -853,6 +853,7 @@ describe('OAuthService.authorize', () => {
       error: 'temporarily_unavailable',
       redirectUri: 'http://localhost:54321/callback',
       state: 'opaque-state',
+      cause: expect.any(WriteConflictError) as unknown,
     })
     await expect(ctx.service.authorize(ac, approval)).resolves.toMatchObject({
       status: 'approved',

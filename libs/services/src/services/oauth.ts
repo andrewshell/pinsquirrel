@@ -181,6 +181,8 @@ export interface AuthorizationErrorRedirect {
   state?: string
   /** RFC 9207, which the redirect carries on success and on failure. */
   issuer: string
+  /** What the server failed on, for the transport's log and never the client. */
+  cause?: unknown
 }
 
 export type AuthorizationRequestResolution =
@@ -388,11 +390,14 @@ export class OAuthService {
     } catch (error) {
       if (error instanceof WriteConflictError) {
         const unavailable = new OAuthTemporarilyUnavailableError()
-        return this.errorRedirect(
-          resolved,
-          unavailable.code,
-          unavailable.message
-        )
+        return {
+          ...this.errorRedirect(
+            resolved,
+            unavailable.code,
+            unavailable.message
+          ),
+          cause: error,
+        }
       }
       throw error
     }

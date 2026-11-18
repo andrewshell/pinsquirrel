@@ -47,6 +47,9 @@ describe('retryOnDeadlock', () => {
     )
 
     expect(thrown).toBeInstanceOf(WriteConflictError)
+    expect((thrown as Error).message).toBe(
+      'The write lost two deadlocks and changed nothing'
+    )
     expect((thrown as Error).cause).toSatisfy(isDeadlockError)
     expect(runs).toBe(2)
   })
@@ -63,6 +66,9 @@ describe('retryOnDeadlock', () => {
     )
 
     expect(thrown).toBeInstanceOf(WriteConflictError)
+    expect((thrown as Error).message).toBe(
+      'The write waited too long for a lock and changed nothing'
+    )
     expect((thrown as Error).cause).toSatisfy(isLockWaitTimeoutError)
     expect(runs).toBe(1)
   })

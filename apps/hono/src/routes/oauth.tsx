@@ -122,6 +122,12 @@ function redirectToClient(c: Context, outcome: AuthorizationOutcome) {
   if (outcome.status === 'approved') {
     location.searchParams.set('code', outcome.code)
   } else {
+    if (outcome.cause !== undefined) {
+      logger.warn(
+        { error: outcome.error, cause: safeError(outcome.cause) },
+        outcome.errorDescription
+      )
+    }
     location.searchParams.set('error', outcome.error)
     location.searchParams.set('error_description', outcome.errorDescription)
   }

@@ -4,6 +4,7 @@ import { OAuthError, ValidationError } from '@pinsquirrel/domain'
 import { oauthService } from '../lib/services.js'
 import { describeValidationError } from '../lib/oauth-error.js'
 import { protocolParams } from '../lib/form.js'
+import { logger, safeError } from '../lib/logger.js'
 import { oauthTokenIpLimiter, rateLimitByIp } from '../middleware/rate-limit.js'
 
 /**
@@ -24,9 +25,11 @@ import { oauthTokenIpLimiter, rateLimitByIp } from '../middleware/rate-limit.js'
  * that registry describes something wrong with the request, and a client told
  * `invalid_request` would fix its request instead of waiting.
  *
- * An exchange or refresh that lost to concurrent writes is a `503` with
- * `Retry-After` and `temporarily_unavailable` (Decision 46): the code or token
- * is unchanged, and this is the answer clients retry without dropping it.
+ * A request whose write lost to concurrent writes, or waited too long behind
+ * them, is a `503` with `Retry-After` and `temporarily_unavailable` (Decision
+ * 46). Nothing was written, and this is the answer clients send again: an
+ * exchange or refresh without dropping its code or token, and a revocation
+ * because RFC 7009 2.2.1 has it assume the token still exists.
  */
 
 const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded'
@@ -43,6 +46,16 @@ async function formParams(
   c: Context
 ): Promise<Record<string, string | string[]>> {
   return protocolParams(await c.req.parseBody({ all: true }))
+}
+
+function oauthErrorResponse(c: Context, error: OAuthError) {
+  if (error.cause !== undefined) {
+    logger.warn(
+      { error: error.code, cause: safeError(error.cause) },
+      error.message
+    )
+  }
+  return errorResponse(c, error.code, error.message)
 }
 
 function errorResponse(c: Context, error: string, description: string) {
@@ -126,7 +139,7 @@ oauthToken.post('/token', async c => {
   } catch (error) {
     if (error instanceof OAuthError) {
       // The service names its own code; the transport never invents one.
-      return errorResponse(c, error.code, error.message)
+      return oauthErrorResponse(c, error)
     }
     if (error instanceof ValidationError) {
       return errorResponse(c, 'invalid_request', describeValidationError(error))
@@ -163,7 +176,7 @@ oauthToken.post('/revoke', async c => {
     await oauthService.revokeToken(await formParams(c))
   } catch (error) {
     if (error instanceof OAuthError) {
-      return errorResponse(c, error.code, error.message)
+      return oauthErrorResponse(c, error)
     }
     if (error instanceof ValidationError) {
       return errorResponse(c, 'invalid_request', describeValidationError(error))

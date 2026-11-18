@@ -46,7 +46,17 @@ export async function retryOnDeadlock<T>(write: () => Promise<T>): Promise<T> {
 }
 
 function asWriteConflict(error: unknown): unknown {
-  return isDeadlockError(error) || isLockWaitTimeoutError(error)
-    ? new WriteConflictError({ cause: error })
-    : error
+  if (isDeadlockError(error)) {
+    return new WriteConflictError(
+      'The write lost two deadlocks and changed nothing',
+      { cause: error }
+    )
+  }
+  if (isLockWaitTimeoutError(error)) {
+    return new WriteConflictError(
+      'The write waited too long for a lock and changed nothing',
+      { cause: error }
+    )
+  }
+  return error
 }

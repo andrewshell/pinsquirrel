@@ -4,8 +4,11 @@
  * can succeed if it is made again.
  */
 export class WriteConflictError extends Error {
-  constructor(options?: ErrorOptions) {
-    super('The write conflicted with another and changed nothing', options)
+  constructor(
+    message = 'The write conflicted with another and changed nothing',
+    options?: ErrorOptions
+  ) {
+    super(message, options)
     this.name = 'WriteConflictError'
   }
 }
