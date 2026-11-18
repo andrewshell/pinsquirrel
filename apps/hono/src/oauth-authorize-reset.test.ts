@@ -19,26 +19,12 @@ import {
 } from './lib/db'
 import { accountService } from './lib/services'
 
-/**
- * An authorization request that is still running when the user's sessions and
- * tokens are revoked, which is what a password reset or change does.
- *
- * The real `OAuthService` over the real repositories, with one substitution: a
- * client metadata fetcher the test holds open. That fetch is the slow step
- * between the session check at the start of the request and the code written
- * at its end, and its duration is up to whoever names the client.
- */
-
 const REDIRECT_URI = 'https://cimd.example/callback'
 
 let user: User
 const createdUsers: string[] = []
 const clientIds: string[] = []
 
-/**
- * A client id never seen before, so the request has to fetch its document:
- * a cached one would skip the slow step this is about.
- */
 function freshClientId(): string {
   const id = `https://cimd.example/${randomBytes(4).toString('hex')}.json`
   clientIds.push(id)
@@ -71,7 +57,6 @@ async function signIn(userId: string): Promise<string> {
   return id
 }
 
-/** A service whose metadata fetch waits until the test lets it finish. */
 function serviceWithHeldFetch(clientId: string) {
   let release!: () => void
   const held = new Promise<void>(resolve => (release = resolve))

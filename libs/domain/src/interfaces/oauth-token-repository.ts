@@ -44,8 +44,7 @@ export interface OAuthTokenRepository {
 
   /**
    * Remove expired and revoked tokens and report how many. A rotated refresh
-   * token is kept until its own expiry: presenting it again is how a leaked
-   * chain is detected. Joins the sweep in the shape of
+   * token is kept until its own expiry. Joins the sweep in the shape of
    * `SessionRepository.deleteExpiredSessions`.
    */
   deleteExpiredTokens(): Promise<number>

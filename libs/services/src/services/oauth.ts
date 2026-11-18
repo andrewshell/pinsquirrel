@@ -322,8 +322,6 @@ export class OAuthService {
       input.sessionId
     )
     if (!created) {
-      // Signed out, or a password reset ended every session, while this
-      // request was resolving the client.
       throw new OAuthAccessDeniedError(
         'The session that approved this request has ended'
       )
@@ -404,7 +402,7 @@ export class OAuthService {
       }
     }
 
-    await this.requireAdmitted(code.userId, client.clientId)
+    await this.revokeGrantUnlessAdmitted(code.userId, client.clientId)
 
     return this.issueTokens({
       client,
@@ -459,7 +457,7 @@ export class OAuthService {
       )
     }
 
-    await this.requireAdmitted(token.userId, client.clientId)
+    await this.revokeGrantUnlessAdmitted(token.userId, client.clientId)
 
     const scopes = request.scope
       ? narrowedScopes(request.scope, token.scopes)
@@ -513,8 +511,7 @@ export class OAuthService {
    * expired one, a revoked one and one that never existed are indistinguishable
    * from outside on purpose, and a token whose user is gone reads as invalid
    * too: a distinct answer would confirm the token itself was good. So does
-   * one whose user is no longer admitted, which is how a suspension reaches a
-   * token already in a client's hands.
+   * one whose user is no longer admitted.
    */
   async verifyAccessToken(
     rawToken: string,
@@ -769,11 +766,7 @@ export class OAuthService {
     await this.tokenRepository.revoke(token.id)
   }
 
-  /**
-   * Refuse a grant whose user is no longer admitted, and end it, so a client
-   * that keeps retrying holds nothing live.
-   */
-  private async requireAdmitted(
+  private async revokeGrantUnlessAdmitted(
     userId: string,
     clientId: string
   ): Promise<void> {

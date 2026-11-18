@@ -744,8 +744,6 @@ describe('refresh rotation', () => {
     expect(call.status).toBe(401)
   })
 
-  // The hourly sweep runs between a refresh and the next one, so the retired
-  // token has to outlast it for a replay to still be recognised.
   it('still kills the grant when the retired token comes back after a sweep', async () => {
     const original = await connect({ resource: mcpResource })
     const res = await exchange({

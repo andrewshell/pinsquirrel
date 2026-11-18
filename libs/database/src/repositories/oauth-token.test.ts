@@ -293,8 +293,6 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
       }
     })
 
-    // A retired refresh token presented again is how a leaked chain is
-    // detected, and that needs the row.
     it('should keep a rotated refresh token until its own expiry', async () => {
       const rotated = await repository.create(token({ kind: 'refresh' }))
       await repository.markRotated(rotated.id)

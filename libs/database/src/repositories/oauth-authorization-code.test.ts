@@ -12,6 +12,7 @@ import { insertUser } from '../test-fixtures.js'
 import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes.js'
 import { DrizzleOAuthClientRepository } from './oauth-client.js'
 import { DrizzleOAuthAuthorizationCodeRepository } from './oauth-authorization-code.js'
+import { DrizzleUserRepository } from './user.js'
 
 describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
   let testDb: MySql2Database
@@ -40,7 +41,6 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
     ...overrides,
   })
 
-  /** A code created under the user's live session, for tests about the rest. */
   const createCode = async (data = code()): Promise<AuthorizationCode> => {
     const created = await repository.create(data, sessionId)
     if (!created)
@@ -112,14 +112,35 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
       ).rejects.toThrow()
     })
 
-    // A password reset deletes the user's sessions and unspent codes at one
-    // instant. An authorization still in flight then must not leave a code
-    // behind that nothing will revoke.
     it('should create nothing once the session it was approved in is gone', async () => {
       await testPool.query('DELETE FROM sessions WHERE id = ?', [sessionId])
       const data = code()
 
       expect(await repository.create(data, sessionId)).toBeNull()
+      expect(await repository.findByCodeHash(data.codeHash)).toBeNull()
+    })
+
+    it('should leave no code when the sessions are revoked between its session check and its insert', async () => {
+      // Holding the client row stalls the insert's foreign key check, after
+      // the session has been read.
+      const stall = await testPool.getConnection()
+      await stall.beginTransaction()
+      await stall.query(
+        'SELECT client_id FROM oauth_clients WHERE client_id = ? FOR UPDATE',
+        [clientId]
+      )
+      const data = code()
+      const creating = repository.create(data, sessionId)
+      await new Promise(resolve => setTimeout(resolve, 200))
+      const revoking = new DrizzleUserRepository(
+        testDb
+      ).revokeSessionsAndTokens(userId)
+      await new Promise(resolve => setTimeout(resolve, 200))
+      await stall.commit()
+      stall.release()
+
+      await Promise.all([creating, revoking])
+
       expect(await repository.findByCodeHash(data.codeHash)).toBeNull()
     })
 

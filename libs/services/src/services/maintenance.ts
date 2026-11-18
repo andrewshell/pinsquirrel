@@ -70,9 +70,6 @@ export class MaintenanceService {
       // Spent codes are kept until they expire, so a replay is still
       // recognisable while the code could plausibly be presented again.
       this.oauthCodeRepository.deleteExpiredCodes(),
-      // Expired and revoked tokens only. A rotated refresh token stays until
-      // its own expiry, because presenting it again is what ends a leaked
-      // grant, and that needs the row.
       this.oauthTokenRepository.deleteExpiredTokens(),
       this.oauthClientRepository.deleteExpiredIncompleteClients(
         new Date(Date.now() - INCOMPLETE_CLIENT_TTL_MS)

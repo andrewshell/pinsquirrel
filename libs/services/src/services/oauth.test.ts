@@ -96,7 +96,6 @@ function makeUser(id: string, username: string): User {
 const user = makeUser('user-1', 'squirrel')
 const otherUser = makeUser('user-2', 'intruder')
 
-/** The two ways an account stops being admitted (see `isAdmitted`). */
 const notAdmitted: [string, User][] = [
   ['without the User role', { ...user, roles: [] }],
   ['on the waitlist', { ...user, status: UserStatus.Waitlist }],
@@ -669,8 +668,6 @@ describe('OAuthService.authorize', () => {
     expect(created.expiresAt.getTime()).toBeGreaterThan(Date.now())
   })
 
-  // The repository writes the code only while the approving session exists,
-  // so a password reset that ended it mid-request leaves nothing to exchange.
   it('refuses when the session that approved the request has ended', async () => {
     vi.mocked(ctx.codeRepository.create).mockResolvedValue(null)
 
@@ -849,7 +846,6 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     expect(ctx.tokenRepository.create).not.toHaveBeenCalled()
   })
 
-  // A code minted before the account was suspended or waitlisted.
   it.each(notAdmitted)(
     'refuses a code for a user %s and revokes the grant',
     async (_label, account) => {
@@ -1042,8 +1038,6 @@ describe('OAuthService.exchangeRefreshToken', () => {
     )
   })
 
-  // Refresh tokens slide, so without this a suspended account's grant would
-  // never end on its own.
   it.each(notAdmitted)(
     'refuses a user %s and revokes the grant',
     async (_label, account) => {
@@ -1061,8 +1055,6 @@ describe('OAuthService.exchangeRefreshToken', () => {
     }
   )
 
-  // The retired row is what records a revocation that landed mid-refresh, so
-  // not finding it cannot be read as "not revoked".
   it('takes back the new tokens when the retired token has gone missing', async () => {
     vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(null)
 

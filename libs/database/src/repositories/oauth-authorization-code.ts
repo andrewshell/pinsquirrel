@@ -36,9 +36,6 @@ export class DrizzleOAuthAuthorizationCodeRepository implements OAuthAuthorizati
     const id = crypto.randomUUID()
 
     return this.db.transaction(async tx => {
-      // A locking read: a revocation deleting this session waits for this
-      // transaction, and then deletes the code with the user's others; one
-      // that got there first has committed, and the row is gone.
       const [session] = await tx
         .select({ id: sessions.id })
         .from(sessions)

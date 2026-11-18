@@ -583,9 +583,9 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     insert runs in a transaction that first reads the session row `FOR SHARE`. A revocation
     that deleted the session first leaves nothing to read, and `authorize` answers
     `access_denied`; one that starts after the read waits for the insert and then deletes the
-    new code with the user's other unspent codes. Binding to the session, not the user, keeps
-    a password change that preserves the changer's own session from cancelling their own
-    authorization while still ending everyone else's. No schema change was needed. A per-user
+    new code with the user's other unspent codes. The check is on the approving session rather
+    than the user, so a password change, which keeps the changer's own session, still lets
+    them authorize afterwards. No schema change was needed. A per-user
     revocation timestamp would also cover the code exchange, which can still issue tokens if a
     revocation lands in the milliseconds between consuming the code and writing the tokens;
     that window is not one a caller can widen.

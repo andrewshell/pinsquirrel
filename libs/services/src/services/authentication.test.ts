@@ -490,8 +490,6 @@ describe('AuthenticationService', () => {
       expect(result.roles).toEqual([])
     })
 
-    // Sessions and OAuth tokens outlive a role change unless revoked, and a
-    // suspended account must lose both.
     it('should revoke the sessions and tokens of a user losing the User role', async () => {
       const plainUser = { ...mockUser, roles: [Role.User] }
       vi.mocked(mockUserRepository.findById)
