@@ -959,6 +959,29 @@ describe("initBackground: the options page's disconnect request", () => {
     expect(disconnect).toHaveBeenCalledTimes(1)
   })
 
+  // Chrome stops a worker after 30 seconds with no event or extension API
+  // call, and waiting on a lock is neither.
+  it('keeps the worker alive while Disconnect waits, and stops after', async () => {
+    vi.useFakeTimers()
+    try {
+      const chrome = stubChrome(CONNECTED)
+      const waiting = deferred()
+      initBackground(deps({ disconnect: () => waiting.promise }))
+
+      deliver(chrome, { type: 'disconnect' })
+      await vi.advanceTimersByTimeAsync(60_000)
+      const whileWaiting = chrome.getPlatformInfo.mock.calls.length
+
+      waiting.resolve()
+      await vi.advanceTimersByTimeAsync(60_000)
+
+      expect(whileWaiting).toBeGreaterThanOrEqual(2)
+      expect(chrome.getPlatformInfo).toHaveBeenCalledTimes(whileWaiting)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('answers a failed disconnect with the reason, rather than rejecting', async () => {
     const chrome = stubChrome(CONNECTED)
     const disconnect = vi.fn(() => Promise.reject(new Error('Storage is full')))

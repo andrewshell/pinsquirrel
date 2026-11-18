@@ -117,6 +117,10 @@ export interface ChromeStub {
   runtime: RuntimeEventsStub
   /** `chrome.runtime.openOptionsPage`, which the pin flow falls back to. */
   openOptionsPage: ReturnType<typeof vi.fn<() => Promise<void>>>
+  /** `chrome.runtime.getPlatformInfo`, the call the worker keeps itself alive with. */
+  getPlatformInfo: ReturnType<
+    typeof vi.fn<() => Promise<chrome.runtime.PlatformInfo>>
+  >
   /** The periodic sync alarm, for a test to inspect and fire. */
   alarms: AlarmsStub
   /** The toolbar click that asks for the current page to be pinned. */
@@ -468,6 +472,9 @@ export function stubChrome(
     },
     runtime: runtimeEvents,
     openOptionsPage: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+    getPlatformInfo: vi.fn<() => Promise<chrome.runtime.PlatformInfo>>(() =>
+      Promise.resolve({ os: 'mac', arch: 'arm64', nacl_arch: 'arm' })
+    ),
     alarms,
     action: { onClicked },
     commands: { onCommand },
@@ -483,6 +490,7 @@ export function stubChrome(
     runtime: {
       sendMessage: stub.sendMessage,
       openOptionsPage: stub.openOptionsPage,
+      getPlatformInfo: stub.getPlatformInfo,
       onStartup: runtimeEvents.onStartup,
       onInstalled: runtimeEvents.onInstalled,
       onMessage: runtimeEvents.onMessage,
