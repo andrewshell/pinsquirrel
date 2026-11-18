@@ -61,11 +61,6 @@ function inMemoryResets(): PasswordResetRepository {
       rows.push(row)
       return Promise.resolve(row)
     }),
-    deleteByUserId: vi.fn((userId: string) => {
-      const before = rows.length
-      rows.splice(0, rows.length, ...rows.filter(r => r.userId !== userId))
-      return Promise.resolve(rows.length < before)
-    }),
   }
 }
 
@@ -110,7 +105,6 @@ describe('AccountService', () => {
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
-      deleteByUserId: vi.fn(),
       deleteExpiredTokens: vi.fn(),
       isValidToken: vi.fn(),
     }
@@ -916,7 +910,6 @@ describe('AccountService', () => {
       expect(mockUserRepository.findByEmailHash).toHaveBeenCalledWith(
         'hashed_test@example.com'
       )
-      expect(mockPasswordResetRepository.deleteByUserId).not.toHaveBeenCalled()
       expect(mockPasswordResetRepository.create).toHaveBeenCalledWith({
         userId: mockUserWithEmail.id,
         tokenHash: 'hashed_mock-token',
@@ -1197,7 +1190,6 @@ describe('AccountService', () => {
 
       expect(mockUserRepository.update).not.toHaveBeenCalled()
       expect(mockPasswordResetRepository.delete).not.toHaveBeenCalled()
-      expect(mockPasswordResetRepository.deleteByUserId).not.toHaveBeenCalled()
     })
 
     it('refuses the link when the account is gone by the time the password is written', async () => {

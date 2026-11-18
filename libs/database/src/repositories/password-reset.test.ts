@@ -160,34 +160,6 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
     })
   })
 
-  describe('deleteByUserId', () => {
-    it('should delete all tokens for a user', async () => {
-      const { id: userId } = await insertUser(testPool)
-
-      await repository.create({
-        userId,
-        tokenHash: 'token_hash_1',
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-      })
-      await repository.create({
-        userId,
-        tokenHash: 'token_hash_2',
-        expiresAt: new Date(Date.now() + 30 * 60 * 1000),
-      })
-
-      const result = await repository.deleteByUserId(userId)
-      expect(result).toBe(true)
-
-      const remainingTokens = await repository.findByUserId(userId)
-      expect(remainingTokens).toHaveLength(0)
-    })
-
-    it('should return false for user with no tokens', async () => {
-      const result = await repository.deleteByUserId('non-existent-user')
-      expect(result).toBe(false)
-    })
-  })
-
   describe('isValidToken', () => {
     it('should return true for valid non-expired token', async () => {
       const { id: userId } = await insertUser(testPool)

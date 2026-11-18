@@ -97,13 +97,6 @@ export class DrizzlePasswordResetRepository implements PasswordResetRepository {
     return result[0].affectedRows > 0
   }
 
-  async deleteByUserId(userId: string): Promise<boolean> {
-    const result = await this.db
-      .delete(passwordResetTokens)
-      .where(eq(passwordResetTokens.userId, userId))
-    return result[0].affectedRows > 0
-  }
-
   async deleteExpiredTokens(expiredBefore: Date): Promise<number> {
     const result = await this.db
       .delete(passwordResetTokens)
