@@ -476,7 +476,7 @@ export class OAuthService {
     })
 
     const parent = await this.tokenRepository.findById(token.id)
-    if (parent?.revokedAt) {
+    if (!parent || parent.revokedAt) {
       await this.revokeGrantFamily(token.userId, token.clientId)
       throw new OAuthInvalidGrantError(
         'The grant was revoked during the refresh'

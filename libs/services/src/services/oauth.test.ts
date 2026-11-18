@@ -939,6 +939,9 @@ describe('OAuthService.exchangeRefreshToken', () => {
       storedRefresh()
     )
     vi.mocked(ctx.tokenRepository.markRotated).mockResolvedValue(true)
+    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(
+      storedRefresh({ rotatedAt: new Date() })
+    )
     vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockResolvedValue(2)
     vi.mocked(ctx.tokenRepository.create).mockImplementation(data =>
       Promise.resolve(makeToken(data))
@@ -1749,18 +1752,21 @@ describe('OAuthService token requests and the latency budget', () => {
   })
 
   it('refreshes without waiting on the client metadata document', async () => {
-    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
-      makeToken({
-        kind: 'refresh',
-        tokenHash: 'hashed_raw-refresh',
-        clientId: CIMD_URL,
-        userId: user.id,
-        scopes: ['pins:read', 'offline_access'],
-        resource: MCP_RESOURCE,
-        expiresAt: new Date(Date.now() + 60_000),
-      })
-    )
+    const stored = makeToken({
+      kind: 'refresh',
+      tokenHash: 'hashed_raw-refresh',
+      clientId: CIMD_URL,
+      userId: user.id,
+      scopes: ['pins:read', 'offline_access'],
+      resource: MCP_RESOURCE,
+      expiresAt: new Date(Date.now() + 60_000),
+    })
+    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(stored)
     vi.mocked(ctx.tokenRepository.markRotated).mockResolvedValue(true)
+    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue({
+      ...stored,
+      rotatedAt: new Date(),
+    })
 
     await ctx.service.exchangeRefreshToken({
       grant_type: 'refresh_token',

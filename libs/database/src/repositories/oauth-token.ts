@@ -117,8 +117,7 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
       .where(
         or(
           lt(oauthTokens.expiresAt, new Date()),
-          isNotNull(oauthTokens.revokedAt),
-          isNotNull(oauthTokens.rotatedAt)
+          isNotNull(oauthTokens.revokedAt)
         )
       )
     return result[0].affectedRows
