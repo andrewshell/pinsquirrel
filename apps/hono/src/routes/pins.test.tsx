@@ -30,6 +30,11 @@ import {
 const svc = createServiceMocks()
 const session = createSessionMocks()
 
+vi.mock('../lib/logger.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../lib/logger.js')>()),
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+}))
+
 vi.mock('../lib/services', () => ({
   pinService: {
     getPin: (...a: unknown[]) => svc.getPin(...a) as unknown,
@@ -56,6 +61,7 @@ vi.mock('../middleware/session', () => ({
   getAuthUser: () => session.authUser() as unknown,
 }))
 
+import { logger, safeError } from '../lib/logger.js'
 import { pinsRoutes } from './pins'
 
 describe('pins routes', () => {
@@ -629,6 +635,23 @@ describe('pins routes', () => {
       expect(html).toContain('name="embed"')
     })
 
+    it('logs an unexpected failure through safeError', async () => {
+      const failure = new Error(
+        'Failed query: insert into `pins` values (?)\nparams: secret'
+      )
+      svc.createPin.mockRejectedValue(failure)
+
+      await app.request(
+        '/pins/new',
+        formBody({ url: 'https://x.test/a', title: 'Half-typed' })
+      )
+
+      expect(logger.error).toHaveBeenCalledWith(
+        { err: safeError(failure) },
+        expect.any(String)
+      )
+    })
+
     it('reports an unexpected failure as a 500 without losing the form', async () => {
       svc.createPin.mockRejectedValue(new Error('database on fire'))
 
@@ -866,6 +889,23 @@ describe('pins routes', () => {
       expect(res.status).toBe(200)
       expect(res.headers.get('Location')).toBeNull()
       expect(await res.text()).toContain('/pins/pin-existing/edit')
+    })
+
+    it('logs an unexpected failure through safeError', async () => {
+      const failure = new Error(
+        'Failed query: insert into `pins` values (?)\nparams: secret'
+      )
+      svc.updatePin.mockRejectedValue(failure)
+
+      await app.request(
+        '/pins/pin-1/edit',
+        formBody({ url: 'https://x.test/b', title: 'Updated' })
+      )
+
+      expect(logger.error).toHaveBeenCalledWith(
+        { err: safeError(failure) },
+        expect.any(String)
+      )
     })
 
     it('reports an unexpected failure as a 500 without losing the form', async () => {

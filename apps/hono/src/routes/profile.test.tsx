@@ -46,6 +46,11 @@ function makeGrant(overrides: Record<string, unknown> = {}) {
   }
 }
 
+vi.mock('../lib/logger.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../lib/logger.js')>()),
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+}))
+
 vi.mock('../lib/services', () => ({
   accountService: {
     requestEmailChange: (...a: unknown[]) =>
@@ -85,6 +90,7 @@ vi.mock('../middleware/session', () => ({
   }),
 }))
 
+const { logger, safeError } = await import('../lib/logger.js')
 const { profileRoutes } = await import('./profile')
 const { emailChangeLimiter, privateUnlockLimiter } =
   await import('../middleware/rate-limit')
@@ -377,6 +383,27 @@ describe('profile routes', () => {
     const card = cardSection(await res.text(), 'Change Password')
     expect(card).toContain('your password was not changed')
     expect(card).toContain('Please try again')
+  })
+
+  it('logs an unexpected failure through safeError', async () => {
+    const failure = new Error(
+      'Failed query: insert into `pins` values (?)\nparams: secret'
+    )
+    svc.changePassword.mockRejectedValue(failure)
+
+    await app.request(
+      '/profile',
+      formBody({
+        intent: 'change-password',
+        currentPassword: 'current',
+        newPassword: 'newpassword123',
+      })
+    )
+
+    expect(logger.error).toHaveBeenCalledWith(
+      { err: safeError(failure) },
+      expect.any(String)
+    )
   })
 
   it('shows an unexpected failure in the card of the form that failed', async () => {

@@ -22,6 +22,7 @@ import {
   DEFAULT_PAGE_SIZE,
 } from '@pinsquirrel/domain'
 import { pinService, tagService } from '../lib/services'
+import { logger, safeError } from '../lib/logger.js'
 import { isEmbedRequest, withEmbed } from '../lib/embed'
 import { getString, parsePinForm } from '../lib/form'
 import { getAuthUser, getSessionManager } from '../middleware/session'
@@ -389,6 +390,7 @@ export function createPinRoutes({
         )
       }
 
+      logger.error({ err: safeError(error) }, 'Pin create failed')
       const errors = { _form: ['Failed to create pin. Please try again.'] }
       if (isHtmx) {
         return c.html(<PinForm {...formProps} errors={errors} />, 500)
@@ -570,6 +572,7 @@ export function createPinRoutes({
         )
       }
 
+      logger.error({ err: safeError(error) }, 'Pin update failed')
       const errors = { _form: ['Failed to update pin. Please try again.'] }
       if (isHtmx) {
         return c.html(<PinForm {...formProps} errors={errors} />, 500)

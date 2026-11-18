@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   DuplicatePinError,
   PinNotFoundError,
@@ -7,6 +7,12 @@ import {
   UnauthorizedTagAccessError,
   ValidationError,
 } from '@pinsquirrel/domain'
+vi.mock('../lib/logger.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../lib/logger.js')>()),
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+}))
+
+import { logger, safeError } from '../lib/logger.js'
 import { mapDomainErrorToMcp } from './errors'
 import { InsufficientScopeError } from './scopes'
 
@@ -15,10 +21,34 @@ function textOf(result: ReturnType<typeof mapDomainErrorToMcp>) {
 }
 
 describe('mapDomainErrorToMcp', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('reports a validation failure without echoing the input', () => {
     const result = mapDomainErrorToMcp(new ValidationError({}))
     expect(result.isError).toBe(true)
     expect(textOf(result)).toBe('Invalid request')
+  })
+
+  it('logs an unknown error through safeError', () => {
+    const failure = new Error(
+      'Failed query: insert into `pins` values (?)\nparams: secret'
+    )
+
+    mapDomainErrorToMcp(failure)
+
+    expect(logger.error).toHaveBeenCalledWith(
+      { err: safeError(failure) },
+      expect.any(String)
+    )
+  })
+
+  it('does not log a refusal it maps', () => {
+    mapDomainErrorToMcp(new PinNotFoundError('pin-1'))
+    mapDomainErrorToMcp(new ValidationError({}))
+
+    expect(logger.error).not.toHaveBeenCalled()
   })
 
   it('collapses an unknown error to a generic message', () => {

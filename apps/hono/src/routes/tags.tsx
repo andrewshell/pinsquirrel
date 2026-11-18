@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { AccessControl, ValidationError } from '@pinsquirrel/domain'
 import { pinService, tagService } from '../lib/services'
+import { logger, safeError } from '../lib/logger.js'
 import { isEmbedRequest, withEmbed } from '../lib/embed'
 import { getString } from '../lib/form'
 import {
@@ -146,6 +147,7 @@ tags.post('/merge', async c => {
     if (error instanceof ValidationError) {
       return reject(error.fields)
     }
+    logger.error({ err: safeError(error) }, 'Tag merge failed')
     return reject({ _form: ['Failed to merge tags. Please try again.'] }, 500)
   }
 })

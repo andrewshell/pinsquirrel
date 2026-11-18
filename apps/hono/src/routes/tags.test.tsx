@@ -35,6 +35,11 @@ const session = {
 // A real TagService over a mocked repository. The merge rules moved into the
 // service, so mocking the service wholesale would stop these tests exercising
 // the very thing they exist to pin down.
+vi.mock('../lib/logger.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../lib/logger.js')>()),
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+}))
+
 vi.mock('../lib/services', () => ({
   pinService: {
     getUserPinsWithPagination: (...a: unknown[]) =>
@@ -61,6 +66,7 @@ vi.mock('../middleware/session', () => ({
   }),
 }))
 
+import { logger, safeError } from '../lib/logger.js'
 import { tagsRoutes } from './tags'
 
 function tagWithCount(id: string, name: string, pinCount = 3) {
@@ -264,6 +270,20 @@ describe('tag merge routes', () => {
   })
 
   describe('POST /tags/merge failure', () => {
+    it('logs an unexpected failure through safeError', async () => {
+      const failure = new Error(
+        'Failed query: insert into `pins` values (?)\nparams: secret'
+      )
+      repo.mergeTags.mockRejectedValue(failure)
+
+      await postMerge({ sourceTagIds: 'tag-a', destinationTagId: 'tag-c' })
+
+      expect(logger.error).toHaveBeenCalledWith(
+        { err: safeError(failure) },
+        expect.any(String)
+      )
+    })
+
     it('re-renders with an error when the merge throws', async () => {
       repo.mergeTags.mockRejectedValue(new Error('db down'))
 

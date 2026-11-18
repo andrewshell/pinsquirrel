@@ -37,6 +37,12 @@ vi.mock('../lib/services', () => ({
   },
 }))
 
+vi.mock('../lib/logger.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../lib/logger.js')>()),
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+}))
+
+import { logger, safeError } from '../lib/logger.js'
 import { apiV1Limiter } from '../middleware/rate-limit'
 import { TEST_CLIENT_IP, exhaust } from '../test-support/rate-limit'
 import { apiV1Routes } from './api-v1'
@@ -281,6 +287,22 @@ describe('api-v1 routes', () => {
       expect(res.status).toBe(200)
       const body = (await res.json()) as { id: string }
       expect(body.id).toBe('pin-1')
+    })
+
+    it('answers an unexpected failure with a bare 500 and logs it through safeError', async () => {
+      const failure = new Error(
+        'Failed query: insert into `pins` values (?)\nparams: secret'
+      )
+      mockGetPublicPin.mockRejectedValue(failure)
+      const res = await app.request('/api/v1/pins/pin-1', {
+        headers: { Authorization: 'Bearer pso_ok' },
+      })
+      expect(res.status).toBe(500)
+      expect(await res.json()).toEqual({ error: 'Internal server error' })
+      expect(logger.error).toHaveBeenCalledWith(
+        { err: safeError(failure) },
+        expect.any(String)
+      )
     })
 
     // Was the opposite until the REST API was brought in line with MCP: the
