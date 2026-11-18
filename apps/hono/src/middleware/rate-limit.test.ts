@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { RateLimiter } from './rate-limiter'
 import {
   apiV1Limiter,
+  clientAddressKey,
   getClientIp,
   mcpLimiter,
   rateLimitByClientId,
@@ -304,6 +305,28 @@ describe('signinRateLimitKey', () => {
     await app.request('/test', undefined, from('1.2.3.4'))
 
     expect(key).toBe('1.2.3.4:username')
+  })
+
+  it.each([
+    ['1.2.3.4', '1.2.3.4'],
+    ['::ffff:1.2.3.4', '1.2.3.4'],
+    ['::ffff:102:304', '1.2.3.4'],
+    ['::FFFF:0102:0304', '1.2.3.4'],
+    ['::1', '::1'],
+    ['::', '::'],
+    ['2001:db8:1:2:3:4:5:6', '2001:db8:1:2::/64'],
+    ['2001:db8::ffff:102:304', '2001:db8:0:0::/64'],
+  ])('keys %s as %s', async (address, expected) => {
+    const app = new Hono()
+    let key = ''
+    app.get('/test', c => {
+      key = clientAddressKey(c)
+      return c.text('ok')
+    })
+
+    await app.request('/test', undefined, from(address))
+
+    expect(key).toBe(expected)
   })
 
   it('keys an IPv6 caller on its /64', async () => {

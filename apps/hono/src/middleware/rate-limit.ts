@@ -88,36 +88,33 @@ export function getClientIp(c: Context): string {
   return peer ?? 'unknown'
 }
 
-const IPV4_MAPPED = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i
-
-function ipv6Groups(part: string): string[] {
-  if (part === '') return []
-  return part
-    .split(':')
-    .flatMap(group => (group.includes('.') ? ['0', '0'] : [group]))
-}
-
 /**
  * The caller an IP-keyed limit counts. One IPv6 subscriber holds a whole /64,
  * so the key is that prefix, and an IPv4-mapped address is its IPv4 address.
+ * Loopback and the unspecified address are single hosts, not subscribers.
  */
 export function clientAddressKey(c: Context): string {
   const address = getClientIp(c)
   if (isIP(address) !== 6) return address
-  const mapped = IPV4_MAPPED.exec(address)
-  if (mapped) return mapped[1]
-  const [head = '', tail] = address.split('::')
-  const leading = ipv6Groups(head)
-  const trailing = tail === undefined ? [] : ipv6Groups(tail)
+  // The URL parser rewrites every spelling into one compressed hex form, so
+  // `::ffff:1.2.3.4` and `::ffff:102:304` arrive here identical.
+  const canonical = new URL(`http://[${address}]`).hostname.slice(1, -1)
+  if (canonical === '::1' || canonical === '::') return canonical
+  const mapped = /^::ffff:([\da-f]{1,4}):([\da-f]{1,4})$/.exec(canonical)
+  if (mapped) {
+    const high = parseInt(mapped[1], 16)
+    const low = parseInt(mapped[2], 16)
+    return `${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`
+  }
+  const [head, tail] = canonical.split('::')
+  const leading = head === '' ? [] : head.split(':')
+  const trailing = tail === undefined || tail === '' ? [] : tail.split(':')
   const groups = [
     ...leading,
     ...Array<string>(8 - leading.length - trailing.length).fill('0'),
     ...trailing,
   ]
-  const prefix = groups
-    .slice(0, 4)
-    .map(group => parseInt(group, 16).toString(16))
-  return `${prefix.join(':')}::/64`
+  return `${groups.slice(0, 4).join(':')}::/64`
 }
 
 export const signinLimiter = new RateLimiter({
