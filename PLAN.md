@@ -568,6 +568,27 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     `invalid_client` at once. The incomplete-client sweep takes `cimd` rows as well as `dcr`
     ones, since the consent page creates a `cimd` row before anyone approves; a swept client
     is fetched again on its next authorization request.
+36. **OAuth follows the same admission rule as the web app.** `isAdmitted` (active, with the
+    User role) is checked by `authorize`, by both token exchanges and by `verifyAccessToken`,
+    so a token stops working the moment its account stops being admitted. An exchange for an
+    account that is not admitted also revokes the account's tokens for that client.
+    Revoking the User role calls `revokeSessionsAndTokens`, as a password reset does, so a
+    suspension also clears what the checks would refuse anyway.
+37. **A rotated refresh token is kept until its own expiry.** Presenting a retired token again
+    is how a copied refresh chain is noticed, and that needs the row, so the sweep removes
+    only expired and revoked tokens. The cost is one row per refresh for up to thirty days.
+    A refresh whose retired row cannot be read back after issuing is refused and revokes the
+    grant.
+38. **An authorization code is written only while the session that approved it exists.** The
+    insert runs in a transaction that first reads the session row `FOR SHARE`. A revocation
+    that deleted the session first leaves nothing to read, and `authorize` answers
+    `access_denied`; one that starts after the read waits for the insert and then deletes the
+    new code with the user's other unspent codes. Binding to the session, not the user, keeps
+    a password change that preserves the changer's own session from cancelling their own
+    authorization while still ending everyone else's. No schema change was needed. A per-user
+    revocation timestamp would also cover the code exchange, which can still issue tokens if a
+    revocation lands in the milliseconds between consuming the code and writing the tokens;
+    that window is not one a caller can widen.
 
 ## Reference
 
