@@ -11,7 +11,7 @@ import { drizzle } from 'drizzle-orm/mysql2'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import mysql from 'mysql2/promise'
 import type { Pool } from 'mysql2/promise'
-import { insertUser } from '../test-fixtures.js'
+import { heavyTransaction, insertUser } from '../test-fixtures.js'
 import { DrizzleOAuthAuthorizationCodeRepository } from './oauth-authorization-code.js'
 import { DrizzleOAuthClientRepository } from './oauth-client.js'
 import { DrizzleOAuthTokenRepository } from './oauth-token.js'
@@ -779,6 +779,29 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       const { sessions, tokens } = await seed(userId)
 
       await repository.revokeSessionsAndTokens(userId)
+
+      expect(await sessions.findByUserId(userId)).toEqual([])
+      expect(await tokens.findActiveByUserId(userId)).toEqual([])
+    })
+
+    it('runs again when it loses a deadlock, and ends them', async () => {
+      const { id: userId } = await insertUser(testPool)
+      const { sessions, tokens, refresh } = await seed(userId)
+      const pause = () => new Promise(resolve => setTimeout(resolve, 200))
+      const rival = await heavyTransaction(testPool)
+      await rival.query('SELECT id FROM oauth_tokens WHERE id = ? FOR UPDATE', [
+        refresh.id,
+      ])
+
+      const revoking = repository.revokeSessionsAndTokens(userId)
+      await pause()
+      await rival.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [
+        userId,
+      ])
+      await pause()
+      await rival.rollback()
+      rival.release()
+      await revoking
 
       expect(await sessions.findByUserId(userId)).toEqual([])
       expect(await tokens.findActiveByUserId(userId)).toEqual([])

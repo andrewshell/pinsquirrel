@@ -9,7 +9,7 @@ import type {
   CreateAuthorizationCodeData,
   CreateOAuthTokenData,
 } from '@pinsquirrel/domain'
-import { insertUser } from '../test-fixtures.js'
+import { heavyTransaction, insertUser } from '../test-fixtures.js'
 import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes.js'
 import { DrizzleOAuthClientRepository } from './oauth-client.js'
 import { DrizzleOAuthAuthorizationCodeRepository } from './oauth-authorization-code.js'
@@ -400,20 +400,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
     ])('should %s', async (_name, deadlocks) => {
       const created = await createCode()
       const [access, refresh] = tokensFor(created)
-      // InnoDB picks the transaction that changed fewer rows as the victim.
-      const bystanders = await Promise.all(
-        Array.from({ length: 20 }, () =>
-          insertUser(testPool, { emailHash: crypto.randomUUID() })
-        )
-      )
-      const rival = await testPool.getConnection()
-      await rival.beginTransaction()
-      for (const bystander of bystanders) {
-        await rival.query(
-          'UPDATE users SET username = UPPER(username) WHERE id = ?',
-          [bystander.id]
-        )
-      }
+      const rival = await heavyTransaction(testPool)
       await rival.query(
         'SELECT client_id FROM oauth_clients WHERE client_id = ? FOR UPDATE',
         [clientId]

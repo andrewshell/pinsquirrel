@@ -1,4 +1,4 @@
-import type { Pool } from 'mysql2/promise'
+import type { Pool, PoolConnection } from 'mysql2/promise'
 
 /**
  * Row builders for the integration tests.
@@ -89,4 +89,27 @@ export async function insertPin(
   )
 
   return id
+}
+
+/**
+ * An open transaction that InnoDB will not pick as the victim of a deadlock
+ * with a repository call: it has changed more rows than the call will. The
+ * caller takes the locks that make the cycle, then rolls it back and releases
+ * it.
+ */
+export async function heavyTransaction(pool: Pool): Promise<PoolConnection> {
+  const bystanders = await Promise.all(
+    Array.from({ length: 20 }, () =>
+      insertUser(pool, { emailHash: crypto.randomUUID() })
+    )
+  )
+  const connection = await pool.getConnection()
+  await connection.beginTransaction()
+  for (const bystander of bystanders) {
+    await connection.query(
+      'UPDATE users SET username = UPPER(username) WHERE id = ?',
+      [bystander.id]
+    )
+  }
+  return connection
 }

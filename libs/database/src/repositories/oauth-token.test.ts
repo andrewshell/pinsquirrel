@@ -5,7 +5,7 @@ import mysql from 'mysql2/promise'
 import type { Pool, PoolConnection } from 'mysql2/promise'
 import { eq } from 'drizzle-orm'
 import type { CreateOAuthTokenData } from '@pinsquirrel/domain'
-import { insertUser } from '../test-fixtures.js'
+import { heavyTransaction, insertUser } from '../test-fixtures.js'
 import { oauthTokens } from '../schema/oauth-tokens.js'
 import { DrizzleOAuthClientRepository } from './oauth-client.js'
 import { DrizzleOAuthTokenRepository } from './oauth-token.js'
@@ -69,29 +69,38 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
   }
 
   /**
-   * A transaction that InnoDB will not pick as the victim of a deadlock with
-   * an issuance: it has changed more rows. It holds the client row, which
-   * stalls an issuance at its first insert's foreign key check.
+   * Holds the client row, which stalls an issuance at its first insert's
+   * foreign key check.
    */
   const heavierRival = async (): Promise<PoolConnection> => {
-    const bystanders = await Promise.all(
-      Array.from({ length: 20 }, () =>
-        insertUser(testPool, { emailHash: crypto.randomUUID() })
-      )
-    )
-    const rival = await testPool.getConnection()
-    await rival.beginTransaction()
-    for (const bystander of bystanders) {
-      await rival.query(
-        'UPDATE users SET username = UPPER(username) WHERE id = ?',
-        [bystander.id]
-      )
-    }
+    const rival = await heavyTransaction(testPool)
     await rival.query(
       'SELECT client_id FROM oauth_clients WHERE client_id = ? FOR UPDATE',
       [clientId]
     )
     return rival
+  }
+
+  const seedTokens = async (count: number, expiresAt: Date): Promise<void> => {
+    const rows = Array.from({ length: count }, () => {
+      const data = token()
+      return [
+        crypto.randomUUID(),
+        data.tokenHash,
+        data.kind,
+        clientId,
+        userId,
+        JSON.stringify(data.scopes),
+        data.resource,
+        expiresAt,
+      ]
+    })
+    await testPool.query(
+      `INSERT INTO oauth_tokens
+         (id, token_hash, kind, client_id, user_id, scopes, resource, expires_at)
+       VALUES ?`,
+      [rows]
+    )
   }
 
   /**
@@ -300,6 +309,47 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
       await repository.revoke(already.id)
 
       expect(await repository.revokeByUserAndClient(userId, clientId)).toBe(0)
+    })
+  })
+
+  describe('a revocation of more tokens than one batch holds', () => {
+    it('should revoke every one of them', async () => {
+      await seedTokens(1100, new Date(Date.now() + 60 * 60 * 1000))
+
+      expect(await repository.revokeByUserAndClient(userId, clientId)).toBe(
+        1100
+      )
+      expect(await repository.findActiveByUserId(userId)).toEqual([])
+    })
+  })
+
+  describe('a revocation that loses a deadlock', () => {
+    it.each([
+      [
+        'revokeByUserAndClient',
+        () => repository.revokeByUserAndClient(userId, clientId),
+      ],
+      ['revokeByGrant', () => repository.revokeByGrant(userId, 'held')],
+    ])('%s runs again, and revokes', async (_name, revoke) => {
+      const held = await repository.create(token({ grantId: 'held' }))
+      const rival = await heavyTransaction(testPool)
+      await rival.query('SELECT id FROM oauth_tokens WHERE id = ? FOR UPDATE', [
+        held.id,
+      ])
+
+      const revoking = revoke()
+      await pause()
+      await rival.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [
+        userId,
+      ])
+      await pause()
+      await rival.rollback()
+      rival.release()
+
+      expect(await revoking).toBe(1)
+      expect((await repository.findById(held.id))?.revokedAt).toBeInstanceOf(
+        Date
+      )
     })
   })
 
@@ -671,25 +721,7 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
     })
 
     it('should delete more dead tokens than one batch holds', async () => {
-      const dead = Array.from({ length: 1100 }, () => {
-        const data = token()
-        return [
-          crypto.randomUUID(),
-          data.tokenHash,
-          data.kind,
-          clientId,
-          userId,
-          JSON.stringify(data.scopes),
-          data.resource,
-          new Date(Date.now() - 1000),
-        ]
-      })
-      await testPool.query(
-        `INSERT INTO oauth_tokens
-           (id, token_hash, kind, client_id, user_id, scopes, resource, expires_at)
-         VALUES ?`,
-        [dead]
-      )
+      await seedTokens(1100, new Date(Date.now() - 1000))
       const live = await repository.create(token())
 
       expect(await repository.deleteExpiredTokens()).toBe(1100)
