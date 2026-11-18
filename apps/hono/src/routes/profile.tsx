@@ -20,7 +20,7 @@ import {
   retryAfterSeconds,
 } from '../middleware/rate-limit'
 import { reserve } from '../middleware/rate-limiter'
-import { ProfilePage } from '../views/pages/profile'
+import { PROFILE_INTENTS, ProfilePage } from '../views/pages/profile'
 
 const profile = new Hono()
 
@@ -55,7 +55,8 @@ profile.post('/', async c => {
   // Parse form data
   const formData = await c.req.parseBody()
 
-  const intent = getString(formData['intent'])
+  const postedIntent = getString(formData['intent'])
+  const intent = PROFILE_INTENTS.find(known => known === postedIntent)
   const embed = getString(formData['embed']) === '1'
   const back = withEmbed('/profile', embed)
 
@@ -68,7 +69,13 @@ profile.post('/', async c => {
       user.id
     )
     return c.html(
-      <ProfilePage user={user} grants={grants} errors={errors} embed={embed} />,
+      <ProfilePage
+        user={user}
+        grants={grants}
+        errors={errors}
+        failedIntent={intent}
+        embed={embed}
+      />,
       status
     )
   }
@@ -165,15 +172,7 @@ profile.post('/', async c => {
       return c.redirect(back)
     }
 
-    // Invalid intent
-    return c.html(
-      <ProfilePage
-        user={user}
-        errors={{ _form: ['Invalid action'] }}
-        embed={embed}
-      />,
-      400
-    )
+    return await rerender({ _form: ['Invalid action'] }, 400)
   } catch (error) {
     if (error instanceof ValidationError) {
       return rerender(error.fields, 400)

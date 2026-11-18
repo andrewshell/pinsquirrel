@@ -1,5 +1,6 @@
 import type { User } from '@pinsquirrel/domain'
 import type { FC } from 'hono/jsx'
+import { ErrorMessage } from '../../components/FlashMessage'
 import {
   Button,
   Card,
@@ -11,6 +12,7 @@ import {
 type PasswordFormProps = {
   user: User
   errors?: Record<string, string[]>
+  formError?: string
   /** Carried on a hidden field so a rejected form comes back in embed. */
   embed?: boolean
 }
@@ -19,6 +21,7 @@ type PasswordFormProps = {
 export const PasswordForm: FC<PasswordFormProps> = ({
   user,
   errors,
+  formError,
   embed = false,
 }) => (
   <Card>
@@ -35,6 +38,8 @@ export const PasswordForm: FC<PasswordFormProps> = ({
           value={user.username}
           autocomplete="username"
         />
+
+        {formError && <ErrorMessage message={formError} />}
 
         <div>
           <label

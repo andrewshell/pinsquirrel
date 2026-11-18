@@ -111,6 +111,23 @@ describe('profile routes', () => {
     return res.text()
   }
 
+  /** The slice of the page from one card's title up to the next card's title. */
+  function cardSection(html: string, title: string): string {
+    const titles = [
+      'Account Information',
+      'Update Email',
+      'Change Password',
+      'Connected Applications',
+      'Quick Pin Bookmarklet',
+    ]
+    const start = html.indexOf(title)
+    expect(start).toBeGreaterThanOrEqual(0)
+    const ends = titles
+      .map(t => html.indexOf(t, start + title.length))
+      .filter(i => i > start)
+    return html.slice(start, ends.length ? Math.min(...ends) : undefined)
+  }
+
   describe('embed mode', () => {
     it('renders the profile without the chrome for ?embed=1, forms carrying the flag', async () => {
       const html = await (await app.request('/profile?embed=1')).text()
@@ -334,11 +351,33 @@ describe('profile routes', () => {
     })
   })
 
-  it('rejects an unknown intent', async () => {
+  it('rejects an unknown intent without hiding the connected applications', async () => {
     const res = await app.request('/profile', formBody({ intent: 'nonsense' }))
 
     expect(res.status).toBe(400)
-    expect(await res.text()).toContain('Invalid action')
+    const html = await res.text()
+    expect(html).toContain('Invalid action')
+    expect(cardSection(html, 'Update Email')).not.toContain('Invalid action')
+    expect(cardSection(html, 'Connected Applications')).toContain('Claude Code')
+  })
+
+  it('shows an unexpected failure in the card of the form that failed', async () => {
+    svc.changePassword.mockRejectedValue(new Error('database down'))
+
+    const res = await app.request(
+      '/profile',
+      formBody({
+        intent: 'change-password',
+        currentPassword: 'current',
+        newPassword: 'newpassword123',
+      })
+    )
+
+    expect(res.status).toBe(500)
+    const html = await res.text()
+    const message = 'An unexpected error occurred'
+    expect(cardSection(html, 'Change Password')).toContain(message)
+    expect(cardSection(html, 'Update Email')).not.toContain(message)
   })
 
   describe('OAuth grants', () => {
@@ -421,6 +460,10 @@ describe('profile routes', () => {
       )
 
       expect(res.status).toBe(400)
+      const html = await res.text()
+      const message = 'That application access is no longer active.'
+      expect(cardSection(html, 'Connected Applications')).toContain(message)
+      expect(cardSection(html, 'Update Email')).not.toContain(message)
     })
 
     it('keeps the grants on screen when another action fails', async () => {
