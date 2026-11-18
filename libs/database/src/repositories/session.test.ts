@@ -43,6 +43,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       const { id: userId } = await insertUser(testPool)
 
       const sessionData: CreateSessionData = {
+        id: crypto.randomUUID(),
         userId,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       }
@@ -62,6 +63,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       const { id: userId } = await insertUser(testPool)
 
       const sessionData: CreateSessionData = {
+        id: crypto.randomUUID(),
         userId,
         data: { flash: { success: 'Welcome!' }, theme: 'dark' },
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -77,6 +79,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
 
     it('should throw error when creating session for non-existent user', async () => {
       const sessionData: CreateSessionData = {
+        id: crypto.randomUUID(),
         userId: 'non-existent-user',
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       }
@@ -121,10 +124,12 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       const { id: userId } = await insertUser(testPool)
 
       await repository.create({
+        id: crypto.randomUUID(),
         userId,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       })
       await repository.create({
+        id: crypto.randomUUID(),
         userId,
         expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
       })
@@ -145,6 +150,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       const { id: userId } = await insertUser(testPool)
 
       const session = await repository.create({
+        id: crypto.randomUUID(),
         userId,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       })
@@ -162,6 +168,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       const { id: userId } = await insertUser(testPool)
 
       const session = await repository.create({
+        id: crypto.randomUUID(),
         userId,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       })
@@ -187,6 +194,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       const { id: userId } = await insertUser(testPool)
 
       const session = await repository.create({
+        id: crypto.randomUUID(),
         userId,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       })
@@ -209,10 +217,12 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       const { id: userId } = await insertUser(testPool)
 
       await repository.create({
+        id: crypto.randomUUID(),
         userId,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       })
       await repository.create({
+        id: crypto.randomUUID(),
         userId,
         expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
       })
@@ -235,6 +245,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       const { id: userId } = await insertUser(testPool)
 
       const session = await repository.create({
+        id: crypto.randomUUID(),
         userId,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       })
@@ -247,6 +258,7 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       const { id: userId } = await insertUser(testPool)
 
       const session = await repository.create({
+        id: crypto.randomUUID(),
         userId,
         expiresAt: new Date(Date.now() - 60 * 1000),
       })
@@ -266,11 +278,13 @@ describe('DrizzleSessionRepository - Integration Tests', () => {
       const { id: userId } = await insertUser(testPool)
 
       const expiredSession = await repository.create({
+        id: crypto.randomUUID(),
         userId,
         expiresAt: new Date(Date.now() - 60 * 1000),
       })
 
       const validSession = await repository.create({
+        id: crypto.randomUUID(),
         userId,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       })

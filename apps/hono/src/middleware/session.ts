@@ -22,6 +22,7 @@
  * If sessions ever need to be readable from outside this app, that is the
  * point to revisit this.
  */
+import { createHash, randomBytes } from 'node:crypto'
 import type { Context, MiddlewareHandler } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import type { Session, User } from '@pinsquirrel/domain'
@@ -29,7 +30,7 @@ import { sessionRepository, userRepository } from '../lib/db'
 import { isEmbedRequest, withEmbed } from '../lib/embed'
 
 // Session configuration
-const SESSION_COOKIE_NAME = '__session'
+const LEGACY_COOKIE_NAME = '__session'
 const SESSION_DURATION_PERSISTENT = 30 * 24 * 60 * 60 * 1000 // 30 days
 const SESSION_DURATION_TEMPORARY = 24 * 60 * 60 * 1000 // 24 hours (for browser session)
 const PRIVATE_MODE_DURATION = 15 * 60 * 1000 // 15 minutes
@@ -38,11 +39,29 @@ const PRIVATE_MODE_DURATION = 15 * 60 * 1000 // 15 minutes
 // destroy — has to agree on these, or a cookie set one way is not the cookie
 // deleted the other way. `secure` is read per call rather than at module load
 // so tests can vary NODE_ENV.
+const isProduction = () => process.env.NODE_ENV === 'production'
+
 const sessionCookieOptions = () => ({
   path: '/',
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
+  secure: isProduction(),
   sameSite: 'Lax' as const,
+})
+
+// `__Host-` makes the browser refuse the cookie unless it is Secure, on
+// Path=/, and set without a Domain, so no sibling subdomain can plant one. It
+// cannot be set over plain http, which is why development keeps the old name.
+const sessionCookieName = () =>
+  isProduction() ? '__Host-session' : LEGACY_COOKIE_NAME
+
+// The row is stored under the cookie value's SHA-256, so a read of the sessions
+// table yields nothing a browser could present.
+const sessionIdFor = (cookieValue: string) =>
+  createHash('sha256').update(cookieValue).digest('hex')
+
+const persistentCookieOptions = (expiresAt: Date) => ({
+  ...sessionCookieOptions(),
+  maxAge: Math.floor((expiresAt.getTime() - Date.now()) / 1000),
 })
 
 // Flash message types
@@ -115,25 +134,45 @@ declare module 'hono' {
 // Create session middleware
 export function sessionMiddleware(): MiddlewareHandler {
   return async (c, next) => {
-    // Load session from cookie
-    const sessionId = getCookie(c, SESSION_COOKIE_NAME)
+    const cookieName = sessionCookieName()
+    const current = getCookie(c, cookieName)
+    // A session issued before the cookie was renamed arrives under the old
+    // name once, and leaves under the new one.
+    const legacy =
+      current === undefined && cookieName !== LEGACY_COOKIE_NAME
+        ? getCookie(c, LEGACY_COOKIE_NAME)
+        : undefined
+    const cookieValue = current ?? legacy
     let session: Session | null = null
     let sessionData: SessionData | null = null
     let pendingFlash: { type: FlashType; message: string } | null = null
     let sessionModified = false
     let sessionDestroyed = false
 
-    if (sessionId) {
-      // Load session from database
+    if (cookieValue) {
+      const sessionId = sessionIdFor(cookieValue)
       const isValid = await sessionRepository.isValidSession(sessionId)
       if (isValid) {
         session = await sessionRepository.findById(sessionId)
         if (session) {
           sessionData = session.data as SessionData | null
         }
-      } else {
-        // Session expired or invalid - clear the cookie
-        deleteCookie(c, SESSION_COOKIE_NAME, sessionCookieOptions())
+      }
+
+      if (legacy !== undefined) {
+        deleteCookie(c, LEGACY_COOKIE_NAME, sessionCookieOptions())
+        if (session) {
+          setCookie(
+            c,
+            cookieName,
+            cookieValue,
+            sessionData?.keepSignedIn
+              ? persistentCookieOptions(session.expiresAt)
+              : sessionCookieOptions()
+          )
+        }
+      } else if (!session) {
+        deleteCookie(c, cookieName, sessionCookieOptions())
       }
     }
 
@@ -179,7 +218,9 @@ export function sessionMiddleware(): MiddlewareHandler {
           keepSignedIn,
         }
 
+        const token = randomBytes(32).toString('base64url')
         session = await sessionRepository.create({
+          id: sessionIdFor(token),
           userId,
           data: newSessionData,
           expiresAt,
@@ -187,8 +228,7 @@ export function sessionMiddleware(): MiddlewareHandler {
 
         sessionData = newSessionData
 
-        // Set the session cookie
-        setCookie(c, SESSION_COOKIE_NAME, session.id, {
+        setCookie(c, sessionCookieName(), token, {
           ...sessionCookieOptions(),
           ...(keepSignedIn
             ? { maxAge: SESSION_DURATION_PERSISTENT / 1000 }
@@ -204,8 +244,7 @@ export function sessionMiddleware(): MiddlewareHandler {
           sessionDestroyed = true
         }
 
-        // Clear the cookie
-        deleteCookie(c, SESSION_COOKIE_NAME, sessionCookieOptions())
+        deleteCookie(c, sessionCookieName(), sessionCookieOptions())
       },
 
       setFlash(type: FlashType, message: string) {

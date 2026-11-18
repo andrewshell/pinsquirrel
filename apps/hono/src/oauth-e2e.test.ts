@@ -82,7 +82,7 @@ function browserRequest(
   init: RequestInit = {}
 ): Promise<Response> {
   const headers = new Headers(init.headers)
-  headers.set('Cookie', `__session=${sessionId}`)
+  headers.set('Cookie', `__session=${sessionToken}`)
   headers.set('Origin', 'http://localhost')
   return request(path, { ...init, headers })
 }
@@ -245,7 +245,7 @@ async function callListPins(token: string): Promise<Response> {
 
 // State the steps hand to each other, in the order they are established.
 let userId: string
-let sessionId: string
+let sessionToken: string
 let metadata: AuthorizationServerMetadata
 let mcpMetadataPath: string
 let mcpResource: string
@@ -272,12 +272,13 @@ beforeAll(async () => {
   // from here. The session row and the cookie below are exactly what
   // `sessionManager.create` writes, and every request after this resolves it
   // through the real session middleware.
-  const session = await sessionRepository.create({
+  sessionToken = randomBytes(32).toString('base64url')
+  await sessionRepository.create({
+    id: createHash('sha256').update(sessionToken).digest('hex'),
     userId,
     data: { userId, keepSignedIn: true },
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
   })
-  sessionId = session.id
 })
 
 afterAll(async () => {

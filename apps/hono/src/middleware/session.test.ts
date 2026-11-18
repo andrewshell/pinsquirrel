@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
@@ -7,6 +8,15 @@ import {
   getSessionManager,
   getAuthUser,
 } from './session'
+
+const sha256 = (value: string) =>
+  createHash('sha256').update(value).digest('hex')
+
+/** The value of the named cookie a response sets. */
+function cookieSetBy(res: Response, name: string): string | undefined {
+  const header = res.headers.getSetCookie().find(h => h.startsWith(`${name}=`))
+  return header?.split(';')[0]!.slice(name.length + 1)
+}
 
 // Create mock functions
 const mockIsValidSession = vi.fn()
@@ -101,8 +111,9 @@ describe('Session Middleware', () => {
 
       expect(json.isAuthenticated).toBe(true)
       expect(json.userId).toBe('user-456')
-      expect(mockIsValidSession).toHaveBeenCalledWith('session-123')
-      expect(mockFindById).toHaveBeenCalledWith('session-123')
+      // The row is keyed by the cookie value's hash, not the value itself.
+      expect(mockIsValidSession).toHaveBeenCalledWith(sha256('session-123'))
+      expect(mockFindById).toHaveBeenCalledWith(sha256('session-123'))
     })
 
     it('returns user from database', async () => {
@@ -186,13 +197,19 @@ describe('Session Middleware', () => {
 
       expect(json.success).toBe(true)
       expect(mockCreate).toHaveBeenCalledWith({
+        id: expect.any(String),
         userId: 'user-456',
         data: { userId: 'user-456', keepSignedIn: true },
         expiresAt: expect.any(Date),
       })
 
+      // The cookie carries a token; the row is stored under its hash.
+      const token = cookieSetBy(res, '__session')!
+      const { id } = mockCreate.mock.calls[0][0] as { id: string }
+      expect(id).toBe(sha256(token))
+      expect(token).not.toBe(id)
+
       const setCookie = res.headers.get('set-cookie')
-      expect(setCookie).toContain('__session=new-session-789')
       expect(setCookie).toContain('HttpOnly')
       expect(setCookie).toContain('SameSite=Lax')
     })
@@ -216,13 +233,14 @@ describe('Session Middleware', () => {
       const res = await app.request('/login', { method: 'POST' })
 
       expect(mockCreate).toHaveBeenCalledWith({
+        id: expect.any(String),
         userId: 'user-456',
         data: { userId: 'user-456', keepSignedIn: false },
         expiresAt: expect.any(Date),
       })
 
       const setCookie = res.headers.get('set-cookie')
-      expect(setCookie).toContain('__session=new-session-789')
+      expect(cookieSetBy(res, '__session')).toBeTruthy()
       // Should NOT contain Max-Age for session cookies
       expect(setCookie).not.toContain('Max-Age=2592000')
     })

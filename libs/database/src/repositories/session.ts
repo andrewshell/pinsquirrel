@@ -28,11 +28,10 @@ export class DrizzleSessionRepository implements SessionRepository {
   }
 
   async create(data: CreateSessionData): Promise<Session> {
-    const id = crypto.randomUUID()
     const now = new Date()
 
     await this.db.insert(sessions).values({
-      id,
+      id: data.id,
       userId: data.userId,
       data: data.data ?? null,
       expiresAt: data.expiresAt,
@@ -42,7 +41,7 @@ export class DrizzleSessionRepository implements SessionRepository {
     const [created] = await this.db
       .select()
       .from(sessions)
-      .where(eq(sessions.id, id))
+      .where(eq(sessions.id, data.id))
       .limit(1)
 
     return created
