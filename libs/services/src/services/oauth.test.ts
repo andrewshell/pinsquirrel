@@ -434,6 +434,10 @@ describe('OAuthService.resolveClient', () => {
       { redirect_uris: ['https://client.example/cb#x'] },
     ],
     [
+      'a redirect URI with userinfo',
+      { redirect_uris: ['https://u@client.example/cb'] },
+    ],
+    [
       'auth method private_key_jwt',
       { token_endpoint_auth_method: 'private_key_jwt' },
     ],
@@ -1649,6 +1653,15 @@ describe('OAuthService.registerClient', () => {
     await expect(
       ctx.service.registerClient(
         registration({ redirect_uris: ['https://example.com/callback#x'] })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidClientMetadataError)
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses a redirect URI with userinfo', async () => {
+    await expect(
+      ctx.service.registerClient(
+        registration({ redirect_uris: ['https://u@example.com/callback'] })
       )
     ).rejects.toBeInstanceOf(OAuthInvalidClientMetadataError)
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()

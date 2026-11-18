@@ -1244,7 +1244,7 @@ function requireClientRules(metadata: {
   const unusable = metadata.redirect_uris.find(uri => !isUsableRedirectUri(uri))
   if (unusable !== undefined) {
     throw new OAuthInvalidClientMetadataError(
-      `redirect_uri must be https, or http on loopback, with no fragment: ${unusable}`
+      `redirect_uri must be https, or http on loopback, with no fragment or userinfo: ${unusable}`
     )
   }
 

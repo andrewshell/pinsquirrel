@@ -650,13 +650,15 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     to re-authorize with the scope.
 44. **A redirect URI is compared as a string, except for a loopback port.** The request's
     `redirect_uri` must be byte-equal to a registered one; on an `http` loopback redirect
-    (`localhost`, `127.x.x.x`, `[::1]`) the port may differ, per RFC 8252. A trailing slash,
-    userinfo, a fragment, a dot segment, an upper-case host or an explicit default port no
-    longer matches, so a client has to send what it registered. The token exchange requires
-    the exact `redirect_uri` the code was issued to. The canonical form is still the DCR dedup
-    key. Once the redirect URI has matched, every later authorization failure, including an
-    ended approving session, is redirected to the client as an RFC 6749 error with `state`
-    and `iss`; only a bad `client_id`, `redirect_uri` or `state` is shown as a page.
+    (`localhost`, `127.x.x.x`, `[::1]`) the port may differ, per RFC 8252, though it has to be a
+    real port (1-65535). A trailing slash, userinfo, a fragment, a dot segment, an upper-case
+    host or an explicit default port no longer matches, so a client has to send what it
+    registered. The token exchange requires the exact `redirect_uri` the code was issued to. The
+    canonical form is still the DCR dedup key. Registration also refuses a redirect URI with
+    userinfo, as it refuses a fragment. Once the redirect URI has matched, every later
+    authorization failure, including an ended approving session, is redirected to the client as
+    an RFC 6749 error with `state` and `iss`; only a bad `client_id`, `redirect_uri` or `state`
+    is shown as a page.
 
 ## Reference
 
