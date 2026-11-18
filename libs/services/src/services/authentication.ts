@@ -12,7 +12,12 @@ import {
   UnauthorizedUserAccessError,
   AdminAlreadyExistsError,
 } from '@pinsquirrel/domain'
-import { hashPassword, verifyPassword, getDummyHash } from '../utils/crypto.js'
+import {
+  hashPassword,
+  verifyPassword,
+  getDummyHash,
+  needsRehash,
+} from '../utils/crypto.js'
 import { credentialsSchema, passwordChangeSchema } from '../validation/user.js'
 import { validationErrorFromZod } from '../validation/zod-error.js'
 
@@ -68,6 +73,14 @@ export class AuthenticationService {
     // Check if user has the User role
     if (!user.roles.includes(Role.User)) {
       throw new MissingRoleError()
+    }
+
+    // The one moment the plaintext is at hand, so the one chance to move a
+    // hash made with older scrypt parameters onto the current ones.
+    if (needsRehash(user.passwordHash)) {
+      await this.userRepository.update(user.id, {
+        passwordHash: await hashPassword(input.password),
+      })
     }
 
     return user

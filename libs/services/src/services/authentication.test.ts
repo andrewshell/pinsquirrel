@@ -26,13 +26,14 @@ vi.mock('../utils/crypto.js', () => ({
       Promise.resolve(`hashed_${password}`)
     ),
   verifyPassword: vi.fn(),
+  needsRehash: vi.fn().mockReturnValue(false),
   hashEmail: vi.fn().mockImplementation((email: string) => `hashed_${email}`),
   generateSecureToken: vi.fn().mockReturnValue('mock-token'),
   hashToken: vi.fn().mockImplementation((token: string) => `hashed_${token}`),
   getDummyHash: vi.fn().mockReturnValue('dummy_salt:dummy_key'),
 }))
 
-import { verifyPassword } from '../utils/crypto.js'
+import { needsRehash, verifyPassword } from '../utils/crypto.js'
 
 describe('AuthenticationService', () => {
   let authService: AuthenticationService
@@ -90,6 +91,33 @@ describe('AuthenticationService', () => {
         '$2b$10$validhash'
       )
       expect(result).toEqual(userWithPassword)
+    })
+
+    it('rehashes a password stored with older parameters on sign-in', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(mockUser)
+      vi.mocked(verifyPassword).mockResolvedValue(true)
+      vi.mocked(needsRehash).mockReturnValueOnce(true)
+
+      await authService.login({
+        username: 'testuser',
+        password: 'password12345',
+      })
+
+      expect(mockUserRepository.update).toHaveBeenCalledWith(mockUser.id, {
+        passwordHash: 'hashed_password12345',
+      })
+    })
+
+    it('leaves a current password hash alone on sign-in', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(mockUser)
+      vi.mocked(verifyPassword).mockResolvedValue(true)
+
+      await authService.login({
+        username: 'testuser',
+        password: 'password12345',
+      })
+
+      expect(mockUserRepository.update).not.toHaveBeenCalled()
     })
 
     it('should throw InvalidCredentialsError for non-existent user', async () => {

@@ -1,7 +1,9 @@
+import { randomBytes, scryptSync } from 'node:crypto'
 import { describe, it, expect } from 'vitest'
 import {
   hashPassword,
   verifyPassword,
+  needsRehash,
   hashEmail,
   generateSecureToken,
   hashToken,
@@ -32,6 +34,12 @@ describe('crypto utilities', () => {
 
       expect(hash).toBeDefined()
       expect(hash.length).toBeGreaterThan(0)
+    })
+
+    it('records its scrypt cost parameters in the stored hash', async () => {
+      const stored = await hashPassword('correct horse battery staple')
+
+      expect(stored).toMatch(/^scrypt\$131072\$8\$1\$[^$]+\$[^$]+$/)
     })
   })
 
@@ -77,12 +85,35 @@ describe('crypto utilities', () => {
       expect(isValid).toBe(false)
     })
 
+    it('verifies a hash stored in the legacy salt:key form', async () => {
+      const salt = randomBytes(32)
+      const key = scryptSync('mySecurePassword123', salt, 64)
+      const legacy = `${salt.toString('base64')}:${key.toString('base64')}`
+
+      expect(await verifyPassword('mySecurePassword123', legacy)).toBe(true)
+      expect(await verifyPassword('wrongPassword', legacy)).toBe(false)
+    })
+
     it('should return false for hash with invalid base64', async () => {
       const password = 'mySecurePassword123'
       const invalidHash = 'invalid@base64:also@invalid'
 
       const isValid = await verifyPassword(password, invalidHash)
       expect(isValid).toBe(false)
+    })
+  })
+
+  describe('needsRehash', () => {
+    it('is true for a legacy salt:key hash', () => {
+      expect(needsRehash('c2FsdA==:a2V5')).toBe(true)
+    })
+
+    it('is true for a hash made with lower cost parameters', () => {
+      expect(needsRehash('scrypt$16384$8$1$c2FsdA==$a2V5')).toBe(true)
+    })
+
+    it('is false for a hash made by hashPassword', async () => {
+      expect(needsRehash(await hashPassword('mySecurePassword123'))).toBe(false)
     })
   })
 
