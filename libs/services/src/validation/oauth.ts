@@ -88,23 +88,26 @@ export const tokenRequestSchema = z.discriminatedUnion('grant_type', [
 
 export type TokenRequestParams = z.infer<typeof tokenRequestSchema>
 
+/** The width of the column an authorization code stores its redirect URI in. */
+const MAX_REDIRECT_URI_LENGTH = 512
+const MAX_REDIRECT_URIS = 10
+
 /**
  * The RFC 7591 registration body posted to `/oauth/register`.
  *
  * The SDK schema allows an empty `redirect_uris`; this server does not, since
  * a client with nowhere to send the user cannot complete an authorization and
- * the row would only ever be swept.
- *
- * It is bounded too, because an anonymous caller writes it into a row. Ten
- * redirect URIs is several times what any known client registers, and an
- * authorization code stores its redirect URI in a 512-character column, so a
- * longer one could never complete a flow.
+ * the row would only ever be swept. The bounds are Decision 34.
  */
 export const clientRegistrationSchema = OAuthClientMetadataSchema.extend({
   redirect_uris: z
-    .array(OAuthClientMetadataSchema.shape.redirect_uris.element.max(512))
+    .array(
+      OAuthClientMetadataSchema.shape.redirect_uris.element.max(
+        MAX_REDIRECT_URI_LENGTH
+      )
+    )
     .min(1, 'at least one redirect_uri is required')
-    .max(10),
+    .max(MAX_REDIRECT_URIS),
 })
 
 export type ClientRegistrationMetadata = z.infer<

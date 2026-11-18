@@ -97,12 +97,8 @@ export function clientAddressKey(c: Context): string {
   return addressKey(getClientIp(c), 64)
 }
 
-/**
- * The network around the caller: an IPv6 caller's /48, and otherwise the same
- * key as `clientAddressKey`. A routed /48 is free from tunnel brokers and holds
- * 65,536 /64s, each with its own `clientAddressKey` budget.
- */
-export function clientNetworkKey(c: Context): string {
+/** An IPv6 caller's /48; any other caller keys as `clientAddressKey`. */
+export function clientSlash48Key(c: Context): string {
   return addressKey(getClientIp(c), 48)
 }
 
@@ -190,19 +186,16 @@ export const forgotPasswordLimiter = new RateLimiter({
  * hour covers even an office sharing one address; anything past that is
  * something filling the table.
  */
+const REGISTRATIONS_PER_ADDRESS_PER_HOUR = 10
+
 export const oauthRegisterLimiter = new RateLimiter({
-  maxAttempts: 10,
+  maxAttempts: REGISTRATIONS_PER_ADDRESS_PER_HOUR,
   windowMs: 60 * 60 * 1000,
 })
 
-/**
- * Dynamic client registration, per IPv6 /48, beside the per-/64 limit above.
- * Three /64s' worth: enough for a site that numbers each office or household
- * from one /48, while one holder of a /48 can no longer multiply the
- * per-/64 budget by 65,536.
- */
-export const oauthRegisterNetworkLimiter = new RateLimiter({
-  maxAttempts: 30,
+/** Dynamic client registration, per IPv6 /48 (Decision 34). */
+export const oauthRegisterSlash48Limiter = new RateLimiter({
+  maxAttempts: 3 * REGISTRATIONS_PER_ADDRESS_PER_HOUR,
   windowMs: 60 * 60 * 1000,
 })
 
@@ -285,20 +278,15 @@ export function rateLimitByIp(
   }
 }
 
-/**
- * `rateLimitByIp`, plus a second budget for the network around the caller
- * (`clientNetworkKey`). Both are checked before either is spent, so a request
- * one of them refuses costs the other nothing.
- */
-export function rateLimitByIpAndNetwork(
+export function rateLimitByIpAndSlash48(
   addressLimiter: RateLimiter,
-  networkLimiter: RateLimiter,
+  slash48Limiter: RateLimiter,
   message: string
 ): MiddlewareHandler {
   return async (c, next) => {
     const result = reserve([
       [addressLimiter, clientAddressKey(c)],
-      [networkLimiter, clientNetworkKey(c)],
+      [slash48Limiter, clientSlash48Key(c)],
     ])
     if (result.limited) {
       return refuse(c, message, result.retryAfterMs)

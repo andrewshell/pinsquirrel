@@ -117,9 +117,6 @@ describe('request body limit', () => {
   })
 })
 
-// The token and registration routes mount at `/oauth`, the same prefix as the
-// consent screen, so a limiter they apply to every path would also count the
-// pages a signed-in person loads.
 describe('OAuth endpoint rate limits', () => {
   const consentForm = {
     method: 'POST',
@@ -128,6 +125,18 @@ describe('OAuth endpoint rate limits', () => {
       'Sec-Fetch-Site': 'same-origin',
     },
     body: 'decision=approve',
+  }
+
+  const morePageLoadsThanAnyBudget = 62
+
+  /** A status other than 429 means the request got past the limiter. */
+  async function statusPastLimiter(path: string): Promise<number> {
+    const res = await app.request(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: 'x',
+    })
+    return res.status
   }
 
   beforeEach(() => {
@@ -160,25 +169,17 @@ describe('OAuth endpoint rate limits', () => {
   })
 
   it('leaves the registration and token budgets to their own endpoints', async () => {
-    // More page loads than either budget allows an address.
-    for (let i = 0; i < 31; i++) {
-      await app.request('/oauth/authorize?client_id=x')
-      await app.request('/oauth/extension/callback?code=x')
+    for (let i = 0; i < morePageLoadsThanAnyBudget; i++) {
+      await app.request(
+        i % 2 === 0
+          ? '/oauth/authorize?client_id=x'
+          : '/oauth/extension/callback?code=x'
+      )
     }
 
-    // A wrong content type is answered after the limiter, so a status other
-    // than 429 shows the budget is still there.
-    const register = await app.request('/oauth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: 'x',
-    })
-    const revoke = await app.request('/oauth/revoke', {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: 'x',
-    })
-
-    expect([register.status, revoke.status]).toEqual([415, 415])
+    expect([
+      await statusPastLimiter('/oauth/register'),
+      await statusPastLimiter('/oauth/revoke'),
+    ]).toEqual([415, 415])
   })
 })

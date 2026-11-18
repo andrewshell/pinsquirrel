@@ -18,9 +18,7 @@ import { oauthTokenIpLimiter, rateLimitByIp } from '../middleware/rate-limit.js'
  * specifies nothing else. `/oauth/register` is the JSON one; the two do not
  * share a parser.
  *
- * Both are rate limited per IP, and only per IP. A `client_id` is public and
- * shared by every user of that client, so a budget keyed on it could be spent
- * by anyone who names it (Decision 33). A refusal is a plain `429` with
+ * Both are rate limited per IP only (Decision 33). A refusal is a plain `429` with
  * `Retry-After` rather than an RFC 6749 error object, because every code in
  * that registry describes something wrong with the request, and a client told
  * `invalid_request` would fix its request instead of waiting.

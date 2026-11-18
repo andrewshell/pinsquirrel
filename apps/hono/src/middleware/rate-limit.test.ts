@@ -4,7 +4,7 @@ import { RateLimiter } from './rate-limiter'
 import {
   apiV1Limiter,
   clientAddressKey,
-  clientNetworkKey,
+  clientSlash48Key,
   getClientIp,
   mcpLimiter,
   rateLimitByIp,
@@ -370,11 +370,11 @@ describe('signinRateLimitKey', () => {
     ['::1', '::1'],
     ['2001:db8:1:2:3:4:5:6', '2001:db8:1::/48'],
     ['2001:db8::1', '2001:db8:0::/48'],
-  ])('keys the network around %s as %s', async (address, expected) => {
+  ])('keys the /48 around %s as %s', async (address, expected) => {
     const app = new Hono()
     let key = ''
     app.get('/test', c => {
-      key = clientNetworkKey(c)
+      key = clientSlash48Key(c)
       return c.text('ok')
     })
 

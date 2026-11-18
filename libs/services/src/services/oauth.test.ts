@@ -1132,8 +1132,6 @@ describe('OAuthService.registerClient', () => {
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
-  // An authorization code stores its redirect URI in a 512-character column,
-  // so a longer one could never complete a flow.
   it('refuses a redirect URI longer than 512 characters', async () => {
     const longUri = `https://client.example/${'a'.repeat(600)}`
 

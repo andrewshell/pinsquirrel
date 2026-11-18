@@ -263,9 +263,6 @@ describe('POST /oauth/token', () => {
       expect(mockExchangeAuthorizationCode).not.toHaveBeenCalled()
     })
 
-    // A client_id is public and shared by every user of that client, so
-    // requests that name it from other addresses must not spend a budget its
-    // real users draw from.
     it('serves a valid exchange after other addresses send invalid ones for the same client', async () => {
       mockExchangeAuthorizationCode.mockImplementation(
         (input: { code: string }) =>

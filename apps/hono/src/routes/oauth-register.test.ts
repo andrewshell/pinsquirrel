@@ -16,7 +16,7 @@ vi.mock('../lib/services', () => ({
 
 import {
   oauthRegisterLimiter,
-  oauthRegisterNetworkLimiter,
+  oauthRegisterSlash48Limiter,
 } from '../middleware/rate-limit'
 import { TEST_CLIENT_IP, exhaust } from '../test-support/rate-limit'
 
@@ -57,7 +57,7 @@ describe('POST /oauth/register', () => {
     // The limiter is a module-level singleton, so each case starts with its
     // own budget rather than inheriting whatever the last one spent.
     oauthRegisterLimiter.reset(TEST_CLIENT_IP)
-    oauthRegisterNetworkLimiter.reset(TEST_CLIENT_IP)
+    oauthRegisterSlash48Limiter.reset(TEST_CLIENT_IP)
     app = new Hono()
     app.route('/oauth', oauthRegisterRoutes)
   })
@@ -165,7 +165,6 @@ describe('POST /oauth/register', () => {
       expect(mockRegisterClient).not.toHaveBeenCalled()
     })
 
-    // A routed /48 holds 65,536 /64s, and each /64 has its own budget.
     it('makes every /64 in one IPv6 /48 share a budget', async () => {
       mockRegisterClient.mockResolvedValue(REGISTERED)
       const from = (address: string) => ({
