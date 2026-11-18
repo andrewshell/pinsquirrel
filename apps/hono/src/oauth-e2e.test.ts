@@ -156,13 +156,13 @@ function exchange(fields: Record<string, string>): Promise<Response> {
 }
 
 /**
- * A whole connection: consent, approval, and the token exchange the callback
- * triggers. Returns what the client ends up holding.
+ * Consent and approval, up to the callback. Returns the token request the
+ * client would send next.
  */
-async function connect(input: {
+async function authorizeForCode(input: {
   resource: string
   scope?: string
-}): Promise<TokenResponse> {
+}): Promise<Record<string, string>> {
   const { verifier, challenge } = pkcePair()
   const query = authorizationQuery({
     challenge,
@@ -172,13 +172,24 @@ async function connect(input: {
   })
 
   const callback = await approve(query)
-  const res = await exchange({
+  return {
     grant_type: 'authorization_code',
     code: callback.searchParams.get('code') ?? '',
     redirect_uri: query.redirect_uri,
     client_id: clientId,
     code_verifier: verifier,
-  })
+  }
+}
+
+/**
+ * A whole connection: consent, approval, and the token exchange the callback
+ * triggers. Returns what the client ends up holding.
+ */
+async function connect(input: {
+  resource: string
+  scope?: string
+}): Promise<TokenResponse> {
+  const res = await exchange(await authorizeForCode(input))
 
   expect(res.status).toBe(200)
   return (await res.json()) as TokenResponse
@@ -455,17 +466,24 @@ describe('authorization', () => {
     expect(mcpTokens.scope).toBe('pins:read tags:read offline_access')
   })
 
-  it('refuses a second exchange of the same code', async () => {
-    const res = await exchange({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: query.redirect_uri,
-      client_id: clientId,
-      code_verifier: verifier,
-    })
+  it('refuses a second exchange of the same code, and ends the tokens of the first', async () => {
+    const tokenRequest = await authorizeForCode({ resource: mcpResource })
+    const first = (await (await exchange(tokenRequest)).json()) as TokenResponse
+    expect((await callListPins(first.access_token)).status).toBe(200)
+
+    const res = await exchange(tokenRequest)
 
     expect(res.status).toBe(400)
     expect(await res.json()).toMatchObject({ error: 'invalid_grant' })
+    expect((await callListPins(first.access_token)).status).toBe(401)
+    const refresh = await exchange({
+      grant_type: 'refresh_token',
+      refresh_token: first.refresh_token ?? '',
+      client_id: clientId,
+    })
+    expect(refresh.status).toBe(400)
+    // Another connection of the same client is a different grant.
+    expect((await callListPins(mcpTokens.access_token)).status).toBe(200)
   })
 
   it('refuses the exchange when the PKCE verifier does not match', async () => {

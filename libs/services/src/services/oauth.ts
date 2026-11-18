@@ -350,7 +350,8 @@ export class OAuthService {
   /**
    * Spend an authorization code and mint the tokens it stands for.
    *
-   * The code is read and checked first. A code that passes is spent and its
+   * The code is read and checked first. One that was already spent takes the
+   * tokens it produced down with it. A code that passes is spent and its
    * tokens are written in one step (`exchange`), so a failure in between
    * leaves the client a code that still works. A code that fails a check is
    * spent anyway, because a failed check must not leave a code alive to try
@@ -374,12 +375,11 @@ export class OAuthService {
     const code = await this.codeRepository.findByCodeHash(
       hashToken(request.code)
     )
-    if (!code || code.consumedAt || code.expiresAt <= new Date()) {
-      // Unknown, expired, or already spent. One answer for all three: telling
-      // them apart would say whether a code ever existed.
-      throw new OAuthInvalidGrantError(
-        'The authorization code is invalid, expired, or already used'
-      )
+    if (code?.consumedAt) {
+      return this.refuseSpentCode(code)
+    }
+    if (!code || code.expiresAt <= new Date()) {
+      throw invalidCode()
     }
 
     try {
@@ -400,12 +400,27 @@ export class OAuthService {
       grantId: code.grantId ?? randomUUID(),
     })
 
-    if ((await this.codeRepository.exchange(code.id, rows)) !== 'exchanged') {
-      throw new OAuthInvalidGrantError(
-        'The authorization code is invalid, expired, or already used'
-      )
+    const outcome = await this.codeRepository.exchange(code.id, rows)
+    if (outcome === 'spent') {
+      // Lost the race with a concurrent exchange of the same code.
+      return this.refuseSpentCode(code)
+    }
+    if (outcome === 'gone') {
+      throw invalidCode()
     }
     return issued
+  }
+
+  /**
+   * Answer a code that was already exchanged.
+   *
+   * A code presented twice has been seen by two parties, and nothing says
+   * which of them holds the tokens it produced, so those tokens are revoked
+   * (RFC 6749 4.1.2). The answer is the same as for any other bad code.
+   */
+  private async refuseSpentCode(code: AuthorizationCode): Promise<never> {
+    await this.revokeGrantOf(code)
+    throw invalidCode()
   }
 
   /** Everything a code exchange has to prove before the code is honoured. */
@@ -818,19 +833,19 @@ export class OAuthService {
   }
 
   /**
-   * Kill the grant a token belongs to. A token from before grants had ids
-   * cannot be told apart from the user's other tokens for that client, so all
-   * of them go.
+   * Kill the grant a token or a code belongs to. One from before grants had
+   * ids cannot be told apart from the user's other tokens for that client, so
+   * all of them go.
    */
   private async revokeGrantOf(
-    token: Pick<OAuthToken, 'userId' | 'clientId' | 'grantId'>
+    holder: Pick<OAuthToken, 'userId' | 'clientId' | 'grantId'>
   ): Promise<void> {
-    if (token.grantId) {
-      await this.tokenRepository.revokeByGrant(token.userId, token.grantId)
+    if (holder.grantId) {
+      await this.tokenRepository.revokeByGrant(holder.userId, holder.grantId)
     } else {
       await this.tokenRepository.revokeByUserAndClient(
-        token.userId,
-        token.clientId
+        holder.userId,
+        holder.clientId
       )
     }
   }
@@ -1061,6 +1076,16 @@ const DEFAULT_GRANT_TYPES = ['authorization_code', 'refresh_token']
  * than dropped, so a client asking for something it will not get finds out
  * now instead of at the first call.
  */
+/**
+ * Unknown, expired, or already spent. One answer for all three: telling them
+ * apart would say whether a code ever existed.
+ */
+function invalidCode(): OAuthInvalidGrantError {
+  return new OAuthInvalidGrantError(
+    'The authorization code is invalid, expired, or already used'
+  )
+}
+
 /**
  * Does this verifier hash to the challenge the code was issued with?
  *

@@ -891,13 +891,64 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     expect(ctx.store.tokens).toEqual([])
   })
 
-  it('refuses a code that was already spent', async () => {
-    await ctx.service.exchangeAuthorizationCode(tokenParams())
+  // A code presented twice was seen by two parties, and there is no telling
+  // which one holds the tokens it produced (RFC 6749 4.1.2).
+  describe('a code presented a second time', () => {
+    beforeEach(() => {
+      ctx.store.codes[0].scopes = offlineScopes
+      ctx.store.codes[0].grantId = 'grant-laptop'
+      seedDevice(ctx.store, 'desktop')
+    })
 
-    await expect(
-      ctx.service.exchangeAuthorizationCode(tokenParams())
-    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
-    expect(ctx.store.tokens).toHaveLength(1)
+    it('is refused, and the tokens of its first exchange with it', async () => {
+      const first = await ctx.service.exchangeAuthorizationCode(tokenParams())
+
+      await expect(
+        ctx.service.exchangeAuthorizationCode(tokenParams())
+      ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+
+      expect(
+        await ctx.service.verifyAccessToken(first.accessToken, MCP_RESOURCE)
+      ).toBeNull()
+      await expect(
+        ctx.service.exchangeRefreshToken({
+          grant_type: 'refresh_token',
+          refresh_token: first.refreshToken,
+          client_id: CIMD_URL,
+        })
+      ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+      expect(liveTokenIds(ctx.store)).toEqual([
+        'desktop-access',
+        'desktop-refresh',
+      ])
+    })
+
+    it('ends the first exchange when the two arrive together', async () => {
+      const outcomes = await Promise.allSettled([
+        ctx.service.exchangeAuthorizationCode(tokenParams()),
+        ctx.service.exchangeAuthorizationCode(tokenParams()),
+      ])
+
+      expect(outcomes.map(outcome => outcome.status).sort()).toEqual([
+        'fulfilled',
+        'rejected',
+      ])
+      expect(liveTokenIds(ctx.store)).toEqual([
+        'desktop-access',
+        'desktop-refresh',
+      ])
+    })
+
+    it('ends everything the client holds when the code has no grant id', async () => {
+      ctx.store.codes[0].grantId = null
+      await ctx.service.exchangeAuthorizationCode(tokenParams())
+
+      await expect(
+        ctx.service.exchangeAuthorizationCode(tokenParams())
+      ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+
+      expect(liveTokenIds(ctx.store)).toEqual([])
+    })
   })
 
   // The spend and the tokens are one write. If it fails, the client still
