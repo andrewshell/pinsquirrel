@@ -181,6 +181,10 @@ oauth.get('/authorize', async c => {
 
 oauth.post('/authorize', async c => {
   const user = getAuthUser(c)
+  const session = getSessionManager(c).getSession()
+  if (!session) {
+    throw new Error('POST /oauth/authorize reached without a session')
+  }
   const formData = await c.req.parseBody()
   const params = authorizationParams(formData)
   // Anything that is not the approve button is a refusal. A malformed or
@@ -193,6 +197,7 @@ oauth.post('/authorize', async c => {
     outcome = await oauthService.authorize(new AccessControl(user), {
       params,
       userId: user.id,
+      sessionId: session.id,
       approved,
     })
   } catch (error) {

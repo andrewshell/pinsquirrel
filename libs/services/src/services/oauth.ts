@@ -275,7 +275,13 @@ export class OAuthService {
    */
   async authorize(
     ac: AccessControl,
-    input: { params: unknown; userId: string; approved: boolean }
+    input: {
+      params: unknown
+      userId: string
+      /** The session the user approved in; the code is written only while it exists. */
+      sessionId: string
+      approved: boolean
+    }
   ): Promise<AuthorizationOutcome> {
     if (!ac.canCreateAs(input.userId)) {
       throw new OAuthAccessDeniedError(
@@ -302,16 +308,26 @@ export class OAuthService {
     const code = generateSecureToken()
     const expiresAt = new Date(Date.now() + AUTHORIZATION_CODE_TTL_MS)
 
-    await this.codeRepository.create({
-      codeHash: hashToken(code),
-      clientId: resolved.client.clientId,
-      userId: input.userId,
-      redirectUri: resolved.redirectUri,
-      codeChallenge: resolved.codeChallenge,
-      scopes: resolved.scopes,
-      resource: resolved.resource,
-      expiresAt,
-    })
+    const created = await this.codeRepository.create(
+      {
+        codeHash: hashToken(code),
+        clientId: resolved.client.clientId,
+        userId: input.userId,
+        redirectUri: resolved.redirectUri,
+        codeChallenge: resolved.codeChallenge,
+        scopes: resolved.scopes,
+        resource: resolved.resource,
+        expiresAt,
+      },
+      input.sessionId
+    )
+    if (!created) {
+      // Signed out, or a password reset ended every session, while this
+      // request was resolving the client.
+      throw new OAuthAccessDeniedError(
+        'The session that approved this request has ended'
+      )
+    }
 
     if (!resolved.client.completedAt) {
       // What takes a registration out of the incomplete-DCR sweep. A client

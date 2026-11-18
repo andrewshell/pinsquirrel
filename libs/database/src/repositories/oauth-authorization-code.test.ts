@@ -124,7 +124,9 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
     })
 
     it('should create nothing under a session that belongs to another user', async () => {
-      const otherUserId = (await insertUser(testPool)).id
+      const otherUserId = (
+        await insertUser(testPool, { emailHash: 'other_email' })
+      ).id
       const data = code({ userId: otherUserId })
 
       expect(await repository.create(data, sessionId)).toBeNull()
