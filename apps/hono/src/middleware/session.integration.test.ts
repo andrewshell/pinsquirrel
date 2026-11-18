@@ -97,4 +97,23 @@ describe('session storage', () => {
     expect(cookieValue(cookies.get('__Host-session')!)).toBe(legacyValue)
     expect(cookies.get('__session')).toMatch(/Max-Age=0/)
   })
+
+  it('ignores __session in production unless it holds a pre-hashing session id', async () => {
+    process.env.NODE_ENV = 'production'
+    const token = randomBytes(32).toString('base64url')
+    await sessionRepository.create({
+      id: createHash('sha256').update(token).digest('hex'),
+      userId,
+      data: { userId, keepSignedIn: true },
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    })
+    const app = buildApp()
+
+    const res = await app.request('https://pinsquirrel.test/whoami', {
+      headers: { Cookie: `__session=${token}` },
+    })
+
+    expect(await res.json()).toEqual({ userId: null })
+    expect(setCookies(res).has('__Host-session')).toBe(false)
+  })
 })

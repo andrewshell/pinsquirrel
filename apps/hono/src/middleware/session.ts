@@ -32,6 +32,11 @@ import { isEmbedRequest, withEmbed } from '../lib/embed'
 
 // Session configuration
 const LEGACY_COOKIE_NAME = '__session'
+// Session ids from before they were hashed were `crypto.randomUUID()`. In
+// production `__session` is only honoured with that shape, so the fallback
+// dies with the last of those sessions and cannot carry a current token.
+const PRE_HASHING_SESSION_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const SESSION_DURATION_PERSISTENT = 30 * 24 * 60 * 60 * 1000 // 30 days
 const SESSION_DURATION_TEMPORARY = 24 * 60 * 60 * 1000 // 24 hours (for browser session)
 const PRIVATE_MODE_DURATION = 15 * 60 * 1000 // 15 minutes
@@ -135,9 +140,14 @@ export function sessionMiddleware(): MiddlewareHandler {
   return async (c, next) => {
     const cookieName = sessionCookieName()
     const current = getCookie(c, cookieName)
-    const legacy =
+    const legacyCandidate =
       current === undefined && cookieName !== LEGACY_COOKIE_NAME
         ? getCookie(c, LEGACY_COOKIE_NAME)
+        : undefined
+    const legacy =
+      legacyCandidate !== undefined &&
+      PRE_HASHING_SESSION_ID.test(legacyCandidate)
+        ? legacyCandidate
         : undefined
     const cookieValue = current ?? legacy
     let session: Session | null = null
