@@ -276,6 +276,7 @@ auth.post(
       // before the handler runs, and deciding it a second time by matching
       // 'Too many' in a message meant any service error that happened to use
       // those words came back as a rate limit.
+      logger.error({ err: safeError(error) }, 'Password reset request failed')
       return c.html(
         <ForgotPasswordPage
           errors={{ _form: ['An error occurred. Please try again later.'] }}
@@ -408,6 +409,7 @@ auth.post('/reset-password/:token', async c => {
       )
     }
 
+    logger.error({ err: safeError(error) }, 'Password reset failed')
     return c.html(
       <ResetPasswordPage
         token={token}

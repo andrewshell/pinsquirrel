@@ -124,6 +124,7 @@ export {
   OAuthInvalidGrantError,
   OAuthUnauthorizedClientError,
   OAuthUnsupportedGrantTypeError,
+  OAuthUnsupportedResponseTypeError,
   OAuthInvalidScopeError,
   OAuthInvalidTargetError,
   OAuthAccessDeniedError,

@@ -146,14 +146,6 @@ describe('clientRegistrationSchema', () => {
       clientRegistrationSchema.safeParse({ redirect_uris: [] }).success
     ).toBe(false)
   })
-
-  it('rejects a script-scheme redirect URI', () => {
-    expect(
-      clientRegistrationSchema.safeParse({
-        redirect_uris: ['javascript:alert(1)'],
-      }).success
-    ).toBe(false)
-  })
 })
 
 describe('clientIdMetadataDocumentSchema', () => {

@@ -212,7 +212,7 @@ profile.post('/', async c => {
       )
     }
 
-    // Generic error
+    logger.error({ err: safeError(error) }, 'Profile update failed')
     return rerender(
       { _form: ['An unexpected error occurred. Please try again.'] },
       500

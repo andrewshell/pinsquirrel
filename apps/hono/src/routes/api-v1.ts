@@ -20,6 +20,7 @@ import {
   pinFilterFromInput,
 } from '@pinsquirrel/services'
 import { pinService, tagService } from '../lib/services'
+import { logger, safeError } from '../lib/logger.js'
 import { oauthAuth, getOAuthUser, requireScope } from '../middleware/oauth-auth'
 import { oauthConfig } from '../lib/config'
 import { apiV1Limiter, rateLimitByIp } from '../middleware/rate-limit'
@@ -222,6 +223,7 @@ function errorResponse(c: Context, err: unknown) {
   ) {
     return c.json({ error: 'Tag not found' }, 404)
   }
+  logger.error({ err: safeError(err) }, 'REST API request failed')
   return c.json({ error: 'Internal server error' }, 500)
 }
 

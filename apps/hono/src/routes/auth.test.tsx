@@ -88,6 +88,7 @@ vi.mock('../lib/logger.js', () => ({
   safeError: (e: unknown) => ({ message: String(e) }),
 }))
 
+import { logger } from '../lib/logger.js'
 import { authRoutes } from './auth'
 import {
   signinIpLimiter,
@@ -545,7 +546,7 @@ describe('auth routes', () => {
       expect(res.status).toBe(400)
     })
 
-    it('returns 500 for an unexpected failure', async () => {
+    it('returns 500 for an unexpected failure, and logs it', async () => {
       auth.requestPasswordReset.mockImplementation(() => {
         throw new Error('smtp down')
       })
@@ -556,6 +557,10 @@ describe('auth routes', () => {
       )
 
       expect(res.status).toBe(500)
+      expect(logger.error).toHaveBeenCalledWith(
+        { err: { message: 'Error: smtp down' } },
+        expect.any(String)
+      )
     })
 
     it('does not read a 429 out of an error message', async () => {
@@ -718,7 +723,7 @@ describe('auth routes', () => {
       expect(html).toContain('action="/reset-password/tok-1"')
     })
 
-    it('returns 500 for an unexpected failure', async () => {
+    it('returns 500 for an unexpected failure, and logs it', async () => {
       auth.resetPassword.mockRejectedValue(new Error('db down'))
 
       const res = await app.request(
@@ -727,6 +732,10 @@ describe('auth routes', () => {
       )
 
       expect(res.status).toBe(500)
+      expect(logger.error).toHaveBeenCalledWith(
+        { err: { message: 'Error: db down' } },
+        expect.any(String)
+      )
     })
   })
 

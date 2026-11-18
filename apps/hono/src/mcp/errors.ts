@@ -6,6 +6,7 @@ import {
   UnauthorizedTagAccessError,
   ValidationError,
 } from '@pinsquirrel/domain'
+import { logger, safeError } from '../lib/logger.js'
 import { InsufficientScopeError } from './scopes.js'
 
 /**
@@ -57,6 +58,7 @@ export function mapDomainErrorToMcp(err: unknown) {
   ) {
     message = 'Tag not found'
   } else {
+    logger.error({ err: safeError(err) }, 'MCP tool failed')
     message = 'Internal server error'
   }
   return {

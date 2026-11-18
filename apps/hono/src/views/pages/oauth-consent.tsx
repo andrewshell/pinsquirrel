@@ -91,11 +91,15 @@ export const OAuthConsentPage: FC<OAuthConsentPageProps> = ({
   >
     <Card>
       <CardHeader>
-        <CardTitle>Authorize {displayName(client)}</CardTitle>
+        <CardTitle class="wrap-anywhere">
+          Authorize {displayName(client)}
+        </CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
         <p class="text-sm text-muted-foreground">
-          <span class="font-bold text-foreground">{displayName(client)}</span>{' '}
+          <span class="font-bold text-foreground wrap-anywhere">
+            {displayName(client)}
+          </span>{' '}
           wants access to your PinSquirrel account as{' '}
           <span class="font-bold text-foreground">{user.username}</span>.
         </p>

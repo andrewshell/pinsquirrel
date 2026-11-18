@@ -212,12 +212,53 @@ describe('resolveStaticOAuthClients', () => {
   })
 
   it.each([
+    'https://u:p@acme.example.com/callback',
+    'https://u@acme.example.com/callback',
+    'http://@127.0.0.1/callback',
+  ])('fails at boot on a redirect URI with userinfo: %s', uri => {
+    expect(() =>
+      resolveStaticOAuthClients({
+        OAUTH_STATIC_CLIENTS: JSON.stringify([
+          { client_id: 'acme', client_name: 'Acme', redirect_uris: [uri] },
+        ]),
+      })
+    ).toThrow(/OAUTH_STATIC_CLIENTS is invalid.*no fragment, userinfo/)
+  })
+
+  it.each([
+    ' https://acme.example.com/callback',
+    'https://acme.example.com/callback\t',
+    'https://acme.example.com/call\u0000back',
+  ])(
+    'fails at boot on a redirect URI with whitespace or a control character: %j',
+    uri => {
+      expect(() =>
+        resolveStaticOAuthClients({
+          OAUTH_STATIC_CLIENTS: JSON.stringify([
+            { client_id: 'acme', client_name: 'Acme', redirect_uris: [uri] },
+          ]),
+        })
+      ).toThrow(/OAUTH_STATIC_CLIENTS is invalid.*control characters/)
+    }
+  )
+
+  it('fails at boot on a redirect URI longer than 512 characters, naming the redirect URI rule', () => {
+    expect(() =>
+      resolveStaticOAuthClients({
+        OAUTH_STATIC_CLIENTS: JSON.stringify([
+          {
+            client_id: 'acme',
+            client_name: 'Acme',
+            redirect_uris: [`https://acme.example.com/${'a'.repeat(500)}`],
+          },
+        ]),
+      })
+    ).toThrow(/OAUTH_STATIC_CLIENTS is invalid.*at most 512 characters/)
+  })
+
+  it.each([
     ['client_id', { client_id: 'a'.repeat(256) }],
     ['client_name', { client_name: 'a'.repeat(256) }],
-    [
-      'redirect URI',
-      { redirect_uris: [`https://acme.example.com/${'a'.repeat(500)}`] },
-    ],
   ])('fails at boot on a %s longer than its column', (_, patch) => {
     expect(() =>
       resolveStaticOAuthClients({

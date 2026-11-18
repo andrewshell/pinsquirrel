@@ -555,7 +555,8 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     One site is usually assigned a /48, so `/register` allows ten an hour per /64 and thirty
     an hour per /48, and a registration has to fit both. A registration
     carries at most ten redirect URIs of at most 512 characters each, the width of the
-    column an authorization code stores its redirect URI in.
+    column an authorization code stores its redirect URI in. Too many URIs is
+    `invalid_client_metadata`; a URI that is too long breaks a redirect URI rule (decision 48).
 35. **Every client is held to one set of rules, and its identifier is an exact string.** DCR,
     CIMD and static clients all pass `requireClientRules` before a row is written: public
     (`none`) only, the implemented grant types only, and redirect URIs that are https or
@@ -744,6 +745,18 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     address was not changed and offers the same link again. An address another account
     took after the link was sent still answers that the link is invalid, and now leaves
     the link unspent.
+48. **The redirect URI rules hold at authorize, not only when a client is stored.** A redirect
+    URI that does not parse, is longer than 512 characters, has a loopback port above 65535,
+    has userinfo (an empty one included), or has surrounding whitespace or a control
+    character is refused as `invalid_redirect_uri`, whether a DCR, CIMD or static client
+    carries it. The URI is stored and matched as sent, so one `URL` would quietly trim is
+    refused rather than stored with the padding. A client row stored
+    before a rule existed can still hold a URI that breaks it, so `authorize` checks the
+    request's `redirect_uri` against the same rules and shows the error page when it fails.
+    The refusal is per URI and at authorize only: the client's other redirect URIs keep
+    working, and its existing grants keep refreshing, because the token endpoint sends no
+    browser anywhere. A `response_type` other than `code` is redirected as
+    `unsupported_response_type`; a missing one stays `invalid_request`.
 
 ## Reference
 

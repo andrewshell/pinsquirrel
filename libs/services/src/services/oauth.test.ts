@@ -492,19 +492,41 @@ describe('OAuthService.resolveClient', () => {
     expect(ctx.clientRepository.findByClientId).not.toHaveBeenCalled()
   })
 
-  it.each([
-    ['a client_name longer than its column', { client_name: 'n'.repeat(256) }],
-    [
-      'a redirect URI longer than its column',
-      { redirect_uris: [`https://client.example/${'a'.repeat(500)}`] },
-    ],
-  ])('refuses a document with %s and stores nothing', async (_, patch) => {
+  it('refuses a document with a client_name longer than its column and stores nothing', async () => {
     vi.mocked(ctx.fetcher.fetch).mockResolvedValue(
-      JSON.stringify({ ...cimdDocument, ...patch })
+      JSON.stringify({ ...cimdDocument, client_name: 'n'.repeat(256) })
     )
 
     await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(
       OAuthInvalidClientMetadataError
+    )
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses a document with a redirect URI longer than 512 characters as invalid_redirect_uri and stores nothing', async () => {
+    vi.mocked(ctx.fetcher.fetch).mockResolvedValue(
+      JSON.stringify({
+        ...cimdDocument,
+        redirect_uris: [`https://client.example/${'a'.repeat(500)}`],
+      })
+    )
+
+    await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(
+      OAuthInvalidRedirectUriError
+    )
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses a document with a control character in a redirect URI as invalid_redirect_uri and stores nothing', async () => {
+    vi.mocked(ctx.fetcher.fetch).mockResolvedValue(
+      JSON.stringify({
+        ...cimdDocument,
+        redirect_uris: ['https://client.example/c\tb'],
+      })
+    )
+
+    await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(
+      OAuthInvalidRedirectUriError
     )
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
@@ -626,7 +648,81 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
     }
   )
 
+  it.each([
+    ['a fragment', 'https://client.example/cb#frag'],
+    ['userinfo', 'https://u@client.example/cb'],
+    ['plain http off loopback', 'http://client.example/cb'],
+    ['a trailing space', 'https://client.example/cb '],
+    ['an embedded newline', 'https://client.example/c\nb'],
+  ])(
+    'refuses a stored client whose redirect URI has %s',
+    async (_, registered) => {
+      vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+        makeClient({
+          clientId: 'dcr_legacy',
+          redirectUris: [registered],
+          registrationType: 'dcr',
+        })
+      )
+
+      await expect(
+        ctx.service.resolveAuthorizationRequest(
+          authorizeParams({ client_id: 'dcr_legacy', redirect_uri: registered })
+        )
+      ).rejects.toBeInstanceOf(OAuthInvalidRequestError)
+    }
+  )
+
+  it('still serves the usable redirect URIs of a stored client that also has an unusable one', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({
+        clientId: 'dcr_legacy',
+        redirectUris: [
+          'https://client.example/cb#frag',
+          'https://client.example/cb',
+        ],
+        registrationType: 'dcr',
+      })
+    )
+
+    const resolved = await resolve(
+      authorizeParams({
+        client_id: 'dcr_legacy',
+        redirect_uri: 'https://client.example/cb',
+      })
+    )
+
+    expect(resolved.redirectUri).toBe('https://client.example/cb')
+  })
+
+  it('redirects a response type other than code as unsupported_response_type', async () => {
+    await expect(
+      ctx.service.resolveAuthorizationRequest(
+        authorizeParams({ response_type: 'token' })
+      )
+    ).resolves.toMatchObject(redirectedError('unsupported_response_type'))
+  })
+
+  it('redirects a request with no response type as invalid_request', async () => {
+    await expect(
+      ctx.service.resolveAuthorizationRequest(
+        authorizeParams({ response_type: undefined })
+      )
+    ).resolves.toMatchObject(redirectedError('invalid_request'))
+  })
+
   // RFC 6749 3.1: a parameter may be sent once.
+  it.each([[['code', 'code']], [['token', 'token']], [['code', 'token']]])(
+    'redirects a repeated response type %j as invalid_request',
+    async responseType => {
+      await expect(
+        ctx.service.resolveAuthorizationRequest(
+          authorizeParams({ response_type: responseType })
+        )
+      ).resolves.toMatchObject(redirectedError('invalid_request'))
+    }
+  )
+
   it('refuses a repeated redirect_uri outright, since neither can be trusted', async () => {
     await expect(
       ctx.service.resolveAuthorizationRequest(
@@ -2018,6 +2114,25 @@ describe('OAuthService.registerClient', () => {
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['empty userinfo', 'http://@127.0.0.1/callback'],
+    ['a value that is not a URI', 'not a uri'],
+    ['a loopback port above 65535', 'http://127.0.0.1:99999/callback'],
+    ['a script scheme', 'javascript:alert(1)'],
+    ['a leading space', ' https://client.example/cb'],
+    ['a trailing space', 'https://client.example/cb '],
+    ['a trailing tab', 'https://client.example/cb\t'],
+    ['an embedded newline', 'https://client.example/c\nb'],
+    ['a NUL', '\0https://client.example/cb'],
+    ['another C0 control character', 'https://client.example/c\u0001b'],
+    ['a DEL', 'https://client.example/c\u007fb'],
+  ])('refuses %s as invalid_redirect_uri', async (_, uri) => {
+    await expect(
+      ctx.service.registerClient(registration({ redirect_uris: [uri] }))
+    ).rejects.toBeInstanceOf(OAuthInvalidRedirectUriError)
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
   it('refuses an authentication method this server does not advertise', async () => {
     await expect(
       ctx.service.registerClient(
@@ -2041,14 +2156,25 @@ describe('OAuthService.registerClient', () => {
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
-  it('refuses a redirect URI longer than its column before creating a row', async () => {
+  it('refuses a redirect URI longer than 512 characters as invalid_redirect_uri before creating a row', async () => {
     const prefix = 'http://localhost:54321/'
     const uri = prefix + 'a'.repeat(513 - prefix.length)
 
     await expect(
       ctx.service.registerClient(registration({ redirect_uris: [uri] }))
-    ).rejects.toBeInstanceOf(ValidationError)
+    ).rejects.toBeInstanceOf(OAuthInvalidRedirectUriError)
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('accepts a redirect URI of exactly 512 characters', async () => {
+    const prefix = 'http://localhost:54321/'
+    const uri = prefix + 'a'.repeat(512 - prefix.length)
+
+    await ctx.service.registerClient(registration({ redirect_uris: [uri] }))
+
+    expect(ctx.clientRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ redirectUris: [uri] })
+    )
   })
 
   it('rejects a malformed registration as a validation failure', async () => {
@@ -2065,15 +2191,6 @@ describe('OAuthService.registerClient', () => {
 
     await expect(
       ctx.service.registerClient(registration({ redirect_uris: redirectUris }))
-    ).rejects.toBeInstanceOf(ValidationError)
-    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
-  })
-
-  it('refuses a redirect URI longer than 512 characters', async () => {
-    const longUri = `https://client.example/${'a'.repeat(600)}`
-
-    await expect(
-      ctx.service.registerClient(registration({ redirect_uris: [longUri] }))
     ).rejects.toBeInstanceOf(ValidationError)
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
@@ -2513,6 +2630,31 @@ describe('OAuthService.reconcileStaticClients', () => {
     expect(failures.map(failure => failure.error)).toEqual([
       expect.any(OAuthInvalidClientMetadataError),
     ])
+  })
+
+  it('reports a redirect URI longer than 512 characters as invalid_redirect_uri', async () => {
+    const failures = await ctx.service.reconcileStaticClients([
+      {
+        ...acme,
+        redirectUris: [`https://acme.example.com/${'a'.repeat(500)}`],
+      },
+    ])
+
+    expect(failures.map(failure => failure.error)).toEqual([
+      expect.any(OAuthInvalidRedirectUriError),
+    ])
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('reports a redirect URI with surrounding whitespace as invalid_redirect_uri', async () => {
+    const failures = await ctx.service.reconcileStaticClients([
+      { ...acme, redirectUris: [' https://acme.example.com/callback\n'] },
+    ])
+
+    expect(failures.map(failure => failure.error)).toEqual([
+      expect.any(OAuthInvalidRedirectUriError),
+    ])
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
   it('still reconciles the entries after one that fails, and names the one that failed', async () => {
