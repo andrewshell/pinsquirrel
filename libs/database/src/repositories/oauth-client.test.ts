@@ -4,7 +4,9 @@ import type { MySql2Database } from 'drizzle-orm/mysql2'
 import mysql from 'mysql2/promise'
 import type { Pool } from 'mysql2/promise'
 import { eq } from 'drizzle-orm'
+import { WriteConflictError } from '@pinsquirrel/domain'
 import type { CreateOAuthClientData } from '@pinsquirrel/domain'
+import { impatientDatabase, transactionHolding } from '../test-fixtures.js'
 import { oauthClients } from '../schema/oauth-clients.js'
 import { DrizzleOAuthClientRepository } from './oauth-client.js'
 
@@ -204,6 +206,30 @@ describe('DrizzleOAuthClientRepository - Integration Tests', () => {
 
       const found = await repository.findById(created.id)
       expect(found?.completedAt?.getTime()).toBe(completedAt.getTime())
+    })
+
+    it('should throw a write conflict when its lock wait times out, and record the date when called again', async () => {
+      const created = await repository.create(dcrClient())
+      const rival = await transactionHolding(
+        testPool,
+        'SELECT id FROM oauth_clients WHERE id = ? FOR UPDATE',
+        [created.id]
+      )
+      const impatient = new DrizzleOAuthClientRepository(
+        await impatientDatabase(TEST_DATABASE_URL)
+      )
+
+      const thrown: unknown = await impatient
+        .markCompleted(created.id, new Date())
+        .catch((error: unknown) => error)
+      await rival.rollback()
+
+      expect(thrown).toBeInstanceOf(WriteConflictError)
+      expect((await repository.findById(created.id))?.completedAt).toBeNull()
+      await repository.markCompleted(created.id, new Date())
+      expect(
+        (await repository.findById(created.id))?.completedAt
+      ).toBeInstanceOf(Date)
     })
   })
 

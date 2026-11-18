@@ -123,16 +123,18 @@ export class DrizzleOAuthAuthorizationCodeRepository implements OAuthAuthorizati
     // takes is what makes two concurrent exchanges of the same code resolve to
     // one winner. `affectedRows` is 1 only for the call that found the code
     // unspent and unexpired.
-    const result = await this.db
-      .update(oauthAuthorizationCodes)
-      .set({ consumedAt: now })
-      .where(
-        and(
-          eq(oauthAuthorizationCodes.codeHash, codeHash),
-          isNull(oauthAuthorizationCodes.consumedAt),
-          gt(oauthAuthorizationCodes.expiresAt, now)
+    const result = await retryOnDeadlock(() =>
+      this.db
+        .update(oauthAuthorizationCodes)
+        .set({ consumedAt: now })
+        .where(
+          and(
+            eq(oauthAuthorizationCodes.codeHash, codeHash),
+            isNull(oauthAuthorizationCodes.consumedAt),
+            gt(oauthAuthorizationCodes.expiresAt, now)
+          )
         )
-      )
+    )
 
     if (result[0].affectedRows === 0) {
       return null

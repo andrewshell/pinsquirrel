@@ -67,10 +67,12 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
   }
 
   async revoke(id: string): Promise<boolean> {
-    const result = await this.db
-      .update(oauthTokens)
-      .set({ revokedAt: new Date() })
-      .where(and(eq(oauthTokens.id, id), isNull(oauthTokens.revokedAt)))
+    const result = await retryOnDeadlock(() =>
+      this.db
+        .update(oauthTokens)
+        .set({ revokedAt: new Date() })
+        .where(and(eq(oauthTokens.id, id), isNull(oauthTokens.revokedAt)))
+    )
     return result[0].affectedRows > 0
   }
 

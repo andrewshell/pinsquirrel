@@ -6,7 +6,12 @@ import type { Pool, PoolConnection } from 'mysql2/promise'
 import { eq } from 'drizzle-orm'
 import { WriteConflictError } from '@pinsquirrel/domain'
 import type { CreateOAuthTokenData } from '@pinsquirrel/domain'
-import { heavyTransaction, insertUser } from '../test-fixtures.js'
+import {
+  heavyTransaction,
+  impatientDatabase,
+  insertUser,
+  transactionHolding,
+} from '../test-fixtures.js'
 import { oauthTokens } from '../schema/oauth-tokens.js'
 import { DrizzleOAuthClientRepository } from './oauth-client.js'
 import { PRIMARY_KEY_BATCH } from './oauth-issuance.js'
@@ -357,6 +362,104 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
     })
   })
 
+  describe('a revocation that loses a deadlock twice', () => {
+    it.each([
+      [
+        'revokeByUserAndClient',
+        () => repository.revokeByUserAndClient(userId, clientId),
+      ],
+      ['revokeByGrant', () => repository.revokeByGrant(userId, 'held')],
+    ])(
+      '%s throws a write conflict, leaves the grant live, and revokes it when called again',
+      async (_name, revoke) => {
+        const holdToken = 'SELECT id FROM oauth_tokens WHERE id = ? FOR UPDATE'
+        const holdUser = 'SELECT id FROM users WHERE id = ? FOR UPDATE'
+        const held = await repository.create(token({ grantId: 'held' }))
+        const first = await heavyTransaction(testPool)
+        const second = await heavyTransaction(testPool)
+        await first.query(holdToken, [held.id])
+
+        const revoking = revoke().catch((error: unknown) => error)
+        await pause()
+        await first.query(holdUser, [userId])
+        const secondHoldsToken = second.query(holdToken, [held.id])
+        await pause()
+        await first.rollback()
+        await secondHoldsToken
+        await pause()
+        await second.query(holdUser, [userId])
+        const thrown = await Promise.race([revoking, pause()])
+        await second.rollback()
+
+        expect(thrown).toBeInstanceOf(WriteConflictError)
+        expect((await repository.findById(held.id))?.revokedAt).toBeNull()
+        expect(await revoke()).toBe(1)
+        expect((await repository.findById(held.id))?.revokedAt).toBeInstanceOf(
+          Date
+        )
+      }
+    )
+  })
+
+  describe('a write whose lock wait times out', () => {
+    const impatient = async () =>
+      new DrizzleOAuthTokenRepository(
+        await impatientDatabase(TEST_DATABASE_URL)
+      )
+
+    it.each([
+      [
+        'revokeByUserAndClient',
+        (tokens: DrizzleOAuthTokenRepository) =>
+          tokens.revokeByUserAndClient(userId, clientId),
+      ],
+      [
+        'revokeByGrant',
+        (tokens: DrizzleOAuthTokenRepository) =>
+          tokens.revokeByGrant(userId, 'held'),
+      ],
+    ])(
+      '%s throws a write conflict, leaves the grant live, and revokes it when called again',
+      async (_name, revoke) => {
+        const held = await repository.create(token({ grantId: 'held' }))
+        const rival = await transactionHolding(
+          testPool,
+          'SELECT id FROM oauth_tokens WHERE id = ? FOR UPDATE',
+          [held.id]
+        )
+
+        const thrown: unknown = await revoke(await impatient()).catch(
+          (error: unknown) => error
+        )
+        await rival.rollback()
+
+        expect(thrown).toBeInstanceOf(WriteConflictError)
+        expect((await repository.findById(held.id))?.revokedAt).toBeNull()
+        expect(await revoke(repository)).toBe(1)
+      }
+    )
+
+    it('revoke throws a write conflict, leaves the token live, and revokes it when called again', async () => {
+      const held = await repository.create(token())
+      const rival = await transactionHolding(
+        testPool,
+        'SELECT id FROM oauth_tokens WHERE id = ? FOR UPDATE',
+        [held.id]
+      )
+
+      const thrown: unknown = await (
+        await impatient()
+      )
+        .revoke(held.id)
+        .catch((error: unknown) => error)
+      await rival.rollback()
+
+      expect(thrown).toBeInstanceOf(WriteConflictError)
+      expect((await repository.findById(held.id))?.revokedAt).toBeNull()
+      expect(await repository.revoke(held.id)).toBe(true)
+    })
+  })
+
   describe('a revocation while another user refreshes', () => {
     it('does not wait on the other user, whose refresh then writes its tokens', async () => {
       for (let i = 0; i < 30; i++) {
@@ -593,6 +696,28 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
       for (const successor of successors) {
         expect(await repository.findByTokenHash(successor.tokenHash)).toBeNull()
       }
+      expect(await repository.rotate(parent.id, successors)).toBe(true)
+    })
+
+    it('should throw a write conflict when its lock wait times out, undo the retirement it had made, and rotate when called again', async () => {
+      const parent = await repository.create(token({ kind: 'refresh' }))
+      const successors = successorsOf(parent)
+      const rival = await transactionHolding(
+        testPool,
+        'SELECT client_id FROM oauth_clients WHERE client_id = ? FOR UPDATE',
+        [clientId]
+      )
+      const impatient = new DrizzleOAuthTokenRepository(
+        await impatientDatabase(TEST_DATABASE_URL)
+      )
+
+      const thrown: unknown = await impatient
+        .rotate(parent.id, successors)
+        .catch((error: unknown) => error)
+      await rival.rollback()
+
+      expect(thrown).toBeInstanceOf(WriteConflictError)
+      expect((await repository.findById(parent.id))?.rotatedAt).toBeNull()
       expect(await repository.rotate(parent.id, successors)).toBe(true)
     })
 

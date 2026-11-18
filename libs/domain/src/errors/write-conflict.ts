@@ -1,6 +1,7 @@
 /**
- * A write lost to concurrent writes on the same rows and was undone in full.
- * Nothing changed, and the same call can succeed if it is made again.
+ * A write lost to concurrent writes on the same rows, or waited too long
+ * behind them, and was undone in full. Nothing changed, and the same call
+ * can succeed if it is made again.
  */
 export class WriteConflictError extends Error {
   constructor(options?: ErrorOptions) {

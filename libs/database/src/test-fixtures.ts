@@ -1,4 +1,5 @@
-import type { Pool, PoolConnection } from 'mysql2/promise'
+import { drizzle, type MySql2Database } from 'drizzle-orm/mysql2'
+import mysql, { type Pool, type PoolConnection } from 'mysql2/promise'
 import { onTestFinished } from 'vitest'
 
 /**
@@ -113,6 +114,36 @@ export async function heavyTransaction(pool: Pool): Promise<PoolConnection> {
       [bystander.id]
     )
   }
+  onTestFinished(async () => {
+    await connection.rollback()
+    connection.release()
+  })
+  return connection
+}
+
+/**
+ * A database on one connection whose lock waits give up after a second
+ * where the server default is fifty. It is closed when the test ends.
+ */
+export async function impatientDatabase(url: string): Promise<MySql2Database> {
+  const pool = mysql.createPool({ uri: url, connectionLimit: 1 })
+  await pool.query('SET SESSION innodb_lock_wait_timeout = 1')
+  onTestFinished(() => pool.end())
+  return drizzle({ client: pool })
+}
+
+/**
+ * An open transaction holding the rows a locking read names. It is rolled
+ * back and released when the test ends, or sooner by the test.
+ */
+export async function transactionHolding(
+  pool: Pool,
+  lockingRead: string,
+  params: unknown[]
+): Promise<PoolConnection> {
+  const connection = await pool.getConnection()
+  await connection.beginTransaction()
+  await connection.query(lockingRead, params)
   onTestFinished(async () => {
     await connection.rollback()
     connection.release()
