@@ -143,7 +143,7 @@ export function createEmailChangeNoticeTemplate(): {
   const body =
     'Someone signed in to your PinSquirrel account and asked to move it to a different email address. The change takes effect only when the link sent to the new address is followed.'
   const advice =
-    "If this wasn't you, sign in and change your password now, then contact andrew@pinsquirrel.com."
+    "If this wasn't you, change your password now, or reset it from the sign-in page if you can't sign in. Either one cancels the change. Then contact andrew@pinsquirrel.com."
   const html = htmlEmail(
     title,
     `

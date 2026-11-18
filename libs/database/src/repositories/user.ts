@@ -13,6 +13,7 @@ import { userRoles } from '../schema/user-roles.js'
 import { sessions } from '../schema/sessions.js'
 import { oauthTokens } from '../schema/oauth-tokens.js'
 import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes.js'
+import { emailChanges } from '../schema/email-changes.js'
 import { isDuplicateKeyError } from './duplicate-key.js'
 
 /**
@@ -299,6 +300,7 @@ export class DrizzleUserRepository implements UserRepository {
             isNull(oauthAuthorizationCodes.consumedAt)
           )
         )
+      await tx.delete(emailChanges).where(eq(emailChanges.userId, userId))
     })
   }
 

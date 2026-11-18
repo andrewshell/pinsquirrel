@@ -38,8 +38,8 @@ export interface UserRepository extends Repository<
   deleteStaleUnverified(id: string, createdBefore: Date): Promise<boolean>
   /**
    * End every web session, OAuth token and unused authorization code issued
-   * to a user, all or nothing, except the one session named by
-   * `keepSessionId`.
+   * to a user, and cancel their pending email change, all or nothing, except
+   * the one session named by `keepSessionId`.
    */
   revokeSessionsAndTokens(userId: string, keepSessionId?: string): Promise<void>
 }

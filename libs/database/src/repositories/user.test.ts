@@ -16,6 +16,7 @@ import { DrizzleOAuthAuthorizationCodeRepository } from './oauth-authorization-c
 import { DrizzleOAuthClientRepository } from './oauth-client.js'
 import { DrizzleOAuthTokenRepository } from './oauth-token.js'
 import { DrizzleSessionRepository } from './session.js'
+import { DrizzleEmailChangeRepository } from './email-change.js'
 import { DrizzleUserRepository } from './user.js'
 import { Role, UserAlreadyExistsError, UserStatus } from '@pinsquirrel/domain'
 
@@ -750,6 +751,31 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       await repository.revokeSessionsAndTokens(userId)
 
       expect(await codes.consume(code.codeHash)).toBeNull()
+    })
+
+    it('cancels a pending email change, leaving others alone', async () => {
+      const { id: userId } = await insertUser(testPool)
+      const { id: bystanderId } = await insertUser(testPool, {
+        emailHash: 'bystander_email',
+      })
+      const changes = new DrizzleEmailChangeRepository(testDb)
+      for (const [id, tokenHash] of [
+        [userId, 'pending-change'],
+        [bystanderId, 'bystander-change'],
+      ]) {
+        await changes.save({
+          userId: id,
+          tokenHash,
+          emailHash: `new-${tokenHash}`,
+          emailEncrypted: null,
+          expiresAt: later(),
+        })
+      }
+
+      await repository.revokeSessionsAndTokens(userId)
+
+      expect(await changes.consume('pending-change')).toBeNull()
+      expect(await changes.consume('bystander-change')).not.toBeNull()
     })
 
     it('keeps the one session it is told to keep', async () => {
