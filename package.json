@@ -21,8 +21,9 @@
     "db:migrate": "pnpm --filter @pinsquirrel/database db:migrate",
     "extension:package": "pnpm --filter @pinsquirrel/chrome-extension package",
     "docker:build-push": "./scripts/docker-build-push.sh",
-    "docker:build-push-skip-quality": "./scripts/docker-build-push.sh --skip-quality",
-    "docker:dry-run": "./scripts/docker-build-push.sh --dry-run --skip-quality",
+    "docker:dry-run": "./scripts/docker-build-push.sh --dry-run",
+    "release": "node scripts/release.ts",
+    "release:dry-run": "node scripts/release.ts --dry-run",
     "prepare": "husky || true"
   },
   "devDependencies": {

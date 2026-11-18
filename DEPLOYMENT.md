@@ -6,14 +6,97 @@ proxy (Caddy) with a MySQL 8 database alongside it.
 ## Build
 
 ```bash
-# From the repo root — the build context is the whole monorepo
-docker build -f apps/hono/Dockerfile -t andrewshell/pinsquirrel:latest .
-
-# Or the script, which runs `pnpm quality` first and pushes to Docker Hub
-pnpm docker:build-push
-pnpm docker:build-push-skip-quality   # skip the gate
-pnpm docker:dry-run                   # build only
+# From the repo root. The build context is the whole monorepo.
+docker build -f apps/hono/Dockerfile -t pinsquirrel:local .
 ```
+
+## Publishing a release
+
+The image is `ghcr.io/andrewshell/pinsquirrel`, built for `linux/amd64` and `linux/arm64`. It is
+tagged with the root package's version and `latest`.
+
+Merging the root package's release pull request publishes it. release-please tags the merge
+`vX.Y.Z`, creates the GitHub release, and the `publish` job in
+`.github/workflows/release-please.yml` starts. It runs `node scripts/release.ts --skip-gates` in
+the `release` environment, with the workflow's `GITHUB_TOKEN` logged in to ghcr.io and QEMU so the
+amd64 runner can build arm64 too. A Chrome extension release does not start it.
+
+`scripts/release.ts` asks the registry whether the version's image exists
+(`docker manifest inspect`, which pulls nothing). If it does, there is nothing to do. Otherwise it
+pushes only from a checkout where:
+
+- the tag `vX.Y.Z` exists and is in the history of HEAD.
+- nothing has changed between the tag and HEAD outside `apps/chrome-extension` and
+  `.release-please-manifest.json`, which an extension release rewrites. So the image is what was
+  released.
+- HEAD is `main`, clean and level with its upstream.
+
+Then it checks Docker and the ghcr.io login, runs `pnpm quality` unless `--skip-gates` is given,
+and runs `scripts/docker-build-push.sh --skip-gates`.
+
+The job skips the quality gate. CI runs on every pull request to `main` and on the release merge
+itself, but nothing makes the publish wait for it, and the `main` ruleset requires no checks. A
+release pull request that release-please opens with the default `GITHUB_TOKEN` gets no CI at all,
+because GitHub does not start workflows from that token's events. Its diff is only versions and
+changelogs. Set `RELEASE_PLEASE_TOKEN` (below) to get CI on it.
+
+To retry a failed publish, re-run the `publish` job, or run the `Release Please` workflow from the
+Actions tab on `main`. A manual run skips release-please and goes straight to `publish`. The
+script pushes only when the registry lacks the version, so a retry is safe. It works only while
+`main` is still at the release commit. Any later commit, including a `docs:`, `ci:` or `chore:`
+commit that release-please hides and that opens no release pull request, makes the script refuse.
+Then the next root release publishes the version. When only hidden-type commits have landed, force
+a release by adding a `Release-As: X.Y.Z` footer to a commit (see the release-please
+documentation).
+
+### One-time setup
+
+- In the repository settings, create the environment `release` and limit its deployment branches
+  to `main`. Without it, the first run creates the environment with no limit.
+- The first push creates the ghcr.io package `pinsquirrel`. When the `publish` job makes that
+  push, GitHub links the package to this repository and lets its workflows write to it. If you
+  push the first image from your machine instead, open the package settings and, under **Manage
+  Actions access**, give this repository the **Write** role. The `org.opencontainers.image.source`
+  label in the Dockerfile links the package to this repository either way.
+- A new package is private. To let servers pull it without a login, set its visibility to public
+  in the package settings. Otherwise each server needs `docker login ghcr.io` with a token that
+  has `read:packages`.
+- Optional: store a fine-grained personal access token as the repository secret
+  `RELEASE_PLEASE_TOKEN`, with **Contents** and **Pull requests** read and write on this
+  repository, so release pull requests get CI. The release works without it.
+
+### Moving a server from Docker Hub
+
+Images used to go to Docker Hub as `andrewshell/pinsquirrel`. New versions go only to
+`ghcr.io/andrewshell/pinsquirrel`. Nothing is on GHCR yet. The package appears when the `publish`
+job pushes the next root release, and `v3.10.1` is never published there. The package starts
+private. Keep running the Docker Hub image until that first image exists and the package is public
+(or the server has `docker login ghcr.io` with a `read:packages` token). Only then change the image
+name in the compose file, as in [Running it](#running-it), and pull it.
+
+### From your machine
+
+Use this when Actions is unavailable, after the release pull request merges:
+
+```bash
+git checkout main && git pull --prune --tags
+pnpm release:dry-run   # the plan, and why
+pnpm release           # pnpm quality, then <version> and latest
+pnpm release beta      # the same, plus a custom tag
+```
+
+To push only an image, or to finish a release whose push failed, use the image script. It reads
+the version from the root `package.json` and runs `pnpm quality` unless told not to:
+
+```bash
+pnpm docker:dry-run                           # the image, version and tags
+pnpm docker:build-push                        # pnpm quality, then <version> and latest
+pnpm docker:build-push -- --skip-gates beta   # after a run whose gate passed
+```
+
+From a machine, both need `docker login ghcr.io` with a personal access token that has
+`write:packages`. Confirm a push carried both platforms with
+`docker buildx imagetools inspect ghcr.io/andrewshell/pinsquirrel:<version>`.
 
 ## Migrations
 
@@ -69,7 +152,7 @@ production.
 ```yaml
 services:
   pinsquirrel:
-    image: andrewshell/pinsquirrel:latest
+    image: ghcr.io/andrewshell/pinsquirrel:latest
     ports:
       # Only Caddy on this host should reach the app.
       - '127.0.0.1:8100:8100'
