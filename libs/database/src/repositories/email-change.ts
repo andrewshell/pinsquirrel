@@ -21,11 +21,6 @@ export class DrizzleEmailChangeRepository implements EmailChangeRepository {
       .onDuplicateKeyUpdate({ set: row })
   }
 
-  /**
-   * The user's row is written before the change is spent: a password change
-   * locks that row and then deletes the user's pending change, and the
-   * opposite order here would deadlock with it. PLAN.md decision 47.
-   */
   async confirm(tokenHash: string): Promise<boolean> {
     try {
       await writeOrConflict(() =>
