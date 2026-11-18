@@ -7,11 +7,13 @@ import { eq } from 'drizzle-orm'
 import type {
   AuthorizationCode,
   CreateAuthorizationCodeData,
+  CreateOAuthTokenData,
 } from '@pinsquirrel/domain'
 import { insertUser } from '../test-fixtures.js'
 import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes.js'
 import { DrizzleOAuthClientRepository } from './oauth-client.js'
 import { DrizzleOAuthAuthorizationCodeRepository } from './oauth-authorization-code.js'
+import { DrizzleOAuthTokenRepository } from './oauth-token.js'
 import { DrizzleUserRepository } from './user.js'
 
 describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
@@ -233,6 +235,128 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
 
     it('should return null for an unknown hash', async () => {
       expect(await repository.consume('nope')).toBeNull()
+    })
+  })
+
+  describe('exchange', () => {
+    const tokensFor = (
+      created: AuthorizationCode
+    ): [CreateOAuthTokenData, CreateOAuthTokenData] => {
+      const shared = {
+        clientId,
+        userId,
+        scopes: created.scopes,
+        resource: created.resource,
+        grantId: created.grantId ?? crypto.randomUUID(),
+        expiresAt: new Date(Date.now() + 60 * 1000),
+      }
+      const hash = () => crypto.randomUUID().replace(/-/g, '').repeat(2)
+      return [
+        { ...shared, kind: 'access', tokenHash: hash() },
+        { ...shared, kind: 'refresh', tokenHash: hash() },
+      ]
+    }
+
+    const stored = (data: CreateOAuthTokenData) =>
+      new DrizzleOAuthTokenRepository(testDb).findByTokenHash(data.tokenHash)
+
+    it('should spend the code and write its tokens', async () => {
+      const created = await createCode()
+      const [access, refresh] = tokensFor(created)
+
+      expect(await repository.exchange(created.id, [access, refresh])).toBe(
+        'exchanged'
+      )
+
+      expect(
+        (await repository.findById(created.id))?.consumedAt
+      ).toBeInstanceOf(Date)
+      expect(await stored(access)).toMatchObject({ grantId: created.grantId })
+      expect(await stored(refresh)).toMatchObject({ grantId: created.grantId })
+    })
+
+    it('should leave the code unspent when a token cannot be written', async () => {
+      const created = await createCode()
+      const [access, refresh] = tokensFor(created)
+
+      await expect(
+        repository.exchange(created.id, [
+          access,
+          { ...refresh, tokenHash: access.tokenHash },
+        ])
+      ).rejects.toThrow()
+
+      expect((await repository.findById(created.id))?.consumedAt).toBeNull()
+      expect(await stored(access)).toBeNull()
+    })
+
+    it('should say a spent code was spent, and write nothing', async () => {
+      const created = await createCode()
+      await repository.exchange(created.id, tokensFor(created))
+      const again = tokensFor(created)
+
+      expect(await repository.exchange(created.id, again)).toBe('spent')
+      expect(await stored(again[0])).toBeNull()
+    })
+
+    it('should let exactly one of two concurrent exchanges win', async () => {
+      const created = await createCode()
+
+      const results = await Promise.all([
+        repository.exchange(created.id, tokensFor(created)),
+        repository.exchange(created.id, tokensFor(created)),
+      ])
+
+      expect(results.sort()).toEqual(['exchanged', 'spent'])
+    })
+
+    it('should say an expired code is gone', async () => {
+      const created = await createCode(
+        code({ expiresAt: new Date(Date.now() - 1000) })
+      )
+
+      expect(await repository.exchange(created.id, tokensFor(created))).toBe(
+        'gone'
+      )
+      expect((await repository.findById(created.id))?.consumedAt).toBeNull()
+    })
+
+    it('should say a code the user revoked is gone, and write nothing', async () => {
+      const created = await createCode()
+      const pair = tokensFor(created)
+      await new DrizzleUserRepository(testDb).revokeSessionsAndTokens(userId)
+
+      expect(await repository.exchange(created.id, pair)).toBe('gone')
+      expect(await stored(pair[0])).toBeNull()
+    })
+
+    // The exchange holds the user's row shared until its tokens are
+    // committed. A revocation takes that row before it stamps the tokens, so
+    // it either runs first and the code is gone, or runs after and sees them.
+    it('should not leave live tokens when the user revokes everything mid-exchange', async () => {
+      const created = await createCode()
+      const [access, refresh] = tokensFor(created)
+      // Holding the client row stalls the first token insert's foreign key
+      // check, after the exchange has spent the code.
+      const stall = await testPool.getConnection()
+      await stall.beginTransaction()
+      await stall.query(
+        'SELECT client_id FROM oauth_clients WHERE client_id = ? FOR UPDATE',
+        [clientId]
+      )
+      const exchanging = repository.exchange(created.id, [access, refresh])
+      await new Promise(resolve => setTimeout(resolve, 200))
+      const revoking = new DrizzleUserRepository(
+        testDb
+      ).revokeSessionsAndTokens(userId)
+      await new Promise(resolve => setTimeout(resolve, 200))
+      await stall.commit()
+      stall.release()
+
+      await Promise.all([exchanging, revoking])
+
+      expect((await stored(access))?.revokedAt).toBeInstanceOf(Date)
+      expect((await stored(refresh))?.revokedAt).toBeInstanceOf(Date)
     })
   })
 

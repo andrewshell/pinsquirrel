@@ -1,6 +1,7 @@
 import type {
   OAuthToken,
   CreateOAuthTokenData,
+  IssuedTokenData,
 } from '../entities/oauth-grant.js'
 
 export interface OAuthTokenRepository {
@@ -40,12 +41,22 @@ export interface OAuthTokenRepository {
   revokeByGrant(userId: string, grantId: string): Promise<number>
 
   /**
-   * Mark a refresh token as exchanged for a successor. Distinct from
-   * `revoke` so that a later presentation of this token is recognisable as a
-   * replay of a rotated token rather than a user revocation. False when the
-   * token was already rotated or revoked.
+   * Retire a refresh token and write its successors, as one step.
+   *
+   * Either the token is marked rotated and every successor is stored, or
+   * nothing changed. False, with nothing written, when the token was already
+   * rotated or revoked: the mark is conditional, so of two concurrent
+   * rotations of one token exactly one wins. A failure while writing the
+   * successors leaves the token unrotated for the client to retry with.
+   *
+   * Rotation is distinct from `revoke` so that a later presentation of the
+   * token is recognisable as a replay rather than a user revocation. A token
+   * from before grant ids takes the grant of its successors.
+   *
+   * It cannot overlap a revocation either: see `exchange` on the code
+   * repository.
    */
-  markRotated(id: string): Promise<boolean>
+  rotate(tokenId: string, successors: IssuedTokenData): Promise<boolean>
 
   /**
    * Remove expired and revoked tokens and report how many. A rotated refresh

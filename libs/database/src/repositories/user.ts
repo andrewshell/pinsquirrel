@@ -14,6 +14,7 @@ import { sessions } from '../schema/sessions.js'
 import { oauthTokens } from '../schema/oauth-tokens.js'
 import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes.js'
 import { emailChanges } from '../schema/email-changes.js'
+import { holdUserWhileRevoking } from './oauth-issuance.js'
 import { isDuplicateKeyError } from './duplicate-key.js'
 
 /**
@@ -287,6 +288,9 @@ export class DrizzleUserRepository implements UserRepository {
               : ne(sessions.id, keepSessionId)
           )
         )
+      // After the sessions, which is the order a code being written takes
+      // the two in: its session, then this row.
+      await holdUserWhileRevoking(tx, userId)
       await tx
         .update(oauthTokens)
         .set({ revokedAt: new Date() })

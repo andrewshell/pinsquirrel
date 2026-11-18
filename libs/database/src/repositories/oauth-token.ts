@@ -1,11 +1,17 @@
 import type {
   OAuthToken,
   CreateOAuthTokenData,
+  IssuedTokenData,
   OAuthTokenRepository,
 } from '@pinsquirrel/domain'
-import { and, eq, gt, isNotNull, isNull, lt, or } from 'drizzle-orm'
+import { and, eq, gt, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { oauthTokens } from '../schema/oauth-tokens'
+import {
+  holdUserWhileIssuing,
+  holdUserWhileRevoking,
+  insertTokens,
+} from './oauth-issuance'
 
 export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
   constructor(private db: MySql2Database) {}
@@ -36,24 +42,7 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
   }
 
   async create(data: CreateOAuthTokenData): Promise<OAuthToken> {
-    const id = crypto.randomUUID()
-    const now = new Date()
-
-    await this.db.insert(oauthTokens).values({
-      id,
-      tokenHash: data.tokenHash,
-      kind: data.kind,
-      clientId: data.clientId,
-      userId: data.userId,
-      scopes: data.scopes,
-      resource: data.resource,
-      grantId: data.grantId,
-      expiresAt: data.expiresAt,
-      revokedAt: null,
-      rotatedAt: null,
-      rotatedFrom: data.rotatedFrom ?? null,
-      createdAt: now,
-    })
+    const [id] = await insertTokens(this.db, [data])
 
     const [created] = await this.db
       .select()
@@ -76,45 +65,43 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
     userId: string,
     clientId: string
   ): Promise<number> {
-    const result = await this.db
-      .update(oauthTokens)
-      .set({ revokedAt: new Date() })
-      .where(
-        and(
-          eq(oauthTokens.userId, userId),
-          eq(oauthTokens.clientId, clientId),
-          isNull(oauthTokens.revokedAt)
-        )
-      )
-    return result[0].affectedRows
+    return this.revokeFor(userId, eq(oauthTokens.clientId, clientId))
   }
 
   async revokeByGrant(userId: string, grantId: string): Promise<number> {
-    const result = await this.db
-      .update(oauthTokens)
-      .set({ revokedAt: new Date() })
-      .where(
-        and(
-          eq(oauthTokens.grantId, grantId),
-          eq(oauthTokens.userId, userId),
-          isNull(oauthTokens.revokedAt)
-        )
-      )
-    return result[0].affectedRows
+    return this.revokeFor(userId, eq(oauthTokens.grantId, grantId))
   }
 
-  async markRotated(id: string): Promise<boolean> {
-    const result = await this.db
-      .update(oauthTokens)
-      .set({ rotatedAt: new Date() })
-      .where(
-        and(
-          eq(oauthTokens.id, id),
-          isNull(oauthTokens.rotatedAt),
-          isNull(oauthTokens.revokedAt)
+  async rotate(tokenId: string, successors: IssuedTokenData): Promise<boolean> {
+    const [{ userId, grantId }] = successors
+
+    return this.db.transaction(async tx => {
+      if (!(await holdUserWhileIssuing(tx, userId))) {
+        return false
+      }
+
+      // Conditional, so the row lock this UPDATE takes is what makes two
+      // concurrent rotations of the same token resolve to one winner.
+      const result = await tx
+        .update(oauthTokens)
+        .set({
+          rotatedAt: new Date(),
+          grantId: sql`coalesce(${oauthTokens.grantId}, ${grantId})`,
+        })
+        .where(
+          and(
+            eq(oauthTokens.id, tokenId),
+            isNull(oauthTokens.rotatedAt),
+            isNull(oauthTokens.revokedAt)
+          )
         )
-      )
-    return result[0].affectedRows > 0
+      if (result[0].affectedRows === 0) {
+        return false
+      }
+
+      await insertTokens(tx, successors)
+      return true
+    })
   }
 
   async deleteExpiredTokens(): Promise<number> {
@@ -127,6 +114,26 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
         )
       )
     return result[0].affectedRows
+  }
+
+  private async revokeFor(
+    userId: string,
+    which: ReturnType<typeof eq>
+  ): Promise<number> {
+    return this.db.transaction(async tx => {
+      await holdUserWhileRevoking(tx, userId)
+      const result = await tx
+        .update(oauthTokens)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(oauthTokens.userId, userId),
+            which,
+            isNull(oauthTokens.revokedAt)
+          )
+        )
+      return result[0].affectedRows
+    })
   }
 
   /** Not expired, not revoked, not already exchanged for a successor. */

@@ -1,12 +1,15 @@
 import type {
   AuthorizationCode,
+  CodeExchangeOutcome,
   CreateAuthorizationCodeData,
+  IssuedTokenData,
   OAuthAuthorizationCodeRepository,
 } from '@pinsquirrel/domain'
 import { and, eq, gt, isNull, lt } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes'
 import { sessions } from '../schema/sessions'
+import { holdUserWhileIssuing, insertTokens } from './oauth-issuance'
 
 export class DrizzleOAuthAuthorizationCodeRepository implements OAuthAuthorizationCodeRepository {
   constructor(private db: MySql2Database) {}
@@ -68,6 +71,43 @@ export class DrizzleOAuthAuthorizationCodeRepository implements OAuthAuthorizati
         .where(eq(oauthAuthorizationCodes.id, id))
         .limit(1)
       return created
+    })
+  }
+
+  async exchange(
+    codeId: string,
+    tokens: IssuedTokenData
+  ): Promise<CodeExchangeOutcome> {
+    const [{ userId }] = tokens
+
+    return this.db.transaction(async tx => {
+      if (!(await holdUserWhileIssuing(tx, userId))) {
+        return 'gone'
+      }
+
+      const now = new Date()
+      // Conditional, so the row lock this UPDATE takes is what makes two
+      // concurrent exchanges of the same code resolve to one winner.
+      const result = await tx
+        .update(oauthAuthorizationCodes)
+        .set({ consumedAt: now })
+        .where(
+          and(
+            eq(oauthAuthorizationCodes.id, codeId),
+            isNull(oauthAuthorizationCodes.consumedAt),
+            gt(oauthAuthorizationCodes.expiresAt, now)
+          )
+        )
+      if (result[0].affectedRows === 0) {
+        const [code] = await tx
+          .select({ consumedAt: oauthAuthorizationCodes.consumedAt })
+          .from(oauthAuthorizationCodes)
+          .where(eq(oauthAuthorizationCodes.id, codeId))
+        return code?.consumedAt ? 'spent' : 'gone'
+      }
+
+      await insertTokens(tx, tokens)
+      return 'exchanged'
     })
   }
 

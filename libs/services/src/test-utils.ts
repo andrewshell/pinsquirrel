@@ -2,6 +2,7 @@ import type {
   AuthorizationCode,
   CreateAuthorizationCodeData,
   CreateOAuthTokenData,
+  IssuedTokenData,
   OAuthAuthorizationCodeRepository,
   OAuthToken,
   OAuthTokenRepository,
@@ -64,6 +65,21 @@ export function createInMemoryOAuthStore() {
   const tokens: OAuthToken[] = []
   let issued = 0
   const tick = () => new Promise<void>(resolve => setImmediate(resolve))
+  const insertToken = (data: CreateOAuthTokenData): OAuthToken => {
+    if (tokens.some(token => token.tokenHash === data.tokenHash)) {
+      throw new Error('Duplicate entry for token_hash')
+    }
+    const token: OAuthToken = {
+      id: `token-${String(++issued)}`,
+      revokedAt: null,
+      rotatedAt: null,
+      createdAt: new Date(),
+      ...data,
+      rotatedFrom: data.rotatedFrom ?? null,
+    }
+    tokens.push(token)
+    return token
+  }
   const revokeWhere = (matches: (token: OAuthToken) => boolean) => {
     const live = tokens.filter(token => !token.revokedAt && matches(token))
     for (const token of live) token.revokedAt = new Date()
@@ -89,6 +105,15 @@ export function createInMemoryOAuthStore() {
       }
       codes.push(code)
       return code
+    }),
+    exchange: vi.fn(async (codeId: string, issuedTokens: IssuedTokenData) => {
+      await tick()
+      const code = codes.find(candidate => candidate.id === codeId)
+      if (!code || code.expiresAt <= new Date()) return 'gone'
+      if (code.consumedAt) return 'spent'
+      code.consumedAt = new Date()
+      issuedTokens.forEach(insertToken)
+      return 'exchanged'
     }),
     consume: vi.fn(async hash => {
       await tick()
@@ -127,16 +152,7 @@ export function createInMemoryOAuthStore() {
     }),
     create: vi.fn(async (data: CreateOAuthTokenData) => {
       await tick()
-      const token: OAuthToken = {
-        id: `token-${String(++issued)}`,
-        revokedAt: null,
-        rotatedAt: null,
-        createdAt: new Date(),
-        ...data,
-        rotatedFrom: data.rotatedFrom ?? null,
-      }
-      tokens.push(token)
-      return token
+      return insertToken(data)
     }),
     revoke: vi.fn(async id => {
       await tick()
@@ -154,14 +170,18 @@ export function createInMemoryOAuthStore() {
         token => token.userId === userId && token.grantId === grantId
       )
     }),
-    markRotated: vi.fn(async id => {
+    rotate: vi.fn(async (tokenId: string, successors: IssuedTokenData) => {
       await tick()
       const token = tokens.find(
         candidate =>
-          candidate.id === id && !candidate.rotatedAt && !candidate.revokedAt
+          candidate.id === tokenId &&
+          !candidate.rotatedAt &&
+          !candidate.revokedAt
       )
       if (!token) return false
       token.rotatedAt = new Date()
+      token.grantId ??= successors[0].grantId
+      successors.forEach(insertToken)
       return true
     }),
     deleteExpiredTokens: vi.fn(),

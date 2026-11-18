@@ -117,3 +117,16 @@ export interface CreateOAuthTokenData {
   expiresAt: Date
   rotatedFrom?: string | null
 }
+
+/**
+ * The rows one issuance writes: an access token, and a refresh token when the
+ * grant has one. Never empty, so a code cannot be spent or a refresh token
+ * retired with nothing to show for it.
+ */
+export type IssuedTokenData = [CreateOAuthTokenData, ...CreateOAuthTokenData[]]
+
+/**
+ * How an attempt to spend a code ended. `spent` is a code that was already
+ * exchanged, which is a replay. `gone` is one that expired or was deleted.
+ */
+export type CodeExchangeOutcome = 'exchanged' | 'spent' | 'gone'

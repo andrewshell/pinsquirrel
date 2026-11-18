@@ -50,6 +50,13 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
       })
     ).clientId
 
+  const retire = async (id: string): Promise<void> => {
+    await testDb
+      .update(oauthTokens)
+      .set({ rotatedAt: new Date() })
+      .where(eq(oauthTokens.id, id))
+  }
+
   const expire = async (id: string): Promise<void> => {
     await testDb
       .update(oauthTokens)
@@ -157,7 +164,7 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
       await repository.revoke(revoked.id)
 
       const rotated = await repository.create(token({ kind: 'refresh' }))
-      await repository.markRotated(rotated.id)
+      await retire(rotated.id)
 
       const result = await repository.findActiveByUserId(userId)
 
@@ -261,31 +268,148 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
     })
   })
 
-  describe('markRotated', () => {
-    it('should mark a refresh token exchanged without calling it revoked', async () => {
-      const created = await repository.create(token({ kind: 'refresh' }))
+  describe('rotate', () => {
+    const successorsOf = (parent: { id: string; grantId: string | null }) =>
+      [
+        token({ grantId: parent.grantId ?? crypto.randomUUID() }),
+        token({
+          kind: 'refresh',
+          grantId: parent.grantId ?? crypto.randomUUID(),
+          rotatedFrom: parent.id,
+        }),
+      ] as [CreateOAuthTokenData, CreateOAuthTokenData]
 
-      expect(await repository.markRotated(created.id)).toBe(true)
+    it('should retire the token and write its successors', async () => {
+      const parent = await repository.create(token({ kind: 'refresh' }))
+      const successors = successorsOf(parent)
 
-      const found = await repository.findById(created.id)
-      expect(found?.rotatedAt).toBeInstanceOf(Date)
+      expect(await repository.rotate(parent.id, successors)).toBe(true)
+
+      const retired = await repository.findById(parent.id)
+      expect(retired?.rotatedAt).toBeInstanceOf(Date)
       // A replayed rotated token has to stay distinguishable from one a user
       // deliberately killed.
-      expect(found?.revokedAt).toBeNull()
+      expect(retired?.revokedAt).toBeNull()
+      for (const successor of successors) {
+        expect(
+          await repository.findByTokenHash(successor.tokenHash)
+        ).toMatchObject({ grantId: parent.grantId, revokedAt: null })
+      }
     })
 
-    it('should return false the second time', async () => {
-      const created = await repository.create(token({ kind: 'refresh' }))
-      await repository.markRotated(created.id)
+    it('should leave the token unrotated when a successor cannot be written', async () => {
+      const parent = await repository.create(token({ kind: 'refresh' }))
+      const taken = await repository.create(token())
+      const [access, refresh] = successorsOf(parent)
 
-      expect(await repository.markRotated(created.id)).toBe(false)
+      await expect(
+        repository.rotate(parent.id, [
+          access,
+          { ...refresh, tokenHash: taken.tokenHash },
+        ])
+      ).rejects.toThrow()
+
+      expect((await repository.findById(parent.id))?.rotatedAt).toBeNull()
+      expect(await repository.findByTokenHash(access.tokenHash)).toBeNull()
     })
 
-    it('should return false for a token revoked after it was read', async () => {
-      const created = await repository.create(token({ kind: 'refresh' }))
-      await repository.revokeByUserAndClient(userId, clientId)
+    it('should write nothing for a token that was already rotated', async () => {
+      const parent = await repository.create(token({ kind: 'refresh' }))
+      await repository.rotate(parent.id, successorsOf(parent))
+      const late = successorsOf(parent)
 
-      expect(await repository.markRotated(created.id)).toBe(false)
+      expect(await repository.rotate(parent.id, late)).toBe(false)
+      expect(await repository.findByTokenHash(late[0].tokenHash)).toBeNull()
+    })
+
+    it('should write nothing for a token revoked after it was read', async () => {
+      const parent = await repository.create(token({ kind: 'refresh' }))
+      await repository.revoke(parent.id)
+      const late = successorsOf(parent)
+
+      expect(await repository.rotate(parent.id, late)).toBe(false)
+      expect(await repository.findByTokenHash(late[0].tokenHash)).toBeNull()
+    })
+
+    it('should let exactly one of two concurrent rotations win', async () => {
+      const parent = await repository.create(token({ kind: 'refresh' }))
+
+      const results = await Promise.all([
+        repository.rotate(parent.id, successorsOf(parent)),
+        repository.rotate(parent.id, successorsOf(parent)),
+      ])
+
+      expect(results.filter(Boolean)).toHaveLength(1)
+      const [rows] = await testPool.query(
+        'SELECT id FROM oauth_tokens WHERE rotated_from = ?',
+        [parent.id]
+      )
+      expect(rows).toHaveLength(1)
+    })
+
+    it('should bring a token from before grant ids into the grant of its successors', async () => {
+      const parent = await repository.create(token({ kind: 'refresh' }))
+      await testPool.query(
+        'UPDATE oauth_tokens SET grant_id = NULL WHERE id = ?',
+        [parent.id]
+      )
+      const successors = successorsOf({ id: parent.id, grantId: 'adopted' })
+
+      await repository.rotate(parent.id, successors)
+
+      expect((await repository.findById(parent.id))?.grantId).toBe('adopted')
+    })
+  })
+
+  describe('a revocation while tokens are being issued', () => {
+    // Issuing holds the user's row shared until its rows are committed. Each
+    // revocation takes that row first, so it runs after the commit and sees
+    // them.
+    it.each([
+      [
+        'revokeByUserAndClient',
+        () => repository.revokeByUserAndClient(userId, clientId),
+      ],
+      ['revokeByGrant', () => repository.revokeByGrant(userId, 'in-flight')],
+    ])('%s waits, then takes the new tokens too', async (_name, revoke) => {
+      const issuing = await testPool.getConnection()
+      await issuing.beginTransaction()
+      await issuing.query('SELECT id FROM users WHERE id = ? FOR SHARE', [
+        userId,
+      ])
+      const issued = token({ grantId: 'in-flight' })
+
+      let settled = false
+      const revoking = revoke().finally(() => {
+        settled = true
+      })
+      await new Promise(resolve => setTimeout(resolve, 200))
+      const settledWhileIssuing = settled
+
+      await issuing.query(
+        `INSERT INTO oauth_tokens
+           (id, token_hash, kind, client_id, user_id, scopes, resource, grant_id, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          crypto.randomUUID(),
+          issued.tokenHash,
+          issued.kind,
+          clientId,
+          userId,
+          JSON.stringify(issued.scopes),
+          issued.resource,
+          issued.grantId,
+          issued.expiresAt,
+        ]
+      )
+      await issuing.commit()
+      issuing.release()
+
+      expect(settledWhileIssuing).toBe(false)
+      expect(await revoking).toBe(1)
+      expect(
+        (await repository.findByTokenHash(issued.tokenHash))?.revokedAt
+      ).toBeInstanceOf(Date)
     })
   })
 
@@ -302,7 +426,7 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
       const rotatedAndExpired = await repository.create(
         token({ kind: 'refresh' })
       )
-      await repository.markRotated(rotatedAndExpired.id)
+      await retire(rotatedAndExpired.id)
       await expire(rotatedAndExpired.id)
 
       const deleted = await repository.deleteExpiredTokens()
@@ -316,7 +440,7 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
 
     it('should keep a rotated refresh token until its own expiry', async () => {
       const rotated = await repository.create(token({ kind: 'refresh' }))
-      await repository.markRotated(rotated.id)
+      await retire(rotated.id)
 
       await repository.deleteExpiredTokens()
 

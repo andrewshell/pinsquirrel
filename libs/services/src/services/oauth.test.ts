@@ -900,6 +900,22 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     expect(ctx.store.tokens).toHaveLength(1)
   })
 
+  // The spend and the tokens are one write. If it fails, the client still
+  // holds a code that works.
+  it('leaves the code usable when its tokens cannot be written', async () => {
+    vi.mocked(ctx.codeRepository.exchange).mockRejectedValueOnce(
+      new Error('lost connection to MySQL')
+    )
+    await expect(
+      ctx.service.exchangeAuthorizationCode(tokenParams())
+    ).rejects.toThrow('lost connection to MySQL')
+
+    const issued = await ctx.service.exchangeAuthorizationCode(tokenParams())
+
+    expect(issued.accessToken).toBeTruthy()
+    expect(ctx.store.tokens).toHaveLength(1)
+  })
+
   it.each(notAdmitted)(
     'refuses a code for a user %s and revokes what the client holds',
     async (_label, account) => {
@@ -1077,10 +1093,13 @@ describe('OAuthService.exchangeRefreshToken', () => {
     expect(liveTokenIds(ctx.store)).toEqual([])
   })
 
-  // Two refreshes racing on the same token: the marking is conditional, so
-  // exactly one wins and the loser is a replay like any other.
+  // Two refreshes racing on the same token: the retirement is conditional,
+  // so exactly one wins and the loser is a replay like any other.
   it('treats losing the rotation race as a replay', async () => {
-    vi.mocked(ctx.tokenRepository.markRotated).mockResolvedValue(false)
+    vi.mocked(ctx.tokenRepository.rotate).mockImplementationOnce(() => {
+      presented().rotatedAt = longAgo()
+      return Promise.resolve(false)
+    })
 
     await expect(
       ctx.service.exchangeRefreshToken(refreshParams())
@@ -1088,26 +1107,44 @@ describe('OAuthService.exchangeRefreshToken', () => {
     expect(liveTokenIds(ctx.store)).toEqual([])
   })
 
-  it('leaves no live successor when the grant was revoked mid-refresh', async () => {
-    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue({
-      ...presented(),
-      rotatedAt: new Date(),
-      revokedAt: new Date(),
+  it('issues nothing when the token is revoked while it is being refreshed', async () => {
+    const rotate = vi.mocked(ctx.tokenRepository.rotate)
+    const real = rotate.getMockImplementation()
+    rotate.mockImplementationOnce((...args) => {
+      presented().revokedAt = new Date()
+      return real?.(...args) ?? Promise.resolve(false)
     })
 
     await expect(
       ctx.service.exchangeRefreshToken(refreshParams())
     ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
-    expect(successors().filter(token => !token.revokedAt)).toEqual([])
+    expect(successors()).toEqual([])
   })
 
-  it('leaves no live successor when the retired token has gone missing', async () => {
-    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(null)
-
+  // The retirement and the successors are one write. If it fails, the client
+  // still holds a token that works.
+  it('leaves the token usable when its successors cannot be written', async () => {
+    vi.mocked(ctx.tokenRepository.rotate).mockRejectedValueOnce(
+      new Error('lost connection to MySQL')
+    )
     await expect(
       ctx.service.exchangeRefreshToken(refreshParams())
-    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
-    expect(successors().filter(token => !token.revokedAt)).toEqual([])
+    ).rejects.toThrow('lost connection to MySQL')
+
+    const issued = await ctx.service.exchangeRefreshToken(refreshParams())
+
+    expect(issued.refreshToken).toBeTruthy()
+    expect(ctx.store.tokens.some(token => token.revokedAt)).toBe(false)
+  })
+
+  it('gives a token from before grant ids, and its successors, a grant of their own', async () => {
+    presented().grantId = null
+
+    await ctx.service.exchangeRefreshToken(refreshParams())
+
+    const adopted = presented().grantId
+    expect(adopted).toMatch(/^[0-9a-f-]{36}$/)
+    expect(successors().map(token => token.grantId)).toEqual([adopted, adopted])
   })
 
   it.each(notAdmitted)(
