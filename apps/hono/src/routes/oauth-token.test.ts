@@ -22,10 +22,7 @@ vi.mock('../lib/services', () => ({
   },
 }))
 
-import {
-  oauthTokenClientLimiter,
-  oauthTokenIpLimiter,
-} from '../middleware/rate-limit'
+import { oauthTokenIpLimiter } from '../middleware/rate-limit'
 import { TEST_CLIENT_IP, exhaust } from '../test-support/rate-limit'
 
 const { oauthTokenRoutes } = await import('./oauth-token')
@@ -63,7 +60,6 @@ describe('POST /oauth/token', () => {
     // Module-level limiters outlive a single test, so every case starts with
     // its own budget rather than inheriting whatever the last one spent.
     oauthTokenIpLimiter.reset(TEST_CLIENT_IP)
-    oauthTokenClientLimiter.reset(CODE_GRANT.client_id)
     app = new Hono()
     app.route('/oauth', oauthTokenRoutes)
   })
@@ -304,7 +300,6 @@ describe('POST /oauth/revoke', () => {
     // Module-level limiters outlive a single test, so every case starts with
     // its own budget rather than inheriting whatever the last one spent.
     oauthTokenIpLimiter.reset(TEST_CLIENT_IP)
-    oauthTokenClientLimiter.reset(CODE_GRANT.client_id)
     app = new Hono()
     app.route('/oauth', oauthTokenRoutes)
   })

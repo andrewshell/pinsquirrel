@@ -197,20 +197,6 @@ export const oauthTokenIpLimiter = new RateLimiter({
 })
 
 /**
- * The same endpoint keyed on `client_id`, because a public client's IP proves
- * little: a native client refreshes from whatever address the user is on.
- *
- * Deliberately far looser than the per-IP limit. A CIMD `client_id` is one
- * string shared by every user of that application, so every Claude Code
- * installation in the world lands in this one bucket - a tight limit here
- * would be a self-inflicted outage rather than a defence.
- */
-export const oauthTokenClientLimiter = new RateLimiter({
-  maxAttempts: 300,
-  windowMs: 15 * 60 * 1000,
-})
-
-/**
  * The two protected resources, per IP, one limiter each so a flood at one
  * cannot spend the other's budget.
  *
@@ -272,47 +258,6 @@ export function rateLimitByIp(
     if (result.limited) {
       return refuse(c, message, result.retryAfterMs)
     }
-    await next()
-  }
-}
-
-/**
- * Limit a form-encoded OAuth request on the `client_id` it names.
- *
- * Sits beside `rateLimitByIp` on `/oauth/token` rather than replacing it: the
- * IP bounds one caller, and this bounds one application across every address
- * its users happen to be on.
- *
- * Reading the body here is safe because Hono caches the parsed body on the
- * request, so the handler's own `parseBody()` sees the same object rather than
- * a consumed stream.
- *
- * A request that names no client spends no budget. There would be nothing to
- * key on but a shared empty string, and one malformed caller could then lock
- * every real client out; the IP limiter has already counted it either way.
- */
-export function rateLimitByClientId(
-  limiter: RateLimiter,
-  message = 'Too many requests. Please try again later.'
-): MiddlewareHandler {
-  return async (c, next) => {
-    let clientId: string | undefined
-    try {
-      const body = await c.req.parseBody()
-      const value = body['client_id']
-      if (typeof value === 'string' && value !== '') clientId = value
-    } catch {
-      // Not a body this middleware can read. The endpoint answers 415 to those,
-      // which tells the caller far more than a rate-limit refusal would.
-    }
-
-    if (clientId) {
-      const result = limiter.hit(clientId)
-      if (result.limited) {
-        return refuse(c, message, result.retryAfterMs)
-      }
-    }
-
     await next()
   }
 }

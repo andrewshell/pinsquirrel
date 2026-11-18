@@ -60,8 +60,9 @@ is not repeated here. On top of it:
 - One Zod-to-`ValidationError` helper, `validationErrorFromZod`
   (`libs/services/src/validation/zod-error.ts`). Routes translate that to RFC 6749 codes, not
   the service.
-- Rate limiting is `RateLimiter` (`middleware/rate-limiter.ts`) plus `rateLimitByIp()` /
-  `rateLimitByClientId()` (`middleware/rate-limit.ts`), applied inside the route file. `getClientIp`
+- Rate limiting is `RateLimiter` (`middleware/rate-limiter.ts`) plus `rateLimitByIp()`
+  (`middleware/rate-limit.ts`), applied inside the route file to the routes it guards, never `'*'`
+  in a sub-app that mounts at a shared prefix. `getClientIp`
   honours forwarding headers only when `TRUST_PROXY` is set and the socket peer is a trusted proxy;
   production sets it.
 - `/mcp` builds an `McpServer` and a `StreamableHTTPTransport` per request and closes both
@@ -543,6 +544,11 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     profile form posts the client id and the service revokes every live token the user
     holds for it. A token id in the form went stale once the client refreshed and the
     sweep removed that row.
+33. **The token endpoint is limited per address only, not per `client_id`.** A `client_id` is
+    public and every user of a client shares it, so a budget keyed on it let requests from
+    other addresses refuse that client's real users. Authorization codes and refresh tokens
+    are 32 random bytes, so there is nothing a distributed caller could guess; the per-/64
+    budget bounds each caller.
 
 ## Reference
 
