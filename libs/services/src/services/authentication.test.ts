@@ -198,21 +198,25 @@ describe('AuthenticationService', () => {
       )
     })
 
-    it('should throw validation error for invalid password', async () => {
-      const loginInput = {
-        username: 'testuser',
-        password: 'short', // too short
-      }
+    it('signs in a user whose password predates the 12-character rule', async () => {
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(mockUser)
+      vi.mocked(verifyPassword).mockResolvedValue(true)
 
-      await expect(authService.login(loginInput)).rejects.toThrow(
-        'Password must be at least 12 characters'
-      )
+      await expect(
+        authService.login({ username: 'testuser', password: 'tenchars10' })
+      ).resolves.toEqual(mockUser)
+    })
+
+    it('should throw validation error for an empty password', async () => {
+      await expect(
+        authService.login({ username: 'testuser', password: '' })
+      ).rejects.toThrow('Password is required')
     })
 
     it('should report every field error, not just the first', async () => {
       const loginInput = {
         username: 'a!', // too short and has an illegal character
-        password: 'short', // too short
+        password: '',
       }
 
       const error = await authService.login(loginInput).catch((e: unknown) => e)
@@ -223,7 +227,7 @@ describe('AuthenticationService', () => {
           'Username must be at least 3 characters',
           'Username can only contain letters, numbers, and underscores',
         ],
-        password: ['Password must be at least 12 characters'],
+        password: ['Password is required'],
       })
     })
   })
@@ -863,14 +867,30 @@ describe('AuthenticationService', () => {
       ).rejects.toThrow(InvalidCredentialsError)
     })
 
-    it('should throw validation error for invalid current password', async () => {
+    it('accepts a correct current password that predates the 12-character rule', async () => {
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
+      vi.mocked(verifyPassword).mockResolvedValue(true)
+
+      await authService.changePassword(selfAc(mockUser.id), {
+        userId: mockUser.id,
+        currentPassword: 'tenchars10',
+        newPassword: 'newpass1234567',
+      })
+
+      expect(mockUserRepository.update).toHaveBeenCalledWith(mockUser.id, {
+        passwordHash: 'hashed_newpass1234567',
+      })
+    })
+
+    it('should throw validation error for an empty current password', async () => {
       await expect(
         authService.changePassword(selfAc('123'), {
           userId: '123',
-          currentPassword: 'short', // too short
+          currentPassword: '',
           newPassword: 'newpass1234567',
         })
-      ).rejects.toThrow('Password must be at least 12 characters')
+      ).rejects.toThrow('Password is required')
     })
 
     it('should throw validation error for invalid new password', async () => {

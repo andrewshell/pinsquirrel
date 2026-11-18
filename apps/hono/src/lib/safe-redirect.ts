@@ -6,7 +6,10 @@
  * `//evil.test`, and the URL parser strips tabs and newlines, so `/<tab>/evil`
  * is protocol-relative too. Parsing is the only way to see what the browser
  * will see. The resolved path is what gets returned, so any such smuggled
- * characters are gone from the `Location` header as well.
+ * characters are gone from the `Location` header as well. Resolving also
+ * removes dot segments, so `/.//evil.test` stays on our origin yet comes back
+ * as `//evil.test`; a resolved path starting with `//` is refused for that
+ * reason.
  */
 export function safeRedirect(
   redirectTo: string | undefined,
@@ -20,6 +23,7 @@ export function safeRedirect(
   try {
     const resolved = new URL(redirectTo, origin)
     if (resolved.origin !== origin) return fallback
+    if (resolved.pathname.startsWith('//')) return fallback
     return `${resolved.pathname}${resolved.search}${resolved.hash}`
   } catch {
     return fallback

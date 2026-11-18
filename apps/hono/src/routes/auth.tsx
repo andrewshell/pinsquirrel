@@ -9,6 +9,7 @@ import {
   ResetTokenExpiredError,
 } from '@pinsquirrel/domain'
 import { accountService, authService } from '../lib/services'
+import { baseUrl } from '../lib/config'
 import { isEmbedRequest, withEmbed } from '../lib/embed'
 import { getString } from '../lib/form'
 import { logger, safeError } from '../lib/logger.js'
@@ -174,18 +175,14 @@ auth.post(
     const email = getString(formData.email)
     const embed = getString(formData.embed) === '1'
 
-    // Build the reset URL for password verification email
-    const url = new URL(c.req.url)
-    const resetUrl = `${url.origin}/reset-password`
-
     try {
       const result = await accountService.register({
         username,
         email,
-        resetUrl,
+        resetUrl: `${baseUrl}/reset-password`,
         notifyEmail: process.env.NOTIFY_EMAIL || undefined,
-        signinUrl: `${url.origin}/signin`,
-        signupUrl: `${url.origin}/signup`,
+        signinUrl: `${baseUrl}/signin`,
+        signupUrl: `${baseUrl}/signup`,
       })
 
       if (result.emailFailed) {
@@ -263,15 +260,11 @@ auth.post(
     const email = getString(formData.email)
     const embed = getString(formData.embed) === '1'
 
-    // Build the reset URL
-    const url = new URL(c.req.url)
-    const resetBaseUrl = `${url.origin}/reset-password`
-
     try {
       // Request password reset - service handles validation
       await accountService.requestPasswordReset({
         email,
-        resetUrl: resetBaseUrl,
+        resetUrl: `${baseUrl}/reset-password`,
       })
 
       // Always show success message to avoid revealing whether email exists

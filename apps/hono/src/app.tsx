@@ -41,7 +41,7 @@ app.use('*', async (c, next) => {
   logger.info(
     {
       method: c.req.method,
-      path: c.req.path,
+      route: c.req.routePath,
       status: c.res.status,
       duration: Date.now() - start,
     },

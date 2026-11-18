@@ -66,7 +66,7 @@ export const ResetPasswordPage: FC<ResetPasswordPageProps> = ({
               <div>
                 <h2 class="text-xl font-bold mb-4">Set New Password</h2>
                 <p class="text-muted-foreground mb-4">
-                  Enter your new password below. Make sure it's at least 8
+                  Enter your new password below. Make sure it's at least 12
                   characters long.
                 </p>
 
