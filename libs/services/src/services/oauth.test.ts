@@ -458,6 +458,34 @@ describe('OAuthService.resolveClient', () => {
     expect(ctx.clientRepository.update).not.toHaveBeenCalled()
   })
 
+  it('refuses a client_id longer than its column without fetching it', async () => {
+    const prefix = 'https://example.com/'
+    const clientId = prefix + 'a'.repeat(256 - prefix.length)
+
+    await expect(ctx.service.resolveClient(clientId)).rejects.toBeInstanceOf(
+      OAuthInvalidClientError
+    )
+    expect(ctx.fetcher.fetch).not.toHaveBeenCalled()
+    expect(ctx.clientRepository.findByClientId).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a client_name longer than its column', { client_name: 'n'.repeat(256) }],
+    [
+      'a redirect URI longer than its column',
+      { redirect_uris: [`https://client.example/${'a'.repeat(500)}`] },
+    ],
+  ])('refuses a document with %s and stores nothing', async (_, patch) => {
+    vi.mocked(ctx.fetcher.fetch).mockResolvedValue(
+      JSON.stringify({ ...cimdDocument, ...patch })
+    )
+
+    await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(
+      OAuthInvalidClientMetadataError
+    )
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
   it('refuses a document it could not fetch at all', async () => {
     vi.mocked(ctx.fetcher.fetch).mockRejectedValue(new Error('ECONNREFUSED'))
 
@@ -495,6 +523,23 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
 
   // Nothing is redirected to a URI the client did not register, because the
   // redirect is where the code would be delivered.
+  it.each([
+    ['client_id', `https://example.com/${'a'.repeat(240)}`],
+    ['redirect_uri', `http://localhost:54321/${'a'.repeat(500)}`],
+    ['state', 's'.repeat(1025)],
+    ['scope', 'pins:read '.repeat(103)],
+  ])(
+    'rejects a %s longer than it may be as a validation failure',
+    async (field, value) => {
+      await expect(
+        ctx.service.resolveAuthorizationRequest(
+          authorizeParams({ [field]: value })
+        )
+      ).rejects.toBeInstanceOf(ValidationError)
+      expect(ctx.fetcher.fetch).not.toHaveBeenCalled()
+    }
+  )
+
   it('rejects a redirect URI the client never registered', async () => {
     await expect(
       ctx.service.resolveAuthorizationRequest(
@@ -1231,6 +1276,25 @@ describe('OAuthService.registerClient', () => {
         registration({ grant_types: ['client_credentials'] })
       )
     ).rejects.toBeInstanceOf(OAuthInvalidClientMetadataError)
+  })
+
+  // The columns are what bound these, and a value over one fails as a 500
+  // inside the insert. Refused up front, it is the caller's error instead.
+  it('refuses a client_name longer than its column before creating a row', async () => {
+    await expect(
+      ctx.service.registerClient(registration({ client_name: 'n'.repeat(256) }))
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses a redirect URI longer than its column before creating a row', async () => {
+    const prefix = 'http://localhost:54321/'
+    const uri = prefix + 'a'.repeat(513 - prefix.length)
+
+    await expect(
+      ctx.service.registerClient(registration({ redirect_uris: [uri] }))
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
   it('rejects a malformed registration as a validation failure', async () => {

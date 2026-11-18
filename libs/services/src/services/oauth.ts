@@ -34,6 +34,7 @@ import {
   clientIdMetadataDocumentSchema,
   clientRegistrationSchema,
   isUsableRedirectUri,
+  MAX_CLIENT_ID_LENGTH,
   refreshTokenGrantSchema,
   type ClientIdMetadataDocument,
 } from '../validation/oauth.js'
@@ -848,6 +849,12 @@ export class OAuthService {
    * `dcr` or `static` registration and is a row lookup.
    */
   async resolveClient(clientId: string): Promise<OAuthClient> {
+    if (clientId.length > MAX_CLIENT_ID_LENGTH) {
+      // No row can be stored under it, so there is nothing to look up and no
+      // document worth fetching.
+      throw new OAuthInvalidClientError('client_id is too long')
+    }
+
     if (looksLikeUrl(clientId)) {
       return this.resolveClientIdMetadataDocument(clientId)
     }
