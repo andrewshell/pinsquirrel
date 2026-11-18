@@ -978,6 +978,27 @@ describe("initBackground: the options page's disconnect request", () => {
     }
   })
 
+  it('stops keeping the worker alive when Disconnect fails', async () => {
+    vi.useFakeTimers()
+    try {
+      const chrome = stubChrome(CONNECTED)
+      const waiting = deferred()
+      initBackground(deps({ disconnect: () => waiting.promise }))
+
+      deliver(chrome, { type: 'disconnect' })
+      await vi.advanceTimersByTimeAsync(60_000)
+      const whileWaiting = chrome.getPlatformInfo.mock.calls.length
+
+      waiting.reject(new Error('Storage is full'))
+      await vi.advanceTimersByTimeAsync(60_000)
+
+      expect(whileWaiting).toBeGreaterThanOrEqual(2)
+      expect(chrome.getPlatformInfo).toHaveBeenCalledTimes(whileWaiting)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('answers a failed disconnect with the reason, rather than rejecting', async () => {
     const chrome = stubChrome(CONNECTED)
     const disconnect = vi.fn(() => Promise.reject(new Error('Storage is full')))
