@@ -410,7 +410,8 @@ export class OAuthService {
    * Spend an authorization code and mint the tokens it stands for.
    *
    * The code is read and checked first. One that was already spent takes the
-   * tokens it produced down with it. A code that passes is spent and its
+   * tokens it produced down with it, when the client it was issued to presents
+   * it. A code that passes is spent and its
    * tokens are written in one step (`exchange`), so a failure in between
    * leaves the client a code that still works. A code that fails a check is
    * spent anyway, because a failed check must not leave a code alive to try
@@ -437,6 +438,9 @@ export class OAuthService {
       hashToken(request.code)
     )
     if (code?.consumedAt) {
+      if (code.clientId !== client.clientId) {
+        throw invalidCode()
+      }
       return this.refuseSpentCode(code)
     }
     if (!code || code.expiresAt <= new Date()) {

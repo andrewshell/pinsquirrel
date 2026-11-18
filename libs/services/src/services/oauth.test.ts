@@ -1064,6 +1064,24 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
       ])
     })
 
+    // Only the client the code was issued to can end its grant by presenting
+    // it again; anyone else is told the same thing and changes nothing.
+    it('is refused without ending the grant when another client presents it', async () => {
+      const first = await ctx.service.exchangeAuthorizationCode(tokenParams())
+      const other = 'dcr_another_client'
+      vi.mocked(ctx.clientRepository.findByClientId).mockImplementation(id =>
+        Promise.resolve(makeClient({ clientId: id }))
+      )
+
+      await expect(
+        ctx.service.exchangeAuthorizationCode(tokenParams({ client_id: other }))
+      ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+
+      expect(
+        await ctx.service.verifyAccessToken(first.accessToken, MCP_RESOURCE)
+      ).not.toBeNull()
+    })
+
     it('ends everything the client holds when the code has no grant id', async () => {
       ctx.store.codes[0].grantId = null
       await ctx.service.exchangeAuthorizationCode(tokenParams())
