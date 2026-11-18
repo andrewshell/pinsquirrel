@@ -4,7 +4,10 @@ import type { MySql2Database } from 'drizzle-orm/mysql2'
 import mysql from 'mysql2/promise'
 import type { Pool } from 'mysql2/promise'
 import { eq } from 'drizzle-orm'
-import type { CreateAuthorizationCodeData } from '@pinsquirrel/domain'
+import type {
+  AuthorizationCode,
+  CreateAuthorizationCodeData,
+} from '@pinsquirrel/domain'
 import { insertUser } from '../test-fixtures.js'
 import { oauthAuthorizationCodes } from '../schema/oauth-authorization-codes.js'
 import { DrizzleOAuthClientRepository } from './oauth-client.js'
@@ -17,6 +20,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
   let clients: DrizzleOAuthClientRepository
   let userId: string
   let clientId: string
+  let sessionId: string
 
   const TEST_DATABASE_URL =
     process.env.TEST_DATABASE_URL ||
@@ -36,6 +40,14 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
     ...overrides,
   })
 
+  /** A code created under the user's live session, for tests about the rest. */
+  const createCode = async (data = code()): Promise<AuthorizationCode> => {
+    const created = await repository.create(data, sessionId)
+    if (!created)
+      throw new Error('The session the code was created under is gone')
+    return created
+  }
+
   beforeAll(() => {
     testPool = mysql.createPool(TEST_DATABASE_URL)
     testDb = drizzle({ client: testPool })
@@ -52,9 +64,15 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
     await testPool.query('DELETE FROM oauth_tokens')
     await testPool.query('DELETE FROM oauth_authorization_codes')
     await testPool.query('DELETE FROM oauth_clients')
+    await testPool.query('DELETE FROM sessions')
     await testPool.query('DELETE FROM users')
 
     userId = (await insertUser(testPool)).id
+    sessionId = crypto.randomUUID().replace(/-/g, '').repeat(2)
+    await testPool.query(
+      'INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)',
+      [sessionId, userId, new Date(Date.now() + 60 * 60 * 1000)]
+    )
     clientId = (
       await clients.create({
         clientId: `client-${crypto.randomUUID()}`,
@@ -71,7 +89,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
     it('should create a code with everything the exchange has to check', async () => {
       const data = code()
 
-      const result = await repository.create(data)
+      const result = await createCode(data)
 
       expect(result).toMatchObject({
         codeHash: data.codeHash,
@@ -90,12 +108,31 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
 
     it('should reject a code for an unregistered client', async () => {
       await expect(
-        repository.create(code({ clientId: 'never-registered' }))
+        repository.create(code({ clientId: 'never-registered' }), sessionId)
       ).rejects.toThrow()
     })
 
+    // A password reset deletes the user's sessions and unspent codes at one
+    // instant. An authorization still in flight then must not leave a code
+    // behind that nothing will revoke.
+    it('should create nothing once the session it was approved in is gone', async () => {
+      await testPool.query('DELETE FROM sessions WHERE id = ?', [sessionId])
+      const data = code()
+
+      expect(await repository.create(data, sessionId)).toBeNull()
+      expect(await repository.findByCodeHash(data.codeHash)).toBeNull()
+    })
+
+    it('should create nothing under a session that belongs to another user', async () => {
+      const otherUserId = (await insertUser(testPool)).id
+      const data = code({ userId: otherUserId })
+
+      expect(await repository.create(data, sessionId)).toBeNull()
+      expect(await repository.findByCodeHash(data.codeHash)).toBeNull()
+    })
+
     it('should go with the client when the client is deleted', async () => {
-      const created = await repository.create(code())
+      const created = await createCode()
 
       const client = await clients.findByClientId(clientId)
       await clients.delete(client!.id)
@@ -104,7 +141,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
     })
 
     it('should go with the user when the user is deleted', async () => {
-      const created = await repository.create(code())
+      const created = await createCode()
 
       await testPool.query('DELETE FROM users WHERE id = ?', [userId])
 
@@ -114,7 +151,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
 
   describe('findByCodeHash', () => {
     it('should find a code by its hash', async () => {
-      const created = await repository.create(code())
+      const created = await createCode()
 
       const result = await repository.findByCodeHash(created.codeHash)
 
@@ -129,7 +166,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
 
   describe('consume', () => {
     it('should return the code and mark it spent', async () => {
-      const created = await repository.create(code())
+      const created = await createCode()
 
       const consumed = await repository.consume(created.codeHash)
 
@@ -141,7 +178,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
     })
 
     it('should refuse a second exchange of the same code', async () => {
-      const created = await repository.create(code())
+      const created = await createCode()
       await repository.consume(created.codeHash)
 
       expect(await repository.consume(created.codeHash)).toBeNull()
@@ -150,7 +187,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
     it('should let exactly one of two concurrent exchanges win', async () => {
       // The single-use guarantee. A read-then-write would let both callers
       // see an unconsumed code and both mint tokens.
-      const created = await repository.create(code())
+      const created = await createCode()
 
       const results = await Promise.all([
         repository.consume(created.codeHash),
@@ -161,7 +198,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
     })
 
     it('should refuse an expired code', async () => {
-      const created = await repository.create(
+      const created = await createCode(
         code({ expiresAt: new Date(Date.now() - 1000) })
       )
 
@@ -176,7 +213,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
 
   describe('delete', () => {
     it('should delete a code', async () => {
-      const created = await repository.create(code())
+      const created = await createCode()
 
       expect(await repository.delete(created.id)).toBe(true)
       expect(await repository.findById(created.id)).toBeNull()
@@ -189,12 +226,12 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
 
   describe('deleteExpiredCodes', () => {
     it('should delete expired codes, spent or not, and keep live ones', async () => {
-      const expired = await repository.create(code())
+      const expired = await createCode()
       await testDb
         .update(oauthAuthorizationCodes)
         .set({ expiresAt: new Date(Date.now() - 1000) })
         .where(eq(oauthAuthorizationCodes.id, expired.id))
-      const live = await repository.create(code())
+      const live = await createCode()
       await repository.consume(live.codeHash)
 
       const deleted = await repository.deleteExpiredCodes()

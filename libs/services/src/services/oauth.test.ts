@@ -46,6 +46,8 @@ const API_RESOURCE = 'https://pinsquirrel.com/api/v1'
 
 const CIMD_URL = 'https://claude.ai/oauth/claude-code-client-metadata'
 
+const SESSION_ID = 'session-1'
+
 /** Claude Code's real published document. */
 const cimdDocument = {
   client_id: CIMD_URL,
@@ -638,6 +640,7 @@ describe('OAuthService.authorize', () => {
     const outcome = await ctx.service.authorize(ac, {
       params: authorizeParams(),
       userId: user.id,
+      sessionId: SESSION_ID,
       approved: true,
     })
 
@@ -659,10 +662,27 @@ describe('OAuthService.authorize', () => {
         codeChallenge: CODE_CHALLENGE,
         scopes: ['pins:read', 'tags:read'],
         resource: MCP_RESOURCE,
-      })
+      }),
+      SESSION_ID
     )
     const created = vi.mocked(ctx.codeRepository.create).mock.calls[0][0]
     expect(created.expiresAt.getTime()).toBeGreaterThan(Date.now())
+  })
+
+  // The repository writes the code only while the approving session exists,
+  // so a password reset that ended it mid-request leaves nothing to exchange.
+  it('refuses when the session that approved the request has ended', async () => {
+    vi.mocked(ctx.codeRepository.create).mockResolvedValue(null)
+
+    await expect(
+      ctx.service.authorize(ac, {
+        params: authorizeParams(),
+        userId: user.id,
+        sessionId: SESSION_ID,
+        approved: true,
+      })
+    ).rejects.toBeInstanceOf(OAuthAccessDeniedError)
+    expect(ctx.clientRepository.markCompleted).not.toHaveBeenCalled()
   })
 
   // `completed_at` is what keeps a registration out of the incomplete-DCR
@@ -671,6 +691,7 @@ describe('OAuthService.authorize', () => {
     await ctx.service.authorize(ac, {
       params: authorizeParams(),
       userId: user.id,
+      sessionId: SESSION_ID,
       approved: true,
     })
 
@@ -688,6 +709,7 @@ describe('OAuthService.authorize', () => {
     await ctx.service.authorize(ac, {
       params: authorizeParams(),
       userId: user.id,
+      sessionId: SESSION_ID,
       approved: true,
     })
 
@@ -700,6 +722,7 @@ describe('OAuthService.authorize', () => {
     const outcome = await ctx.service.authorize(ac, {
       params: authorizeParams(),
       userId: user.id,
+      sessionId: SESSION_ID,
       approved: false,
     })
 
@@ -720,6 +743,7 @@ describe('OAuthService.authorize', () => {
         ctx.service.authorize(new AccessControl(account), {
           params: authorizeParams(),
           userId: account.id,
+          sessionId: SESSION_ID,
           approved: true,
         })
       ).rejects.toBeInstanceOf(OAuthAccessDeniedError)
@@ -732,6 +756,7 @@ describe('OAuthService.authorize', () => {
       ctx.service.authorize(new AccessControl(otherUser), {
         params: authorizeParams(),
         userId: user.id,
+        sessionId: SESSION_ID,
         approved: true,
       })
     ).rejects.toBeInstanceOf(OAuthAccessDeniedError)
