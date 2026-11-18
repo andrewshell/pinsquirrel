@@ -1,5 +1,65 @@
 # Changelog
 
+## [3.11.0](https://github.com/andrewshell/pinsquirrel/compare/v3.10.1...v3.11.0) (2026-11-18)
+
+
+### Features
+
+* **hono:** drain deferred account work on shutdown ([56a851f](https://github.com/andrewshell/pinsquirrel/commit/56a851fd9ac8e27e86d7561f909dd244c050ffbf))
+
+
+### Bug Fixes
+
+* **account:** cancel a pending email change when credentials are revoked ([691909e](https://github.com/andrewshell/pinsquirrel/commit/691909eaadf78479deec1cc616c520331c442557))
+* **account:** profile error placement and small account follow-ups ([0e391ac](https://github.com/andrewshell/pinsquirrel/commit/0e391ac6c5796a3f90d9e9b7d415a7541f9c8980))
+* **account:** refuse a reset link whose account is gone at write time ([2f43233](https://github.com/andrewshell/pinsquirrel/commit/2f4323390d2ce678a78e92edc3249a8a3ffca02c))
+* **auth:** make rate-limit release idempotent; document TRUST_PROXY and sign-in lockout ([bb252df](https://github.com/andrewshell/pinsquirrel/commit/bb252df37274215d2b122c59e3c3e4820191f5e8))
+* **database:** create a user and its roles in one transaction ([8e9112e](https://github.com/andrewshell/pinsquirrel/commit/8e9112eff4d8fd4651811ed3c3cb0606f969387e))
+* **database:** end unused authorization codes with sessions and tokens ([24f2544](https://github.com/andrewshell/pinsquirrel/commit/24f254411afc20d58df0e2a708b8588c936f5b87))
+* **database:** load a user and its roles by username in one query ([0e14bf5](https://github.com/andrewshell/pinsquirrel/commit/0e14bf51b6d211cd09bf7f3756acb4507c624598))
+* **docker:** move to Node 26.13.1 LTS ([#187](https://github.com/andrewshell/pinsquirrel/issues/187)) ([a95a0b0](https://github.com/andrewshell/pinsquirrel/commit/a95a0b0f573c50cc6974edb242432d42033e4988))
+* harden sessions and stored credentials ([aa57de1](https://github.com/andrewshell/pinsquirrel/commit/aa57de1ed1c019729bbc1c29b868bf793950efeb))
+* **hono:** accept the legacy session cookie only for pre-hashing ids ([f8aaff4](https://github.com/andrewshell/pinsquirrel/commit/f8aaff450717173491a28ae407ce7b350a7dccfd))
+* **hono:** build emailed links from the configured origin ([eacd77b](https://github.com/andrewshell/pinsquirrel/commit/eacd77bf46ef48d515002b39061804505fbd9bd5))
+* **hono:** cap request body size app-wide ([c830a96](https://github.com/andrewshell/pinsquirrel/commit/c830a962db1ee825ad4e51451efed9bc7c7e12d8))
+* **hono:** confirm email changes from the new address ([30bbb5e](https://github.com/andrewshell/pinsquirrel/commit/30bbb5e8385a643dc24fafcc8511fcd2fb3361ea))
+* **hono:** count an IPv6 caller's whole /64 against IP-keyed limits ([2199d36](https://github.com/andrewshell/pinsquirrel/commit/2199d3682c8ad0c1e943da31fc10673bcf836a5a))
+* **hono:** count sign-in and unlock attempts before verifying the password ([58cea7d](https://github.com/andrewshell/pinsquirrel/commit/58cea7d4bf85249d17ed49ecc915ce23fc6ddcd2))
+* **hono:** describe how email addresses are stored and shared ([8786f95](https://github.com/andrewshell/pinsquirrel/commit/8786f95c67266cdf9cc0d8a05becc7064ab30266))
+* **hono:** end sessions when account access changes ([070cfd5](https://github.com/andrewshell/pinsquirrel/commit/070cfd55724c7d72f63c1a5a0bfd6143201ca4a1))
+* **hono:** hash stored session identifiers and use a __Host- cookie ([bc28dd6](https://github.com/andrewshell/pinsquirrel/commit/bc28dd69693a055afdbbd3fa9fec1859428be135))
+* **hono:** honour forwarding headers only from trusted peers ([89b51be](https://github.com/andrewshell/pinsquirrel/commit/89b51beda43597eee8fb8997ded78db6663c36c7))
+* **hono:** key IPv6 peers with a zone id instead of throwing ([5b6a0cd](https://github.com/andrewshell/pinsquirrel/commit/5b6a0cdbf282dd2cdc3421b347dd559e245fe755))
+* **hono:** leave failed-query parameters out of logged errors ([ae9b2b1](https://github.com/andrewshell/pinsquirrel/commit/ae9b2b1d249c5a71213a5017ba5d0a1ec5ca2076))
+* **hono:** limit failed sign-ins per username across addresses ([47de055](https://github.com/andrewshell/pinsquirrel/commit/47de055e4011f2fe9157608315589ad993cdda99))
+* **hono:** limit wrong current passwords on change-password ([690fa51](https://github.com/andrewshell/pinsquirrel/commit/690fa51d0ce1a8c64342efa85fdb6a532866bb73))
+* **hono:** log the matched route pattern instead of the request path ([74b05a3](https://github.com/andrewshell/pinsquirrel/commit/74b05a3b414713befdcfdee26999e3095319ec5f))
+* **hono:** refuse redirect targets that resolve to a // path ([e350d7c](https://github.com/andrewshell/pinsquirrel/commit/e350d7c4fda644f191e3a5572a25b6e0549e0a79))
+* **hono:** show each profile error in the card of the form that posted it ([2cb8e8b](https://github.com/andrewshell/pinsquirrel/commit/2cb8e8b159f26b185d76cd789ec6dcc09f59bb52))
+* **hono:** show profile times in UTC and label the zone ([1b0733a](https://github.com/andrewshell/pinsquirrel/commit/1b0733ab2e85cee0f88773063d7d1edbc9652155))
+* **hono:** stop recording refused attempts in the rate limiter ([368c7e2](https://github.com/andrewshell/pinsquirrel/commit/368c7e2e0ab650aea0f2e8cedb4546f3c1440c4f))
+* **hono:** tighten account rate limits and request limits ([0cfb656](https://github.com/andrewshell/pinsquirrel/commit/0cfb656c676b6a549c09b559026d21ae866f7b1d))
+* **hono:** use the configured origin, parsed redirect paths and existing-password checks ([393443c](https://github.com/andrewshell/pinsquirrel/commit/393443c22593a60b5f8e7b001ec2cf28442d4c5a))
+* **hono:** write back only the session keys a request changed ([0cdb2de](https://github.com/andrewshell/pinsquirrel/commit/0cdb2de7fb50e50856b9e3fc9f33c0e47fd62391))
+* **mailgun:** turn off click and open tracking on every message ([a1f6cad](https://github.com/andrewshell/pinsquirrel/commit/a1f6cad96992604b68726a3a48e84655078c4276))
+* **rate-limit:** key hex IPv4-mapped, loopback and unspecified addresses correctly ([4ad2683](https://github.com/andrewshell/pinsquirrel/commit/4ad26832caeedf16155bd590597564e6afbc62e3))
+* **services:** check existing passwords without the 12-character rule ([f52218f](https://github.com/andrewshell/pinsquirrel/commit/f52218f88d10363fe2c863b859eddc727695e590))
+* **services:** confirm email changes and answer every address alike ([1eab352](https://github.com/andrewshell/pinsquirrel/commit/1eab35236ef2e39e4ba78d22b28ebeafe42fb841))
+* **services:** count already-registered mail toward the reset limit ([0b7a6d0](https://github.com/andrewshell/pinsquirrel/commit/0b7a6d0ca539828a868665a1a1e70d9ed6907868))
+* **services:** defer sign-up and reset work past validation ([364ad5e](https://github.com/andrewshell/pinsquirrel/commit/364ad5ea14cc02d3485bb6d695d6a9791b35f781))
+* **services:** derive at every known scrypt cost on each password check ([3b3b304](https://github.com/andrewshell/pinsquirrel/commit/3b3b3048766df4735ba52149a54995e46ecd5b66))
+* **services:** end sessions and OAuth tokens when the password changes ([101ad12](https://github.com/andrewshell/pinsquirrel/commit/101ad127b275b9120780157fcb0756567840b5d3))
+* **services:** keep a refresh from outliving a concurrent revoke ([17a394f](https://github.com/andrewshell/pinsquirrel/commit/17a394f91f5ef88c7faba3d7f8fa0dcd746772bf))
+* **services:** keep reset tokens so the per-account reset limit counts ([5e9197f](https://github.com/andrewshell/pinsquirrel/commit/5e9197f41e336e31d7067bddd4ba51a9a791dda4))
+* **services:** key the stored email hash with EMAIL_HASH_KEY ([d6faf77](https://github.com/andrewshell/pinsquirrel/commit/d6faf77836299b208f5c15ca44b01091c3c756b3))
+* **services:** record scrypt parameters in stored password hashes ([028d99c](https://github.com/andrewshell/pinsquirrel/commit/028d99caee9311a48fc5d55a98878b44b368bcdf))
+* **services:** rehash on sign-in only over the hash that was verified ([88455a8](https://github.com/andrewshell/pinsquirrel/commit/88455a8cde92e2981fd93206f9f21352e5d3d09f))
+* **services:** release usernames and emails held by stale sign-ups ([f3c3338](https://github.com/andrewshell/pinsquirrel/commit/f3c33384c1a7dcfdbcce38852bb449a7c7d00053))
+* **services:** revoke a connected application by client, not by one token ([89de911](https://github.com/andrewshell/pinsquirrel/commit/89de911b1ce775ca3790c7a59e651ffca9a02ec1))
+* **services:** send sign-up verification as its own 48-hour mail ([0524e22](https://github.com/andrewshell/pinsquirrel/commit/0524e2252250edc3119f20511afb9b88674c2b93))
+* **services:** show when a connected application's access runs out ([9daf8cc](https://github.com/andrewshell/pinsquirrel/commit/9daf8ccb566dc640ff3b2a8c4300f0a874f8a8fb))
+* **services:** use a reset token at most once ([97b91e8](https://github.com/andrewshell/pinsquirrel/commit/97b91e88ffaae1ce5618c4ae358ae8240bf266a8))
+
 ## [3.10.1](https://github.com/andrewshell/pinsquirrel/compare/v3.10.0...v3.10.1) (2026-10-23)
 
 
