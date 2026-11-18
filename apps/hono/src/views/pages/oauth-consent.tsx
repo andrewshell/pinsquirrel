@@ -85,93 +85,87 @@ export const OAuthConsentPage: FC<OAuthConsentPageProps> = ({
   resource,
   params,
   embed = false,
-}) => {
-  const clientLabel = displayName(client)
-  const clientProvenance = provenance(client)
-  return (
-    <DefaultLayout
-      title="Authorize application"
-      user={user}
-      width="form"
-      embed={embed}
-    >
-      <Card>
-        <CardHeader>
-          <CardTitle>Authorize {clientLabel}</CardTitle>
-        </CardHeader>
-        <CardContent class="space-y-4">
-          <p class="text-sm text-muted-foreground">
-            <span class="font-bold text-foreground">{clientLabel}</span> wants
-            access to your PinSquirrel account as{' '}
-            <span class="font-bold text-foreground">{user.username}</span>.
-          </p>
-          {clientProvenance && (
-            <p class="text-sm text-muted-foreground">{clientProvenance}</p>
-          )}
+}) => (
+  <DefaultLayout
+    title="Authorize application"
+    user={user}
+    width="form"
+    embed={embed}
+  >
+    <Card>
+      <CardHeader>
+        <CardTitle>Authorize {displayName(client)}</CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <p class="text-sm text-muted-foreground">
+          <span class="font-bold text-foreground">{displayName(client)}</span>{' '}
+          wants access to your PinSquirrel account as{' '}
+          <span class="font-bold text-foreground">{user.username}</span>.
+        </p>
+        {provenance(client) && (
+          <p class="text-sm text-muted-foreground">{provenance(client)}</p>
+        )}
 
-          <div class="bg-muted p-4 border-2 border-foreground neobrutalism-shadow space-y-2">
-            <p class="text-sm font-medium text-foreground">It is asking to:</p>
-            <ul class="space-y-1">
-              {scopes.map(scope => (
-                <li class="text-sm text-foreground">
-                  <span class="font-mono text-xs">{scope}</span>
-                  {SCOPE_DESCRIPTIONS[scope] && (
-                    <span class="text-muted-foreground">
-                      {' '}
-                      &mdash; {SCOPE_DESCRIPTIONS[scope]}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <dl class="text-sm space-y-1">
-            <div>
-              <dt class="inline font-medium text-foreground">
-                Sends you back to
-              </dt>
-              <dd class="inline text-muted-foreground">
-                {' '}
-                <span class="font-bold text-foreground">
-                  {redirectHost}
-                </span>{' '}
-                <span class="font-mono text-xs break-all">({redirectUri})</span>
-              </dd>
-            </div>
-            <div>
-              <dt class="inline font-medium text-foreground">Access to</dt>
-              <dd class="inline text-muted-foreground font-mono text-xs break-all">
-                {' '}
-                {resource}
-              </dd>
-            </div>
-          </dl>
-
-          <p class="text-sm text-muted-foreground">
-            Only approve this if you started it. Check the name and the address
-            above match the application you are connecting.
-          </p>
-
-          <form method="post" action="/oauth/authorize" class="flex gap-3">
-            {Object.entries(params).map(([name, value]) => (
-              <input type="hidden" name={name} value={value} />
+        <div class="bg-muted p-4 border-2 border-foreground neobrutalism-shadow space-y-2">
+          <p class="text-sm font-medium text-foreground">It is asking to:</p>
+          <ul class="space-y-1">
+            {scopes.map(scope => (
+              <li class="text-sm text-foreground">
+                <span class="font-mono text-xs">{scope}</span>
+                {SCOPE_DESCRIPTIONS[scope] && (
+                  <span class="text-muted-foreground">
+                    {' '}
+                    &mdash; {SCOPE_DESCRIPTIONS[scope]}
+                  </span>
+                )}
+              </li>
             ))}
-            {embed && <input type="hidden" name="embed" value="1" />}
-            <Button type="submit" name="decision" value="approve">
-              Approve
-            </Button>
-            <Button
-              type="submit"
-              name="decision"
-              value="deny"
-              variant="destructive"
-            >
-              Deny
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </DefaultLayout>
-  )
-}
+          </ul>
+        </div>
+
+        <dl class="text-sm space-y-1">
+          <div>
+            <dt class="inline font-medium text-foreground">
+              Sends you back to
+            </dt>
+            <dd class="inline text-muted-foreground">
+              {' '}
+              <span class="font-bold text-foreground">{redirectHost}</span>{' '}
+              <span class="font-mono text-xs break-all">({redirectUri})</span>
+            </dd>
+          </div>
+          <div>
+            <dt class="inline font-medium text-foreground">Access to</dt>
+            <dd class="inline text-muted-foreground font-mono text-xs break-all">
+              {' '}
+              {resource}
+            </dd>
+          </div>
+        </dl>
+
+        <p class="text-sm text-muted-foreground">
+          Only approve this if you started it. Check the name and the address
+          above match the application you are connecting.
+        </p>
+
+        <form method="post" action="/oauth/authorize" class="flex gap-3">
+          {Object.entries(params).map(([name, value]) => (
+            <input type="hidden" name={name} value={value} />
+          ))}
+          {embed && <input type="hidden" name="embed" value="1" />}
+          <Button type="submit" name="decision" value="approve">
+            Approve
+          </Button>
+          <Button
+            type="submit"
+            name="decision"
+            value="deny"
+            variant="destructive"
+          >
+            Deny
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  </DefaultLayout>
+)

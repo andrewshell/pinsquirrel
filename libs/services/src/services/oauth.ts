@@ -1191,8 +1191,9 @@ function grantedScopes(scope: string | undefined): string[] {
   // text, and this message is shown under this server's name.
   const unknown = requested.filter(one => !SUPPORTED_SCOPES.includes(one))
   if (unknown.length > 0) {
+    const noun = unknown.length === 1 ? 'scope' : 'scopes'
     throw new OAuthInvalidScopeError(
-      `${unknown.length === 1 ? '1 unknown scope' : `${unknown.length} unknown scopes`} requested. This server grants ${SUPPORTED_SCOPES.join(', ')}`
+      `${unknown.length} unknown ${noun} requested. This server grants ${SUPPORTED_SCOPES.join(', ')}`
     )
   }
 
