@@ -21,9 +21,9 @@ import { retryOnDeadlock } from './deadlock'
 import {
   changedRows,
   holdUserWhileIssuing,
-  inBatches,
   insertTokens,
   issueOrRefuse,
+  PRIMARY_KEY_BATCH,
   revokeUserTokens,
 } from './oauth-issuance'
 
@@ -135,22 +135,29 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
     // Found with a read that locks nothing, then deleted by primary key. One
     // DELETE over the whole table locks every gap in it, and a refresh that
     // has retired its token cannot then insert the successors. PLAN.md
-    // decision 41.
-    const found = await this.db
-      .select({ id: oauthTokens.id })
-      .from(oauthTokens)
-      .where(dead)
-
+    // decision 41. One batch at a time, each read starting after the last id
+    // of the one before, so a backlog of any size is one pass over the table.
     let deleted = 0
-    for (const batch of inBatches(found.map(row => row.id))) {
+    let lastId = ''
+    for (;;) {
+      const batch = await this.db
+        .select({ id: oauthTokens.id })
+        .from(oauthTokens)
+        .where(and(gt(oauthTokens.id, lastId), dead))
+        .orderBy(oauthTokens.id)
+        .limit(PRIMARY_KEY_BATCH)
+      if (batch.length === 0) {
+        return deleted
+      }
+      const ids = batch.map(row => row.id)
       deleted += await retryOnDeadlock(() =>
         changedRows(
           this.db,
-          sql`delete ${oauthTokens} from ${oauthTokens} force index (primary) where ${and(inArray(oauthTokens.id, batch), dead)}`
+          sql`delete ${oauthTokens} from ${oauthTokens} force index (primary) where ${and(inArray(oauthTokens.id, ids), dead)}`
         )
       )
+      lastId = ids[ids.length - 1]
     }
-    return deleted
   }
 
   /** Not expired, not revoked, not already exchanged for a successor. */

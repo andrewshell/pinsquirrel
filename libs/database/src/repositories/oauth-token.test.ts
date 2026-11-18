@@ -8,6 +8,7 @@ import type { CreateOAuthTokenData } from '@pinsquirrel/domain'
 import { heavyTransaction, insertUser } from '../test-fixtures.js'
 import { oauthTokens } from '../schema/oauth-tokens.js'
 import { DrizzleOAuthClientRepository } from './oauth-client.js'
+import { PRIMARY_KEY_BATCH } from './oauth-issuance.js'
 import { DrizzleOAuthTokenRepository } from './oauth-token.js'
 
 describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
@@ -319,7 +320,10 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
       expect(await repository.revokeByUserAndClient(userId, clientId)).toBe(
         1100
       )
-      expect(await repository.findActiveByUserId(userId)).toEqual([])
+      const [unrevoked] = await testPool.query(
+        'SELECT id FROM oauth_tokens WHERE revoked_at IS NULL'
+      )
+      expect(unrevoked).toEqual([])
     })
   })
 
@@ -720,12 +724,57 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
       expect(await repository.findById(expired.id)).toBeNull()
     })
 
+    it('should not wait on a live token that a refresh holds, among more dead tokens than one batch holds', async () => {
+      const live = await repository.create(token({ kind: 'refresh' }))
+      await seedTokens(1100, new Date(Date.now() - 1000))
+      await testPool.query('ANALYZE TABLE oauth_tokens')
+      const refreshing = await testPool.getConnection()
+      await refreshing.beginTransaction()
+      await refreshing.query(
+        'UPDATE oauth_tokens SET rotated_at = NOW(3) WHERE id = ?',
+        [live.id]
+      )
+
+      const sweeping = repository.deleteExpiredTokens()
+      const settledWhileRefreshing = await settles(sweeping)
+      await refreshing.rollback()
+      refreshing.release()
+
+      expect(settledWhileRefreshing).toBe(true)
+      expect(await sweeping).toBe(1100)
+    })
+
     it('should delete more dead tokens than one batch holds', async () => {
       await seedTokens(1100, new Date(Date.now() - 1000))
       const live = await repository.create(token())
 
       expect(await repository.deleteExpiredTokens()).toBe(1100)
       expect(await repository.findById(live.id)).not.toBeNull()
+    })
+
+    it('should read no more dead tokens at once than one batch holds', async () => {
+      await seedTokens(1100, new Date(Date.now() - 1000))
+      let largestRead = 0
+      const counting = new Proxy(testPool, {
+        get(pool, property, receiver) {
+          if (property !== 'query') {
+            return Reflect.get(pool, property, receiver) as unknown
+          }
+          return async (...args: Parameters<Pool['query']>) => {
+            const result = await pool.query(...args)
+            if (Array.isArray(result[0])) {
+              largestRead = Math.max(largestRead, result[0].length)
+            }
+            return result
+          }
+        },
+      })
+      const sweep = new DrizzleOAuthTokenRepository(
+        drizzle({ client: counting })
+      )
+
+      expect(await sweep.deleteExpiredTokens()).toBe(1100)
+      expect(largestRead).toBe(PRIMARY_KEY_BATCH)
     })
 
     it('should keep a rotated refresh token until its own expiry', async () => {

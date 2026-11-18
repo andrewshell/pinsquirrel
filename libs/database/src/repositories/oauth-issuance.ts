@@ -14,7 +14,7 @@ type Transaction = Parameters<Parameters<MySql2Database['transaction']>[0]>[0]
  * Rows a statement names by primary key at a time. With FORCE INDEX
  * (PRIMARY) such a statement locks those rows and no gap between them.
  */
-const PRIMARY_KEY_BATCH = 500
+export const PRIMARY_KEY_BATCH = 500
 
 export function inBatches<T>(items: T[]): T[][] {
   const batches: T[][] = []
