@@ -405,7 +405,11 @@ export class AccountService {
       updateData.status = UserStatus.Waitlist
     }
 
-    await this.userRepository.update(user.id, updateData)
+    // A stale unverified account can be deleted between the reads above and
+    // this write; its link is then as dead as the account.
+    if (!(await this.userRepository.update(user.id, updateData))) {
+      throw new InvalidResetTokenError()
+    }
 
     await this.passwordResetRepository.deleteByUserId(user.id)
     await this.userRepository.revokeSessionsAndTokens(user.id)

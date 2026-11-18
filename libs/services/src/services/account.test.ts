@@ -1200,6 +1200,24 @@ describe('AccountService', () => {
       )
     })
 
+    it('refuses the link when the account is gone by the time the password is written', async () => {
+      vi.mocked(mockPasswordResetRepository.findByTokenHash).mockResolvedValue(
+        mockPasswordResetToken
+      )
+      vi.mocked(mockPasswordResetRepository.isValidToken).mockResolvedValue(
+        true
+      )
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.update).mockResolvedValue(null)
+
+      await expect(
+        accountService.resetPassword({
+          token: 'mock-token',
+          newPassword: 'newpassword123',
+        })
+      ).rejects.toThrow(InvalidResetTokenError)
+    })
+
     it('should promote an unverified user to the waitlist when they set their password', async () => {
       const unverifiedUser = { ...mockUser, status: UserStatus.Unverified }
       vi.mocked(mockPasswordResetRepository.findByTokenHash).mockResolvedValue(
@@ -1271,6 +1289,7 @@ describe('AccountService', () => {
         true
       )
       vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
+      vi.mocked(mockUserRepository.update).mockResolvedValue(mockUser)
       vi.mocked(mockPasswordResetRepository.consume)
         .mockResolvedValueOnce(true)
         .mockResolvedValueOnce(false)
