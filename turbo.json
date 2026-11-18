@@ -16,7 +16,7 @@
       // it here passes it through and puts it in the cache key, so a result
       // from one database is never replayed for another.
       "env": ["TEST_DATABASE_URL"],
-      "outputs": ["coverage/**"]
+      "outputs": []
     },
     "@pinsquirrel/hono#test": {
       // Both suites talk to the same test database, and libs/database's setup
@@ -24,7 +24,7 @@
       // from landing in the middle of the OAuth end-to-end run.
       "dependsOn": ["@pinsquirrel/database#test"],
       "env": ["TEST_DATABASE_URL"],
-      "outputs": ["coverage/**"]
+      "outputs": []
     },
     "typecheck": {},
     "start": {
