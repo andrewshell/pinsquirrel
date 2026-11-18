@@ -470,7 +470,7 @@ function isSpent(tokens: StoredTokens): boolean {
 }
 
 /**
- * The lock every refresh runs under.
+ * The lock every refresh and every disconnect runs under.
  *
  * Rotation is mandatory server-side, so of two refreshes of one token the
  * server lets one win and answers the other `invalid_grant`, which would
@@ -613,26 +613,30 @@ export async function authorizedFetch(
  * reconnecting against a `client_id` the server has since forgotten.
  */
 export async function disconnect(): Promise<void> {
-  const tokens = await storedTokens()
+  // Under the refresh lock, so a refresh already sent stores its pair before
+  // this reads one to revoke, and a refresh waiting behind this finds nothing.
+  await navigator.locks.request(REFRESH_LOCK, async () => {
+    const tokens = await storedTokens()
 
-  if (tokens) {
-    try {
-      const endpoints = await discoverEndpoints(tokens.baseUrl)
-      await timedFetch(endpoints.revocationEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          token: tokens.refreshToken,
-          token_type_hint: 'refresh_token',
-          client_id: tokens.clientId,
-        }).toString(),
-      })
-    } catch {
-      // A transport failure is no reason to leave a disconnected extension
-      // holding credentials. Neither is a refusal, which `fetch` resolves
-      // with rather than throwing: the stored token is cleared regardless.
+    if (tokens) {
+      try {
+        const endpoints = await discoverEndpoints(tokens.baseUrl)
+        await timedFetch(endpoints.revocationEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            token: tokens.refreshToken,
+            token_type_hint: 'refresh_token',
+            client_id: tokens.clientId,
+          }).toString(),
+        })
+      } catch {
+        // A transport failure is no reason to leave a disconnected extension
+        // holding credentials. Neither is a refusal, which `fetch` resolves
+        // with rather than throwing: the stored token is cleared regardless.
+      }
     }
-  }
 
-  await storage.clear()
+    await storage.clear()
+  })
 }

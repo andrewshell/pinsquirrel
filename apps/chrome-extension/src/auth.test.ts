@@ -590,6 +590,36 @@ describe('disconnect', () => {
     expect(server.chrome.local.items).toEqual({})
   })
 
+  // The worker can be mid-refresh when the user clicks Disconnect. The pair it
+  // is about to store is the live one, so that is the one to revoke, and
+  // nothing may be stored once Disconnect has cleared.
+  it('waits for a refresh already sent, revokes the pair it got, and keeps nothing', async () => {
+    const server = stubOAuthServer(connected({ expiresAt: Date.now() - 1000 }))
+    let answer = () => {}
+    const answered = new Promise<void>(resolve => {
+      answer = resolve
+    })
+    server.fetched.route(TOKEN_URL, async () => {
+      await answered
+      return tokenResponse({
+        access_token: 'pso_fresh',
+        refresh_token: 'refresh-2',
+      })
+    })
+
+    const refreshing = getAccessToken()
+    await vi.waitFor(() => {
+      expect(server.fetched.urls).toContain(TOKEN_URL)
+    })
+    const disconnecting = disconnect()
+    await new Promise(resolve => setTimeout(resolve, 10))
+    answer()
+    await Promise.allSettled([refreshing, disconnecting])
+
+    expect(server.revocations.map(form => form.token)).toEqual(['refresh-2'])
+    expect(server.chrome.local.items).toEqual({})
+  })
+
   it('does nothing to revoke when there is no connection to end', async () => {
     const server = stubOAuthServer()
 
