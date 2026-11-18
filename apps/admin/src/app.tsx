@@ -1049,6 +1049,22 @@ export function createApp(config: AdminConfig): Hono {
       if (error instanceof CannotDeleteOwnAccountError) {
         return renderUsers(c, env, username, { error: error.message }, 400)
       }
+      if (error instanceof WriteConflictError) {
+        console.warn(
+          `[admin] deleting a user lost to another write on "${env.name}":`,
+          error.cause
+        )
+        return renderUsers(
+          c,
+          env,
+          username,
+          {
+            error:
+              'The database was busy and the user was not deleted. Please try again.',
+          },
+          503
+        )
+      }
       return renderUsers(
         c,
         env,

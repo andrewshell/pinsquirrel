@@ -280,6 +280,8 @@ export class AuthenticationService {
    * that is every self-lockout revokeRole refuses at once, and could take the
    * system's last admin with it.
    *
+   * All or nothing: after a `WriteConflictError` the account is as it was.
+   *
    * Returns the user as they were, so the caller can still name who is gone.
    */
   async deleteUser(ac: AccessControl, userId: string): Promise<User> {

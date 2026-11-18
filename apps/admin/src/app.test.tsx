@@ -2276,6 +2276,22 @@ describe('POST /users/delete', () => {
     expect(await res.text()).toContain('no longer exists')
   })
 
+  it('says the user was not deleted, and to try again, when the deletion lost to another write', async () => {
+    const cookie = await signIn()
+    authService.deleteUser.mockRejectedValue(new WriteConflictError())
+
+    const res = await app.request(
+      '/users/delete',
+      form({ userId: target.id }, cookie)
+    )
+
+    expect(res.status).toBe(503)
+    const html = await res.text()
+    expect(html).toContain('the user was not deleted')
+    expect(html).toContain('Please try again')
+    expect(html).not.toContain('Deleted')
+  })
+
   it('reports an unexpected failure as a 500', async () => {
     const cookie = await signIn()
     authService.deleteUser.mockRejectedValue(new Error('connection reset'))
