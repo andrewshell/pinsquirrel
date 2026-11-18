@@ -1175,6 +1175,34 @@ describe('OAuthService grants', () => {
     })
   })
 
+  it.each([
+    ['access first', ['access', 'refresh']],
+    ['refresh first', ['refresh', 'access']],
+  ] as const)(
+    'reports when the longest-lived token expires (%s)',
+    async (_order, kinds) => {
+      const createdAt = new Date()
+      const accessExpiry = new Date(createdAt.getTime() + 60 * 60 * 1000)
+      const refreshExpiry = new Date(
+        createdAt.getTime() + 30 * 24 * 60 * 60 * 1000
+      )
+      vi.mocked(ctx.tokenRepository.findActiveByUserId).mockResolvedValue(
+        kinds.map(kind =>
+          grantToken({
+            id: `${kind}-1`,
+            kind,
+            createdAt,
+            expiresAt: kind === 'refresh' ? refreshExpiry : accessExpiry,
+          })
+        )
+      )
+
+      const [grant] = await ctx.service.listGrants(ac, user.id)
+
+      expect(grant.expiresAt).toEqual(refreshExpiry)
+    }
+  )
+
   it('keeps grants for different clients apart', async () => {
     vi.mocked(ctx.tokenRepository.findActiveByUserId).mockResolvedValue([
       grantToken({ id: 'access-1' }),

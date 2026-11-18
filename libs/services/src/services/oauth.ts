@@ -137,6 +137,7 @@ export interface OAuthGrant {
   scopes: string[]
   /** Every audience the client holds a live token for. */
   resources: string[]
+  /** When the longest-lived of the client's tokens runs out. */
   expiresAt: Date
   createdAt: Date
 }
@@ -691,7 +692,9 @@ export class OAuthService {
         clientName: names.get(newest.clientId) ?? null,
         scopes: [...new Set(group.flatMap(token => token.scopes))],
         resources: [...new Set(group.map(token => token.resource))],
-        expiresAt: newest.expiresAt,
+        expiresAt: new Date(
+          Math.max(...group.map(token => token.expiresAt.getTime()))
+        ),
         createdAt: newest.createdAt,
       })
     }
