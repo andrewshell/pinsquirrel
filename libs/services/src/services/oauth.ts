@@ -24,6 +24,7 @@ import {
   OAuthInvalidTargetError,
   OAuthUnauthorizedClientError,
   ResponseTooLargeError,
+  ValidationError,
 } from '@pinsquirrel/domain'
 import { generateSecureToken, hashToken } from '../utils/crypto.js'
 import {
@@ -33,6 +34,7 @@ import {
 } from '../validation/oauth-uri.js'
 import {
   authorizationCodeGrantSchema,
+  authorizationRedirectSchema,
   authorizationRequestSchema,
   clientIdMetadataDocumentSchema,
   clientRegistrationSchema,
@@ -153,6 +155,7 @@ export interface VerifiedAccessToken {
 
 /** An authorization request that passed every check but consent. */
 export interface ResolvedAuthorizationRequest {
+  status: 'resolved'
   client: OAuthClient
   /** Where the browser will be sent, ephemeral loopback port included. */
   redirectUri: string
@@ -161,6 +164,25 @@ export interface ResolvedAuthorizationRequest {
   codeChallenge: string
   state?: string
 }
+
+/**
+ * An RFC 6749 4.1.2.1 error, to be sent to a redirect URI that has already
+ * been shown to be the client's.
+ */
+export interface AuthorizationErrorRedirect {
+  status: 'error'
+  /** The RFC 6749 error code. */
+  error: string
+  errorDescription: string
+  redirectUri: string
+  state?: string
+  /** RFC 9207, which the redirect carries on success and on failure. */
+  issuer: string
+}
+
+/** What a request resolves to once it is known where to send the answer. */
+export type AuthorizationRequestResolution =
+  ResolvedAuthorizationRequest | AuthorizationErrorRedirect
 
 /** What the consent screen's decision leaves the transport to redirect with. */
 export type AuthorizationOutcome =
@@ -172,17 +194,9 @@ export type AuthorizationOutcome =
       state?: string
       scopes: string[]
       expiresAt: Date
-      /** RFC 9207, which the redirect carries on success and on failure. */
       issuer: string
     }
-  | {
-      status: 'denied'
-      error: 'access_denied'
-      errorDescription: string
-      redirectUri: string
-      state?: string
-      issuer: string
-    }
+  | AuthorizationErrorRedirect
 
 /**
  * The OAuth 2.1 authorization server.
@@ -215,14 +229,63 @@ export class OAuthService {
    * and the scopes and audience the user is being asked to agree to.
    *
    * The order the checks run in is the order the failures have to be handled
-   * in. A bad `client_id` or an unregistered `redirect_uri` is a page the user
-   * sees, because there is nowhere trustworthy to redirect. Everything after
-   * that is redirected back to the client as an RFC 6749 error, which is why
+   * in. A bad `client_id`, `redirect_uri` or `state`, or an unregistered
+   * `redirect_uri`, is thrown, for a page the user sees, because there is
+   * nowhere trustworthy to redirect. Everything after that comes back as an
+   * error outcome to redirect to the client (RFC 6749 4.1.2.1), which is why
    * the redirect URI is established first.
    */
   async resolveAuthorizationRequest(
     params: unknown
-  ): Promise<ResolvedAuthorizationRequest> {
+  ): Promise<AuthorizationRequestResolution> {
+    const target = authorizationRedirectSchema.safeParse(params)
+    if (!target.success) {
+      throw validationErrorFromZod(target.error, {
+        fallbackField: 'authorization_request',
+      })
+    }
+    const {
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      state,
+    } = target.data
+
+    const client = await this.resolveClient(clientId)
+
+    if (
+      !client.redirectUris.some(uri => redirectUriMatches(uri, redirectUri))
+    ) {
+      throw new OAuthInvalidRequestError(
+        'redirect_uri does not match a URI this client registered'
+      )
+    }
+
+    try {
+      return this.checkAuthorizationRequest(client, params)
+    } catch (error) {
+      if (error instanceof OAuthError) {
+        return this.errorRedirect(
+          { redirectUri, state },
+          error.code,
+          error.message
+        )
+      }
+      if (error instanceof ValidationError) {
+        return this.errorRedirect(
+          { redirectUri, state },
+          'invalid_request',
+          `Invalid parameter: ${Object.keys(error.fields).join(', ')}`
+        )
+      }
+      throw error
+    }
+  }
+
+  /** The checks that run once the client and its redirect URI check out. */
+  private checkAuthorizationRequest(
+    client: OAuthClient,
+    params: unknown
+  ): ResolvedAuthorizationRequest {
     const parsed = authorizationRequestSchema.safeParse(params)
     if (!parsed.success) {
       throw validationErrorFromZod(parsed.error, {
@@ -230,18 +293,6 @@ export class OAuthService {
       })
     }
     const request = parsed.data
-
-    const client = await this.resolveClient(request.client_id)
-
-    if (
-      !client.redirectUris.some(uri =>
-        redirectUriMatches(uri, request.redirect_uri)
-      )
-    ) {
-      throw new OAuthInvalidRequestError(
-        'redirect_uri does not match a URI this client registered'
-      )
-    }
 
     if (!client.grantTypes.includes('authorization_code')) {
       throw new OAuthUnauthorizedClientError(
@@ -253,6 +304,7 @@ export class OAuthService {
     const scopes = grantedScopes(request.scope)
 
     return {
+      status: 'resolved',
       client,
       // The URI the browser is actually sent to, which is the one the token
       // exchange has to repeat. For a loopback client that is the registered
@@ -294,16 +346,16 @@ export class OAuthService {
     }
 
     const resolved = await this.resolveAuthorizationRequest(input.params)
+    if (resolved.status === 'error') {
+      return resolved
+    }
 
     if (!input.approved) {
-      return {
-        status: 'denied',
-        error: 'access_denied',
-        errorDescription: 'The user denied the authorization request',
-        redirectUri: resolved.redirectUri,
-        state: resolved.state,
-        issuer: this.config.issuer,
-      }
+      return this.errorRedirect(
+        resolved,
+        'access_denied',
+        'The user denied the authorization request'
+      )
     }
 
     const code = generateSecureToken()
@@ -324,7 +376,9 @@ export class OAuthService {
       input.sessionId
     )
     if (!created) {
-      throw new OAuthAccessDeniedError(
+      return this.errorRedirect(
+        resolved,
+        'access_denied',
         'The session that approved this request has ended'
       )
     }
@@ -863,6 +917,21 @@ export class OAuthService {
     }
   }
 
+  private errorRedirect(
+    target: { redirectUri: string; state?: string },
+    error: string,
+    errorDescription: string
+  ): AuthorizationErrorRedirect {
+    return {
+      status: 'error',
+      error,
+      errorDescription,
+      redirectUri: target.redirectUri,
+      state: target.state,
+      issuer: this.config.issuer,
+    }
+  }
+
   /**
    * The configured resource a `resource` parameter names, in canonical form.
    *
@@ -1118,10 +1187,12 @@ function grantedScopes(scope: string | undefined): string[] {
     return [...DEFAULT_SCOPES]
   }
 
+  // The count and never the scopes themselves: the request is the client's
+  // text, and this message is shown under this server's name.
   const unknown = requested.filter(one => !SUPPORTED_SCOPES.includes(one))
   if (unknown.length > 0) {
     throw new OAuthInvalidScopeError(
-      `Unknown scope: ${unknown.join(', ')}. This server grants ${SUPPORTED_SCOPES.join(', ')}`
+      `${unknown.length === 1 ? '1 unknown scope' : `${unknown.length} unknown scopes`} requested. This server grants ${SUPPORTED_SCOPES.join(', ')}`
     )
   }
 

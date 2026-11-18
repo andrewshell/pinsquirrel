@@ -65,6 +65,19 @@ export type AuthorizationRequestParams = z.infer<
   typeof authorizationRequestSchema
 >
 
+/**
+ * The part of an authorization request that says where to send the answer.
+ *
+ * Parsed on its own and first: until these check out there is nowhere to send
+ * an error, so a failure here is shown to the user, and every failure after
+ * them is redirected to the client (RFC 6749 4.1.2.1).
+ */
+export const authorizationRedirectSchema = authorizationRequestSchema.pick({
+  client_id: true,
+  redirect_uri: true,
+  state: true,
+})
+
 /** `grant_type=authorization_code` on `/oauth/token`. */
 export const authorizationCodeGrantSchema = z.object({
   grant_type: z.literal('authorization_code'),

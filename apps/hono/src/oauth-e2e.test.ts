@@ -141,6 +141,22 @@ function authorizationQuery(input: {
   }
 }
 
+/** Check an error was sent to the client's callback, and return where it went. */
+function expectRedirectedError(
+  res: Response,
+  query: Record<string, string>,
+  error: string
+): URL {
+  expect(res.status).toBe(302)
+  const location = new URL(res.headers.get('Location') ?? 'about:blank')
+  expect(`${location.origin}${location.pathname}`).toBe(query.redirect_uri)
+  expect(location.searchParams.get('error')).toBe(error)
+  expect(location.searchParams.get('state')).toBe(query.state)
+  expect(location.searchParams.get('iss')).toBe(metadata.issuer)
+  expect(location.searchParams.get('code')).toBeNull()
+  return location
+}
+
 /** Approve a consent form and read the client's callback out of the redirect. */
 async function approve(query: Record<string, string>): Promise<URL> {
   const res = await browserRequest(
@@ -257,6 +273,7 @@ let mcpResource: string
 let apiResource: string
 let authorizationServer: string
 let clientId: string
+const otherClientIds: string[] = []
 let mcpTokens: TokenResponse
 let apiTokens: TokenResponse
 let mcpInitialized = false
@@ -295,8 +312,8 @@ afterAll(async () => {
   // it: all three cascade from `users.id`. The client this run registered has
   // nothing to cascade from, so it goes explicitly.
   if (userId) await userRepository.delete(userId)
-  if (clientId) {
-    const client = await oauthClientRepository.findByClientId(clientId)
+  for (const id of [clientId, ...otherClientIds]) {
+    const client = id ? await oauthClientRepository.findByClientId(id) : null
     if (client) await oauthClientRepository.delete(client.id)
   }
   // The pool would otherwise hold the worker open once the run is over.
@@ -565,8 +582,7 @@ describe('audience binding', () => {
       `${pathOf(metadata.authorization_endpoint)}?${new URLSearchParams(query).toString()}`
     )
 
-    expect(res.status).toBe(400)
-    expect(await res.text()).toContain('invalid_target')
+    expectRedirectedError(res, query, 'invalid_target')
   })
 
   it('refuses a token request naming a resource the code was not issued for', async () => {
@@ -590,6 +606,85 @@ describe('audience binding', () => {
 
     expect(res.status).toBe(400)
     expect(await res.json()).toMatchObject({ error: 'invalid_target' })
+  })
+})
+
+/**
+ * RFC 6749 4.1.2.1: once the client and its redirect URI check out, a failure
+ * is the client's to hear about, at that redirect URI. Before that there is
+ * nowhere trustworthy to send it, so the person in the browser sees a page.
+ */
+describe('authorization errors', () => {
+  function getAuthorize(query: Record<string, string>): Promise<Response> {
+    return browserRequest(
+      `${pathOf(metadata.authorization_endpoint)}?${new URLSearchParams(query).toString()}`
+    )
+  }
+
+  function readQuery(scope = 'pins:read'): Record<string, string> {
+    return authorizationQuery({
+      challenge: pkcePair().challenge,
+      resource: mcpResource,
+      scope,
+      state: randomUUID(),
+    })
+  }
+
+  it('redirects an unknown scope as invalid_scope, without repeating it', async () => {
+    const query = readQuery('Your account is suspended')
+
+    const res = await getAuthorize(query)
+
+    const location = expectRedirectedError(res, query, 'invalid_scope')
+    expect(location.searchParams.get('error_description')).not.toContain(
+      'suspended'
+    )
+  })
+
+  it('redirects a request without a code_challenge as invalid_request', async () => {
+    const query = readQuery()
+    delete query.code_challenge
+
+    expectRedirectedError(await getAuthorize(query), query, 'invalid_request')
+  })
+
+  it('redirects a client not registered for the code grant as unauthorized_client', async () => {
+    const registered = await request(
+      pathOf(metadata.registration_endpoint),
+      json({
+        client_name: 'Refresh-only client',
+        redirect_uris: [REGISTERED_REDIRECT_URI],
+        grant_types: ['refresh_token'],
+        token_endpoint_auth_method: 'none',
+      })
+    )
+    expect(registered.status).toBe(201)
+    const refreshOnly = ((await registered.json()) as { client_id: string })
+      .client_id
+    otherClientIds.push(refreshOnly)
+    const query = { ...readQuery(), client_id: refreshOnly }
+
+    expectRedirectedError(
+      await getAuthorize(query),
+      query,
+      'unauthorized_client'
+    )
+  })
+
+  it('renders a redirect URI the client never registered, and sends nothing there', async () => {
+    const query = authorizationQuery({
+      challenge: pkcePair().challenge,
+      resource: mcpResource,
+      scope: 'pins:read',
+      state: randomUUID(),
+      redirectUri: 'http://127.0.0.1:53211/elsewhere',
+    })
+
+    const res = await getAuthorize(query)
+
+    expect(res.status).toBe(400)
+    expect(res.headers.get('Location')).toBeNull()
+    expect(await res.text()).toContain('invalid_request')
   })
 })
 

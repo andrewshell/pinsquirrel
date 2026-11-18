@@ -11,7 +11,6 @@ import { Hono } from 'hono'
 import type { OAuthClient, User } from '@pinsquirrel/domain'
 import {
   OAuthInvalidRequestError,
-  OAuthInvalidScopeError,
   Role,
   UserStatus,
   ValidationError,
@@ -76,9 +75,9 @@ const REQUEST_PARAMS = {
 }
 
 const RESOLVED = {
+  status: 'resolved',
   client: testClient,
   redirectUri: 'https://claude.ai/api/mcp/auth_callback',
-  registeredRedirectUri: 'https://claude.ai/api/mcp/auth_callback',
   scopes: ['pins:read', 'tags:read', 'offline_access'],
   resource: 'http://localhost:8100/mcp',
   codeChallenge: 'c'.repeat(43),
@@ -279,6 +278,28 @@ describe('oauth authorize routes', () => {
       )
     })
 
+    it('redirects an error the service resolved to the client', async () => {
+      mockResolveAuthorizationRequest.mockResolvedValue({
+        status: 'error',
+        error: 'invalid_scope',
+        errorDescription: '1 unknown scope requested',
+        redirectUri: 'https://claude.ai/api/mcp/auth_callback',
+        state: 'the-state',
+        issuer: 'http://localhost:8100',
+      })
+
+      const res = await get()
+
+      expect(res.status).toBe(302)
+      const location = new URL(res.headers.get('Location') ?? '')
+      expect(location.origin + location.pathname).toBe(
+        'https://claude.ai/api/mcp/auth_callback'
+      )
+      expect(location.searchParams.get('error')).toBe('invalid_scope')
+      expect(location.searchParams.get('state')).toBe('the-state')
+      expect(location.searchParams.get('iss')).toBe('http://localhost:8100')
+    })
+
     it('renders a validation failure the same way', async () => {
       mockResolveAuthorizationRequest.mockRejectedValue(
         new ValidationError({
@@ -368,7 +389,7 @@ describe('oauth authorize routes', () => {
     // one the client registered.
     it('redirects with access_denied and iss on denial', async () => {
       mockAuthorize.mockResolvedValue({
-        status: 'denied',
+        status: 'error',
         error: 'access_denied',
         errorDescription: 'The user denied the authorization request',
         redirectUri: 'https://claude.ai/api/mcp/auth_callback',
@@ -391,7 +412,7 @@ describe('oauth authorize routes', () => {
 
     it('treats anything that is not approve as a denial', async () => {
       mockAuthorize.mockResolvedValue({
-        status: 'denied',
+        status: 'error',
         error: 'access_denied',
         errorDescription: 'The user denied the authorization request',
         redirectUri: 'https://claude.ai/api/mcp/auth_callback',
@@ -426,14 +447,18 @@ describe('oauth authorize routes', () => {
 
     it('renders a request error instead of redirecting', async () => {
       mockAuthorize.mockRejectedValue(
-        new OAuthInvalidScopeError('Unknown scope: pins:write')
+        new OAuthInvalidRequestError(
+          'redirect_uri does not match a URI this client registered'
+        )
       )
 
       const res = await post({ ...REQUEST_PARAMS, decision: 'approve' })
 
       expect(res.status).toBe(400)
       expect(res.headers.get('Location')).toBeNull()
-      expect(await res.text()).toContain('Unknown scope: pins:write')
+      expect(await res.text()).toContain(
+        'redirect_uri does not match a URI this client registered'
+      )
     })
   })
 })

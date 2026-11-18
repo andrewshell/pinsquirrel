@@ -2,7 +2,6 @@ import { createHash, randomBytes } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   AccessControl,
-  OAuthAccessDeniedError,
   UserStatus,
   type HttpFetcher,
   type User,
@@ -177,6 +176,11 @@ describe('an authorization in flight across a revocation', () => {
     await userRepository.revokeSessionsAndTokens(user.id)
     release()
 
-    await expect(inFlight).rejects.toBeInstanceOf(OAuthAccessDeniedError)
+    await expect(inFlight).resolves.toMatchObject({
+      status: 'error',
+      error: 'access_denied',
+      redirectUri: REDIRECT_URI,
+      state: 'state',
+    })
   })
 })

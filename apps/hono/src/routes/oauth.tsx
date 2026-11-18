@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import type { User } from '@pinsquirrel/domain'
 import { AccessControl, OAuthError, ValidationError } from '@pinsquirrel/domain'
+import type { AuthorizationOutcome } from '@pinsquirrel/services'
 import { oauthService } from '../lib/services.js'
 import { describeValidationError } from '../lib/oauth-error.js'
 import { isEmbedRequest } from '../lib/embed'
@@ -72,10 +73,11 @@ function redirectHost(redirectUri: string): string {
 /**
  * Render the failure rather than redirecting it.
  *
- * Everything reaching here failed before the redirect URI was established as
- * this client's, so there is no address that has been shown to belong to the
- * client. Redirecting an error to an unvalidated URI is how an open
- * redirector gets built.
+ * The service throws only what fails before the redirect URI is established
+ * as this client's, so there is no address that has been shown to belong to
+ * the client. Redirecting an error to an unvalidated URI is how an open
+ * redirector gets built. Everything later comes back as an outcome for
+ * `redirectToClient`.
  */
 function renderRequestError(
   c: Context,
@@ -106,6 +108,30 @@ function renderRequestError(
     )
   }
   throw error
+}
+
+/**
+ * Send the answer to the client's validated redirect URI: the code, or an
+ * RFC 6749 4.1.2.1 error.
+ */
+function redirectToClient(c: Context, outcome: AuthorizationOutcome) {
+  const location = new URL(outcome.redirectUri)
+  if (outcome.status === 'approved') {
+    location.searchParams.set('code', outcome.code)
+  } else {
+    location.searchParams.set('error', outcome.error)
+    location.searchParams.set('error_description', outcome.errorDescription)
+  }
+  // `state` is the client's CSRF defense, returned exactly as it was sent and
+  // omitted entirely when it was not.
+  if (outcome.state !== undefined) {
+    location.searchParams.set('state', outcome.state)
+  }
+  // RFC 9207, on success and on failure alike: it is how the client knows
+  // which authorization server answered.
+  location.searchParams.set('iss', outcome.issuer)
+
+  return c.redirect(location.toString(), 302)
 }
 
 const oauth = new Hono()
@@ -157,26 +183,30 @@ oauth.get('/authorize', async c => {
   // authorization request and must not be echoed back as one.
   const embed = isEmbedRequest(c)
 
+  let resolved
   try {
-    const resolved = await oauthService.resolveAuthorizationRequest(params)
-
-    return c.html(
-      <OAuthConsentPage
-        user={user}
-        // The name the client published, or the identifier it authenticates
-        // as. A client with neither cannot be told apart from an impostor.
-        clientLabel={resolved.client.clientName ?? resolved.client.clientId}
-        redirectHost={redirectHost(resolved.redirectUri)}
-        redirectUri={resolved.redirectUri}
-        scopes={resolved.scopes}
-        resource={resolved.resource}
-        params={params}
-        embed={embed}
-      />
-    )
+    resolved = await oauthService.resolveAuthorizationRequest(params)
   } catch (error) {
     return renderRequestError(c, user, error, embed)
   }
+  if (resolved.status === 'error') {
+    return redirectToClient(c, resolved)
+  }
+
+  return c.html(
+    <OAuthConsentPage
+      user={user}
+      // The name the client published, or the identifier it authenticates
+      // as. A client with neither cannot be told apart from an impostor.
+      clientLabel={resolved.client.clientName ?? resolved.client.clientId}
+      redirectHost={redirectHost(resolved.redirectUri)}
+      redirectUri={resolved.redirectUri}
+      scopes={resolved.scopes}
+      resource={resolved.resource}
+      params={params}
+      embed={embed}
+    />
+  )
 })
 
 oauth.post('/authorize', async c => {
@@ -204,23 +234,7 @@ oauth.post('/authorize', async c => {
     return renderRequestError(c, user, error, embed)
   }
 
-  const location = new URL(outcome.redirectUri)
-  if (outcome.status === 'approved') {
-    location.searchParams.set('code', outcome.code)
-  } else {
-    location.searchParams.set('error', outcome.error)
-    location.searchParams.set('error_description', outcome.errorDescription)
-  }
-  // `state` is the client's CSRF defense, returned exactly as it was sent and
-  // omitted entirely when it was not.
-  if (outcome.state !== undefined) {
-    location.searchParams.set('state', outcome.state)
-  }
-  // RFC 9207, on success and on failure alike: it is how the client knows
-  // which authorization server answered.
-  location.searchParams.set('iss', outcome.issuer)
-
-  return c.redirect(location.toString(), 302)
+  return redirectToClient(c, outcome)
 })
 
 export { oauth as oauthRoutes }

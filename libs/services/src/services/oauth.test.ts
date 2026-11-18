@@ -516,9 +516,16 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
     ctx = setup()
   })
 
+  async function resolve(params: Record<string, unknown>) {
+    const outcome = await ctx.service.resolveAuthorizationRequest(params)
+    if (outcome.status !== 'resolved') {
+      throw new Error(`Expected a resolved request, got ${outcome.error}`)
+    }
+    return outcome
+  }
+
   it('resolves a Claude Code request against its portless loopback registration', async () => {
-    const resolved =
-      await ctx.service.resolveAuthorizationRequest(authorizeParams())
+    const resolved = await resolve(authorizeParams())
 
     expect(resolved.client.clientId).toBe(CIMD_URL)
     expect(resolved.redirectUri).toBe('http://localhost:54321/callback')
@@ -527,12 +534,32 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
     expect(resolved.state).toBe('opaque-state')
   })
 
-  it('rejects a malformed request as a validation failure', async () => {
+  // RFC 6749 4.1.2.1: once the redirect URI is known to be the client's, the
+  // client is told, rather than the user being left on an error page.
+  function redirectedError(error: string) {
+    return {
+      status: 'error',
+      error,
+      redirectUri: 'http://localhost:54321/callback',
+      state: 'opaque-state',
+      issuer: 'https://pinsquirrel.com',
+    }
+  }
+
+  it('redirects a malformed request as invalid_request', async () => {
     await expect(
       ctx.service.resolveAuthorizationRequest(
         authorizeParams({ code_challenge_method: 'plain' })
       )
-    ).rejects.toBeInstanceOf(ValidationError)
+    ).resolves.toMatchObject(redirectedError('invalid_request'))
+  })
+
+  it('redirects a scope that is too long as invalid_request', async () => {
+    await expect(
+      ctx.service.resolveAuthorizationRequest(
+        authorizeParams({ scope: 'pins:read '.repeat(103) })
+      )
+    ).resolves.toMatchObject(redirectedError('invalid_request'))
   })
 
   // Nothing is redirected to a URI the client did not register, because the
@@ -541,7 +568,6 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
     ['client_id', `https://example.com/${'a'.repeat(240)}`],
     ['redirect_uri', `http://localhost:54321/${'a'.repeat(500)}`],
     ['state', 's'.repeat(1025)],
-    ['scope', 'pins:read '.repeat(103)],
   ])(
     'rejects a %s longer than it may be as a validation failure',
     async (field, value) => {
@@ -588,32 +614,43 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
     }
   )
 
-  it('rejects a resource this server issues no tokens for', async () => {
+  it('redirects a resource this server issues no tokens for', async () => {
     await expect(
       ctx.service.resolveAuthorizationRequest(
         authorizeParams({ resource: 'https://pinsquirrel.com' })
       )
-    ).rejects.toBeInstanceOf(OAuthInvalidTargetError)
+    ).resolves.toMatchObject(redirectedError('invalid_target'))
   })
 
   it('accepts a resource written differently but meaning the same thing', async () => {
-    const resolved = await ctx.service.resolveAuthorizationRequest(
+    const resolved = await resolve(
       authorizeParams({ resource: 'HTTPS://PinSquirrel.com/mcp/' })
     )
 
     expect(resolved.resource).toBe(MCP_RESOURCE)
   })
 
-  it('rejects a scope that is not granted here', async () => {
+  it('redirects a scope that is not granted here', async () => {
     await expect(
       ctx.service.resolveAuthorizationRequest(
         authorizeParams({ scope: 'pins:read pins:administer' })
       )
-    ).rejects.toBeInstanceOf(OAuthInvalidScopeError)
+    ).resolves.toMatchObject(redirectedError('invalid_scope'))
+  })
+
+  it('does not repeat the unknown scope text back', async () => {
+    const outcome = await ctx.service.resolveAuthorizationRequest(
+      authorizeParams({ scope: 'Your account is suspended' })
+    )
+
+    expect(outcome.status).toBe('error')
+    if (outcome.status !== 'error') return
+    expect(outcome.errorDescription).not.toContain('suspended')
+    expect(outcome.errorDescription).toContain('4 unknown scopes')
   })
 
   it('grants the write scopes to a client that asks for them', async () => {
-    const resolved = await ctx.service.resolveAuthorizationRequest(
+    const resolved = await resolve(
       authorizeParams({
         scope: 'pins:read tags:read pins:write tags:write',
       })
@@ -630,22 +667,21 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
   // A write scope is never implied: it is granted because the client named it
   // and the user approved it on the consent screen (Decision 14).
   it('grants no write scope to a request that names none', async () => {
-    const resolved =
-      await ctx.service.resolveAuthorizationRequest(authorizeParams())
+    const resolved = await resolve(authorizeParams())
 
     expect(resolved.scopes).not.toContain('pins:write')
     expect(resolved.scopes).not.toContain('tags:write')
   })
 
   it('keeps offline_access, which is what buys a refresh token', async () => {
-    const resolved = await ctx.service.resolveAuthorizationRequest(
+    const resolved = await resolve(
       authorizeParams({ scope: 'pins:read offline_access' })
     )
 
     expect(resolved.scopes).toEqual(['pins:read', 'offline_access'])
   })
 
-  it('rejects a client that is not registered for this grant', async () => {
+  it('redirects a client that is not registered for this grant', async () => {
     vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
       makeClient({ clientId: 'dcr_ro', grantTypes: ['refresh_token'] })
     )
@@ -654,7 +690,7 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
       ctx.service.resolveAuthorizationRequest(
         authorizeParams({ client_id: 'dcr_ro' })
       )
-    ).rejects.toBeInstanceOf(OAuthUnauthorizedClientError)
+    ).resolves.toMatchObject(redirectedError('unauthorized_client'))
   })
 })
 
@@ -718,7 +754,7 @@ describe('OAuthService.authorize', () => {
     expect(created.expiresAt.getTime()).toBeGreaterThan(Date.now())
   })
 
-  it('refuses when the session that approved the request has ended', async () => {
+  it('redirects access_denied when the session that approved the request has ended', async () => {
     vi.mocked(ctx.codeRepository.create).mockResolvedValue(null)
 
     await expect(
@@ -728,7 +764,12 @@ describe('OAuthService.authorize', () => {
         sessionId: SESSION_ID,
         approved: true,
       })
-    ).rejects.toBeInstanceOf(OAuthAccessDeniedError)
+    ).resolves.toMatchObject({
+      status: 'error',
+      error: 'access_denied',
+      redirectUri: 'http://localhost:54321/callback',
+      state: 'opaque-state',
+    })
     expect(ctx.clientRepository.markCompleted).not.toHaveBeenCalled()
   })
 
@@ -774,7 +815,7 @@ describe('OAuthService.authorize', () => {
     })
 
     expect(outcome).toMatchObject({
-      status: 'denied',
+      status: 'error',
       error: 'access_denied',
       redirectUri: 'http://localhost:54321/callback',
       state: 'opaque-state',

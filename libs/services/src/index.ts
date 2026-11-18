@@ -23,7 +23,9 @@ export { UserService } from './services/user.js'
 export {
   OAuthService,
   REFRESH_ROTATION_GRACE_MS,
+  type AuthorizationErrorRedirect,
   type AuthorizationOutcome,
+  type AuthorizationRequestResolution,
   type IssuedTokens,
   type OAuthGrant,
   type OAuthServiceConfig,
