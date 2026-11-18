@@ -103,6 +103,11 @@ export interface OAuthToken extends AccessGateable {
    * walked. Null for the first token of a grant.
    */
   rotatedFrom: string | null
+  /**
+   * When the user approved the grant, carried unchanged through every
+   * rotation. Null only for a token from before the column.
+   */
+  grantedAt: Date | null
   createdAt: Date
 }
 
@@ -114,6 +119,7 @@ export interface CreateOAuthTokenData {
   scopes: string[]
   resource: string
   grantId: string
+  grantedAt: Date
   expiresAt: Date
   rotatedFrom?: string | null
 }

@@ -141,12 +141,13 @@ function makeCode(
 }
 
 function makeToken(
-  data: Omit<CreateOAuthTokenData, 'grantId'>,
+  data: Omit<CreateOAuthTokenData, 'grantId' | 'grantedAt'>,
   overrides: Partial<OAuthToken> = {}
 ): OAuthToken {
   return {
     id: `token-${data.kind}`,
     grantId: 'grant-1',
+    grantedAt: null,
     revokedAt: null,
     rotatedAt: null,
     rotatedFrom: data.rotatedFrom ?? null,
@@ -960,6 +961,15 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     ctx.store.codes.push(makeCode())
   })
 
+  it('records when the user approved, which is when the code was written', async () => {
+    const approved = new Date(Date.now() - 30_000)
+    ctx.store.codes[0].createdAt = approved
+
+    await ctx.service.exchangeAuthorizationCode(tokenParams())
+
+    expect(ctx.store.tokens.map(token => token.grantedAt)).toEqual([approved])
+  })
+
   it('exchanges a code for an access token bound to the requested resource', async () => {
     const issued = await ctx.service.exchangeAuthorizationCode(tokenParams())
 
@@ -1281,6 +1291,27 @@ describe('OAuthService.exchangeRefreshToken', () => {
       makeClient()
     )
     seedDevice(ctx.store, 'laptop')
+  })
+
+  it('carries the time the grant was approved to the successors', async () => {
+    const approved = new Date('2026-11-01T10:00:00Z')
+    presented().grantedAt = approved
+
+    await ctx.service.exchangeRefreshToken(refreshParams())
+
+    expect(successors().map(token => token.grantedAt)).toEqual([
+      approved,
+      approved,
+    ])
+  })
+
+  it('takes a token from before the column as approved when it was made', async () => {
+    const made = new Date('2026-11-01T10:00:00Z')
+    Object.assign(presented(), { grantedAt: null, createdAt: made })
+
+    await ctx.service.exchangeRefreshToken(refreshParams())
+
+    expect(successors().map(token => token.grantedAt)).toEqual([made, made])
   })
 
   // OAuth 2.1 requires rotation for public clients, and both CIMD and DCR
@@ -1991,6 +2022,30 @@ describe('OAuthService grants', () => {
       expect(grant.expiresAt).toEqual(refreshExpiry)
     }
   )
+
+  // A refresh mints new rows; the profile says when the user approved.
+  it('reports when the user authorized the client, not when it last refreshed', async () => {
+    const approved = new Date('2026-11-01T10:00:00Z')
+    ctx.store.tokens.push(
+      grantToken({ id: 'a', grantedAt: approved, createdAt: new Date() })
+    )
+
+    const [grant] = await ctx.service.listGrants(ac, user.id)
+
+    expect(grant.createdAt).toEqual(approved)
+  })
+
+  it('reports the earliest approval when the client has several grants', async () => {
+    const first = new Date('2026-10-01T10:00:00Z')
+    ctx.store.tokens.push(
+      grantToken({ id: 'a', grantedAt: new Date('2026-11-01T10:00:00Z') }),
+      grantToken({ id: 'b', grantId: 'grant-2', grantedAt: first })
+    )
+
+    const [grant] = await ctx.service.listGrants(ac, user.id)
+
+    expect(grant.createdAt).toEqual(first)
+  })
 
   it('keeps grants for different clients apart', async () => {
     vi.mocked(ctx.tokenRepository.findActiveByUserId).mockResolvedValue([

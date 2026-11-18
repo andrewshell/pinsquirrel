@@ -34,6 +34,7 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
     scopes: ['pins:read', 'tags:read'],
     resource: MCP,
     grantId: crypto.randomUUID(),
+    grantedAt: new Date(Date.now() - 60 * 60 * 1000),
     expiresAt: new Date(Date.now() + 60 * 60 * 1000),
     ...overrides,
   })
@@ -174,6 +175,7 @@ describe('DrizzleOAuthTokenRepository - Integration Tests', () => {
         rotatedFrom: null,
       })
       expect(result.id).toBeDefined()
+      expect(result.grantedAt?.getTime()).toBe(data.grantedAt.getTime())
       expect(result.expiresAt.getTime()).toBe(data.expiresAt.getTime())
       expect(result.createdAt).toBeInstanceOf(Date)
     })

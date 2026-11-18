@@ -736,6 +736,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
           scopes: ['pins:read'],
           resource: 'https://example.test/mcp',
           grantId: crypto.randomUUID(),
+          grantedAt: new Date(),
           expiresAt: later(),
         })
       const kept = await makeSession()

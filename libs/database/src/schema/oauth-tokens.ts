@@ -32,6 +32,8 @@ export const oauthTokens = mysqlTable(
     // arrived at, never defaulted: a token for /mcp must not drive /api/v1.
     resource: varchar('resource', { length: 255 }).notNull(),
     grantId: varchar('grant_id', { length: 36 }),
+    // When the user approved the grant, copied to each successor on rotation.
+    grantedAt: timestamp('granted_at', { mode: 'date', fsp: 3 }),
     expiresAt: timestamp('expires_at', { mode: 'date', fsp: 3 }).notNull(),
     revokedAt: timestamp('revoked_at', { mode: 'date', fsp: 3 }),
     rotatedAt: timestamp('rotated_at', { mode: 'date', fsp: 3 }),

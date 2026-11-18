@@ -144,6 +144,7 @@ export interface OAuthGrant {
   resources: string[]
   /** When the longest-lived of the client's tokens runs out. */
   expiresAt: Date
+  /** When the user first approved the client, of the grants still live. */
   createdAt: Date
 }
 
@@ -470,6 +471,7 @@ export class OAuthService {
       refreshScopes: refreshable ? code.scopes : null,
       resource: code.resource,
       grantId: code.grantId ?? randomUUID(),
+      grantedAt: code.createdAt,
     })
 
     const outcome = await this.codeRepository.exchange(code.id, rows)
@@ -602,6 +604,7 @@ export class OAuthService {
       refreshScopes: token.scopes,
       resource: token.resource,
       grantId: token.grantId ?? randomUUID(),
+      grantedAt: token.grantedAt ?? token.createdAt,
       rotatedFrom: token.id,
     })
 
@@ -855,7 +858,13 @@ export class OAuthService {
         expiresAt: new Date(
           Math.max(...group.map(token => token.expiresAt.getTime()))
         ),
-        createdAt: newest.createdAt,
+        createdAt: new Date(
+          Math.min(
+            ...group.map(token =>
+              (token.grantedAt ?? token.createdAt).getTime()
+            )
+          )
+        ),
       })
     }
 
@@ -1387,6 +1396,7 @@ function mintTokens(grant: {
   refreshScopes: string[] | null
   resource: string
   grantId: string
+  grantedAt: Date
   rotatedFrom?: string
 }): { rows: IssuedTokenData; issued: IssuedTokens } {
   const shared = {
@@ -1394,6 +1404,7 @@ function mintTokens(grant: {
     userId: grant.userId,
     resource: grant.resource,
     grantId: grant.grantId,
+    grantedAt: grant.grantedAt,
   }
 
   const accessToken = ACCESS_TOKEN_PREFIX + generateSecureToken()

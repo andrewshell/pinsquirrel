@@ -118,6 +118,7 @@ export async function insertTokens(
     scopes: data.scopes,
     resource: data.resource,
     grantId: data.grantId,
+    grantedAt: data.grantedAt,
     expiresAt: data.expiresAt,
     revokedAt: null,
     rotatedAt: null,

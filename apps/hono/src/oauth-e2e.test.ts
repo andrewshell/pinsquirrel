@@ -1239,6 +1239,7 @@ describe('expiry', () => {
       scopes: ['pins:read', 'tags:read'],
       resource: mcpResource,
       grantId: randomUUID(),
+      grantedAt: new Date(),
       expiresAt: new Date(Date.now() - 1000),
     })
 

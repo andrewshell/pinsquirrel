@@ -268,6 +268,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
         scopes: created.scopes,
         resource: created.resource,
         grantId: created.grantId ?? crypto.randomUUID(),
+        grantedAt: created.createdAt,
         expiresAt: new Date(Date.now() + 60 * 1000),
       }
       const hash = () => crypto.randomUUID().replace(/-/g, '').repeat(2)
