@@ -352,8 +352,8 @@ describe('getAccessToken', () => {
     expect(server.chrome.local.items.selectedTagIds).toEqual(['tag-1'])
   })
 
-  // Two refreshes of the same token means one loses the rotation race, and the
-  // server revokes the whole grant family for a replay.
+  // Two refreshes of the same token means one loses the rotation race, and a
+  // replay outside the server's short grace window revokes the grant.
   it('posts one refresh when two callers want a token at once', async () => {
     const server = stubOAuthServer(connected({ expiresAt: Date.now() - 1000 }))
 
@@ -426,8 +426,8 @@ describe('disconnect', () => {
 
     await disconnect()
 
-    // A refresh token takes its whole grant family with it server-side, so
-    // this is what makes the access token stop working too.
+    // A refresh token takes its grant with it server-side, so this is what
+    // makes the access token stop working too.
     expect(server.revocations).toEqual([
       {
         token: 'refresh-stored',
@@ -446,6 +446,15 @@ describe('disconnect', () => {
 
     await disconnect()
 
+    expect(server.chrome.local.items).toEqual({})
+  })
+
+  it('clears local storage even when the server refuses the revocation', async () => {
+    const server = stubOAuthServer(connected({ clientId: 'dcr_other' }))
+
+    await disconnect()
+
+    expect(server.revocations).toHaveLength(1)
     expect(server.chrome.local.items).toEqual({})
   })
 

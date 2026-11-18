@@ -106,8 +106,15 @@ export function stubOAuthServer(
       return tokenHandler(form)
     },
     [`${BASE_URL}/oauth/revoke`]: (_url, init) => {
-      revocations.push(formOf(init))
-      // RFC 7009: always 200, with no body.
+      const form = formOf(init)
+      revocations.push(form)
+      // The real route refuses a request with no token, or one naming a client
+      // the token was not issued to. Anything else is 200 with no body, an
+      // unknown or dead token included (RFC 7009).
+      if (!form.token) return oauthErrorResponse('invalid_request')
+      if (form.client_id && form.client_id !== REGISTERED_CLIENT_ID) {
+        return oauthErrorResponse('invalid_grant')
+      }
       return new Response(null, { status: 200 })
     },
   })
