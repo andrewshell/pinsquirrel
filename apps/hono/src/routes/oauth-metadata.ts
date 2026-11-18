@@ -61,6 +61,8 @@ export function createOAuthMetadataRoutes(config: OAuthConfig): Hono {
       // silently falls back to DCR.
       client_id_metadata_document_supported: true,
       token_endpoint_auth_methods_supported: ['none'],
+      // RFC 8414 reads an absent list as `client_secret_basic`.
+      revocation_endpoint_auth_methods_supported: ['none'],
       authorization_response_iss_parameter_supported: true,
     })
   )

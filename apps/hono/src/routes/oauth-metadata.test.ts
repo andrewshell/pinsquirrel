@@ -78,6 +78,7 @@ describe('GET /.well-known/oauth-authorization-server', () => {
       code_challenge_methods_supported: ['S256'],
       client_id_metadata_document_supported: true,
       token_endpoint_auth_methods_supported: ['none'],
+      revocation_endpoint_auth_methods_supported: ['none'],
       authorization_response_iss_parameter_supported: true,
     })
   })
