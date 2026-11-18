@@ -280,6 +280,55 @@ describe('OAuthService.resolveClient', () => {
     )
   })
 
+  // The database is not trusted to have compared the identifier exactly. A row
+  // for a different client id is a miss, never a cache entry to refresh.
+  it('never refreshes a row stored under a different client id', async () => {
+    const requested = 'https://claude.example/C.json'
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({
+        clientId: 'https://claude.example/c.json',
+        metadataFetchedAt: new Date(Date.now() - 48 * 60 * 60 * 1000),
+      })
+    )
+    vi.mocked(ctx.fetcher.fetch).mockResolvedValue(
+      JSON.stringify({ ...cimdDocument, client_id: requested })
+    )
+
+    const client = await ctx.service.resolveClient(requested)
+
+    expect(ctx.clientRepository.update).not.toHaveBeenCalled()
+    expect(ctx.clientRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ clientId: requested })
+    )
+    expect(client.clientId).toBe(requested)
+  })
+
+  it('never serves a fresh row stored under a different client id', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({ clientId: 'DCR_ABC', registrationType: 'dcr' })
+    )
+
+    await expect(ctx.service.resolveClient('dcr_abc')).rejects.toBeInstanceOf(
+      OAuthInvalidClientError
+    )
+  })
+
+  // A URL that `URL` would rewrite is two spellings of one client, or, for a
+  // host with accents, a spelling of a different one.
+  it.each([
+    ['an upper-case host', 'https://CLAUDE.example/c.json'],
+    ['a host that is not ASCII', 'https://clàude.example/c.json'],
+    ['a fragment', 'https://claude.example/c.json#x'],
+    ['an empty fragment', 'https://claude.example/c.json#'],
+    ['userinfo', 'https://user@claude.example/c.json'],
+    ['a default port', 'https://claude.example:443/c.json'],
+  ])('refuses a CIMD URL with %s', async (_, clientId) => {
+    await expect(ctx.service.resolveClient(clientId)).rejects.toBeInstanceOf(
+      OAuthInvalidClientError
+    )
+    expect(ctx.fetcher.fetch).not.toHaveBeenCalled()
+  })
+
   // The URL rules, all of them before anything is fetched.
   it('refuses a CIMD URL that is not https', async () => {
     await expect(

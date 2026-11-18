@@ -110,6 +110,26 @@ describe('DrizzleOAuthClientRepository - Integration Tests', () => {
       const result = await repository.findByClientId('never-registered')
       expect(result).toBeNull()
     })
+
+    // A client id is an exact string. Under a case- and accent-insensitive
+    // collation, `https://clàude.example/c.json` is a different URL (a
+    // different, registrable punycode host) but the same row.
+    it.each([
+      ['an accent variant', 'https://clàude.example/c.json'],
+      ['a case variant', 'https://CLAUDE.example/C.json'],
+    ])(
+      'should return null for %s of a stored client id',
+      async (_, variant) => {
+        await repository.create(
+          dcrClient({
+            clientId: 'https://claude.example/c.json',
+            registrationType: 'cimd',
+          })
+        )
+
+        expect(await repository.findByClientId(variant)).toBeNull()
+      }
+    )
   })
 
   describe('findById', () => {

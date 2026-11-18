@@ -18,6 +18,7 @@ export const oauthTokens = mysqlTable(
     tokenHash: varchar('token_hash', { length: 64 }).notNull().unique(),
     kind: mysqlEnum('kind', ['access', 'refresh']).notNull(),
     clientId: varchar('client_id', { length: 255 })
+      .collate('utf8mb4_bin')
       .notNull()
       .references(() => oauthClients.clientId, { onDelete: 'cascade' }),
     userId: varchar('user_id', { length: 36 })

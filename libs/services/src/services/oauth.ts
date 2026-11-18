@@ -874,11 +874,23 @@ export class OAuthService {
       return this.resolveClientIdMetadataDocument(clientId)
     }
 
-    const client = await this.clientRepository.findByClientId(clientId)
+    const client = await this.findClient(clientId)
     if (!client) {
       throw new OAuthInvalidClientError('Unknown client_id')
     }
     return client
+  }
+
+  /**
+   * The row stored under exactly this `client_id`, or null.
+   *
+   * The column compares exactly, and this checks again: a row for a different
+   * identifier handed back here would be refreshed with, or authorize, a
+   * client it does not belong to.
+   */
+  private async findClient(clientId: string): Promise<OAuthClient | null> {
+    const client = await this.clientRepository.findByClientId(clientId)
+    return client?.clientId === clientId ? client : null
   }
 
   /**
@@ -899,7 +911,7 @@ export class OAuthService {
    * that page is not on the budget.
    */
   private async resolveClientForGrant(clientId: string): Promise<OAuthClient> {
-    const known = await this.clientRepository.findByClientId(clientId)
+    const known = await this.findClient(clientId)
     if (known) return known
 
     // No row at all. There is no grant to exchange either, but resolving
@@ -923,7 +935,7 @@ export class OAuthService {
   ): Promise<OAuthClient> {
     const url = this.validateMetadataUrl(clientId)
 
-    const cached = await this.clientRepository.findByClientId(clientId)
+    const cached = await this.findClient(clientId)
     if (cached && isFresh(cached.metadataFetchedAt)) {
       return cached
     }
@@ -972,6 +984,22 @@ export class OAuthService {
     if (url.pathname === '' || url.pathname === '/') {
       throw new OAuthInvalidClientError(
         'A client_id URL must name a document, not an origin'
+      )
+    }
+
+    // One client, one spelling. A URL that parsing would rewrite (an
+    // upper-case or non-ASCII host, a default port) has another spelling that
+    // fetches the same document, or for a non-ASCII host a different one, and
+    // the document's own client_id is compared as an exact string. A fragment
+    // or userinfo is never part of a client's identity.
+    if (
+      url.href !== clientId ||
+      clientId.includes('#') ||
+      url.username !== '' ||
+      url.password !== ''
+    ) {
+      throw new OAuthInvalidClientError(
+        'A client_id URL must be in canonical form, with no fragment or userinfo'
       )
     }
 
