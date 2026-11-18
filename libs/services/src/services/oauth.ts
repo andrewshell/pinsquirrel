@@ -723,6 +723,9 @@ export class OAuthService {
    * codes and tokens that reference it - an operator editing a name should not
    * be able to sign every user of that connector out by fat-fingering a
    * different identifier.
+   *
+   * Each entry is reconciled on its own, so one bad entry does not keep the
+   * rest out of the table. The failures come back for the caller to log.
    */
   async reconcileStaticClients(
     clients: {
@@ -730,43 +733,55 @@ export class OAuthService {
       clientName: string | null
       redirectUris: string[]
     }[]
-  ): Promise<void> {
+  ): Promise<{ clientId: string; error: unknown }[]> {
+    const failures: { clientId: string; error: unknown }[] = []
     for (const client of clients) {
-      const { redirectUris, grantTypes, authMethod } = requireClientRules({
-        redirect_uris: client.redirectUris,
-      })
-
-      const existing = await this.clientRepository.findByClientId(
-        client.clientId
-      )
-
-      if (!existing) {
-        await this.clientRepository.create({
-          clientId: client.clientId,
-          clientName: client.clientName,
-          redirectUris,
-          grantTypes,
-          tokenEndpointAuthMethod: authMethod,
-          registrationType: 'static',
-          metadataUrl: null,
-          metadataFetchedAt: null,
-        })
-        continue
+      try {
+        await this.reconcileStaticClient(client)
+      } catch (error) {
+        failures.push({ clientId: client.clientId, error })
       }
+    }
+    return failures
+  }
 
-      if (
-        existing.clientName === client.clientName &&
-        sameUriList(existing.redirectUris, redirectUris)
-      ) {
-        // Nothing to say. Every boot would otherwise write the same row back.
-        continue
-      }
+  private async reconcileStaticClient(client: {
+    clientId: string
+    clientName: string | null
+    redirectUris: string[]
+  }): Promise<void> {
+    const { redirectUris, grantTypes, authMethod } = requireClientRules({
+      redirect_uris: client.redirectUris,
+    })
 
-      await this.clientRepository.update(existing.id, {
+    const existing = await this.clientRepository.findByClientId(client.clientId)
+
+    if (!existing) {
+      await this.clientRepository.create({
+        clientId: client.clientId,
         clientName: client.clientName,
         redirectUris,
+        grantTypes,
+        tokenEndpointAuthMethod: authMethod,
+        registrationType: 'static',
+        metadataUrl: null,
+        metadataFetchedAt: null,
       })
+      return
     }
+
+    if (
+      existing.clientName === client.clientName &&
+      sameUriList(existing.redirectUris, redirectUris)
+    ) {
+      // Nothing to say. Every boot would otherwise write the same row back.
+      return
+    }
+
+    await this.clientRepository.update(existing.id, {
+      clientName: client.clientName,
+      redirectUris,
+    })
   }
 
   /**

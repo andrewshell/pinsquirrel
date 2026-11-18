@@ -2038,21 +2038,53 @@ describe('OAuthService.reconcileStaticClients', () => {
     expect(ctx.clientRepository.delete).not.toHaveBeenCalled()
   })
 
-  it('refuses a redirect URI with a fragment', async () => {
-    await expect(
-      ctx.service.reconcileStaticClients([
-        { ...acme, redirectUris: ['https://acme.example.com/callback#x'] },
-      ])
-    ).rejects.toThrow(OAuthInvalidClientMetadataError)
+  it('reports a redirect URI with a fragment as that entry failing', async () => {
+    const failures = await ctx.service.reconcileStaticClients([
+      { ...acme, redirectUris: ['https://acme.example.com/callback#x'] },
+    ])
+
+    expect(failures).toEqual([
+      {
+        clientId: 'acme-connector',
+        error: expect.any(OAuthInvalidClientMetadataError) as Error,
+      },
+    ])
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
-  it('refuses a redirect URI this server would never redirect to', async () => {
-    await expect(
-      ctx.service.reconcileStaticClients([
-        { ...acme, redirectUris: ['http://acme.example.com/callback'] },
-      ])
-    ).rejects.toThrow(OAuthInvalidClientMetadataError)
+  it('reports a redirect URI this server would never redirect to', async () => {
+    const failures = await ctx.service.reconcileStaticClients([
+      { ...acme, redirectUris: ['http://acme.example.com/callback'] },
+    ])
+
+    expect(failures.map(failure => failure.error)).toEqual([
+      expect.any(OAuthInvalidClientMetadataError),
+    ])
+  })
+
+  it('still reconciles the entries after one that fails, and names the one that failed', async () => {
+    const broken = new Error('Data too long for column client_id')
+    vi.mocked(ctx.clientRepository.create).mockImplementation(data =>
+      data.clientId === 'broken-connector'
+        ? Promise.reject(broken)
+        : Promise.resolve(makeClient(data as OAuthClient))
+    )
+
+    const failures = await ctx.service.reconcileStaticClients([
+      { ...acme, clientId: 'broken-connector' },
+      acme,
+    ])
+
+    expect(failures).toEqual([{ clientId: 'broken-connector', error: broken }])
+    expect(ctx.clientRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ clientId: 'acme-connector' })
+    )
+  })
+
+  it('reports no failures when every entry reconciles', async () => {
+    await expect(ctx.service.reconcileStaticClients([acme])).resolves.toEqual(
+      []
+    )
   })
 })
 
