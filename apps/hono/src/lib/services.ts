@@ -16,6 +16,7 @@ import {
   type EmailSealer,
 } from '@pinsquirrel/services'
 import { oauthConfig } from './config'
+import { createDeferredWork } from './deferred-work'
 import { logger, safeError } from './logger'
 import {
   userRepository,
@@ -74,6 +75,12 @@ if (emailHashKey && emailHashKey.length < 32) {
   )
 }
 
+// Sign-up and reset work that runs after the response; `index.ts` drains it
+// on shutdown.
+export const deferredWork = createDeferredWork(error => {
+  logger.error({ err: safeError(error) }, 'Deferred account work failed')
+})
+
 // Create service instances
 export const authService = new AuthenticationService(userRepository)
 export const accountService = new AccountService(
@@ -82,11 +89,7 @@ export const accountService = new AccountService(
   emailChangeRepository,
   emailService,
   {
-    defer: work => {
-      work().catch((error: unknown) => {
-        logger.error({ err: safeError(error) }, 'Deferred account work failed')
-      })
-    },
+    defer: work => deferredWork.defer(work),
     emailSealer,
     emailHashKey,
   }

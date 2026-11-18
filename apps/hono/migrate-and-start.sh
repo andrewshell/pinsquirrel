@@ -37,4 +37,7 @@ echo "Database migrations completed successfully."
 
 # Start the application
 echo "Starting PinSquirrel Hono application..."
-pnpm $PNPM_NO_DEP_CHECK --filter @pinsquirrel/hono start
+# exec node itself, so it is PID 1 and `docker stop`'s SIGTERM reaches the app,
+# which drains its deferred work. As a child of this shell it never saw it.
+cd apps/hono
+exec node dist/index.js
