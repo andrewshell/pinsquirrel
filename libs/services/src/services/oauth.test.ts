@@ -237,8 +237,6 @@ describe('OAuthService.resolveClient', () => {
     expect(ctx.fetcher.fetch).toHaveBeenCalledWith(CIMD_URL, {
       // A metadata URL that redirects is a misconfigured client.
       redirect: 'error',
-      // Capped while it is read, so a compressed body cannot decode into a
-      // large string before anything checks it.
       maxBytes: 16 * 1024,
     })
     expect(ctx.clientRepository.create).toHaveBeenCalledWith(
@@ -280,8 +278,6 @@ describe('OAuthService.resolveClient', () => {
     )
   })
 
-  // The database is not trusted to have compared the identifier exactly. A row
-  // for a different client id is a miss, never a cache entry to refresh.
   it('never refreshes a row stored under a different client id', async () => {
     const requested = 'https://claude.example/C.json'
     vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
@@ -313,8 +309,6 @@ describe('OAuthService.resolveClient', () => {
     )
   })
 
-  // A URL that `URL` would rewrite is two spellings of one client, or, for a
-  // host with accents, a spelling of a different one.
   it.each([
     ['an upper-case host', 'https://CLAUDE.example/c.json'],
     ['a host that is not ASCII', 'https://clàude.example/c.json'],
@@ -407,8 +401,6 @@ describe('OAuthService.resolveClient', () => {
     )
   })
 
-  // A published document is held to the rules a registration is: anything
-  // else would make CIMD the way around them.
   it.each([
     [
       'a plaintext redirect URI that is not loopback',
@@ -1278,8 +1270,6 @@ describe('OAuthService.registerClient', () => {
     ).rejects.toBeInstanceOf(OAuthInvalidClientMetadataError)
   })
 
-  // The columns are what bound these, and a value over one fails as a 500
-  // inside the insert. Refused up front, it is the caller's error instead.
   it('refuses a client_name longer than its column before creating a row', async () => {
     await expect(
       ctx.service.registerClient(registration({ client_name: 'n'.repeat(256) }))
@@ -1699,9 +1689,6 @@ describe('OAuthService token requests and the latency budget', () => {
     expect(ctx.fetcher.fetch).not.toHaveBeenCalled()
   })
 
-  // A code or a refresh token can only exist for a client that has a row, so
-  // a client with none has nothing to exchange, and fetching its document
-  // could not change that.
   it('refuses a code exchange for a client it has no row for, without fetching or storing it', async () => {
     vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(null)
 

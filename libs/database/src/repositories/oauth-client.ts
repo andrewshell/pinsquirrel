@@ -102,15 +102,15 @@ export class DrizzleOAuthClientRepository implements OAuthClientRepository {
   async deleteExpiredIncompleteClients(
     registeredBefore: Date
   ): Promise<number> {
-    const result = await this.db.delete(oauthClients).where(
-      and(
-        // The rows anyone can create: `dcr` at registration, `cimd` when the
-        // consent page renders. Never `static`, which an operator entered.
-        inArray(oauthClients.registrationType, ['dcr', 'cimd']),
-        isNull(oauthClients.completedAt),
-        lt(oauthClients.createdAt, registeredBefore)
+    const result = await this.db
+      .delete(oauthClients)
+      .where(
+        and(
+          inArray(oauthClients.registrationType, ['dcr', 'cimd']),
+          isNull(oauthClients.completedAt),
+          lt(oauthClients.createdAt, registeredBefore)
+        )
       )
-    )
     return result[0].affectedRows
   }
 }

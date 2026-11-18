@@ -172,8 +172,6 @@ export class NodeHttpFetcher implements HttpFetcher {
 }
 
 /**
- * The body as text, refused once it decodes past `maxBytes`.
- *
  * `Content-Length` describes the bytes on the wire, which for a compressed
  * response says nothing about the decoded size, so it only short-cuts the
  * obvious case; the count that decides is of the decoded stream.

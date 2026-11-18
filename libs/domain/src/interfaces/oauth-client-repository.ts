@@ -28,10 +28,7 @@ export interface OAuthClientRepository extends Repository<
    *
    * Named like `SessionRepository.deleteExpiredSessions` because it joins the
    * same sweep, but the cutoff is passed in: the TTL is a policy the service
-   * owns, not a property of the row. Both kinds are rows an anonymous caller
-   * can create: a `dcr` row at registration, a `cimd` row when the consent
-   * page renders. A `static` client is entered by an operator and may sit
-   * unused indefinitely, so it is never swept.
+   * owns, not a property of the row.
    */
   deleteExpiredIncompleteClients(registeredBefore: Date): Promise<number>
 }

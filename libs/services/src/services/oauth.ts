@@ -101,11 +101,6 @@ const DEFAULT_SCOPES = ['pins:read', 'tags:read']
 /** How long a fetched CIMD document is trusted before it is fetched again. */
 const CIMD_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
-/**
- * The most a CIMD document may weigh once decoded. Real ones are a few hundred
- * bytes; the URL is caller-supplied, so the fetcher enforces this while it
- * reads rather than after.
- */
 const MAX_CIMD_DOCUMENT_BYTES = 16 * 1024
 
 /** What this server issues tokens for. */
@@ -351,7 +346,7 @@ export class OAuthService {
     }
     const request = parsed.data
 
-    const client = await this.resolveClientForGrant(request.client_id)
+    const client = await this.requireStoredClient(request.client_id)
 
     const code = await this.codeRepository.consume(hashToken(request.code))
     if (!code) {
@@ -418,7 +413,7 @@ export class OAuthService {
     }
     const request = parsed.data
 
-    const client = await this.resolveClientForGrant(request.client_id)
+    const client = await this.requireStoredClient(request.client_id)
 
     const token = await this.tokenRepository.findByTokenHash(
       hashToken(request.refresh_token)
@@ -850,8 +845,6 @@ export class OAuthService {
    */
   async resolveClient(clientId: string): Promise<OAuthClient> {
     if (clientId.length > MAX_CLIENT_ID_LENGTH) {
-      // No row can be stored under it, so there is nothing to look up and no
-      // document worth fetching.
       throw new OAuthInvalidClientError('client_id is too long')
     }
 
@@ -866,34 +859,17 @@ export class OAuthService {
     return client
   }
 
-  /**
-   * The row stored under exactly this `client_id`, or null.
-   *
-   * The column compares exactly, and this checks again: a row for a different
-   * identifier handed back here would be refreshed with, or authorize, a
-   * client it does not belong to.
-   */
   private async findClient(clientId: string): Promise<OAuthClient | null> {
     const client = await this.clientRepository.findByClientId(clientId)
     return client?.clientId === clientId ? client : null
   }
 
   /**
-   * The client behind a `client_id` on a token request: the row this server
-   * already has, however old its cached metadata is, or `invalid_client`.
-   *
-   * Never a fetch. A code or a refresh token can only exist for a client that
-   * has a row, so a client with none has nothing to exchange; fetching its
-   * document would only hand an anonymous caller an outbound request and a
-   * stored row. A stale row is not re-fetched either: the token endpoint
-   * compares the identifier against the code or the refresh token, checks the
-   * redirect URI against the code and the audience against the grant, and
-   * reads nothing else off the client, so a re-fetch could not change the
-   * answer. It could spend the client's whole latency budget (10 seconds for
-   * a token exchange) waiting on somebody else's server. The authorization
-   * request is where the document is validated and refreshed.
+   * A stale row is not re-fetched here: Claude gives a token exchange 10
+   * seconds and a refresh 30, and a CIMD fetch has a 10 second timeout of its
+   * own. The authorization request is where the document is refreshed.
    */
-  private async resolveClientForGrant(clientId: string): Promise<OAuthClient> {
+  private async requireStoredClient(clientId: string): Promise<OAuthClient> {
     const known = await this.findClient(clientId)
     if (!known) {
       throw new OAuthInvalidClientError('Unknown client_id')
@@ -970,11 +946,8 @@ export class OAuthService {
       )
     }
 
-    // One client, one spelling. A URL that parsing would rewrite (an
-    // upper-case or non-ASCII host, a default port) has another spelling that
-    // fetches the same document, or for a non-ASCII host a different one, and
-    // the document's own client_id is compared as an exact string. A fragment
-    // or userinfo is never part of a client's identity.
+    // draft-ietf-oauth-client-id-metadata-document, section 3: no fragment or
+    // userinfo, and client ids compare as exact strings, never normalized.
     if (
       url.href !== clientId ||
       clientId.includes('#') ||
@@ -1119,17 +1092,6 @@ function narrowedScopes(scope: string, granted: string[]): string[] {
  * Normalized on both sides, so a trailing slash or an upper-case host is not
  * an audience failure. Divergent normalization here looks like random
  * connection breakage from the outside.
- */
-/**
- * The rules every client is held to, whichever way it arrived: registered
- * (DCR), published (CIMD) or configured (static). Applied before anything is
- * stored, so no path is a way around the others.
- *
- * Public clients only: the server metadata advertises
- * `token_endpoint_auth_method` `none` and nothing else, and a client that
- * expects a secret or a key to be checked is refused rather than silently
- * served as one that does not. Only the grant types this server implements,
- * and redirect URIs it is willing to send a browser to.
  */
 function requireClientRules(metadata: {
   redirect_uris: string[]

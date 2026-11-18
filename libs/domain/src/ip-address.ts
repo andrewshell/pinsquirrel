@@ -14,10 +14,9 @@
 
 /**
  * IPv4 ranges that must never be fetched, as [network, prefix length]: every
- * block in the IANA special-purpose registry that is not globally reachable,
- * and the documentation and benchmarking blocks besides. None of them is
- * somewhere a public web server lives, and several are somewhere a private
- * one does.
+ * block the IANA IPv4 special-purpose registry marks not globally reachable
+ * (https://www.iana.org/assignments/iana-ipv4-special-registry), plus
+ * multicast.
  *
  * Prefix-string matching cannot express these: it blocks all of `172.*` when
  * only `172.16.0.0/12` is private, and it misses `169.254.169.254` — the cloud
@@ -104,11 +103,7 @@ function ipv6ToBytes(address: string): number[] | null {
   return [...headBytes, ...Array<number>(gap).fill(0), ...tailBytes]
 }
 
-/**
- * Global unicast is `2000::/3`. Everything outside it (loopback, unique local,
- * link-local, site-local, multicast, local-use NAT64) is somewhere other than
- * the public internet, so the IPv6 check allows in rather than blocks out.
- */
+/** Global unicast is `2000::/3`. */
 function isGlobalUnicast(bytes: number[]): boolean {
   return (bytes[0] & 0xe0) === 0x20
 }
@@ -117,8 +112,7 @@ function isGlobalUnicast(bytes: number[]): boolean {
  * The IPv4 address an IPv6 address carries, when it is one of the forms that
  * route to that IPv4 address: IPv4-mapped (`::ffff:0:0/96`), IPv4-compatible
  * (`::/96`, which also covers `::` and `::1`), NAT64 (`64:ff9b::/96`) and
- * 6to4 (`2002::/16`). Deciding on the IPv6 form alone would let
- * `64:ff9b::a9fe:a9fe` reach `169.254.169.254` through a NAT64 gateway.
+ * 6to4 (`2002::/16`).
  */
 function embeddedIpv4(bytes: number[]): string | null {
   const zeros = (from: number, to: number) =>

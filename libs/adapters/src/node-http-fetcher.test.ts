@@ -185,6 +185,7 @@ describe('NodeHttpFetcher', () => {
 
   describe('with maxBytes', () => {
     const CAP = 16 * 1024
+    const READ_AHEAD_SLACK = 64 * 1024
 
     function streamOf(total: number) {
       const chunk = new Uint8Array(1024).fill(0x61)
@@ -224,8 +225,7 @@ describe('NodeHttpFetcher', () => {
       await expect(
         fetcher.fetch('https://example.com', { maxBytes: CAP })
       ).rejects.toBeInstanceOf(ResponseTooLargeError)
-      // One chunk of slack for what was in flight, nowhere near the full MiB.
-      expect(stream.pulled()).toBeLessThanOrEqual(CAP + 64 * 1024)
+      expect(stream.pulled()).toBeLessThanOrEqual(CAP + READ_AHEAD_SLACK)
     })
 
     it('refuses a declared Content-Length over the limit without reading', async () => {
@@ -242,16 +242,12 @@ describe('NodeHttpFetcher', () => {
       expect(stream.pulled()).toBeLessThanOrEqual(1024)
     })
 
-    // The limit is on what the body decodes to, not on what crossed the wire:
-    // 8 MiB of gzip is a few KiB.
     describe('against a real server sending gzip', () => {
       const decoded = 8 * 1024 * 1024
       const gzipped = gzipSync(Buffer.alloc(decoded, 0x61))
       let server: Server
       let url: string
 
-      // The loopback server is a private address by design; this test is about
-      // decoding, so it goes around the address check.
       const unguarded = new NodeHttpFetcher(
         (target, init) =>
           undiciFetch(target, { ...init, dispatcher: undefined }),

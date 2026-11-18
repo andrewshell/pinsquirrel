@@ -1,8 +1,6 @@
--- Compare OAuth client ids as exact strings. The referencing columns must
--- share the referenced column's collation, and MySQL refuses to change one
--- side of a foreign key at a time, so the checks are off across the three
--- changes. Every statement is a MODIFY to a fixed definition, so re-running
--- it is a no-op.
+-- The referencing columns must share the referenced column's collation, and
+-- MySQL refuses to change one side of a foreign key at a time, so the checks
+-- are off across the three changes.
 SET FOREIGN_KEY_CHECKS = 0;--> statement-breakpoint
 ALTER TABLE `oauth_clients` MODIFY COLUMN `client_id` varchar(255) COLLATE utf8mb4_bin NOT NULL;--> statement-breakpoint
 ALTER TABLE `oauth_authorization_codes` MODIFY COLUMN `client_id` varchar(255) COLLATE utf8mb4_bin NOT NULL;--> statement-breakpoint

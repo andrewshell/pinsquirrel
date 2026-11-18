@@ -13,9 +13,9 @@ export const oauthClients = mysqlTable(
     id: varchar('id', { length: 36 }).primaryKey(),
     // The identifier the client sends on every request, and what the codes
     // and tokens below point at. Unique, so it can carry those foreign keys
-    // without a join on the hot path. Binary, because it is compared as an
-    // exact string: under the default collation two URLs that differ in case
-    // or accents, and so name different hosts, would be one row.
+    // without a join on the hot path. Binary: MySQL's default collation
+    // ignores case and accents, and CIMD compares client ids by simple string
+    // comparison (draft-ietf-oauth-client-id-metadata-document, section 3).
     clientId: varchar('client_id', { length: 255 })
       .collate('utf8mb4_bin')
       .notNull()
@@ -42,9 +42,6 @@ export const oauthClients = mysqlTable(
       .notNull(),
   },
   table => ({
-    // The sweep deletes `dcr` and `cimd` rows with no `completed_at` older
-    // than the TTL. Anyone can create those rows, so this runs against the one
-    // table an unauthenticated caller can grow, and it must not scan it.
     incompleteIdx: index('oauth_clients_incomplete_idx').on(
       table.registrationType,
       table.completedAt,

@@ -111,9 +111,6 @@ describe('DrizzleOAuthClientRepository - Integration Tests', () => {
       expect(result).toBeNull()
     })
 
-    // A client id is an exact string. Under a case- and accent-insensitive
-    // collation, `https://clàude.example/c.json` is a different URL (a
-    // different, registrable punycode host) but the same row.
     it.each([
       ['an accent variant', 'https://clàude.example/c.json'],
       ['a case variant', 'https://CLAUDE.example/C.json'],
@@ -250,8 +247,6 @@ describe('DrizzleOAuthClientRepository - Integration Tests', () => {
       expect(await repository.findById(recent)).not.toBeNull()
     })
 
-    // A `cimd` row is written when the consent page renders, before anyone
-    // approves, so it grows the table the same way a `dcr` row does.
     it('should delete CIMD registrations that never completed one', async () => {
       const stale = await createdAgo(
         dcrClient({ registrationType: 'cimd' }),
@@ -272,8 +267,6 @@ describe('DrizzleOAuthClientRepository - Integration Tests', () => {
     })
 
     it('should never touch a static registration', async () => {
-      // A static client is entered by an operator and may sit unused for
-      // months.
       const staticClient = await createdAgo(
         dcrClient({ registrationType: 'static' }),
         30 * 24 * 60 * 60 * 1000

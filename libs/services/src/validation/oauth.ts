@@ -18,17 +18,10 @@ import { isLoopbackRedirectHost } from './oauth-uri.js'
  * server needs to be stricter about are re-stated here.
  */
 
-/**
- * The widths of the columns these values end up in (`oauth_clients.client_id`
- * and `client_name`, `oauth_authorization_codes.redirect_uri`). A value over
- * one is refused here as the caller's mistake, rather than failing inside an
- * insert as a 500, after an outbound fetch or after the user clicked Approve.
- */
 export const MAX_CLIENT_ID_LENGTH = 255
 const MAX_CLIENT_NAME_LENGTH = 255
 const MAX_REDIRECT_URI_LENGTH = 512
 
-/** `state` and `scope` are not stored as sent, but travel in a URL. */
 const MAX_PARAMETER_LENGTH = 1024
 
 const clientIdValue = z.string().min(1).max(MAX_CLIENT_ID_LENGTH)
@@ -110,7 +103,6 @@ export type TokenRequestParams = z.infer<typeof tokenRequestSchema>
 
 const MAX_REDIRECT_URIS = 10
 
-/** The SDK's client metadata, with the lengths the columns allow. */
 const clientMetadataSchema = OAuthClientMetadataSchema.extend({
   client_name: z.string().max(MAX_CLIENT_NAME_LENGTH).optional(),
   redirect_uris: z.array(SafeUrlSchema.max(MAX_REDIRECT_URI_LENGTH)),
@@ -156,14 +148,8 @@ export type ClientIdMetadataDocument = z.infer<
 
 /**
  * A redirect URI this server is willing to send a browser to: https, or http
- * on a loopback host, where there is no network to intercept and RFC 8252
- * expects it. A plaintext URI on a real host would carry an authorization code
- * across the internet in the clear. No fragment, which RFC 6749 3.1.2 forbids:
- * the code and `state` go in the query, and a fragment would follow them.
- *
- * The one rule for every way a client arrives (registration, metadata
- * document, operator config), so the config fails at boot on what the
- * registration path would refuse.
+ * on a loopback host (RFC 8252 section 7.3). No fragment (RFC 6749 section
+ * 3.1.2).
  */
 export function isUsableRedirectUri(uri: string): boolean {
   if (uri.includes('#')) return false
