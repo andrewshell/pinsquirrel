@@ -40,6 +40,11 @@ repositories by definition; that is their job.
   `prettier --check .` at the root and covers root files too (`PLAN.md`, `DEPLOYMENT.md`, this
   file). To fix those: `pnpm exec prettier --write <file>`.
 - For TDD, leave `pnpm --filter <workspace> test:watch` running.
+- The database tests drop every table before they migrate, so two worktrees testing at once
+  must not share a database. Give each its own (create it as root in the dev MySQL container
+  and grant `pinsquirrel` all privileges on it), then export
+  `TEST_DATABASE_URL=mysql://pinsquirrel:pinsquirrel@localhost:3306/<db>` before
+  `pnpm quality` or `pnpm test`. Without it the tests use `pinsquirrel_test`.
 
 ## Pre-work baseline
 
