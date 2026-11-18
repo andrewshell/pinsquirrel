@@ -250,16 +250,32 @@ describe('DrizzleOAuthClientRepository - Integration Tests', () => {
       expect(await repository.findById(recent)).not.toBeNull()
     })
 
-    it('should never touch a static or CIMD registration', async () => {
+    // A `cimd` row is written when the consent page renders, before anyone
+    // approves, so it grows the table the same way a `dcr` row does.
+    it('should delete CIMD registrations that never completed one', async () => {
+      const stale = await createdAgo(
+        dcrClient({ registrationType: 'cimd' }),
+        2 * 60 * 60 * 1000
+      )
+      const completed = await createdAgo(
+        dcrClient({ registrationType: 'cimd' }),
+        2 * 60 * 60 * 1000
+      )
+      await repository.markCompleted(completed, new Date())
+
+      const deleted =
+        await repository.deleteExpiredIncompleteClients(anHourAgo())
+
+      expect(deleted).toBe(1)
+      expect(await repository.findById(stale)).toBeNull()
+      expect(await repository.findById(completed)).not.toBeNull()
+    })
+
+    it('should never touch a static registration', async () => {
       // A static client is entered by an operator and may sit unused for
-      // months; a CIMD row is a cache entry keyed by a URL the client
-      // re-presents. Neither is the unbounded growth this sweep bounds.
+      // months.
       const staticClient = await createdAgo(
         dcrClient({ registrationType: 'static' }),
-        30 * 24 * 60 * 60 * 1000
-      )
-      const cimdClient = await createdAgo(
-        dcrClient({ registrationType: 'cimd' }),
         30 * 24 * 60 * 60 * 1000
       )
 
@@ -268,7 +284,6 @@ describe('DrizzleOAuthClientRepository - Integration Tests', () => {
 
       expect(deleted).toBe(0)
       expect(await repository.findById(staticClient)).not.toBeNull()
-      expect(await repository.findById(cimdClient)).not.toBeNull()
     })
 
     it('should return 0 when there is nothing to sweep', async () => {

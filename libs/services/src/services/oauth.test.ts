@@ -648,6 +648,9 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
 
   beforeEach(() => {
     ctx = setup()
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient()
+    )
     vi.mocked(ctx.codeRepository.consume).mockResolvedValue(makeCode())
     vi.mocked(ctx.tokenRepository.create).mockImplementation(data =>
       Promise.resolve(makeToken(data))
@@ -803,6 +806,9 @@ describe('OAuthService.exchangeRefreshToken', () => {
 
   beforeEach(() => {
     ctx = setup()
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient()
+    )
     vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
       storedRefresh()
     )
@@ -1560,9 +1566,10 @@ describe('OAuthService token requests and the latency budget', () => {
     expect(ctx.fetcher.fetch).not.toHaveBeenCalled()
   })
 
-  // The authorization request is where the document is validated, so a client
-  // this server has never seen still has to be fetched there.
-  it('still fetches the document for a client it has no row for', async () => {
+  // A code or a refresh token can only exist for a client that has a row, so
+  // a client with none has nothing to exchange, and fetching its document
+  // could not change that.
+  it('refuses a code exchange for a client it has no row for, without fetching or storing it', async () => {
     vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(null)
 
     await expect(
@@ -1570,12 +1577,28 @@ describe('OAuthService token requests and the latency budget', () => {
         grant_type: 'authorization_code',
         code: 'raw-code',
         redirect_uri: 'http://localhost:54321/callback',
-        client_id: CIMD_URL,
+        client_id: 'https://unknown.example/client.json',
         code_verifier: CODE_VERIFIER,
       })
-    ).resolves.toBeDefined()
+    ).rejects.toBeInstanceOf(OAuthInvalidClientError)
 
-    expect(ctx.fetcher.fetch).toHaveBeenCalled()
+    expect(ctx.fetcher.fetch).not.toHaveBeenCalled()
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses a refresh for a client it has no row for, without fetching or storing it', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(null)
+
+    await expect(
+      ctx.service.exchangeRefreshToken({
+        grant_type: 'refresh_token',
+        refresh_token: 'raw-refresh',
+        client_id: 'https://unknown.example/client.json',
+      })
+    ).rejects.toBeInstanceOf(OAuthInvalidClientError)
+
+    expect(ctx.fetcher.fetch).not.toHaveBeenCalled()
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
   // The cache is what keeps the consent page off the network on every visit.

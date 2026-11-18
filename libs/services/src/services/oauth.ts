@@ -894,30 +894,26 @@ export class OAuthService {
   }
 
   /**
-   * The client behind a `client_id` on a token request.
+   * The client behind a `client_id` on a token request: the row this server
+   * already has, however old its cached metadata is, or `invalid_client`.
    *
-   * A row this server already has is good enough here, however old its cached
-   * metadata is. What the token endpoint does with the client is compare its
-   * identifier against the one on the code or the refresh token; the redirect
-   * URI is checked against the code, and the audience against the grant.
-   * Nothing reads the redirect URIs or the grant types off the client, so a
-   * re-fetch could not change the answer.
-   *
-   * It could easily change the timing. Claude gives a token exchange 10
-   * seconds and a refresh 30, and a CIMD fetch has a 10 second timeout of its
-   * own, so a stale cache behind a slow or unreachable client host would spend
-   * the entire budget waiting for a document whose contents do not matter. The
-   * authorization request is where the document is validated and refreshed;
-   * that page is not on the budget.
+   * Never a fetch. A code or a refresh token can only exist for a client that
+   * has a row, so a client with none has nothing to exchange; fetching its
+   * document would only hand an anonymous caller an outbound request and a
+   * stored row. A stale row is not re-fetched either: the token endpoint
+   * compares the identifier against the code or the refresh token, checks the
+   * redirect URI against the code and the audience against the grant, and
+   * reads nothing else off the client, so a re-fetch could not change the
+   * answer. It could spend the client's whole latency budget (10 seconds for
+   * a token exchange) waiting on somebody else's server. The authorization
+   * request is where the document is validated and refreshed.
    */
   private async resolveClientForGrant(clientId: string): Promise<OAuthClient> {
     const known = await this.findClient(clientId)
-    if (known) return known
-
-    // No row at all. There is no grant to exchange either, but resolving
-    // properly is what turns that into `invalid_client` rather than a
-    // confusing `invalid_grant`.
-    return this.resolveClient(clientId)
+    if (!known) {
+      throw new OAuthInvalidClientError('Unknown client_id')
+    }
+    return known
   }
 
   /**

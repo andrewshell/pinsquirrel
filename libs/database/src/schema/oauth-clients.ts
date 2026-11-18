@@ -42,9 +42,9 @@ export const oauthClients = mysqlTable(
       .notNull(),
   },
   table => ({
-    // The sweep deletes `dcr` rows with no `completed_at` older than the TTL.
-    // Anyone can create those rows, so this runs against the one table an
-    // unauthenticated caller can grow, and it must not scan it.
+    // The sweep deletes `dcr` and `cimd` rows with no `completed_at` older
+    // than the TTL. Anyone can create those rows, so this runs against the one
+    // table an unauthenticated caller can grow, and it must not scan it.
     incompleteIdx: index('oauth_clients_incomplete_idx').on(
       table.registrationType,
       table.completedAt,

@@ -4,7 +4,7 @@ import type {
   UpdateOAuthClientData,
   OAuthClientRepository,
 } from '@pinsquirrel/domain'
-import { and, eq, isNull, lt } from 'drizzle-orm'
+import { and, eq, inArray, isNull, lt } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { oauthClients } from '../schema/oauth-clients'
 
@@ -104,9 +104,9 @@ export class DrizzleOAuthClientRepository implements OAuthClientRepository {
   ): Promise<number> {
     const result = await this.db.delete(oauthClients).where(
       and(
-        // Only `dcr`: those are the rows an anonymous caller creates, and
-        // Claude creates a fresh one per connection.
-        eq(oauthClients.registrationType, 'dcr'),
+        // The rows anyone can create: `dcr` at registration, `cimd` when the
+        // consent page renders. Never `static`, which an operator entered.
+        inArray(oauthClients.registrationType, ['dcr', 'cimd']),
         isNull(oauthClients.completedAt),
         lt(oauthClients.createdAt, registeredBefore)
       )
