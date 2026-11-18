@@ -7,6 +7,7 @@ import {
   AccessNotGrantedError,
   InvalidResetTokenError,
   ResetTokenExpiredError,
+  WriteConflictError,
 } from '@pinsquirrel/domain'
 import { accountService, authService } from '../lib/services'
 import { baseUrl } from '../lib/config'
@@ -367,6 +368,27 @@ auth.post('/reset-password/:token', async c => {
       error instanceof ResetTokenExpiredError
     ) {
       return c.html(<ResetPasswordPage invalidToken={true} embed={embed} />)
+    }
+
+    // The link is spent only when the reset commits, so the same form works.
+    if (error instanceof WriteConflictError) {
+      logger.warn(
+        { cause: safeError(error.cause) },
+        'Password reset lost to another write'
+      )
+      c.header('Retry-After', '1')
+      return c.html(
+        <ResetPasswordPage
+          token={token}
+          errors={{
+            _form: [
+              'The server was busy and your password was not changed. Please try again.',
+            ],
+          }}
+          embed={embed}
+        />,
+        503
+      )
     }
 
     return c.html(

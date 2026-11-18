@@ -15,6 +15,7 @@ import {
   CannotRevokeOwnRoleError,
   CannotDeleteOwnAccountError,
   AdminAlreadyExistsError,
+  WriteConflictError,
 } from '@pinsquirrel/domain'
 import type { User } from '@pinsquirrel/domain'
 import { readFileSync } from 'node:fs'
@@ -249,7 +250,7 @@ async function renderUsers(
   env: AdminEnvironment,
   username: string,
   outcome: { notice?: string; error?: string } = {},
-  status: 200 | 400 | 404 | 500 = 200
+  status: 200 | 400 | 404 | 500 | 503 = 200
 ) {
   let rows: UserRow[] = []
   let error = outcome.error
@@ -957,7 +958,25 @@ export function createApp(config: AdminConfig): Hono {
           await authService.grantRole(ac, userId, role)
           changes.push(`Granted the ${role} role to ${target.username}.`)
         } else {
-          await authService.revokeRole(ac, userId, role)
+          try {
+            await authService.revokeRole(ac, userId, role)
+          } catch (error) {
+            if (!(error instanceof WriteConflictError)) throw error
+            console.warn(
+              `[admin] revoking ${role} lost to another write on "${env.name}":`,
+              error.cause
+            )
+            return renderUsers(
+              c,
+              env,
+              username,
+              {
+                notice: changes.length > 0 ? changes.join(' ') : undefined,
+                error: `The database was busy and the ${role} role was not revoked from ${target.username}. Please try again.`,
+              },
+              503
+            )
+          }
           // Losing Role.User is a suspension rather than a permission tweak —
           // login() requires it — and the table has no other place to say so.
           const suspended =

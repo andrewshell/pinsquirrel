@@ -4,9 +4,11 @@ import {
   InvalidCredentialsError,
   OAuthError,
   ValidationError,
+  WriteConflictError,
 } from '@pinsquirrel/domain'
 import { accountService, authService, oauthService } from '../lib/services'
 import { baseUrl } from '../lib/config'
+import { logger, safeError } from '../lib/logger.js'
 import { isEmbedRequest, withEmbed } from '../lib/embed'
 import { getString } from '../lib/form'
 import {
@@ -62,7 +64,7 @@ profile.post('/', async c => {
 
   const rerender = async (
     errors: Record<string, string[]>,
-    status: 400 | 429 | 500
+    status: 400 | 429 | 500 | 503
   ) => {
     const grants = await oauthService.listGrants(
       new AccessControl(user),
@@ -164,6 +166,21 @@ profile.post('/', async c => {
         })
       } catch (error) {
         if (!(error instanceof InvalidCredentialsError)) attempt.release()
+        if (error instanceof WriteConflictError) {
+          logger.warn(
+            { cause: safeError(error.cause) },
+            'Password change lost to another write'
+          )
+          c.header('Retry-After', '1')
+          return await rerender(
+            {
+              _form: [
+                'The server was busy and your password was not changed. Please try again.',
+              ],
+            },
+            503
+          )
+        }
         throw error
       }
       privateUnlockLimiter.reset(user.id)

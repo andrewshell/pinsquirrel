@@ -22,6 +22,7 @@ import {
   AccessNotGrantedError,
   InvalidResetTokenError,
   ResetTokenExpiredError,
+  WriteConflictError,
 } from '@pinsquirrel/domain'
 
 const auth = {
@@ -684,6 +685,23 @@ describe('auth routes', () => {
       )
 
       expect(res.status).toBe(400)
+    })
+
+    it('says the password was not changed and offers the same form again when the reset lost to another write', async () => {
+      auth.resetPassword.mockRejectedValue(new WriteConflictError())
+
+      const res = await app.request(
+        '/reset-password/tok-1',
+        form({ newPassword: 'aaaaaaaa', confirmPassword: 'aaaaaaaa' })
+      )
+
+      expect(res.status).toBe(503)
+      expect(res.headers.get('Retry-After')).toBe('1')
+      const html = await res.text()
+      expect(html).toContain('your password was not changed')
+      expect(html).toContain('Please try again')
+      expect(html).not.toContain('request a new reset link')
+      expect(html).toContain('action="/reset-password/tok-1"')
     })
 
     it('returns 500 for an unexpected failure', async () => {
