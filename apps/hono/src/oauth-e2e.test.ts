@@ -734,32 +734,56 @@ describe('refresh rotation', () => {
     expect(call.status).toBe(200)
   })
 
-  it('kills the whole grant when the retired refresh token is presented again', async () => {
-    const replay = await exchange({
+  const replayOriginal = () =>
+    exchange({
       grant_type: 'refresh_token',
       refresh_token: mcpTokens.refresh_token ?? '',
       client_id: clientId,
     })
 
+  /** Run with the clock past the window in which a duplicate is tolerated. */
+  async function afterTheGraceWindow(run: () => Promise<void>): Promise<void> {
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 31 * 1000 })
+    try {
+      await run()
+    } finally {
+      vi.useRealTimers()
+    }
+  }
+
+  it('refuses the retired refresh token moments later, and leaves the new pair working', async () => {
+    const replay = await replayOriginal()
+
     expect(replay.status).toBe(400)
     expect(await replay.json()).toMatchObject({ error: 'invalid_grant' })
+    expect((await callListPins(rotated.access_token)).status).toBe(200)
+  })
 
-    // There is no telling a client replaying its own token from somebody
-    // holding a copy, so the successor dies with it and the user re-consents.
-    const successor = await exchange({
-      grant_type: 'refresh_token',
-      refresh_token: rotated.refresh_token ?? '',
-      client_id: clientId,
-    })
-    expect(successor.status).toBe(400)
-    expect(await successor.json()).toMatchObject({ error: 'invalid_grant' })
+  it('kills the whole grant when the retired refresh token is presented again later', async () => {
+    await afterTheGraceWindow(async () => {
+      const replay = await replayOriginal()
 
-    const call = await mcpRequest(rotated.access_token, {
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'tools/list',
+      expect(replay.status).toBe(400)
+      expect(await replay.json()).toMatchObject({ error: 'invalid_grant' })
+
+      // There is no telling a client replaying its own token from somebody
+      // holding a copy, so the successor dies with it and the user
+      // re-consents.
+      const successor = await exchange({
+        grant_type: 'refresh_token',
+        refresh_token: rotated.refresh_token ?? '',
+        client_id: clientId,
+      })
+      expect(successor.status).toBe(400)
+      expect(await successor.json()).toMatchObject({ error: 'invalid_grant' })
+
+      const call = await mcpRequest(rotated.access_token, {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/list',
+      })
+      expect(call.status).toBe(401)
     })
-    expect(call.status).toBe(401)
   })
 
   it('still kills the grant when the retired token comes back after a sweep', async () => {
@@ -774,19 +798,38 @@ describe('refresh rotation', () => {
 
     await maintenanceService.sweepExpired()
 
-    const replay = await exchange({
-      grant_type: 'refresh_token',
-      refresh_token: original.refresh_token ?? '',
-      client_id: clientId,
-    })
-    expect(replay.status).toBe(400)
+    await afterTheGraceWindow(async () => {
+      const replay = await exchange({
+        grant_type: 'refresh_token',
+        refresh_token: original.refresh_token ?? '',
+        client_id: clientId,
+      })
+      expect(replay.status).toBe(400)
 
-    const call = await mcpRequest(successor.access_token, {
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'tools/list',
+      const call = await mcpRequest(successor.access_token, {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/list',
+      })
+      expect(call.status).toBe(401)
     })
-    expect(call.status).toBe(401)
+  })
+
+  it('lets one of two concurrent refreshes win, and its tokens work', async () => {
+    const original = await connect({ resource: mcpResource })
+    const refresh = () =>
+      exchange({
+        grant_type: 'refresh_token',
+        refresh_token: original.refresh_token ?? '',
+        client_id: clientId,
+      })
+
+    const responses = await Promise.all([refresh(), refresh()])
+
+    expect(responses.map(res => res.status).sort()).toEqual([200, 400])
+    const winner = responses.find(res => res.status === 200)
+    const issued = (await winner?.json()) as TokenResponse
+    expect((await callListPins(issued.access_token)).status).toBe(200)
   })
 })
 

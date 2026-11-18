@@ -1144,18 +1144,51 @@ describe('OAuthService.exchangeRefreshToken', () => {
     expect(liveTokenIds(ctx.store)).toEqual([])
   })
 
-  // Two refreshes racing on the same token: the retirement is conditional,
-  // so exactly one wins and the loser is a replay like any other.
-  it('treats losing the rotation race as a replay', async () => {
-    vi.mocked(ctx.tokenRepository.rotate).mockImplementationOnce(() => {
-      presented().rotatedAt = longAgo()
-      return Promise.resolve(false)
-    })
+  // A client that sends the same refresh twice, from two processes or as a
+  // retry, is not a leak. For a moment after a rotation the duplicate is
+  // refused and nothing else happens.
+  it('refuses a token presented again moments after it was rotated, and leaves the grant alone', async () => {
+    presented().rotatedAt = new Date(Date.now() - 5 * 1000)
 
     await expect(
       ctx.service.exchangeRefreshToken(refreshParams())
     ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+
+    expect(liveTokenIds(ctx.store)).toEqual(['laptop-access', 'laptop-refresh'])
+    expect(successors()).toEqual([])
+  })
+
+  it('kills the grant once that moment has passed', async () => {
+    presented().rotatedAt = new Date(Date.now() - 31 * 1000)
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+
     expect(liveTokenIds(ctx.store)).toEqual([])
+  })
+
+  it('lets one of two concurrent refreshes of a token win, and its tokens stay live', async () => {
+    const outcomes = await Promise.allSettled([
+      ctx.service.exchangeRefreshToken(refreshParams()),
+      ctx.service.exchangeRefreshToken(refreshParams()),
+    ])
+
+    const won = outcomes.filter(outcome => outcome.status === 'fulfilled')
+    const lost = outcomes.filter(outcome => outcome.status === 'rejected')
+    expect(won).toHaveLength(1)
+    expect(lost).toHaveLength(1)
+    expect(lost[0].reason).toBeInstanceOf(OAuthInvalidGrantError)
+
+    const { accessToken, refreshToken } = won[0].value
+    expect(
+      await ctx.service.verifyAccessToken(accessToken, MCP_RESOURCE)
+    ).not.toBeNull()
+    const next = await ctx.service.exchangeRefreshToken(
+      refreshParams({ refresh_token: refreshToken })
+    )
+    expect(next.refreshToken).toBeTruthy()
+    expect(successors()).toHaveLength(4)
   })
 
   it('issues nothing when the token is revoked while it is being refreshed', async () => {

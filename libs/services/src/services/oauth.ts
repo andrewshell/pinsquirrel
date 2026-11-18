@@ -70,6 +70,17 @@ const ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
 /**
+ * How long after a rotation the retired token may turn up again without it
+ * meaning the chain leaked.
+ *
+ * A client that refreshes from two processes at once, or retries a refresh
+ * whose response it never saw, presents the same token twice within moments.
+ * Inside this window the duplicate is refused and the grant is left alone;
+ * after it, a second presentation revokes the grant.
+ */
+const ROTATION_GRACE_MS = 30 * 1000
+
+/**
  * The prefix on every access token this server issues. Not for dispatch,
  * since there is nothing to dispatch between: it is so a leaked or logged
  * token is identifiable on sight.
@@ -465,12 +476,10 @@ export class OAuthService {
    * OAuth 2.1 requires rotation for public clients, and CIMD and DCR both
    * register Claude as one. The retirement and the successors are one write
    * (`rotate`), which only succeeds on a token that has not been rotated or
-   * revoked. So two refreshes racing on the same token resolve to one winner,
-   * and a failure partway leaves the client a token that still works.
-   *
-   * A token presented after it was rotated means the chain leaked. There is no
-   * way to tell a client replaying its own token from somebody else holding a
-   * copy, so the grant it belongs to dies and the user re-consents.
+   * revoked. So of two refreshes racing on the same token one wins and keeps
+   * its tokens, the other is refused, and a failure partway leaves the client
+   * a token that still works. `refuseRotatedToken` covers a token that comes
+   * back after it was rotated.
    */
   async exchangeRefreshToken(params: unknown): Promise<IssuedTokens> {
     const parsed = refreshTokenGrantSchema.safeParse(params)
@@ -499,7 +508,7 @@ export class OAuthService {
     }
 
     if (token.rotatedAt) {
-      return this.refuseRotatedToken(token)
+      return this.refuseRotatedToken(token, token.rotatedAt)
     }
 
     await this.revokeGrantUnlessAdmitted(token.userId, client.clientId)
@@ -531,7 +540,7 @@ export class OAuthService {
       const current = await this.tokenRepository.findById(token.id)
       if (current?.rotatedAt && !current.revokedAt) {
         // Lost the race with a concurrent refresh of the same token.
-        return this.refuseRotatedToken(current)
+        return this.refuseRotatedToken(current, current.rotatedAt)
       }
       throw new OAuthInvalidGrantError(
         'The grant was revoked during the refresh'
@@ -541,8 +550,24 @@ export class OAuthService {
     return issued
   }
 
-  /** Answer a refresh token that was already exchanged for a successor. */
-  private async refuseRotatedToken(token: OAuthToken): Promise<never> {
+  /**
+   * Answer a refresh token that was already exchanged for a successor.
+   *
+   * Moments after the rotation it is a duplicate request, and is only
+   * refused. Later it means the chain leaked: there is no way to tell a
+   * client replaying its own token from somebody else holding a copy, so the
+   * grant it belongs to dies and the user re-consents.
+   */
+  private async refuseRotatedToken(
+    token: OAuthToken,
+    rotatedAt: Date
+  ): Promise<never> {
+    if (Date.now() - rotatedAt.getTime() < ROTATION_GRACE_MS) {
+      throw new OAuthInvalidGrantError(
+        'That refresh token was already exchanged'
+      )
+    }
+
     await this.revokeGrantOf(token)
     throw new OAuthInvalidGrantError(
       'That refresh token was already exchanged; the grant has been revoked'
