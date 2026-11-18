@@ -654,11 +654,12 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     real port (1-65535). A trailing slash, userinfo, a fragment, a dot segment, an upper-case
     host or an explicit default port no longer matches, so a client has to send what it
     registered. The token exchange requires the exact `redirect_uri` the code was issued to. The
-    canonical form is still the DCR dedup key. Registration also refuses a redirect URI with
-    userinfo, as it refuses a fragment. Once the redirect URI has matched, every later
-    authorization failure, including an ended approving session, is redirected to the client as
-    an RFC 6749 error with `state` and `iss`; only a bad `client_id`, `redirect_uri` or `state`
-    is shown as a page.
+    DCR dedup key is the same string with only a loopback port removed, so two registrations
+    share a client only when their redirect URIs would match each other. Registration also
+    refuses a redirect URI with userinfo, as it refuses a fragment. Once the redirect URI has
+    matched, every later authorization failure, including an ended approving session, is
+    redirected to the client as an RFC 6749 error with `state` and `iss`; only a bad
+    `client_id`, `redirect_uri` or `state` is shown as a page.
 
 ## Reference
 

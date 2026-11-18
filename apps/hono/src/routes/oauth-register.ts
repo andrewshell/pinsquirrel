@@ -20,7 +20,7 @@ import {
  * CIMD is the preferred one (Decision 13): DCR is deprecated in the current
  * spec and lets an anonymous caller create rows. What bounds the damage lives
  * in the service and the sweep, not here - `registerClient` derives the
- * identifier from a canonicalized copy of the metadata, so re-registering the
+ * identifier from the metadata, loopback ports aside, so re-registering the
  * same client returns the same row, and `MaintenanceService.sweepExpired`
  * removes registrations that never complete an authorization.
  *

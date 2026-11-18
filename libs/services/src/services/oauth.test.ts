@@ -1716,6 +1716,23 @@ describe('OAuthService.registerClient', () => {
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
+  // Two registrations share a client only when their redirect URIs would
+  // match each other at authorize, which compares them as strings.
+  it.each([
+    ['a trailing slash', 'https://example.com/cb', 'https://example.com/cb/'],
+    ['host case', 'https://example.com/cb', 'https://Example.com/cb'],
+    ['a default port', 'https://example.com/cb', 'https://example.com:443/cb'],
+  ])('keeps registrations apart that differ by %s', async (_, one, other) => {
+    const first = await ctx.service.registerClient(
+      registration({ redirect_uris: [one] })
+    )
+    const second = await ctx.service.registerClient(
+      registration({ redirect_uris: [other] })
+    )
+
+    expect(second.clientId).not.toBe(first.clientId)
+  })
+
   it('keeps different clients apart, port aside', async () => {
     const first = await ctx.service.registerClient(registration())
 

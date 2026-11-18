@@ -1308,10 +1308,10 @@ function requireClientRules(metadata: {
  * The identifier a dynamic registration gets, derived from what it registered.
  *
  * Derived rather than random so that re-registering the same client resolves
- * to the same row. The redirect URIs go in canonicalized, which is what drops
- * the port for loopback hosts only: Claude Code registering a fresh ephemeral
- * port on every connection is one client, and a different path or host is a
- * different one. There is no secret here to protect - a public client's
+ * to the same row. The redirect URIs go in as sent, less the port on a
+ * loopback host: Claude Code registering a fresh ephemeral port on every
+ * connection is one client, and any other difference is a different one,
+ * because authorize would not match one URI against the other. There is no secret here to protect - a public client's
  * identifier is public by definition.
  */
 function dcrClientId(metadata: {
