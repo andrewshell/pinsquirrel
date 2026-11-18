@@ -67,7 +67,7 @@ export function createMcpServer(): McpServer {
         'List and search bookmarks with filtering and pagination. Returns ' +
         'pins sorted by creation date (newest first) by default. Set ' +
         'noTags: true to find the pins that carry no tags at all, which is ' +
-        'where a retagging pass starts.',
+        'where a retagging pass starts. Requires the pins:read scope.',
       inputSchema: pinListInputSchema.shape,
       annotations: { readOnlyHint: true },
     },
@@ -95,7 +95,8 @@ export function createMcpServer(): McpServer {
     'get_pin',
     {
       title: 'Get Pin',
-      description: 'Get a single bookmark by its ID.',
+      description:
+        'Get a single bookmark by its ID. Requires the pins:read scope.',
       inputSchema: pinGetInputSchema.shape,
       annotations: { readOnlyHint: true },
     },
@@ -122,7 +123,7 @@ export function createMcpServer(): McpServer {
         'List your tags. Set withCounts: true for the number of bookmarks ' +
         'on each, which is how to find the tags holding only one or two pins ' +
         'and worth consolidating. The IDs it returns are what merge_tags and ' +
-        'delete_tag take.',
+        'delete_tag take. Requires the tags:read scope.',
       inputSchema: tagListInputSchema.shape,
       annotations: { readOnlyHint: true },
     },
