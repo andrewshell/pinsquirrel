@@ -4,11 +4,17 @@ import { safeError } from './logger'
 class QueryError extends Error {
   constructor(
     readonly query: string,
-    readonly params: unknown[]
+    readonly params: unknown[],
+    cause?: unknown
   ) {
-    super(`Failed query: ${query}\nparams: ${params.join(',')}`)
+    super(`Failed query: ${query}\nparams: ${params.join(',')}`, { cause })
     this.name = 'DrizzleQueryError'
   }
+}
+
+/** What mysql2 rejects with: the server's message, code and number. */
+function mysqlError(code: string, errno: number, message: string): Error {
+  return Object.assign(new Error(message), { code, errno })
 }
 
 describe('safeError', () => {
@@ -32,4 +38,57 @@ describe('safeError', () => {
     )
     expect(JSON.stringify(logged)).not.toContain('alice')
   })
+
+  it('keeps the MySQL error code and message under a failed query', () => {
+    const logged = safeError(
+      new QueryError(
+        'insert into `oauth_tokens` values (?)',
+        ['alice'],
+        mysqlError(
+          'ER_LOCK_DEADLOCK',
+          1213,
+          'Deadlock found when trying to get lock; try restarting transaction'
+        )
+      )
+    )
+
+    expect(logged.cause).toMatchObject({
+      code: 'ER_LOCK_DEADLOCK',
+      errno: 1213,
+      message:
+        'Deadlock found when trying to get lock; try restarting transaction',
+    })
+    expect(JSON.stringify(logged)).not.toContain('alice')
+  })
+
+  // MySQL repeats the offending value in some messages, which is the same
+  // data the bound parameters are cut for.
+  it.each([
+    [
+      'ER_DUP_ENTRY',
+      1062,
+      "Duplicate entry 'alice' for key 'users.users_username_unique'",
+      "Duplicate entry [REDACTED] for key 'users.users_username_unique'",
+    ],
+    [
+      'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD',
+      1366,
+      "Incorrect string value: 'alice' for column 'title' at row 1",
+      "Incorrect string value: [REDACTED] for column 'title' at row 1",
+    ],
+  ])(
+    'leaves the value a %s message repeats out of the log',
+    (code, errno, message, expected) => {
+      const logged = safeError(
+        new QueryError(
+          'insert into `users` values (?)',
+          ['x'],
+          mysqlError(code, errno, message)
+        )
+      )
+
+      expect(logged.cause?.message).toBe(expected)
+      expect(JSON.stringify(logged)).not.toContain('alice')
+    }
+  )
 })
