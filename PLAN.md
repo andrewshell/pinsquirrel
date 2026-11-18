@@ -744,6 +744,15 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     address was not changed and offers the same link again. An address another account
     took after the link was sent still answers that the link is invalid, and now leaves
     the link unspent.
+48. **The redirect URI rules hold at authorize, not only when a client is stored.** A redirect
+    URI that does not parse, has a loopback port above 65535, or has userinfo (an empty one
+    included) is refused at registration as `invalid_redirect_uri`. A client row stored
+    before a rule existed can still hold a URI that breaks it, so `authorize` checks the
+    request's `redirect_uri` against the same rules and shows the error page when it fails.
+    The refusal is per URI and at authorize only: the client's other redirect URIs keep
+    working, and its existing grants keep refreshing, because the token endpoint sends no
+    browser anywhere. A `response_type` other than `code` is redirected as
+    `unsupported_response_type`; a missing one stays `invalid_request`.
 
 ## Reference
 
