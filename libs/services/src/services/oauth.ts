@@ -360,34 +360,39 @@ export class OAuthService {
       )
     }
 
-    if (!resolved.client.completedAt) {
-      await this.clientRepository.markCompleted(resolved.client.id, new Date())
-    }
-
     const code = generateSecureToken()
     const expiresAt = new Date(Date.now() + AUTHORIZATION_CODE_TTL_MS)
 
     let created: AuthorizationCode | null
     try {
-      created = await conflictAsTemporarilyUnavailable(
-        this.codeRepository.create(
-          {
-            codeHash: hashToken(code),
-            clientId: resolved.client.clientId,
-            userId: input.userId,
-            redirectUri: resolved.redirectUri,
-            codeChallenge: resolved.codeChallenge,
-            scopes: resolved.scopes,
-            resource: resolved.resource,
-            grantId: randomUUID(),
-            expiresAt,
-          },
-          input.sessionId
+      if (!resolved.client.completedAt) {
+        await this.clientRepository.markCompleted(
+          resolved.client.id,
+          new Date()
         )
+      }
+      created = await this.codeRepository.create(
+        {
+          codeHash: hashToken(code),
+          clientId: resolved.client.clientId,
+          userId: input.userId,
+          redirectUri: resolved.redirectUri,
+          codeChallenge: resolved.codeChallenge,
+          scopes: resolved.scopes,
+          resource: resolved.resource,
+          grantId: randomUUID(),
+          expiresAt,
+        },
+        input.sessionId
       )
     } catch (error) {
-      if (error instanceof OAuthTemporarilyUnavailableError) {
-        return this.errorRedirect(resolved, error.code, error.message)
+      if (error instanceof WriteConflictError) {
+        const unavailable = new OAuthTemporarilyUnavailableError()
+        return this.errorRedirect(
+          resolved,
+          unavailable.code,
+          unavailable.message
+        )
       }
       throw error
     }
@@ -427,6 +432,10 @@ export class OAuthService {
    * `MaintenanceService` takes none.
    */
   async exchangeAuthorizationCode(params: unknown): Promise<IssuedTokens> {
+    return conflictAsTemporarilyUnavailable(this.spendCode(params))
+  }
+
+  private async spendCode(params: unknown): Promise<IssuedTokens> {
     refuseSeveralResources(params)
     const parsed = authorizationCodeGrantSchema.safeParse(params)
     if (!parsed.success) {
@@ -476,9 +485,7 @@ export class OAuthService {
       grantedAt: code.createdAt,
     })
 
-    const outcome = await conflictAsTemporarilyUnavailable(
-      this.codeRepository.exchange(code.id, rows)
-    )
+    const outcome = await this.codeRepository.exchange(code.id, rows)
     if (outcome === 'spent') {
       return this.refuseSpentCode(code)
     }
@@ -547,6 +554,10 @@ export class OAuthService {
    * back after it was rotated.
    */
   async exchangeRefreshToken(params: unknown): Promise<IssuedTokens> {
+    return conflictAsTemporarilyUnavailable(this.rotateRefreshToken(params))
+  }
+
+  private async rotateRefreshToken(params: unknown): Promise<IssuedTokens> {
     refuseSeveralResources(params)
     const parsed = refreshTokenGrantSchema.safeParse(params)
     if (!parsed.success) {
@@ -612,9 +623,7 @@ export class OAuthService {
       rotatedFrom: token.id,
     })
 
-    const rotated = await conflictAsTemporarilyUnavailable(
-      this.tokenRepository.rotate(token.id, rows)
-    )
+    const rotated = await this.tokenRepository.rotate(token.id, rows)
     if (!rotated) {
       const current = await this.tokenRepository.findById(token.id)
       if (current?.rotatedAt && !current.revokedAt) {
@@ -913,6 +922,10 @@ export class OAuthService {
    * was revoked does not.
    */
   async revokeToken(params: unknown): Promise<void> {
+    return conflictAsTemporarilyUnavailable(this.revokePresentedToken(params))
+  }
+
+  private async revokePresentedToken(params: unknown): Promise<void> {
     const parsed = revocationRequestSchema.safeParse(params)
     if (!parsed.success) {
       throw validationErrorFromZod(parsed.error, {
@@ -1225,14 +1238,16 @@ function refuseSeveralResources(params: unknown): void {
 }
 
 /**
- * The code or token the write was for is unchanged, and `invalid_grant` would
- * have the client throw a working one away (PLAN.md decision 46).
+ * A write of the request lost to other writes and changed nothing. The
+ * client is told to send the request again, which finds what this one found:
+ * a working code or token is still working, and a revocation that was due is
+ * still due (PLAN.md decision 46).
  */
 async function conflictAsTemporarilyUnavailable<T>(
-  write: Promise<T>
+  request: Promise<T>
 ): Promise<T> {
   try {
-    return await write
+    return await request
   } catch (error) {
     if (error instanceof WriteConflictError) {
       throw new OAuthTemporarilyUnavailableError(undefined, { cause: error })
