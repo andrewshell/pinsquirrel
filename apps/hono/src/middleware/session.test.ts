@@ -34,10 +34,6 @@ const mockDelete = vi.fn()
 const mockPatchData = vi.fn()
 const mockFindUserById = vi.fn()
 
-/**
- * A session row that the fake repository reads and writes, so a test can
- * assert what ends up stored whichever write method the middleware uses.
- */
 function storedSession(data: Record<string, unknown>) {
   const row = {
     id: 'session-123',
@@ -682,9 +678,6 @@ describe('Private Mode', () => {
     expect(row.data).not.toHaveProperty('privateUnlockedAt')
   })
 
-  // A save in one tab and a lock (or the tab-close beacon) in another overlap
-  // on one session. The save started while private mode was unlocked; it must
-  // not write that back over the lock.
   it('keeps a lock made while another request on the session was in flight', async () => {
     const row = storedSession({
       userId: 'user-456',

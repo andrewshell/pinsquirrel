@@ -110,7 +110,6 @@ describe('profile routes', () => {
     return res.text()
   }
 
-  /** The slice of the page from one card's title up to the next card's title. */
   function cardSection(html: string, title: string): string {
     const titles = [
       'Account Information',

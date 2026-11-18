@@ -815,8 +815,6 @@ describe('OAuthService.exchangeRefreshToken', () => {
     expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalled()
   })
 
-  // The user revoked between the rotation and the new tokens landing: the
-  // revoke took only the rows that existed, so the new ones must not live on.
   it('takes back the new tokens when the grant was revoked mid-refresh', async () => {
     vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(
       storedRefresh({ rotatedAt: new Date(), revokedAt: new Date() })
@@ -1248,9 +1246,6 @@ describe('OAuthService grants', () => {
     )
   })
 
-  // A profile page left open outlives the token it listed: the client
-  // refreshes and the sweep deletes the rotated row. The client is what the
-  // user is revoking, so that must not matter.
   it('revokes without looking up any single token', async () => {
     vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(null)
     vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockResolvedValue(2)

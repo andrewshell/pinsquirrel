@@ -87,8 +87,6 @@ describe('MailgunEmailService', () => {
     })
   })
 
-  // Click tracking would rewrite every token-bearing link through Mailgun's
-  // redirector, so the account mails switch it off whatever the domain says.
   describe('tracking', () => {
     const base = 'https://app.pinsquirrel.com'
     const sends: [string, (service: MailgunEmailService) => Promise<void>][] = [

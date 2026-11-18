@@ -24,7 +24,6 @@ interface ProfilePageProps {
   user: User
   flash?: FlashMessage | null
   errors?: Record<string, string[]>
-  /** The form that posted, so its `_form` error shows in its own card. */
   failedIntent?: ProfileIntent
   grants?: OAuthGrant[]
   embed?: boolean

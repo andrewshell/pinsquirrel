@@ -120,8 +120,6 @@ describe('DrizzleUserRepository - Integration Tests', () => {
       expect(found?.roles.sort()).toEqual([Role.Admin, Role.User].sort())
     })
 
-    // Sign-in looks a username up before it checks the password. A second
-    // query only for names that exist would make response time say which do.
     it('makes the same number of queries whether or not the user exists', async () => {
       const { username } = await insertUser(testPool)
       const queries: string[] = []

@@ -110,7 +110,6 @@ export class DrizzleUserRepository implements UserRepository {
     return await this.attachRoles(result[0])
   }
 
-  /** One query, so the time it takes does not depend on whether the user exists. */
   async findByUsername(username: string): Promise<User | null> {
     const rows = await this.db
       .select({ user: users, role: userRoles.role })

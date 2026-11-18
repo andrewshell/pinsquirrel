@@ -469,13 +469,12 @@ export class OAuthService {
       rotatedFrom: token.id,
     })
 
-    // A revoke that landed after the rotation took only the rows that existed
-    // then. It also marked this parent, so checking it after the inserts
-    // catches every revoke the new rows could have missed.
     const parent = await this.tokenRepository.findById(token.id)
     if (parent?.revokedAt) {
       await this.revokeGrantFamily(token.userId, token.clientId)
-      throw new OAuthInvalidGrantError('The grant was revoked')
+      throw new OAuthInvalidGrantError(
+        'The grant was revoked during the refresh'
+      )
     }
 
     return issued

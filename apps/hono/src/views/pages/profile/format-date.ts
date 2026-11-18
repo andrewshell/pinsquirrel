@@ -1,7 +1,4 @@
-/**
- * The date format every profile card renders timestamps in. Pinned to UTC and
- * labelled, since the server's zone is nobody's in particular.
- */
+/** The date format every profile card renders timestamps in. */
 export function formatDate(date: Date | string): string {
   return new Date(date).toLocaleDateString('en-US', {
     year: 'numeric',

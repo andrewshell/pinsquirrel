@@ -251,8 +251,6 @@ describe('rateLimitByIp', () => {
     expect(res.headers.get('Retry-After')).toBeTruthy()
   })
 
-  // One IPv6 subscriber holds a whole /64, so every address in it is the same
-  // caller.
   it('counts every address in one IPv6 /64 as one caller', async () => {
     await app.request('/test', { method: 'POST' }, from('2001:db8:1:2::1'))
     await app.request('/test', { method: 'POST' }, from('2001:db8:1:2:ffff::9'))
