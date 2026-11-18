@@ -117,6 +117,9 @@ export interface ChromeStub {
   runtime: RuntimeEventsStub
   /** `chrome.runtime.openOptionsPage`, which the pin flow falls back to. */
   openOptionsPage: ReturnType<typeof vi.fn<() => Promise<void>>>
+  getPlatformInfo: ReturnType<
+    typeof vi.fn<() => Promise<chrome.runtime.PlatformInfo>>
+  >
   /** The periodic sync alarm, for a test to inspect and fire. */
   alarms: AlarmsStub
   /** The toolbar click that asks for the current page to be pinned. */
@@ -148,9 +151,34 @@ function eventStub<Args extends unknown[], R = void>(): EventStub<Args, R> & {
   }
 }
 
-/** The callback-free half of `chrome.storage.StorageArea`, backed by an object. */
+/**
+ * The callback-free half of `chrome.storage.StorageArea`, backed by an object.
+ *
+ * `onChanged` fires as Chrome's does: after the write, with only the keys
+ * whose value changed.
+ */
 function storageArea(area: StubbedStorageArea) {
+  const onChanged = eventStub<[Record<string, chrome.storage.StorageChange>]>()
+  const write = (mutate: () => void) => {
+    const before = { ...area.items }
+    mutate()
+    const changes: Record<string, chrome.storage.StorageChange> = {}
+    for (const key of new Set([
+      ...Object.keys(before),
+      ...Object.keys(area.items),
+    ])) {
+      if (JSON.stringify(before[key]) === JSON.stringify(area.items[key])) {
+        continue
+      }
+      changes[key] = { oldValue: before[key], newValue: area.items[key] }
+    }
+    if (Object.keys(changes).length > 0) {
+      setTimeout(() => onChanged.fire(changes), 0)
+    }
+    return Promise.resolve()
+  }
   return {
+    onChanged,
     get: (keys?: string | string[] | null) => {
       if (keys === undefined || keys === null) {
         return Promise.resolve({ ...area.items })
@@ -162,20 +190,18 @@ function storageArea(area: StubbedStorageArea) {
       }
       return Promise.resolve(found)
     },
-    set: (items: Record<string, unknown>) => {
-      Object.assign(area.items, items)
-      return Promise.resolve()
-    },
-    remove: (keys: string | string[]) => {
-      for (const key of typeof keys === 'string' ? [keys] : keys) {
-        delete area.items[key]
-      }
-      return Promise.resolve()
-    },
-    clear: () => {
-      for (const key of Object.keys(area.items)) delete area.items[key]
-      return Promise.resolve()
-    },
+    set: (items: Record<string, unknown>) =>
+      write(() => Object.assign(area.items, items)),
+    remove: (keys: string | string[]) =>
+      write(() => {
+        for (const key of typeof keys === 'string' ? [keys] : keys) {
+          delete area.items[key]
+        }
+      }),
+    clear: () =>
+      write(() => {
+        for (const key of Object.keys(area.items)) delete area.items[key]
+      }),
   }
 }
 
@@ -445,6 +471,9 @@ export function stubChrome(
     },
     runtime: runtimeEvents,
     openOptionsPage: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+    getPlatformInfo: vi.fn<() => Promise<chrome.runtime.PlatformInfo>>(() =>
+      Promise.resolve({ os: 'mac', arch: 'arm64', nacl_arch: 'arm' })
+    ),
     alarms,
     action: { onClicked },
     commands: { onCommand },
@@ -460,6 +489,7 @@ export function stubChrome(
     runtime: {
       sendMessage: stub.sendMessage,
       openOptionsPage: stub.openOptionsPage,
+      getPlatformInfo: stub.getPlatformInfo,
       onStartup: runtimeEvents.onStartup,
       onInstalled: runtimeEvents.onInstalled,
       onMessage: runtimeEvents.onMessage,

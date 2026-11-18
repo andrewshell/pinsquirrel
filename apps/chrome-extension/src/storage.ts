@@ -46,3 +46,10 @@ export async function remove(keys: StorageKey[]): Promise<void> {
 export async function clear(): Promise<void> {
   await area().clear()
 }
+
+/** Hear which keys any context changed, this one included. */
+export function onChanged(listener: (keys: StorageKey[]) => void): void {
+  area().onChanged.addListener(changes => {
+    listener(Object.keys(changes) as StorageKey[])
+  })
+}

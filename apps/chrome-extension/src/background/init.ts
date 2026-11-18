@@ -1,6 +1,7 @@
 import { ReauthorizationRequiredError, type ConnectOutcome } from '../auth.ts'
 import {
   isConnectRequest,
+  isDisconnectRequest,
   isSyncRequest,
   notifyConnectFinished,
   type ConnectResponse,
@@ -31,6 +32,8 @@ const SYNC_ALARM = 'sync'
  */
 const SYNC_PERIOD_MINUTES = 60
 
+const KEEP_ALIVE_MS = 20_000
+
 /** Everything the worker does that a test cannot run for real. */
 export interface BackgroundDeps {
   /** A full sync of stored selection over the stored connection. */
@@ -54,6 +57,7 @@ export interface BackgroundDeps {
   completeConnect(redirectUrl: string): Promise<ConnectOutcome>
   /** Forget a flow whose tab was closed before it answered. */
   cancelConnect(): Promise<void>
+  disconnect(): Promise<void>
   logger: BackgroundLogger
 }
 
@@ -155,6 +159,25 @@ export function initBackground(deps: BackgroundDeps): void {
       return { ok: true }
     } catch (error) {
       return { ok: false, error: messageOf(error) }
+    }
+  }
+
+  /**
+   * Chrome stops a worker after 30 seconds with no event or extension API
+   * call, and Disconnect can wait on the refresh lock longer than that. An API
+   * call every 20 seconds resets the timer until it is done.
+   */
+  async function disconnectForOptions(): Promise<SyncResponse> {
+    const keepAlive = setInterval(() => {
+      void chrome.runtime.getPlatformInfo()
+    }, KEEP_ALIVE_MS)
+    try {
+      await deps.disconnect()
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: messageOf(error) }
+    } finally {
+      clearInterval(keepAlive)
     }
   }
 
@@ -458,7 +481,7 @@ export function initBackground(deps: BackgroundDeps): void {
   })
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    // Both answers come later, so Chrome has to keep the channel open.
+    // Every answer comes later, so Chrome has to keep the channel open.
     if (isSyncRequest(message)) {
       void syncForOptions().then(sendResponse)
       return true
@@ -466,6 +489,11 @@ export function initBackground(deps: BackgroundDeps): void {
 
     if (isConnectRequest(message)) {
       void openConsentTab(message.baseUrl).then(sendResponse)
+      return true
+    }
+
+    if (isDisconnectRequest(message)) {
+      void disconnectForOptions().then(sendResponse)
       return true
     }
 

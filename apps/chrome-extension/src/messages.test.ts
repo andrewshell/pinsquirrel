@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   isConnectRequest,
+  isDisconnectRequest,
   isSyncRequest,
   notifyConnectFinished,
   onConnectFinished,
   requestConnect,
+  requestDisconnect,
   requestSync,
   SYNC_REQUEST,
   type ConnectResponse,
@@ -183,5 +185,38 @@ describe('the worker telling the page the consent tab answered', () => {
     )
 
     await expect(notifyConnectFinished({ ok: true })).resolves.toBeUndefined()
+  })
+})
+
+describe('requestDisconnect', () => {
+  it('asks the service worker to disconnect and hands back its answer', async () => {
+    const chrome = stubChrome()
+    chrome.sendMessage.mockResolvedValue({ ok: true })
+
+    await expect(requestDisconnect()).resolves.toEqual({ ok: true })
+    expect(chrome.sendMessage).toHaveBeenCalledWith({ type: 'disconnect' })
+  })
+
+  it('reports a worker that could not be reached as a failure', async () => {
+    const chrome = stubChrome()
+    chrome.sendMessage.mockRejectedValue(
+      new Error('Could not establish connection. Receiving end does not exist.')
+    )
+
+    await expect(requestDisconnect()).resolves.toEqual({
+      ok: false,
+      error: 'Could not establish connection. Receiving end does not exist.',
+    })
+  })
+})
+
+describe('isDisconnectRequest', () => {
+  it('recognises the request the options page sends', () => {
+    expect(isDisconnectRequest({ type: 'disconnect' })).toBe(true)
+  })
+
+  it('rejects anything else that arrives on the message channel', () => {
+    expect(isDisconnectRequest({ type: 'sync' })).toBe(false)
+    expect(isDisconnectRequest(null)).toBe(false)
   })
 })

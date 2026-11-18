@@ -1,5 +1,13 @@
-import { ReauthorizationRequiredError } from '../auth.ts'
-import type { ConnectResponse, SyncResponse } from '../messages.ts'
+import {
+  NotConnectedError,
+  ReauthorizationRequiredError,
+  readConnection,
+} from '../auth.ts'
+import type {
+  ConnectResponse,
+  DisconnectResponse,
+  SyncResponse,
+} from '../messages.ts'
 import * as storage from '../storage.ts'
 import type { TagWithCount } from '../types.ts'
 import { filterSelected, filterTags } from './filter.ts'
@@ -44,7 +52,7 @@ export interface OptionsDeps {
   requestConnect(baseUrl: string): Promise<ConnectResponse>
   /** Hear the worker say the consent tab has answered. */
   onConnectFinished(listener: (result: ConnectResponse) => void): void
-  disconnect(): Promise<void>
+  requestDisconnect(): Promise<DisconnectResponse>
   createApiClient(baseUrl: string): OptionsApiClient
   requestSync(): Promise<SyncResponse>
   now(): number
@@ -63,6 +71,7 @@ function elements(doc: Document) {
     reconnectNotice: find('#reconnect-notice'),
     baseUrlInput: find<HTMLInputElement>('#base-url'),
     connectButton: find<HTMLButtonElement>('#connect'),
+    settingsDisconnectButton: find<HTMLButtonElement>('#settings-disconnect'),
     connectedTo: find('#connected-to'),
     tagFilter: find<HTMLInputElement>('#tag-filter'),
     selectedOnly: find<HTMLInputElement>('#selected-only'),
@@ -77,21 +86,22 @@ function elements(doc: Document) {
 }
 
 /**
- * Run `work` with the button that started it disabled.
+ * Run `work` with every action button disabled.
  *
- * Every one of these buttons starts something slow and none of them is safe to
- * start twice: a second Connect opens a second consent tab, and a second sync
- * has two runs writing the same bookmark folders.
+ * Every one of these buttons starts something slow, and none is safe to start
+ * while another runs: a second Connect opens a second consent tab, two syncs
+ * write the same bookmark folders, and a Disconnect that overlaps either one
+ * leaves the page drawn by whichever answers last.
  */
 async function whileBusy(
-  button: HTMLButtonElement,
+  buttons: HTMLButtonElement[],
   work: () => Promise<void>
 ): Promise<void> {
-  button.disabled = true
+  for (const button of buttons) button.disabled = true
   try {
     await work()
   } finally {
-    button.disabled = false
+    for (const button of buttons) button.disabled = false
   }
 }
 
@@ -103,6 +113,12 @@ async function whileBusy(
  */
 export async function initOptions(deps: OptionsDeps): Promise<void> {
   const ui = elements(deps.document)
+  const actions = [
+    ui.connectButton,
+    ui.settingsDisconnectButton,
+    ui.syncButton,
+    ui.disconnectButton,
+  ]
 
   /** The server the page is talking to, kept so a reconnect can prefill it. */
   let baseUrl: string | undefined
@@ -124,18 +140,23 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
    */
   const selection = new Set<string>()
 
+  let view: 'main' | 'settings' | 'reconnect' | undefined
+
   const setStatus = (text: string): void => {
     ui.status.textContent = text
   }
 
   function showSettings({ reconnect = false } = {}): void {
+    view = reconnect ? 'reconnect' : 'settings'
     ui.settingsView.hidden = false
     ui.mainView.hidden = true
     ui.reconnectNotice.hidden = !reconnect
+    ui.settingsDisconnectButton.hidden = !reconnect
     if (baseUrl) ui.baseUrlInput.value = baseUrl
   }
 
   async function showMain(): Promise<void> {
+    view = 'main'
     ui.settingsView.hidden = true
     ui.mainView.hidden = false
     ui.reconnectNotice.hidden = true
@@ -146,6 +167,28 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
     ui.tagFilter.focus()
     await refreshSyncStatus()
     await loadTags()
+  }
+
+  async function showConnection(): Promise<void> {
+    const connection = await readConnection()
+    const previous = baseUrl
+    if (connection.status !== 'none') baseUrl = connection.baseUrl
+    switch (connection.status) {
+      case 'connected':
+        if (view === 'main' && baseUrl === previous) return
+        setStatus('')
+        await showMain()
+        return
+      case 'lost':
+        if (view !== 'reconnect') askToReconnect()
+        return
+      case 'none':
+        if (view !== 'settings') {
+          setStatus('')
+          showSettings()
+        }
+        return
+    }
   }
 
   /**
@@ -167,9 +210,15 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
    *
    * `ReauthorizationRequiredError` is the one that changes the view: the grant
    * is gone and no retry will bring it back, so the page goes to Connect with
-   * the server it was talking to already filled in.
+   * the server it was talking to already filled in. `NotConnectedError` goes
+   * there with no notice: the user disconnected, possibly from another page.
    */
   function report(error: unknown): void {
+    if (error instanceof NotConnectedError) {
+      setStatus('')
+      showSettings()
+      return
+    }
     if (error instanceof ReauthorizationRequiredError) {
       askToReconnect()
       return
@@ -272,7 +321,7 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
     }
 
     setStatus('Opening PinSquirrel...')
-    await whileBusy(ui.connectButton, async () => {
+    await whileBusy(actions, async () => {
       try {
         const response = await deps.requestConnect(origin)
         if (!response.ok) {
@@ -303,9 +352,7 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
       return
     }
     try {
-      baseUrl = await storage.get('baseUrl')
-      setStatus('')
-      await showMain()
+      await showConnection()
     } catch (error) {
       report(error)
     }
@@ -340,33 +387,51 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
 
   async function onSyncNow(): Promise<void> {
     setStatus('Syncing...')
-    await whileBusy(ui.syncButton, async () => {
+    await whileBusy(actions, async () => {
       try {
         const response = await deps.requestSync()
-        setStatus(response.ok ? '' : `Sync failed: ${response.error}`)
         await refreshSyncStatus()
+        if (response.ok) {
+          setStatus('')
+        } else if ((await readConnection()).status === 'connected') {
+          setStatus(`Sync failed: ${response.error}`)
+        } else {
+          await showConnection()
+        }
       } catch (error) {
         report(error)
       }
     })
   }
 
+  /**
+   * Also offered while asking to reconnect: with the grant gone there is
+   * nothing to revoke, but `baseUrl` is still stored, and the toolbar button
+   * keeps opening that server's pin form until something clears it.
+   */
   async function onDisconnect(): Promise<void> {
-    await whileBusy(ui.disconnectButton, async () => {
+    await whileBusy(actions, async () => {
       try {
-        await deps.disconnect()
-        setStatus('')
-        showSettings()
+        const response = await deps.requestDisconnect()
+        if (response.ok) await showConnection()
+        else setStatus(response.error)
       } catch (error) {
         report(error)
       }
     })
   }
 
+  storage.onChanged(keys => {
+    if (keys.includes('baseUrl') || keys.includes('refreshToken')) {
+      void showConnection().catch(report)
+    }
+  })
   ui.connectButton.addEventListener('click', () => void onConnect())
   deps.onConnectFinished(result => void onConnectFinished(result))
   ui.syncButton.addEventListener('click', () => void onSyncNow())
-  ui.disconnectButton.addEventListener('click', () => void onDisconnect())
+  for (const button of [ui.disconnectButton, ui.settingsDisconnectButton]) {
+    button.addEventListener('click', () => void onDisconnect())
+  }
   // One delegated listener, because the boxes themselves are replaced on
   // every render and per-box listeners would have to be re-attached each time.
   ui.tagList.addEventListener(
@@ -380,16 +445,5 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
     drawTagList()
   })
 
-  const stored = await storage.getMany([
-    'baseUrl',
-    'accessToken',
-    'refreshToken',
-  ])
-  baseUrl = stored.baseUrl
-
-  if (stored.baseUrl && stored.accessToken && stored.refreshToken) {
-    await showMain()
-  } else {
-    showSettings()
-  }
+  await showConnection()
 }

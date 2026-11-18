@@ -30,8 +30,12 @@ export interface ConnectRequest {
   baseUrl: string
 }
 
+export interface DisconnectRequest {
+  type: 'disconnect'
+}
+
 /** Every message the options page can send. */
-export type ExtensionMessage = SyncRequest | ConnectRequest
+export type ExtensionMessage = SyncRequest | ConnectRequest | DisconnectRequest
 
 /**
  * The worker's word that the consent tab has answered, sent to whoever is
@@ -54,6 +58,8 @@ export interface ConnectFinished {
  * sender waiting on a response that never comes.
  */
 export type SyncResponse = { ok: true } | { ok: false; error: string }
+
+export type DisconnectResponse = SyncResponse
 
 /**
  * What the worker answers a `ConnectRequest` with - `ok` meaning the consent
@@ -78,6 +84,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** For the worker: is this untyped message the options page's sync request? */
 export function isSyncRequest(value: unknown): value is SyncRequest {
   return isRecord(value) && value.type === 'sync'
+}
+
+export function isDisconnectRequest(
+  value: unknown
+): value is DisconnectRequest {
+  return isRecord(value) && value.type === 'disconnect'
 }
 
 /** For the worker: is this untyped message the options page's connect request? */
@@ -139,6 +151,10 @@ export async function requestConnect(
   baseUrl: string
 ): Promise<ConnectResponse> {
   return send({ type: 'connect', baseUrl }, isConnectResponse, 'connect')
+}
+
+export async function requestDisconnect(): Promise<DisconnectResponse> {
+  return send({ type: 'disconnect' }, isSyncResponse, 'disconnect')
 }
 
 /**

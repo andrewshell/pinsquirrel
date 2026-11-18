@@ -11,7 +11,12 @@
  * again to deliver the next one, so a listener registered after an `await`
  * would miss the event that woke the worker up.
  */
-import { cancelConnect, completeConnect, startConnect } from './auth.ts'
+import {
+  cancelConnect,
+  completeConnect,
+  disconnect,
+  startConnect,
+} from './auth.ts'
 import { initBackground } from './background/init.ts'
 import { runSync } from './bookmark-sync.ts'
 
@@ -20,6 +25,7 @@ initBackground({
   startConnect,
   completeConnect,
   cancelConnect,
+  disconnect,
   logger: {
     warn: message => {
       console.warn(message)

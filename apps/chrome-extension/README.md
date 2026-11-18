@@ -78,7 +78,16 @@ tab abandons the flow. A stale registration — the server answering the exchang
 `invalid_client` — re-registers and sends the same tab to a fresh consent screen,
 because the code was spent on the way in.
 
-Disconnect stays in the page: it opens no tab, so there was never anything to outlive.
+Disconnect runs in the worker too. It waits on the lock every token refresh holds, and
+that wait can outlast the page: a refresh on a slow server takes up to three requests of
+20 seconds each. Run in the page, closing the tab during the wait would drop the
+Disconnect with the tokens still stored.
+
+Every open options page follows `chrome.storage`: a Disconnect, a Connect or a lost grant
+in any context redraws them all. A grant the server refuses (`invalid_grant`) removes the
+credentials and keeps `baseUrl`, so the pages offer to reconnect to that server. They
+also offer Disconnect, which, like a Disconnect while connected, clears everything and
+shows the plain settings view.
 
 ## When it syncs
 

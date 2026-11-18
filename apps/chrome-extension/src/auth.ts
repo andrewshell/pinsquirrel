@@ -1,6 +1,7 @@
 import { discoverEndpoints, type OAuthEndpoints } from './oauth-metadata.ts'
 import { createPkcePair, randomUrlSafeToken } from './pkce.ts'
 import * as storage from './storage.ts'
+import { timedFetch } from './timed-fetch.ts'
 import type { PendingConnect, StoredTokens } from './types.ts'
 
 /**
@@ -80,6 +81,20 @@ export class ReauthorizationRequiredError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'ReauthorizationRequiredError'
+  }
+}
+
+/**
+ * Nothing is stored: never connected, or the user disconnected.
+ *
+ * A `ReauthorizationRequiredError`, because only the user can connect again,
+ * but one the options page shows without the notice that the server dropped
+ * the grant.
+ */
+export class NotConnectedError extends ReauthorizationRequiredError {
+  constructor() {
+    super('The extension is not connected to a PinSquirrel server')
+    this.name = 'NotConnectedError'
   }
 }
 
@@ -193,7 +208,7 @@ async function postTokenRequest(
   endpoint: string,
   params: Record<string, string>
 ): Promise<TokenResponseBody> {
-  const response = await fetch(endpoint, {
+  const response = await timedFetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams(params).toString(),
@@ -237,7 +252,7 @@ async function registerClient(
   endpoints: OAuthEndpoints,
   redirectUri: string
 ): Promise<string> {
-  const response = await fetch(endpoints.registrationEndpoint, {
+  const response = await timedFetch(endpoints.registrationEndpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -446,6 +461,8 @@ const TOKEN_KEYS = [
   'expiresAt',
 ] as const
 
+const CREDENTIAL_KEYS = TOKEN_KEYS.filter(key => key !== 'baseUrl')
+
 /** The stored connection, or nothing if the extension is not connected. */
 async function storedTokens(): Promise<StoredTokens | null> {
   const stored = await storage.getMany([...TOKEN_KEYS])
@@ -453,6 +470,31 @@ async function storedTokens(): Promise<StoredTokens | null> {
     if (stored[key] === undefined) return null
   }
   return stored as StoredTokens
+}
+
+export type Connection =
+  | { status: 'connected'; baseUrl: string }
+  | { status: 'lost'; baseUrl: string }
+  | { status: 'none' }
+
+export async function readConnection(): Promise<Connection> {
+  const tokens = await storedTokens()
+  if (tokens) return { status: 'connected', baseUrl: tokens.baseUrl }
+  const baseUrl = await storage.get('baseUrl')
+  return baseUrl === undefined
+    ? { status: 'none' }
+    : { status: 'lost', baseUrl }
+}
+
+async function requireTokens(): Promise<StoredTokens> {
+  const tokens = await storedTokens()
+  if (tokens) return tokens
+  if ((await storage.get('baseUrl')) === undefined) {
+    throw new NotConnectedError()
+  }
+  throw new ReauthorizationRequiredError(
+    'The server no longer accepts this connection'
+  )
 }
 
 /**
@@ -469,25 +511,33 @@ function isSpent(tokens: StoredTokens): boolean {
 }
 
 /**
- * The one refresh allowed to be in flight.
+ * The lock every refresh and every disconnect runs under.
  *
- * Rotation is mandatory server-side and a rotated token is a replay: two
- * concurrent refreshes of the same token means one of them loses the race and
- * the *whole grant* is revoked. The options page and the service worker can both want
- * a token at once, so they share this promise rather than each posting.
+ * Rotation is mandatory server-side, so of two refreshes of one token the
+ * server lets one win and answers the other `invalid_grant`, which would
+ * clear a connection that is still good. The options page and the service
+ * worker each load this module, so module state cannot keep them apart; a Web
+ * Lock is held per origin and both contexts share the extension's.
  */
-let refreshInFlight: Promise<StoredTokens> | null = null
+const REFRESH_LOCK = 'pinsquirrel-token-refresh'
 
 /**
  * Spend the refresh token for a new pair, and store what comes back.
+ *
+ * Under the lock, the stored refresh token is read again: if it is no longer
+ * the one `spent` holds, another caller refreshed while this one waited, and
+ * its pair is the answer.
  *
  * The endpoints are rediscovered rather than cached across calls: a service
  * worker is torn down between wakes, so a cache would rarely survive to be
  * used, and a stale one would send a refresh to an endpoint the server has
  * moved.
  */
-async function refreshTokens(current: StoredTokens): Promise<StoredTokens> {
-  refreshInFlight ??= (async () => {
+async function refreshTokens(spent: StoredTokens): Promise<StoredTokens> {
+  return navigator.locks.request(REFRESH_LOCK, async () => {
+    const current = await requireTokens()
+    if (current.refreshToken !== spent.refreshToken) return current
+
     try {
       const endpoints = await discoverEndpoints(current.baseUrl)
       const body = await postTokenRequest(endpoints.tokenEndpoint, {
@@ -509,18 +559,14 @@ async function refreshTokens(current: StoredTokens): Promise<StoredTokens> {
         error instanceof OAuthProtocolError &&
         error.code === 'invalid_grant'
       ) {
-        // Expired, revoked from the profile page, or replayed - the server
-        // took the whole family either way. Nothing here can recover it.
-        await storage.remove([...TOKEN_KEYS])
+        // Expired, revoked, or already exchanged - the stored refresh token is
+        // spent either way, and nothing here can recover it.
+        await storage.remove(CREDENTIAL_KEYS)
         throw new ReauthorizationRequiredError(error.message)
       }
       throw error
-    } finally {
-      refreshInFlight = null
     }
-  })()
-
-  return refreshInFlight
+  })
 }
 
 /**
@@ -530,12 +576,7 @@ async function refreshTokens(current: StoredTokens): Promise<StoredTokens> {
  * ask whether it is still valid.
  */
 export async function getAccessToken(): Promise<string> {
-  const tokens = await storedTokens()
-  if (!tokens) {
-    throw new ReauthorizationRequiredError(
-      'The extension is not connected to a PinSquirrel server'
-    )
-  }
+  const tokens = await requireTokens()
   if (!isSpent(tokens)) return tokens.accessToken
 
   return (await refreshTokens(tokens)).accessToken
@@ -576,7 +617,7 @@ export async function authorizedFetch(
   const send = (token: string) => {
     const headers = new Headers(init.headers)
     headers.set('Authorization', `Bearer ${token}`)
-    return fetch(input, { ...init, headers })
+    return timedFetch(input, { ...init, headers })
   }
 
   const token = await getAccessToken()
@@ -603,26 +644,30 @@ export async function authorizedFetch(
  * reconnecting against a `client_id` the server has since forgotten.
  */
 export async function disconnect(): Promise<void> {
-  const tokens = await storedTokens()
+  // Under the refresh lock, so a refresh already sent stores its pair before
+  // this reads one to revoke, and a refresh waiting behind this finds nothing.
+  await navigator.locks.request(REFRESH_LOCK, async () => {
+    const tokens = await storedTokens()
 
-  if (tokens) {
-    try {
-      const endpoints = await discoverEndpoints(tokens.baseUrl)
-      await fetch(endpoints.revocationEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          token: tokens.refreshToken,
-          token_type_hint: 'refresh_token',
-          client_id: tokens.clientId,
-        }).toString(),
-      })
-    } catch {
-      // RFC 7009 answers 200 for an unknown or already-dead token, so the only
-      // failures here are transport ones, and none of them is a reason to
-      // leave a disconnected extension holding credentials.
+    if (tokens) {
+      try {
+        const endpoints = await discoverEndpoints(tokens.baseUrl)
+        await timedFetch(endpoints.revocationEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            token: tokens.refreshToken,
+            token_type_hint: 'refresh_token',
+            client_id: tokens.clientId,
+          }).toString(),
+        })
+      } catch {
+        // A transport failure is no reason to leave a disconnected extension
+        // holding credentials. Neither is a refusal, which `fetch` resolves
+        // with rather than throwing: the stored token is cleared regardless.
+      }
     }
-  }
 
-  await storage.clear()
+    await storage.clear()
+  })
 }

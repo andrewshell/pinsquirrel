@@ -1,3 +1,5 @@
+import { timedFetch } from './timed-fetch.ts'
+
 /**
  * OAuth discovery: the two documents that turn a base URL into a set of
  * endpoints.
@@ -65,7 +67,7 @@ async function fetchDocument(
 ): Promise<Record<string, unknown>> {
   let response: Response
   try {
-    response = await fetch(url)
+    response = await timedFetch(url)
   } catch (cause) {
     throw new DiscoveryError(`Could not reach the ${what} at ${url}`, { cause })
   }

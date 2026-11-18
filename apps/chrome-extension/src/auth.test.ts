@@ -25,6 +25,7 @@ import {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
 const BASE_URL = 'https://pinsquirrel.com'
@@ -154,6 +155,31 @@ describe('startConnect', () => {
     })
   })
 
+  it("fails with the server's reason when registration is refused, and can be retried", async () => {
+    const server = stubOAuthServer()
+    let refusals = 1
+    server.fetched.route(`${SERVER_BASE_URL}/oauth/register`, () =>
+      refusals-- > 0
+        ? jsonResponse(
+            {
+              error: 'too_many_requests',
+              error_description: 'Too many client registrations.',
+            },
+            429
+          )
+        : jsonResponse({ client_id: REGISTERED_CLIENT_ID }, 201)
+    )
+
+    await expect(startConnect(SERVER_BASE_URL)).rejects.toThrow(
+      'Too many client registrations.'
+    )
+    expect(server.chrome.local.items.registeredClients).toBeUndefined()
+    expect(server.chrome.local.items.pendingConnect).toBeUndefined()
+
+    const url = new URL(await startConnect(SERVER_BASE_URL))
+    expect(url.searchParams.get('client_id')).toBe(REGISTERED_CLIENT_ID)
+  })
+
   it('reuses a cached registration rather than registering again', async () => {
     const server = stubOAuthServer({
       registeredClients: { [SERVER_BASE_URL]: 'dcr_cached' },
@@ -277,6 +303,32 @@ describe('completeConnect', () => {
   })
 })
 
+const TOKEN_URL = `${SERVER_BASE_URL}/oauth/token`
+const REVOKE_URL = `${SERVER_BASE_URL}/oauth/revoke`
+
+/**
+ * Every timeout the code asks `AbortSignal.timeout` for, recorded, with each
+ * cut to a few milliseconds so a test does not sit through it.
+ */
+function shortenTimeouts(): number[] {
+  const asked: number[] = []
+  const timeout = AbortSignal.timeout.bind(AbortSignal)
+  vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+    asked.push(ms)
+    return timeout(5)
+  })
+  return asked
+}
+
+function neverAnswers(init: RequestInit | undefined): Promise<Response> {
+  return new Promise((_resolve, reject) => {
+    const signal = init?.signal
+    signal?.addEventListener('abort', () => {
+      reject(signal.reason as Error)
+    })
+  })
+}
+
 /** A connection already in storage, with the access token still good. */
 function connected(overrides: Record<string, unknown> = {}) {
   return {
@@ -352,8 +404,25 @@ describe('getAccessToken', () => {
     expect(server.chrome.local.items.selectedTagIds).toEqual(['tag-1'])
   })
 
-  // Two refreshes of the same token means one loses the rotation race, and the
-  // server revokes the whole grant family for a replay.
+  it('remembers the server whose grant was dropped', async () => {
+    const server = stubOAuthServer(connected({ expiresAt: Date.now() - 1000 }))
+    server.answerTokenWith(() => oauthErrorResponse('invalid_grant'))
+
+    await expect(getAccessToken()).rejects.toThrow()
+
+    expect(server.chrome.local.items.baseUrl).toBe(SERVER_BASE_URL)
+  })
+
+  it('asks for consent again, not as a disconnect, once another context lost the grant', async () => {
+    stubOAuthServer({ baseUrl: SERVER_BASE_URL })
+
+    await expect(getAccessToken()).rejects.toMatchObject({
+      name: 'ReauthorizationRequiredError',
+    })
+  })
+
+  // Two refreshes of the same token means one loses the rotation race, and a
+  // replay outside the server's short grace window revokes the grant.
   it('posts one refresh when two callers want a token at once', async () => {
     const server = stubOAuthServer(connected({ expiresAt: Date.now() - 1000 }))
 
@@ -363,9 +432,86 @@ describe('getAccessToken', () => {
     expect(one).toBe('pso_access')
     expect(other).toBe('pso_access')
   })
+
+  // The options page and the service worker each load their own copy of this
+  // module, sharing only storage. Like the real server, the stub lets one
+  // refresh of a token win and answers the other invalid_grant.
+  it('keeps the connection when the options page and the worker refresh at once', async () => {
+    const server = stubOAuthServer(connected({ expiresAt: Date.now() - 1000 }))
+    const spent = new Set<string>()
+    let issued = 0
+    server.answerTokenWith(form => {
+      if (spent.has(form.refresh_token)) {
+        return oauthErrorResponse('invalid_grant')
+      }
+      spent.add(form.refresh_token)
+      issued += 1
+      return tokenResponse({
+        access_token: `pso_fresh-${issued}`,
+        refresh_token: `refresh-${issued + 1}`,
+      })
+    })
+    vi.resetModules()
+    const optionsPage = await import('./auth.ts')
+    vi.resetModules()
+    const worker = await import('./auth.ts')
+
+    const [one, other] = await Promise.all([
+      optionsPage.getAccessToken(),
+      worker.getAccessToken(),
+    ])
+
+    expect(one).toBe('pso_fresh-1')
+    expect(other).toBe('pso_fresh-1')
+    expect(server.chrome.local.items).toMatchObject({
+      accessToken: 'pso_fresh-1',
+      refreshToken: 'refresh-2',
+    })
+  })
 })
 
 const TAGS_URL = `${SERVER_BASE_URL}/api/v1/tags`
+
+describe('a request the server never answers', () => {
+  it('fails a refresh with a clear error and lets the next one through', async () => {
+    const server = stubOAuthServer(connected({ expiresAt: Date.now() - 1000 }))
+    const timeouts = shortenTimeouts()
+    let hang = true
+    server.fetched.route(TOKEN_URL, (_url, init) =>
+      hang ? neverAnswers(init) : tokenResponse()
+    )
+
+    await expect(getAccessToken()).rejects.toThrow(
+      `${TOKEN_URL} did not answer within 20 seconds`
+    )
+    expect(new Set(timeouts)).toEqual(new Set([20_000]))
+    // The refresh token was never spent, so the connection is still good.
+    expect(server.chrome.local.items.refreshToken).toBe('refresh-stored')
+
+    hang = false
+    expect(await getAccessToken()).toBe('pso_access')
+  })
+
+  it('fails an API call with a clear error', async () => {
+    const server = stubOAuthServer(connected())
+    shortenTimeouts()
+    server.fetched.route(TAGS_URL, (_url, init) => neverAnswers(init))
+
+    await expect(authorizedFetch(TAGS_URL)).rejects.toThrow(
+      `${TAGS_URL} did not answer within 20 seconds`
+    )
+  })
+
+  it('still clears storage when the revocation never answers', async () => {
+    const server = stubOAuthServer(connected())
+    shortenTimeouts()
+    server.fetched.route(REVOKE_URL, (_url, init) => neverAnswers(init))
+
+    await disconnect()
+
+    expect(server.chrome.local.items).toEqual({})
+  })
+})
 
 describe('authorizedFetch', () => {
   it('sends the access token as a bearer credential', async () => {
@@ -426,8 +572,8 @@ describe('disconnect', () => {
 
     await disconnect()
 
-    // A refresh token takes its whole grant family with it server-side, so
-    // this is what makes the access token stop working too.
+    // A refresh token takes its grant with it server-side, so this is what
+    // makes the access token stop working too.
     expect(server.revocations).toEqual([
       {
         token: 'refresh-stored',
@@ -438,15 +584,94 @@ describe('disconnect', () => {
     expect(server.chrome.local.items).toEqual({})
   })
 
+  it('forgets a server whose grant is gone, sending nothing', async () => {
+    const server = stubOAuthServer({
+      baseUrl: SERVER_BASE_URL,
+      lastSyncError: 'PinSquirrel needs to be reconnected',
+      registeredClients: { [SERVER_BASE_URL]: REGISTERED_CLIENT_ID },
+    })
+
+    await disconnect()
+
+    expect(server.fetched.urls).toEqual([])
+    expect(server.chrome.local.items).toEqual({})
+  })
+
   it('clears local storage even when the server cannot be reached', async () => {
     const server = stubOAuthServer(connected())
-    server.fetched.route(`${SERVER_BASE_URL}/oauth/revoke`, () => {
+    server.fetched.route(REVOKE_URL, () => {
       throw new Error('offline')
     })
 
     await disconnect()
 
     expect(server.chrome.local.items).toEqual({})
+  })
+
+  it('clears local storage even when the server refuses the revocation', async () => {
+    const server = stubOAuthServer(connected({ clientId: 'dcr_other' }))
+
+    await disconnect()
+
+    expect(server.revocations).toHaveLength(1)
+    expect(server.chrome.local.items).toEqual({})
+  })
+
+  // The worker can be mid-refresh when the user clicks Disconnect. The pair it
+  // is about to store is the live one, so that is the one to revoke, and
+  // nothing may be stored once Disconnect has cleared.
+  it('waits for a refresh already sent, revokes the pair it got, and keeps nothing', async () => {
+    const server = stubOAuthServer(connected({ expiresAt: Date.now() - 1000 }))
+    let answer = () => {}
+    const answered = new Promise<void>(resolve => {
+      answer = resolve
+    })
+    server.fetched.route(TOKEN_URL, async () => {
+      await answered
+      return tokenResponse({
+        access_token: 'pso_fresh',
+        refresh_token: 'refresh-2',
+      })
+    })
+
+    const refreshing = getAccessToken()
+    await vi.waitFor(() => {
+      expect(server.fetched.urls).toContain(TOKEN_URL)
+    })
+    const disconnecting = disconnect()
+    await new Promise(resolve => setTimeout(resolve, 10))
+    answer()
+    await Promise.allSettled([refreshing, disconnecting])
+
+    expect(server.revocations.map(form => form.token)).toEqual(['refresh-2'])
+    expect(server.chrome.local.items).toEqual({})
+  })
+
+  // The user chose to end the connection, so a call that finds it gone is
+  // not a grant the server dropped and gets no reconnect notice.
+  it('ends a refresh queued behind it as not connected, sending nothing', async () => {
+    const server = stubOAuthServer(connected({ expiresAt: Date.now() - 1000 }))
+    let answer = () => {}
+    const answered = new Promise<void>(resolve => {
+      answer = resolve
+    })
+    server.fetched.route(REVOKE_URL, async () => {
+      await answered
+      return new Response(null, { status: 200 })
+    })
+
+    const disconnecting = disconnect()
+    await vi.waitFor(() => {
+      expect(server.fetched.urls).toContain(REVOKE_URL)
+    })
+    const refreshing = getAccessToken()
+    answer()
+    await disconnecting
+
+    await expect(refreshing).rejects.toMatchObject({
+      name: 'NotConnectedError',
+    })
+    expect(server.tokenRequests).toEqual([])
   })
 
   it('does nothing to revoke when there is no connection to end', async () => {
