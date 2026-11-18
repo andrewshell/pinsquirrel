@@ -108,7 +108,7 @@ export async function heavyTransaction(pool: Pool): Promise<PoolConnection> {
   await connection.beginTransaction()
   for (const bystander of bystanders) {
     await connection.query(
-      'UPDATE users SET password_hash = REVERSE(password_hash) WHERE id = ?',
+      "UPDATE users SET password_hash = CONCAT(password_hash, '.') WHERE id = ?",
       [bystander.id]
     )
   }
