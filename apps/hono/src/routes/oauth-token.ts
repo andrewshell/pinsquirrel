@@ -3,12 +3,7 @@ import type { Context } from 'hono'
 import { OAuthError, ValidationError } from '@pinsquirrel/domain'
 import { oauthService } from '../lib/services.js'
 import { describeValidationError } from '../lib/oauth-error.js'
-import {
-  oauthTokenClientLimiter,
-  oauthTokenIpLimiter,
-  rateLimitByClientId,
-  rateLimitByIp,
-} from '../middleware/rate-limit.js'
+import { oauthTokenIpLimiter, rateLimitByIp } from '../middleware/rate-limit.js'
 
 /**
  * The RFC 6749 token endpoint and the RFC 7009 revocation endpoint.
@@ -23,9 +18,7 @@ import {
  * specifies nothing else. `/oauth/register` is the JSON one; the two do not
  * share a parser.
  *
- * Both are rate limited per IP, and the token endpoint additionally per
- * `client_id`: a public client refreshes from whatever address its user is on,
- * so the address alone bounds nothing for it. A refusal is a plain `429` with
+ * Both are rate limited per IP only (Decision 33). A refusal is a plain `429` with
  * `Retry-After` rather than an RFC 6749 error object, because every code in
  * that registry describes something wrong with the request, and a client told
  * `invalid_request` would fix its request instead of waiting.
@@ -74,12 +67,11 @@ const TOO_MANY_REQUESTS =
   'Too many token requests. Please try again later.' as const
 
 // Revocation shares the per-IP budget: it is the same unauthenticated surface,
-// and a caller grinding it is doing so to find out which tokens exist.
-oauthToken.use('*', rateLimitByIp(oauthTokenIpLimiter, TOO_MANY_REQUESTS))
-oauthToken.use(
-  '/token',
-  rateLimitByClientId(oauthTokenClientLimiter, TOO_MANY_REQUESTS)
-)
+// and a caller grinding it is doing so to find out which tokens exist. Named
+// routes, not '*': this app mounts at `/oauth` beside the consent screen.
+const tokenIpLimit = rateLimitByIp(oauthTokenIpLimiter, TOO_MANY_REQUESTS)
+oauthToken.use('/token', tokenIpLimit)
+oauthToken.use('/revoke', tokenIpLimit)
 
 oauthToken.post('/token', async c => {
   if (!isFormEncoded(c)) {

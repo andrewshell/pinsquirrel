@@ -6,7 +6,8 @@ import { oauthService } from '../lib/services.js'
 import { describeValidationError } from '../lib/oauth-error.js'
 import {
   oauthRegisterLimiter,
-  rateLimitByIp,
+  oauthRegisterSlash48Limiter,
+  rateLimitByIpAndSlash48,
 } from '../middleware/rate-limit.js'
 
 /**
@@ -63,10 +64,13 @@ function clientInformation(client: OAuthClient) {
 
 const oauthRegister = new Hono()
 
+// Scoped to the route, not '*': this app mounts at `/oauth` beside the
+// consent screen, and a wildcard would count every page under that prefix.
 oauthRegister.use(
-  '*',
-  rateLimitByIp(
+  '/register',
+  rateLimitByIpAndSlash48(
     oauthRegisterLimiter,
+    oauthRegisterSlash48Limiter,
     'Too many client registrations. Please try again later.'
   )
 )

@@ -4,9 +4,9 @@ import { RateLimiter } from './rate-limiter'
 import {
   apiV1Limiter,
   clientAddressKey,
+  clientSlash48Key,
   getClientIp,
   mcpLimiter,
-  rateLimitByClientId,
   rateLimitByIp,
   signinRateLimitKey,
 } from './rate-limit'
@@ -364,6 +364,25 @@ describe('signinRateLimitKey', () => {
     }
   })
 
+  it.each([
+    ['1.2.3.4', '1.2.3.4'],
+    ['::ffff:1.2.3.4', '1.2.3.4'],
+    ['::1', '::1'],
+    ['2001:db8:1:2:3:4:5:6', '2001:db8:1::/48'],
+    ['2001:db8::1', '2001:db8:0::/48'],
+  ])('keys the /48 around %s as %s', async (address, expected) => {
+    const app = new Hono()
+    let key = ''
+    app.get('/test', c => {
+      key = clientSlash48Key(c)
+      return c.text('ok')
+    })
+
+    await app.request('/test', undefined, from(address))
+
+    expect(key).toBe(expected)
+  })
+
   it('keys an IPv6 caller on its /64', async () => {
     const app = new Hono()
     let key = ''
@@ -375,86 +394,6 @@ describe('signinRateLimitKey', () => {
     await app.request('/test', undefined, from('2001:db8:1:2:3:4:5:6'))
 
     expect(key).toBe('2001:db8:1:2::/64:alice')
-  })
-})
-
-describe('rateLimitByClientId', () => {
-  let limiter: RateLimiter
-  let app: Hono
-
-  function tokenRequest(fields: Record<string, string>) {
-    return {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams(fields).toString(),
-    }
-  }
-
-  beforeEach(() => {
-    limiter = new RateLimiter({ maxAttempts: 2, windowMs: 60_000 })
-    app = new Hono()
-    app.post(
-      '/token',
-      rateLimitByClientId(limiter, 'Rate limited.'),
-      async c => {
-        // The handler reads the same body the middleware already parsed, which
-        // is the whole reason this can key on a form field at all.
-        const body = await c.req.parseBody()
-        const clientId = body['client_id']
-        return c.text(typeof clientId === 'string' ? clientId : 'none')
-      }
-    )
-  })
-
-  afterEach(() => {
-    limiter.destroy()
-  })
-
-  it('leaves the body readable by the handler', async () => {
-    const res = await app.request('/token', tokenRequest({ client_id: 'a' }))
-    expect(res.status).toBe(200)
-    expect(await res.text()).toBe('a')
-  })
-
-  it('returns 429 with Retry-After once one client has had its share', async () => {
-    await app.request('/token', tokenRequest({ client_id: 'a' }))
-    await app.request('/token', tokenRequest({ client_id: 'a' }))
-
-    const res = await app.request('/token', tokenRequest({ client_id: 'a' }))
-    expect(res.status).toBe(429)
-    expect(await res.text()).toBe('Rate limited.')
-    expect(res.headers.get('Retry-After')).toBeTruthy()
-  })
-
-  it('counts each client separately', async () => {
-    await app.request('/token', tokenRequest({ client_id: 'a' }))
-    await app.request('/token', tokenRequest({ client_id: 'a' }))
-
-    const res = await app.request('/token', tokenRequest({ client_id: 'b' }))
-    expect(res.status).toBe(200)
-  })
-
-  it('spends no budget on a request that names no client', async () => {
-    // There is nothing to key on, and the IP limiter beside it already counted
-    // the request. Charging it to a shared empty key would let one malformed
-    // caller lock every client out.
-    await app.request('/token', tokenRequest({}))
-    await app.request('/token', tokenRequest({}))
-    await app.request('/token', tokenRequest({}))
-
-    const res = await app.request('/token', tokenRequest({ client_id: 'a' }))
-    expect(res.status).toBe(200)
-  })
-
-  it('lets a body it cannot parse through to the endpoint', async () => {
-    // The token endpoint answers 415 to anything that is not form-encoded, and
-    // that answer is more useful than a rate-limit refusal.
-    const res = await app.request('/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: 'a' }),
-    })
-    expect(res.status).toBe(200)
   })
 })
 

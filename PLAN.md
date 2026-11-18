@@ -60,8 +60,9 @@ is not repeated here. On top of it:
 - One Zod-to-`ValidationError` helper, `validationErrorFromZod`
   (`libs/services/src/validation/zod-error.ts`). Routes translate that to RFC 6749 codes, not
   the service.
-- Rate limiting is `RateLimiter` (`middleware/rate-limiter.ts`) plus `rateLimitByIp()` /
-  `rateLimitByClientId()` (`middleware/rate-limit.ts`), applied inside the route file. `getClientIp`
+- Rate limiting is `RateLimiter` (`middleware/rate-limiter.ts`) plus `rateLimitByIp()`
+  (`middleware/rate-limit.ts`), applied inside the route file to the routes it guards, never `'*'`
+  in a sub-app that mounts at a shared prefix. `getClientIp`
   honours forwarding headers only when `TRUST_PROXY` is set and the socket peer is a trusted proxy;
   production sets it.
 - `/mcp` builds an `McpServer` and a `StreamableHTTPTransport` per request and closes both
@@ -317,7 +318,8 @@ manifest's `host_permissions`, and the session cookie is only `Secure` in produc
 3. The redirect URI is `http://localhost:8100/oauth/extension/callback`, a page on the server
    that needs no session. The DCR `client_id` is derived from the metadata, so one extension
    dedups to one `oauth_clients` row, and the manifest's `key` fixes the ID, so a second
-   checkout is the same row. `/oauth/register` allows ten per IP per hour.
+   checkout is the same row. `/oauth/register` allows ten per IP (or IPv6 /64) per hour, and
+   thirty per IPv6 /48.
 4. Tick tags, Sync Now, and check the bookmarks bar for a "PinSquirrel" folder. Revoke from
    `/profile` and confirm the options page comes back on Connect with a notice rather than
    failing silently.
@@ -543,6 +545,16 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     profile form posts the client id and the service revokes every live token the user
     holds for it. A token id in the form went stale once the client refreshed and the
     sweep removed that row.
+33. **The token endpoint is limited per address only, not per `client_id`.** A `client_id` is
+    public and every user of a client shares it, so a budget keyed on it let requests from
+    other addresses refuse that client's real users. Authorization codes and refresh tokens
+    are 32 random bytes, so there is nothing a distributed caller could guess; the per-/64
+    budget bounds each caller.
+34. **Dynamic client registration is also counted per IPv6 /48, and its metadata is bounded.**
+    A routed /48 holds 65,536 /64s, each with its own budget of ten an hour, so `/register`
+    also allows thirty an hour per /48, checked together with the /64 budget. A registration
+    carries at most ten redirect URIs of at most 512 characters each, the width of the
+    column an authorization code stores its redirect URI in.
 
 ## Reference
 

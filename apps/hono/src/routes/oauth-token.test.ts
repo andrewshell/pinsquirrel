@@ -22,10 +22,7 @@ vi.mock('../lib/services', () => ({
   },
 }))
 
-import {
-  oauthTokenClientLimiter,
-  oauthTokenIpLimiter,
-} from '../middleware/rate-limit'
+import { oauthTokenIpLimiter } from '../middleware/rate-limit'
 import { TEST_CLIENT_IP, exhaust } from '../test-support/rate-limit'
 
 const { oauthTokenRoutes } = await import('./oauth-token')
@@ -63,7 +60,6 @@ describe('POST /oauth/token', () => {
     // Module-level limiters outlive a single test, so every case starts with
     // its own budget rather than inheriting whatever the last one spent.
     oauthTokenIpLimiter.reset(TEST_CLIENT_IP)
-    oauthTokenClientLimiter.reset(CODE_GRANT.client_id)
     app = new Hono()
     app.route('/oauth', oauthTokenRoutes)
   })
@@ -267,26 +263,27 @@ describe('POST /oauth/token', () => {
       expect(mockExchangeAuthorizationCode).not.toHaveBeenCalled()
     })
 
-    // A public client refreshes from whatever address its user is on, so the
-    // IP quota alone bounds nothing for it.
-    it('answers 429 once one client_id has spent its own quota', async () => {
-      exhaust(oauthTokenClientLimiter, CODE_GRANT.client_id)
+    it('serves a valid exchange after other addresses send invalid ones for the same client', async () => {
+      mockExchangeAuthorizationCode.mockImplementation(
+        (input: { code: string }) =>
+          input.code === CODE_GRANT.code
+            ? Promise.resolve(ISSUED)
+            : Promise.reject(new OAuthInvalidGrantError())
+      )
+      const others = Array.from({ length: 6 }, (_, i) => `203.0.113.${i + 1}`)
 
+      const refused: number[] = []
+      for (let i = 0; i < 300; i++) {
+        const res = await app.request(
+          '/oauth/token',
+          form({ ...CODE_GRANT, code: `wrong-${i}` }),
+          { incoming: { socket: { remoteAddress: others[i % others.length] } } }
+        )
+        refused.push(res.status)
+      }
       const res = await app.request('/oauth/token', form(CODE_GRANT))
 
-      expect(res.status).toBe(429)
-      expect(mockExchangeAuthorizationCode).not.toHaveBeenCalled()
-    })
-
-    it('leaves another client_id alone', async () => {
-      exhaust(oauthTokenClientLimiter, CODE_GRANT.client_id)
-      mockExchangeAuthorizationCode.mockResolvedValue(ISSUED)
-
-      const res = await app.request(
-        '/oauth/token',
-        form({ ...CODE_GRANT, client_id: 'dcr_somebody_else' })
-      )
-
+      expect(new Set(refused)).toEqual(new Set([400]))
       expect(res.status).toBe(200)
     })
   })
@@ -300,7 +297,6 @@ describe('POST /oauth/revoke', () => {
     // Module-level limiters outlive a single test, so every case starts with
     // its own budget rather than inheriting whatever the last one spent.
     oauthTokenIpLimiter.reset(TEST_CLIENT_IP)
-    oauthTokenClientLimiter.reset(CODE_GRANT.client_id)
     app = new Hono()
     app.route('/oauth', oauthTokenRoutes)
   })

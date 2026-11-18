@@ -1,7 +1,7 @@
 import { BlockList, isIP } from 'node:net'
 import type { Context, MiddlewareHandler } from 'hono'
 import { getConnInfo } from '@hono/node-server/conninfo'
-import { RateLimiter } from './rate-limiter'
+import { RateLimiter, reserve } from './rate-limiter'
 import { expectsJsonError } from '../lib/error-response.js'
 
 // getConnInfo reaches into c.env.incoming.socket, which only exists when the
@@ -94,17 +94,25 @@ export function getClientIp(c: Context): string {
  * Loopback and the unspecified address are single hosts, not subscribers.
  */
 export function clientAddressKey(c: Context): string {
-  const address = getClientIp(c)
+  return addressKey(getClientIp(c), 64)
+}
+
+/** An IPv6 caller's /48; any other caller keys as `clientAddressKey`. */
+export function clientSlash48Key(c: Context): string {
+  return addressKey(getClientIp(c), 48)
+}
+
+function addressKey(address: string, prefixBits: 48 | 64): string {
   if (isIP(address) !== 6) return address
   try {
-    return ipv6Key(address)
+    return ipv6Key(address, prefixBits)
   } catch {
     // A key the limiter cannot canonicalise still has to count, never 500.
     return address
   }
 }
 
-function ipv6Key(address: string): string {
+function ipv6Key(address: string, prefixBits: 48 | 64): string {
   // Zone ids (`fe80::1%eth0`) name a local interface, not a different peer,
   // and the URL parser rejects them.
   const bare = address.split('%')[0]
@@ -126,7 +134,7 @@ function ipv6Key(address: string): string {
     ...Array<string>(8 - leading.length - trailing.length).fill('0'),
     ...trailing,
   ]
-  return `${groups.slice(0, 4).join(':')}::/64`
+  return `${groups.slice(0, prefixBits / 16).join(':')}::/${prefixBits}`
 }
 
 export const signinLimiter = new RateLimiter({
@@ -178,8 +186,16 @@ export const forgotPasswordLimiter = new RateLimiter({
  * hour covers even an office sharing one address; anything past that is
  * something filling the table.
  */
+const REGISTRATIONS_PER_ADDRESS_PER_HOUR = 10
+
 export const oauthRegisterLimiter = new RateLimiter({
-  maxAttempts: 10,
+  maxAttempts: REGISTRATIONS_PER_ADDRESS_PER_HOUR,
+  windowMs: 60 * 60 * 1000,
+})
+
+/** Dynamic client registration, per IPv6 /48 (Decision 34). */
+export const oauthRegisterSlash48Limiter = new RateLimiter({
+  maxAttempts: 3 * REGISTRATIONS_PER_ADDRESS_PER_HOUR,
   windowMs: 60 * 60 * 1000,
 })
 
@@ -193,20 +209,6 @@ export const oauthRegisterLimiter = new RateLimiter({
  */
 export const oauthTokenIpLimiter = new RateLimiter({
   maxAttempts: 60,
-  windowMs: 15 * 60 * 1000,
-})
-
-/**
- * The same endpoint keyed on `client_id`, because a public client's IP proves
- * little: a native client refreshes from whatever address the user is on.
- *
- * Deliberately far looser than the per-IP limit. A CIMD `client_id` is one
- * string shared by every user of that application, so every Claude Code
- * installation in the world lands in this one bucket - a tight limit here
- * would be a self-inflicted outage rather than a defence.
- */
-export const oauthTokenClientLimiter = new RateLimiter({
-  maxAttempts: 300,
   windowMs: 15 * 60 * 1000,
 })
 
@@ -276,43 +278,19 @@ export function rateLimitByIp(
   }
 }
 
-/**
- * Limit a form-encoded OAuth request on the `client_id` it names.
- *
- * Sits beside `rateLimitByIp` on `/oauth/token` rather than replacing it: the
- * IP bounds one caller, and this bounds one application across every address
- * its users happen to be on.
- *
- * Reading the body here is safe because Hono caches the parsed body on the
- * request, so the handler's own `parseBody()` sees the same object rather than
- * a consumed stream.
- *
- * A request that names no client spends no budget. There would be nothing to
- * key on but a shared empty string, and one malformed caller could then lock
- * every real client out; the IP limiter has already counted it either way.
- */
-export function rateLimitByClientId(
-  limiter: RateLimiter,
-  message = 'Too many requests. Please try again later.'
+export function rateLimitByIpAndSlash48(
+  addressLimiter: RateLimiter,
+  slash48Limiter: RateLimiter,
+  message: string
 ): MiddlewareHandler {
   return async (c, next) => {
-    let clientId: string | undefined
-    try {
-      const body = await c.req.parseBody()
-      const value = body['client_id']
-      if (typeof value === 'string' && value !== '') clientId = value
-    } catch {
-      // Not a body this middleware can read. The endpoint answers 415 to those,
-      // which tells the caller far more than a rate-limit refusal would.
+    const result = reserve([
+      [addressLimiter, clientAddressKey(c)],
+      [slash48Limiter, clientSlash48Key(c)],
+    ])
+    if (result.limited) {
+      return refuse(c, message, result.retryAfterMs)
     }
-
-    if (clientId) {
-      const result = limiter.hit(clientId)
-      if (result.limited) {
-        return refuse(c, message, result.retryAfterMs)
-      }
-    }
-
     await next()
   }
 }

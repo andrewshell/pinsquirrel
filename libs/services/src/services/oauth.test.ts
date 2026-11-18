@@ -1119,6 +1119,27 @@ describe('OAuthService.registerClient', () => {
       ctx.service.registerClient({ redirect_uris: [] })
     ).rejects.toBeInstanceOf(ValidationError)
   })
+
+  it('refuses more redirect URIs than a client needs', async () => {
+    const redirectUris = Array.from(
+      { length: 50 },
+      (_, i) => `https://client.example/cb/${String(i)}`
+    )
+
+    await expect(
+      ctx.service.registerClient(registration({ redirect_uris: redirectUris }))
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses a redirect URI longer than 512 characters', async () => {
+    const longUri = `https://client.example/${'a'.repeat(600)}`
+
+    await expect(
+      ctx.service.registerClient(registration({ redirect_uris: [longUri] }))
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
 })
 
 describe('OAuthService grants', () => {

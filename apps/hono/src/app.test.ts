@@ -28,6 +28,11 @@ vi.mock('./lib/logger.js', () => ({
 }))
 
 import { app } from './app'
+import {
+  oauthRegisterLimiter,
+  oauthTokenIpLimiter,
+} from './middleware/rate-limit'
+import { exhaust, TEST_CLIENT_IP } from './test-support/rate-limit'
 
 describe('request log', () => {
   beforeEach(() => {
@@ -109,5 +114,72 @@ describe('request body limit', () => {
     const res = await post('/import', body, 'application/x-www-form-urlencoded')
 
     expect(res.status).toBe(413)
+  })
+})
+
+describe('OAuth endpoint rate limits', () => {
+  const consentForm = {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Sec-Fetch-Site': 'same-origin',
+    },
+    body: 'decision=approve',
+  }
+
+  const morePageLoadsThanAnyBudget = 62
+
+  /** A status other than 429 means the request got past the limiter. */
+  async function statusPastLimiter(path: string): Promise<number> {
+    const res = await app.request(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: 'x',
+    })
+    return res.status
+  }
+
+  beforeEach(() => {
+    oauthRegisterLimiter.reset(TEST_CLIENT_IP)
+    oauthTokenIpLimiter.reset(TEST_CLIENT_IP)
+  })
+
+  it('serves the consent screen and extension callback once the registration budget is spent', async () => {
+    exhaust(oauthRegisterLimiter, TEST_CLIENT_IP)
+
+    const statuses = [
+      (await app.request('/oauth/authorize?client_id=x')).status,
+      (await app.request('/oauth/authorize', consentForm)).status,
+      (await app.request('/oauth/extension/callback?code=x')).status,
+    ]
+
+    expect(statuses).not.toContain(429)
+  })
+
+  it('serves the consent screen and extension callback once the token budget is spent', async () => {
+    exhaust(oauthTokenIpLimiter, TEST_CLIENT_IP)
+
+    const statuses = [
+      (await app.request('/oauth/authorize?client_id=x')).status,
+      (await app.request('/oauth/authorize', consentForm)).status,
+      (await app.request('/oauth/extension/callback?code=x')).status,
+    ]
+
+    expect(statuses).not.toContain(429)
+  })
+
+  it('leaves the registration and token budgets to their own endpoints', async () => {
+    for (let i = 0; i < morePageLoadsThanAnyBudget; i++) {
+      await app.request(
+        i % 2 === 0
+          ? '/oauth/authorize?client_id=x'
+          : '/oauth/extension/callback?code=x'
+      )
+    }
+
+    expect([
+      await statusPastLimiter('/oauth/register'),
+      await statusPastLimiter('/oauth/revoke'),
+    ]).toEqual([415, 415])
   })
 })
