@@ -40,9 +40,15 @@ export const PrivacyPage: FC<PrivacyPageProps> = ({ user, embed = false }) => {
                   </h2>
                   <ul class="list-disc pl-6 space-y-2 text-muted-foreground">
                     <li>
-                      Your email address, but we immediately scramble it beyond
-                      recognition and toss the original (even we can't figure
-                      out what it was)
+                      Your email address, stored as a hash so we can find your
+                      account when you sign up or reset your password. While
+                      PinSquirrel is in early access we also keep a sealed
+                      (encrypted) copy that only the operator can open, offline,
+                      to tell you when you're in
+                    </li>
+                    <li>
+                      When you sign up, the operator gets an email with your
+                      username and email address
                     </li>
                     <li>
                       A username so we know which digital hoard belongs to you
@@ -77,11 +83,11 @@ export const PrivacyPage: FC<PrivacyPageProps> = ({ user, embed = false }) => {
                   </h2>
                   <p class="text-muted-foreground">
                     We use all the standard security stuff to keep your digital
-                    hoard protected. And since we scrambled your email beyond
-                    recognition, even if someone breaks in, they won't be able
-                    to link any personal info to your questionable bookmarking
-                    habits. Links and notes aren't encrypted though, so don't
-                    store anything sensitive.
+                    hoard protected. Your email is stored hashed, and the
+                    readable copy is sealed with a key that isn't on the server,
+                    so the database never holds your address in plain text.
+                    Links and notes aren't encrypted though, so don't store
+                    anything sensitive.
                   </p>
                 </section>
 

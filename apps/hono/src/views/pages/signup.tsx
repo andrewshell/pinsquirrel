@@ -133,7 +133,12 @@ export const SignUpPage: FC<SignUpPageProps> = ({
                     )}
                     <p class="text-xs text-muted-foreground">
                       We'll email you a link to confirm your spot and set your
-                      password. We hash your email for privacy.
+                      password. We store your email hashed, plus a sealed copy
+                      we use to tell you when you're in. Details in the{' '}
+                      <a href="/privacy" class="underline">
+                        privacy policy
+                      </a>
+                      .
                     </p>
                   </div>
 
