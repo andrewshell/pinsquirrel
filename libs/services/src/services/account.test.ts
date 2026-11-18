@@ -113,6 +113,7 @@ describe('AccountService', () => {
       sendSignupNotificationEmail: vi.fn(),
       sendEmailAlreadyRegisteredEmail: vi.fn(),
       sendUsernameTakenEmail: vi.fn(),
+      sendVerificationEmail: vi.fn(),
     }
 
     queue = createDeferQueue()
@@ -151,6 +152,38 @@ describe('AccountService', () => {
         roles: [Role.User],
       })
       expect(mockUserRepository.addRole).not.toHaveBeenCalled()
+    })
+
+    it('sends a 48-hour verification link in its own mail, not a reset mail', async () => {
+      const resets = inMemoryResets()
+      const service = new AccountService(
+        mockUserRepository,
+        resets,
+        mockEmailService,
+        { defer: queue.defer }
+      )
+      vi.mocked(mockUserRepository.findByUsername).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.findByEmailHash).mockResolvedValue(null)
+      vi.mocked(mockUserRepository.create).mockResolvedValue(mockUser)
+
+      const before = Date.now()
+      service.register({
+        username: 'newuser',
+        email: 'new@example.com',
+        resetUrl: 'https://example.com/reset-password',
+      })
+      await queue.flush()
+
+      expect(mockEmailService.sendVerificationEmail).toHaveBeenCalledWith(
+        'new@example.com',
+        'mock-token',
+        'https://example.com/reset-password'
+      )
+      expect(mockEmailService.sendPasswordResetEmail).not.toHaveBeenCalled()
+      const [row] = await resets.findByUserId(mockUser.id)
+      const lifetimeHours = (row.expiresAt.getTime() - before) / 3_600_000
+      expect(lifetimeHours).toBeGreaterThan(47.9)
+      expect(lifetimeHours).toBeLessThanOrEqual(48)
     })
 
     it('should seal the email when an email sealer is configured', async () => {
@@ -383,7 +416,7 @@ describe('AccountService', () => {
       vi.mocked(mockPasswordResetRepository.create).mockResolvedValue(
         mockPasswordResetToken
       )
-      vi.mocked(mockEmailService.sendPasswordResetEmail).mockRejectedValue(
+      vi.mocked(mockEmailService.sendVerificationEmail).mockRejectedValue(
         new Error('Email service unavailable')
       )
 

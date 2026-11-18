@@ -12,6 +12,86 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
+/** The page every transactional mail shares, around its own body. */
+function htmlEmail(title: string, body: string): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>${escapeHtml(title)}</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .container { background-color: #f9f9f9; padding: 30px; border-radius: 8px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .button { display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+        .footer { margin-top: 30px; font-size: 14px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>${escapeHtml(title)}</h1>
+        </div>
+${body}
+        <div class="footer">
+            <p>Best regards,<br>Andrew from PinSquirrel</p>
+            <p><small>This is an automated email. Please do not reply to this message.</small></p>
+        </div>
+    </div>
+</body>
+</html>`.trim()
+}
+
+const SIGN_OFF = `Best regards,
+Andrew from PinSquirrel
+
+This is an automated email. Please do not reply to this message.`
+
+export function createVerificationEmailTemplate(verifyUrl: string): {
+  html: string
+  text: string
+} {
+  const title = 'Confirm your PinSquirrel sign-up'
+  const html = htmlEmail(
+    title,
+    `
+        <p>Hello,</p>
+
+        <p>Thanks for joining the PinSquirrel early-access waitlist. Confirm your email address and choose a password to keep your spot:</p>
+
+        <p style="text-align: center;">
+            <a href="${escapeHtml(verifyUrl)}" class="button">Confirm and set password</a>
+        </p>
+
+        <p>Or copy and paste this link into your browser:</p>
+        <p style="word-break: break-all; color: #007bff;">${escapeHtml(verifyUrl)}</p>
+
+        <p>This link expires in 48 hours.</p>
+
+        <p>If you didn't sign up for PinSquirrel, you can safely ignore this email.</p>
+`
+  )
+
+  const text = `
+${title}
+
+Hello,
+
+Thanks for joining the PinSquirrel early-access waitlist. Confirm your email address and choose a password to keep your spot:
+
+${verifyUrl}
+
+This link expires in 48 hours.
+
+If you didn't sign up for PinSquirrel, you can safely ignore this email.
+
+${SIGN_OFF}
+`.trim()
+
+  return { html, text }
+}
+
 export function createPasswordResetEmailTemplate(resetUrl: string): {
   html: string
   text: string

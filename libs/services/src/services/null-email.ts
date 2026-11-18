@@ -25,6 +25,9 @@ export class NullEmailService implements EmailService {
   readonly sendPasswordResetEmail: EmailService['sendPasswordResetEmail'] =
     () => Promise.reject(new EmailNotConfiguredError())
 
+  readonly sendVerificationEmail: EmailService['sendVerificationEmail'] = () =>
+    Promise.reject(new EmailNotConfiguredError())
+
   readonly sendSignupNotificationEmail: EmailService['sendSignupNotificationEmail'] =
     () => Promise.reject(new EmailNotConfiguredError())
 

@@ -31,6 +31,7 @@ import type { EmailSealer } from './authentication.js'
 export const RESET_REQUEST_WINDOW_MS = 60 * 60 * 1000
 const RESET_REQUESTS_PER_WINDOW = 3
 const RESET_LINK_LIFETIME_MS = 15 * 60 * 1000
+const VERIFICATION_LINK_LIFETIME_MS = 48 * 60 * 60 * 1000
 
 export interface RegistrationInput {
   username: string
@@ -162,9 +163,12 @@ export class AccountService {
     }
 
     if (input.resetUrl) {
-      const token = await this.issueResetToken(user.id, RESET_LINK_LIFETIME_MS)
+      const token = await this.issueResetToken(
+        user.id,
+        VERIFICATION_LINK_LIFETIME_MS
+      )
       if (token) {
-        await this.emailService.sendPasswordResetEmail(
+        await this.emailService.sendVerificationEmail(
           input.email,
           token,
           input.resetUrl

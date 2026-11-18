@@ -3,6 +3,7 @@ import { EmailSendError } from '@pinsquirrel/domain'
 import Mailgun from 'mailgun.js'
 import {
   createPasswordResetEmailTemplate,
+  createVerificationEmailTemplate,
   createSignupNotificationEmailTemplate,
   createEmailAlreadyRegisteredTemplate,
   createUsernameTakenTemplate,
@@ -153,6 +154,25 @@ export class MailgunEmailService implements EmailService {
       'Reset Your PinSquirrel Password',
       createPasswordResetEmailTemplate(fullResetUrl),
       { description: 'password reset email' }
+    )
+  }
+
+  async sendVerificationEmail(
+    email: string,
+    token: string,
+    resetUrl: string
+  ): Promise<void> {
+    if (!email || !token || !resetUrl) {
+      throw new EmailSendError(
+        'Invalid email parameters: email, token, and resetUrl are required'
+      )
+    }
+
+    await this.send(
+      email,
+      'Confirm your PinSquirrel sign-up',
+      createVerificationEmailTemplate(`${resetUrl}/${token}`),
+      { description: 'verification email' }
     )
   }
 

@@ -13,6 +13,10 @@ describe('NullEmailService', () => {
       () => service.sendPasswordResetEmail('a@b.com', 't', 'url'),
     ],
     [
+      'sendVerificationEmail',
+      () => service.sendVerificationEmail('a@b.com', 't', 'url'),
+    ],
+    [
       'sendSignupNotificationEmail',
       () => service.sendSignupNotificationEmail('a@b.com', 'u', 'e@f.com'),
     ],
