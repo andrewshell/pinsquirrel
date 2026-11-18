@@ -79,6 +79,8 @@ services:
       - BASE_URL=https://pinsquirrel.com
       # The app sits behind Caddy, which sets x-forwarded-for.
       - TRUST_PROXY=1
+    # The shutdown drain below needs at least 10 seconds.
+    stop_grace_period: 10s
     depends_on:
       - mysql
 
@@ -101,9 +103,11 @@ successfully.` → `Starting PinSquirrel Hono application...`; a stop before the
 migration failure, and the error above it is the one to read.
 
 On `docker stop` the app stops taking requests and waits up to 8 seconds for sign-up and
-password-reset mail still being sent, inside Docker's default 10-second grace period. Mail it
-gives up on is logged as `Abandoned deferred account work at shutdown`; that user has to ask
-again.
+password-reset mail still being sent. That drain needs a stop grace period of at least 10
+seconds, and Docker does not always give you one: Docker Desktop 29 can kill a plain
+`docker stop` after about 3 seconds, which cuts the drain short. Set `stop_grace_period: 10s`
+in compose, or run `docker stop -t 10`. Mail the app gives up on is logged as `Abandoned
+deferred account work at shutdown`; that user has to ask again.
 
 ## Rate limiting
 
