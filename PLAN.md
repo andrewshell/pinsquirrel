@@ -422,11 +422,10 @@ manifest's `host_permissions`, and the session cookie is only `Secure` in produc
     the way `MailgunEmailService` gets its config. `routes/seo.ts` still derives its origin from
     the request URL, which is fine for a sitemap and must not be copied for anything OAuth
     touches.
-19. **A connection is a client, not a client and a resource.** Revocation runs by user and
-    client — `revokeGrantFamily` is what a refresh-token replay triggers too — so the profile
-    page lists one row per client naming every audience it holds, and revoking it takes both.
-    Splitting families by audience would let a replay on one audience leave the other alive,
-    which is the wrong direction for a security response, and no client uses both audiences.
+19. **A connection is a client, not a client and a resource.** The profile page lists one row
+    per client naming every audience it holds, and its Revoke runs by user and client, so it
+    takes both. No client uses both audiences. Revocation by token is narrower and follows the
+    grant (Decision 39).
 20. **Scopes are enforced at the operation, not at the resource.** `requireScope` sits on the
     write routes and inside the write tools, so a read-only token still reads everything. A
     resource-level check would either lock reads behind write or make the scope decorative,
@@ -577,18 +576,66 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
 37. **A rotated refresh token is kept until its own expiry.** Presenting a retired token again
     is how a copied refresh chain is noticed, and that needs the row, so the sweep removes
     only expired and revoked tokens. The cost is one row per refresh for up to thirty days.
-    A refresh whose retired row cannot be read back after issuing is refused and revokes the
-    grant.
+    A refresh whose retired row is gone or revoked by the time it is rotated issues nothing
+    (Decision 41).
 38. **An authorization code is written only while the session that approved it exists.** The
     insert runs in a transaction that first reads the session row `FOR SHARE`. A revocation
     that deleted the session first leaves nothing to read, and `authorize` answers
     `access_denied`; one that starts after the read waits for the insert and then deletes the
     new code with the user's other unspent codes. The check is on the approving session rather
     than the user, so a password change, which keeps the changer's own session, still lets
-    them authorize afterwards. No schema change was needed. A per-user
-    revocation timestamp would also cover the code exchange, which can still issue tokens if a
-    revocation lands in the milliseconds between consuming the code and writing the tokens;
-    that window is not one a caller can widen.
+    them authorize afterwards. No schema change was needed. The code exchange is covered
+    separately by Decision 41.
+39. **A grant has an id, and revocation by token follows it.** A grant is one approval of the
+    consent screen. `authorize` makes a `grant_id` when it writes the code, the exchange copies
+    it to the access and refresh tokens, and each rotation copies it to the successors. Handing
+    a refresh token to `/oauth/revoke`, presenting a refresh token after its rotation, and
+    presenting a code a second time all revoke that grant and no other, so the same application
+    on another device, which shares the `client_id`, keeps working. The profile page still
+    revokes every grant of a client at once (Decision 19). A grant has no table of its own: a
+    column is enough to revoke by, and a table would put a join on every bearer check. Rows
+    from before the column have no id. Revoking the grant of such a row takes everything the
+    user holds for that client, which is what happened before, and a refresh token without an
+    id is given one, with its successors, when it rotates.
+40. **A refresh token presented again within 30 seconds of its rotation is refused and nothing
+    else happens.** A client that refreshes from two processes, or retries a refresh whose
+    response it never received, presents one token twice within moments. The duplicate gets
+    `invalid_grant`; the request that rotated the token keeps its new pair. After 30 seconds a
+    second presentation revokes the grant, as before. Answering the duplicate with a second
+    pair of tokens was rejected: it would leave two live chains from one token. A client whose
+    response was lost therefore re-authorizes on that device.
+41. **Tokens are written in the transaction that spends the code or retires the refresh token,
+    and issuing and revoking take turns on the user's row.** `exchange` and `rotate` each make
+    the conditional mark and the inserts one transaction, so a failure partway leaves the
+    client a code or a token that still works. Both read the user's row `FOR SHARE` first, and
+    every revocation of a user's tokens reads it `FOR UPDATE` before it touches a token. A
+    revocation therefore finishes before an issuance, which then finds its code deleted or its
+    token revoked, or starts after the issuance commits and takes the new tokens with the rest.
+    This closes the window Decision 38 left in the code exchange and replaces the read-back
+    after a refresh. `revokeSessionsAndTokens` takes the lock after it deletes the sessions,
+    the order in which a code being written takes the two rows.
+    A revocation locks only the tokens it changes. It reads the user's token ids through
+    `oauth_tokens_user_client_idx` with `FOR UPDATE` and stamps them by primary key, 500 at a
+    time. A single `UPDATE ... WHERE user_id = ?` was rejected: once one user holds about a
+    fifth of the table MySQL runs it as a scan of the whole table, and the gaps that scan
+    locks are the ones another user's refresh inserts its successors into. The index read
+    still locks the gap on either side of the user's entries, so the user next in id order
+    can wait for the revocation to commit. That wait cannot become a deadlock, because the
+    revocation's token statements never wait on another user's rows. The hourly sweep finds
+    dead tokens with a read that locks nothing and deletes them by primary key in the same
+    batches.
+    A transaction that issues (`rotate`, `exchange`, and the code's `create`) and is rolled
+    back by InnoDB to break a deadlock runs once more from the start, so it reads the
+    session, the code or the token again and still refuses one that was revoked meanwhile.
+    Rolled back a second time, it reports what it reports for a lost race, and the client
+    gets `invalid_grant` or `access_denied` with its code or token unchanged. A revocation
+    also runs once more, but a second deadlock there is an error: a revocation is never
+    reported as done when it was not.
+42. **A refresh can narrow the access token, never the grant.** A `scope` on a refresh request
+    applies to the access token in that response. The refresh token that replaces the old one
+    keeps the scopes the user approved (RFC 6749 section 6) and is always issued, including
+    when the request leaves out `offline_access`. A client no longer registered for
+    `refresh_token` is refused with `unauthorized_client` before the token is retired.
 
 ## Reference
 

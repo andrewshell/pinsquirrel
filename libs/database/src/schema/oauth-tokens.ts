@@ -9,6 +9,9 @@ import {
 import { oauthClients } from './oauth-clients'
 import { users } from './users'
 
+// Named here because revoking a user's tokens forces its read onto this index.
+export const OAUTH_TOKENS_USER_CLIENT_INDEX = 'oauth_tokens_user_client_idx'
+
 export const oauthTokens = mysqlTable(
   'oauth_tokens',
   {
@@ -28,6 +31,7 @@ export const oauthTokens = mysqlTable(
     // The RFC 8707 audience. Compared against the resource the request
     // arrived at, never defaulted: a token for /mcp must not drive /api/v1.
     resource: varchar('resource', { length: 255 }).notNull(),
+    grantId: varchar('grant_id', { length: 36 }),
     expiresAt: timestamp('expires_at', { mode: 'date', fsp: 3 }).notNull(),
     revokedAt: timestamp('revoked_at', { mode: 'date', fsp: 3 }),
     rotatedAt: timestamp('rotated_at', { mode: 'date', fsp: 3 }),
@@ -45,13 +49,10 @@ export const oauthTokens = mysqlTable(
     expiresAtIdx: index('oauth_tokens_expires_at_idx').on(table.expiresAt),
     // Serves both the grants list (user alone, on the index prefix) and
     // revoking one grant (user and client together).
-    userClientIdx: index('oauth_tokens_user_client_idx').on(
+    userClientIdx: index(OAUTH_TOKENS_USER_CLIENT_INDEX).on(
       table.userId,
       table.clientId
     ),
-    // Walking a rotation chain forward, to spot a replayed refresh token.
-    rotatedFromIdx: index('oauth_tokens_rotated_from_idx').on(
-      table.rotatedFrom
-    ),
+    grantIdx: index('oauth_tokens_grant_idx').on(table.grantId),
   })
 )

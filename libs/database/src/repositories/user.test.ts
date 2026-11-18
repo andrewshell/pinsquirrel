@@ -735,6 +735,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
           userId,
           scopes: ['pins:read'],
           resource: 'https://example.test/mcp',
+          grantId: crypto.randomUUID(),
           expiresAt: later(),
         })
       const kept = await makeSession()
@@ -748,6 +749,7 @@ describe('DrizzleUserRepository - Integration Tests', () => {
           codeChallenge: 'challenge',
           scopes: ['pins:read'],
           resource: 'https://example.test/mcp',
+          grantId: crypto.randomUUID(),
           expiresAt: later(),
         },
         other.id

@@ -1,6 +1,8 @@
 import type {
   AuthorizationCode,
+  CodeExchangeOutcome,
   CreateAuthorizationCodeData,
+  IssuedTokenData,
 } from '../entities/oauth-grant.js'
 
 export interface OAuthAuthorizationCodeRepository {
@@ -22,14 +24,27 @@ export interface OAuthAuthorizationCodeRepository {
   ): Promise<AuthorizationCode | null>
 
   /**
-   * Spend a code, once.
+   * Spend a code and write the tokens it stands for, as one step.
    *
-   * Returns the code if this call was the one that consumed it, and null if
-   * it was already spent, expired, or never existed. The check and the mark
-   * are one statement rather than a read followed by a write, because two
-   * concurrent exchanges of the same code must not both succeed — that is
-   * the single-use guarantee OAuth 2.1 requires, and a read-then-write loses
-   * the race.
+   * Either the code is marked spent and every token is stored, or nothing
+   * changed. The mark is conditional, so of two concurrent exchanges of one
+   * code exactly one is `exchanged`; a failure while writing the tokens
+   * leaves the code unspent for the client to retry with.
+   *
+   * It also cannot overlap a revocation of the user's tokens: the revocation
+   * either ran first, and the code is `gone`, or runs after and takes the new
+   * tokens with the rest.
+   */
+  exchange(
+    codeId: string,
+    tokens: IssuedTokenData
+  ): Promise<CodeExchangeOutcome>
+
+  /**
+   * Spend a code and issue nothing, for an exchange that failed a check: the
+   * code must not stay alive to try again with. Returns the code if this call
+   * was the one that spent it, and null if it was already spent, expired, or
+   * never existed.
    */
   consume(codeHash: string): Promise<AuthorizationCode | null>
 

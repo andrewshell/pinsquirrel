@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { UserStatus } from '@pinsquirrel/domain'
+import { REFRESH_ROTATION_GRACE_MS } from '@pinsquirrel/services'
 import { app } from './app'
 import {
   db,
@@ -155,14 +156,10 @@ function exchange(fields: Record<string, string>): Promise<Response> {
   return request(pathOf(metadata.token_endpoint), form(fields))
 }
 
-/**
- * A whole connection: consent, approval, and the token exchange the callback
- * triggers. Returns what the client ends up holding.
- */
-async function connect(input: {
+async function authorizeForCode(input: {
   resource: string
   scope?: string
-}): Promise<TokenResponse> {
+}): Promise<Record<string, string>> {
   const { verifier, challenge } = pkcePair()
   const query = authorizationQuery({
     challenge,
@@ -172,13 +169,20 @@ async function connect(input: {
   })
 
   const callback = await approve(query)
-  const res = await exchange({
+  return {
     grant_type: 'authorization_code',
     code: callback.searchParams.get('code') ?? '',
     redirect_uri: query.redirect_uri,
     client_id: clientId,
     code_verifier: verifier,
-  })
+  }
+}
+
+async function connect(input: {
+  resource: string
+  scope?: string
+}): Promise<TokenResponse> {
+  const res = await exchange(await authorizeForCode(input))
 
   expect(res.status).toBe(200)
   return (await res.json()) as TokenResponse
@@ -455,17 +459,23 @@ describe('authorization', () => {
     expect(mcpTokens.scope).toBe('pins:read tags:read offline_access')
   })
 
-  it('refuses a second exchange of the same code', async () => {
-    const res = await exchange({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: query.redirect_uri,
-      client_id: clientId,
-      code_verifier: verifier,
-    })
+  it('refuses a second exchange of the same code, and ends the tokens of the first', async () => {
+    const tokenRequest = await authorizeForCode({ resource: mcpResource })
+    const first = (await (await exchange(tokenRequest)).json()) as TokenResponse
+    expect((await callListPins(first.access_token)).status).toBe(200)
+
+    const res = await exchange(tokenRequest)
 
     expect(res.status).toBe(400)
     expect(await res.json()).toMatchObject({ error: 'invalid_grant' })
+    expect((await callListPins(first.access_token)).status).toBe(401)
+    const refresh = await exchange({
+      grant_type: 'refresh_token',
+      refresh_token: first.refresh_token ?? '',
+      client_id: clientId,
+    })
+    expect(refresh.status).toBe(400)
+    expect((await callListPins(mcpTokens.access_token)).status).toBe(200)
   })
 
   it('refuses the exchange when the PKCE verifier does not match', async () => {
@@ -716,32 +726,55 @@ describe('refresh rotation', () => {
     expect(call.status).toBe(200)
   })
 
-  it('kills the whole grant when the retired refresh token is presented again', async () => {
-    const replay = await exchange({
+  const replayOriginal = () =>
+    exchange({
       grant_type: 'refresh_token',
       refresh_token: mcpTokens.refresh_token ?? '',
       client_id: clientId,
     })
 
+  async function afterTheGraceWindow(run: () => Promise<void>): Promise<void> {
+    vi.useFakeTimers({
+      toFake: ['Date'],
+      now: Date.now() + REFRESH_ROTATION_GRACE_MS + 1000,
+    })
+    try {
+      await run()
+    } finally {
+      vi.useRealTimers()
+    }
+  }
+
+  it('refuses the retired refresh token moments later, and leaves the new pair working', async () => {
+    const replay = await replayOriginal()
+
     expect(replay.status).toBe(400)
     expect(await replay.json()).toMatchObject({ error: 'invalid_grant' })
+    expect((await callListPins(rotated.access_token)).status).toBe(200)
+  })
 
-    // There is no telling a client replaying its own token from somebody
-    // holding a copy, so the successor dies with it and the user re-consents.
-    const successor = await exchange({
-      grant_type: 'refresh_token',
-      refresh_token: rotated.refresh_token ?? '',
-      client_id: clientId,
-    })
-    expect(successor.status).toBe(400)
-    expect(await successor.json()).toMatchObject({ error: 'invalid_grant' })
+  it('kills the whole grant when the retired refresh token is presented again later', async () => {
+    await afterTheGraceWindow(async () => {
+      const replay = await replayOriginal()
 
-    const call = await mcpRequest(rotated.access_token, {
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'tools/list',
+      expect(replay.status).toBe(400)
+      expect(await replay.json()).toMatchObject({ error: 'invalid_grant' })
+
+      const successor = await exchange({
+        grant_type: 'refresh_token',
+        refresh_token: rotated.refresh_token ?? '',
+        client_id: clientId,
+      })
+      expect(successor.status).toBe(400)
+      expect(await successor.json()).toMatchObject({ error: 'invalid_grant' })
+
+      const call = await mcpRequest(rotated.access_token, {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/list',
+      })
+      expect(call.status).toBe(401)
     })
-    expect(call.status).toBe(401)
   })
 
   it('still kills the grant when the retired token comes back after a sweep', async () => {
@@ -756,19 +789,63 @@ describe('refresh rotation', () => {
 
     await maintenanceService.sweepExpired()
 
-    const replay = await exchange({
+    await afterTheGraceWindow(async () => {
+      const replay = await exchange({
+        grant_type: 'refresh_token',
+        refresh_token: original.refresh_token ?? '',
+        client_id: clientId,
+      })
+      expect(replay.status).toBe(400)
+
+      const call = await mcpRequest(successor.access_token, {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/list',
+      })
+      expect(call.status).toBe(401)
+    })
+  })
+
+  it('narrows one access token on request and keeps the grant whole', async () => {
+    const original = await connect({ resource: mcpResource })
+
+    const narrowed = await exchange({
       grant_type: 'refresh_token',
       refresh_token: original.refresh_token ?? '',
       client_id: clientId,
+      scope: 'pins:read',
     })
-    expect(replay.status).toBe(400)
+    const narrow = (await narrowed.json()) as TokenResponse
+    expect(narrowed.status).toBe(200)
+    expect(narrow.scope).toBe('pins:read')
+    expect(narrow.refresh_token).toBeTruthy()
 
-    const call = await mcpRequest(successor.access_token, {
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'tools/list',
+    const next = await exchange({
+      grant_type: 'refresh_token',
+      refresh_token: narrow.refresh_token ?? '',
+      client_id: clientId,
     })
-    expect(call.status).toBe(401)
+    expect(next.status).toBe(200)
+    expect(((await next.json()) as TokenResponse).scope).toBe(
+      'pins:read tags:read offline_access'
+    )
+  })
+
+  it('lets one of two concurrent refreshes win, and its tokens work', async () => {
+    const original = await connect({ resource: mcpResource })
+    const refresh = () =>
+      exchange({
+        grant_type: 'refresh_token',
+        refresh_token: original.refresh_token ?? '',
+        client_id: clientId,
+      })
+
+    const responses = await Promise.all([refresh(), refresh()])
+
+    expect(responses.map(res => res.status).sort()).toEqual([200, 400])
+    const winner = responses.find(res => res.status === 200)
+    const issued = (await winner?.json()) as TokenResponse
+    expect((await callListPins(issued.access_token)).status).toBe(200)
   })
 })
 
@@ -818,6 +895,31 @@ describe('revocation', () => {
   })
 })
 
+describe('two connections of one client', () => {
+  const toolsList = (token: string) =>
+    mcpRequest(token, { jsonrpc: '2.0', id: 1, method: 'tools/list' })
+
+  it('ends only the connection whose refresh token is handed back', async () => {
+    const laptop = await connect({ resource: mcpResource })
+    const desktop = await connect({ resource: mcpResource })
+
+    const res = await request(
+      pathOf(metadata.revocation_endpoint),
+      form({ token: laptop.refresh_token ?? '', client_id: clientId })
+    )
+    expect(res.status).toBe(200)
+
+    expect((await toolsList(laptop.access_token)).status).toBe(401)
+    expect((await toolsList(desktop.access_token)).status).toBe(200)
+    const refreshed = await exchange({
+      grant_type: 'refresh_token',
+      refresh_token: desktop.refresh_token ?? '',
+      client_id: clientId,
+    })
+    expect(refreshed.status).toBe(200)
+  })
+})
+
 describe('expiry', () => {
   it('refuses an access token whose lifetime has run out', async () => {
     // The one place this test reaches a repository directly: it is seeding
@@ -831,6 +933,7 @@ describe('expiry', () => {
       userId,
       scopes: ['pins:read', 'tags:read'],
       resource: mcpResource,
+      grantId: randomUUID(),
       expiresAt: new Date(Date.now() - 1000),
     })
 

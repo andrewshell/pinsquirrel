@@ -27,6 +27,7 @@ export const oauthAuthorizationCodes = mysqlTable(
     codeChallenge: varchar('code_challenge', { length: 128 }).notNull(),
     scopes: json('scopes').$type<string[]>().notNull(),
     resource: varchar('resource', { length: 255 }).notNull(),
+    grantId: varchar('grant_id', { length: 36 }),
     expiresAt: timestamp('expires_at', { mode: 'date', fsp: 3 }).notNull(),
     // Set by the single-use exchange. A code with this set has been spent;
     // presenting it again is a replay.

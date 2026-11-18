@@ -22,6 +22,7 @@ export { TagService } from './services/tag.js'
 export { UserService } from './services/user.js'
 export {
   OAuthService,
+  REFRESH_ROTATION_GRACE_MS,
   type AuthorizationOutcome,
   type IssuedTokens,
   type OAuthGrant,

@@ -39,6 +39,8 @@ export type {
   OAuthToken,
   OAuthTokenKind,
   CreateOAuthTokenData,
+  CodeExchangeOutcome,
+  IssuedTokenData,
 } from './entities/oauth-grant.js'
 export {
   Pagination,

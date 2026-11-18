@@ -1,7 +1,9 @@
-import { createHash, timingSafeEqual } from 'node:crypto'
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 import type {
   AccessControl,
+  AuthorizationCode,
   HttpFetcher,
+  IssuedTokenData,
   OAuthToken,
   User,
   OAuthAuthorizationCodeRepository,
@@ -13,6 +15,7 @@ import type {
 import {
   isAdmitted,
   OAuthAccessDeniedError,
+  OAuthError,
   OAuthInvalidClientError,
   OAuthInvalidGrantError,
   OAuthInvalidClientMetadataError,
@@ -66,6 +69,8 @@ const ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000
  * abandoned one falls out on its own.
  */
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000
+
+export const REFRESH_ROTATION_GRACE_MS = 30 * 1000
 
 /**
  * The prefix on every access token this server issues. Not for dispatch,
@@ -317,6 +322,7 @@ export class OAuthService {
         codeChallenge: resolved.codeChallenge,
         scopes: resolved.scopes,
         resource: resolved.resource,
+        grantId: randomUUID(),
         expiresAt,
       },
       input.sessionId
@@ -347,9 +353,13 @@ export class OAuthService {
   /**
    * Spend an authorization code and mint the tokens it stands for.
    *
-   * The code is consumed before anything else is checked, because consuming it
-   * is the single-use guarantee and a failed check must not leave a code alive
-   * to try again with a different verifier.
+   * The code is read and checked first. One that was already spent takes the
+   * tokens it produced down with it. A code that passes is spent and its
+   * tokens are written in one step (`exchange`), so a failure in between
+   * leaves the client a code that still works. A code that fails a check is
+   * spent anyway, because a failed check must not leave a code alive to try
+   * again with a different verifier. A check that could not be made, because
+   * the database was unreachable, spends nothing.
    *
    * There is no `AccessControl` here: the caller is a client, not a user, and
    * the code plus the PKCE verifier is the proof. That is the same reason
@@ -366,15 +376,67 @@ export class OAuthService {
 
     const client = await this.requireStoredClient(request.client_id)
 
-    const code = await this.codeRepository.consume(hashToken(request.code))
-    if (!code) {
-      // Unknown, expired, or already spent. One answer for all three: telling
-      // them apart would say whether a code ever existed.
-      throw new OAuthInvalidGrantError(
-        'The authorization code is invalid, expired, or already used'
-      )
+    const code = await this.codeRepository.findByCodeHash(
+      hashToken(request.code)
+    )
+    if (code?.consumedAt) {
+      return this.refuseSpentCode(code)
+    }
+    if (!code || code.expiresAt <= new Date()) {
+      throw invalidCode()
     }
 
+    try {
+      await this.requireCodeMatches(code, client, request)
+    } catch (error) {
+      if (error instanceof OAuthError) {
+        await this.codeRepository.consume(code.codeHash)
+      }
+      throw error
+    }
+
+    // `offline_access` is what asks for unattended refresh, and a client not
+    // registered for the grant cannot use one.
+    const refreshable =
+      code.scopes.includes(OFFLINE_ACCESS_SCOPE) &&
+      client.grantTypes.includes('refresh_token')
+
+    const { rows, issued } = mintTokens({
+      clientId: client.clientId,
+      userId: code.userId,
+      accessScopes: code.scopes,
+      refreshScopes: refreshable ? code.scopes : null,
+      resource: code.resource,
+      grantId: code.grantId ?? randomUUID(),
+    })
+
+    const outcome = await this.codeRepository.exchange(code.id, rows)
+    if (outcome === 'spent') {
+      return this.refuseSpentCode(code)
+    }
+    if (outcome === 'gone') {
+      throw invalidCode()
+    }
+    return issued
+  }
+
+  /**
+   * Answer a code that was already exchanged.
+   *
+   * A code presented twice has been seen by two parties, and nothing says
+   * which of them holds the tokens it produced, so those tokens are revoked
+   * (RFC 6749 4.1.2). The answer is the same as for any other bad code.
+   */
+  private async refuseSpentCode(code: AuthorizationCode): Promise<never> {
+    await this.revokeGrantOf(code)
+    throw invalidCode()
+  }
+
+  private async requireCodeMatches(
+    code: AuthorizationCode,
+    client: OAuthClient,
+    request: { redirect_uri: string; code_verifier: string; resource?: string }
+  ): Promise<void> {
     if (code.clientId !== client.clientId) {
       throw new OAuthInvalidGrantError(
         'The authorization code was issued to another client'
@@ -403,26 +465,18 @@ export class OAuthService {
     }
 
     await this.revokeGrantUnlessAdmitted(code.userId, client.clientId)
-
-    return this.issueTokens({
-      client,
-      userId: code.userId,
-      scopes: code.scopes,
-      resource: code.resource,
-    })
   }
 
   /**
    * Rotate a refresh token: retire the one presented, issue its successor.
    *
    * OAuth 2.1 requires rotation for public clients, and CIMD and DCR both
-   * register Claude as one. The retirement is `markRotated`, which only
-   * succeeds on a token that has not been rotated yet, so two refreshes racing
-   * on the same token resolve to one winner rather than two live chains.
-   *
-   * A token presented after it was rotated means the chain leaked. There is no
-   * way to tell a client replaying its own token from somebody else holding a
-   * copy, so the whole grant dies and the user re-consents.
+   * register Claude as one. The retirement and the successors are one write
+   * (`rotate`), which only succeeds on a token that has not been rotated or
+   * revoked. So of two refreshes racing on the same token one wins and keeps
+   * its tokens, the other is refused, and a failure partway leaves the client
+   * a token that still works. `refuseRotatedToken` covers a token that comes
+   * back after it was rotated.
    */
   async exchangeRefreshToken(params: unknown): Promise<IssuedTokens> {
     const parsed = refreshTokenGrantSchema.safeParse(params)
@@ -451,9 +505,12 @@ export class OAuthService {
     }
 
     if (token.rotatedAt) {
-      await this.revokeGrantFamily(token.userId, token.clientId)
-      throw new OAuthInvalidGrantError(
-        'That refresh token was already exchanged; the grant has been revoked'
+      return this.refuseRotatedToken(token, token.rotatedAt)
+    }
+
+    if (!client.grantTypes.includes('refresh_token')) {
+      throw new OAuthUnauthorizedClientError(
+        'This client is not registered for the refresh_token grant'
       )
     }
 
@@ -472,32 +529,46 @@ export class OAuthService {
       }
     }
 
-    if (!(await this.tokenRepository.markRotated(token.id))) {
-      // Lost the race with a concurrent refresh of the same token. The other
-      // one is already issuing a successor, so this one is a replay.
-      await this.revokeGrantFamily(token.userId, token.clientId)
-      throw new OAuthInvalidGrantError(
-        'That refresh token was already exchanged; the grant has been revoked'
-      )
-    }
-
-    const issued = await this.issueTokens({
-      client,
+    // A narrower `scope` narrows this access token only. The successor keeps
+    // the grant's scopes (RFC 6749 section 6), and there always is one: a
+    // refresh never retires a token without replacing it.
+    const { rows, issued } = mintTokens({
+      clientId: client.clientId,
       userId: token.userId,
-      scopes,
+      accessScopes: scopes,
+      refreshScopes: token.scopes,
       resource: token.resource,
+      grantId: token.grantId ?? randomUUID(),
       rotatedFrom: token.id,
     })
 
-    const parent = await this.tokenRepository.findById(token.id)
-    if (!parent || parent.revokedAt) {
-      await this.revokeGrantFamily(token.userId, token.clientId)
+    if (!(await this.tokenRepository.rotate(token.id, rows))) {
+      const current = await this.tokenRepository.findById(token.id)
+      if (current?.rotatedAt && !current.revokedAt) {
+        return this.refuseRotatedToken(current, current.rotatedAt)
+      }
       throw new OAuthInvalidGrantError(
         'The grant was revoked during the refresh'
       )
     }
 
     return issued
+  }
+
+  private async refuseRotatedToken(
+    token: OAuthToken,
+    rotatedAt: Date
+  ): Promise<never> {
+    if (Date.now() - rotatedAt.getTime() < REFRESH_ROTATION_GRACE_MS) {
+      throw new OAuthInvalidGrantError(
+        'That refresh token was already exchanged'
+      )
+    }
+
+    await this.revokeGrantOf(token)
+    throw new OAuthInvalidGrantError(
+      'That refresh token was already exchanged; the grant has been revoked'
+    )
   }
 
   /**
@@ -709,12 +780,13 @@ export class OAuthService {
   }
 
   /**
-   * Take an application's access away.
+   * Take an application's access away, on every device it was approved on.
    *
-   * Revoking one token would leave the rest of the grant alive, so the access
-   * token and the refresh token go together: a client whose refresh token
-   * survived would simply mint another access token, and one whose access
-   * token survived keeps working until it expires.
+   * The profile page lists applications, so its Revoke takes every grant the
+   * user has given that client. Revoking one token would leave the rest
+   * alive: a client whose refresh token survived would simply mint another
+   * access token, and one whose access token survived keeps working until it
+   * expires.
    */
   async revokeGrant(
     ac: AccessControl,
@@ -727,7 +799,9 @@ export class OAuthService {
       )
     }
 
-    if ((await this.revokeGrantFamily(userId, clientId)) === 0) {
+    if (
+      (await this.tokenRepository.revokeByUserAndClient(userId, clientId)) === 0
+    ) {
       throw new OAuthInvalidGrantError('No such grant')
     }
   }
@@ -757,9 +831,10 @@ export class OAuthService {
     }
 
     if (token.kind === 'refresh') {
-      // A refresh token stands for the whole grant; leaving its access tokens
-      // alive would keep the client working for the rest of the hour.
-      await this.revokeGrantFamily(token.userId, token.clientId)
+      // A refresh token stands for its grant (RFC 7009 2.1); leaving the
+      // grant's access tokens alive would keep the client working for the
+      // rest of the hour.
+      await this.revokeGrantOf(token)
       return
     }
 
@@ -772,76 +847,23 @@ export class OAuthService {
   ): Promise<void> {
     const user = await this.userRepository.findById(userId)
     if (!user || !isAdmitted(user)) {
-      await this.revokeGrantFamily(userId, clientId)
+      await this.tokenRepository.revokeByUserAndClient(userId, clientId)
       throw new OAuthInvalidGrantError(
         'The account behind this grant is not active'
       )
     }
   }
 
-  /** Kill every live token a user holds for one client. */
-  private async revokeGrantFamily(
-    userId: string,
-    clientId: string
-  ): Promise<number> {
-    return this.tokenRepository.revokeByUserAndClient(userId, clientId)
-  }
-
-  /**
-   * Mint an access token, and a refresh token when one was granted.
-   *
-   * Both carry the audience the grant was made for, because the audience check
-   * at the resource server is the confused-deputy defense (Decision 15) and a
-   * refresh that could widen it would walk straight around it.
-   */
-  private async issueTokens(grant: {
-    client: OAuthClient
-    userId: string
-    scopes: string[]
-    resource: string
-    rotatedFrom?: string
-  }): Promise<IssuedTokens> {
-    const accessToken = ACCESS_TOKEN_PREFIX + generateSecureToken()
-    const expiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL_MS)
-
-    await this.tokenRepository.create({
-      tokenHash: hashToken(accessToken),
-      kind: 'access',
-      clientId: grant.client.clientId,
-      userId: grant.userId,
-      scopes: grant.scopes,
-      resource: grant.resource,
-      expiresAt,
-    })
-
-    // `offline_access` is what asks for unattended refresh, and a client not
-    // registered for the grant cannot use one.
-    const refreshable =
-      grant.scopes.includes(OFFLINE_ACCESS_SCOPE) &&
-      grant.client.grantTypes.includes('refresh_token')
-
-    let refreshToken: string | null = null
-    if (refreshable) {
-      refreshToken = generateSecureToken()
-      await this.tokenRepository.create({
-        tokenHash: hashToken(refreshToken),
-        kind: 'refresh',
-        clientId: grant.client.clientId,
-        userId: grant.userId,
-        scopes: grant.scopes,
-        resource: grant.resource,
-        expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
-        rotatedFrom: grant.rotatedFrom ?? null,
-      })
-    }
-
-    return {
-      accessToken,
-      refreshToken,
-      tokenType: 'Bearer',
-      expiresIn: Math.floor(ACCESS_TOKEN_TTL_MS / 1000),
-      scopes: grant.scopes,
-      resource: grant.resource,
+  private async revokeGrantOf(
+    holder: Pick<OAuthToken, 'userId' | 'clientId' | 'grantId'>
+  ): Promise<void> {
+    if (holder.grantId) {
+      await this.tokenRepository.revokeByGrant(holder.userId, holder.grantId)
+    } else {
+      await this.tokenRepository.revokeByUserAndClient(
+        holder.userId,
+        holder.clientId
+      )
     }
   }
 
@@ -1062,6 +1084,12 @@ export class OAuthService {
 /** The grant types a client gets if its metadata does not say. */
 const DEFAULT_GRANT_TYPES = ['authorization_code', 'refresh_token']
 
+function invalidCode(): OAuthInvalidGrantError {
+  return new OAuthInvalidGrantError(
+    'The authorization code is invalid, expired, or already used'
+  )
+}
+
 /**
  * The scopes a request is granted, or a refusal.
  *
@@ -1212,4 +1240,66 @@ function isFresh(fetchedAt: Date | null): boolean {
 /** Are these the same redirect URIs, in the same order? */
 function sameUriList(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((uri, index) => uri === b[index])
+}
+
+/**
+ * Mint an access token, and a refresh token when the grant has one.
+ *
+ * Returns the rows to store and the raw values to hand back; storing them is
+ * the caller's one write. Both tokens carry the audience the grant was made
+ * for, because the audience check at the resource server is the
+ * confused-deputy defense (Decision 15) and a refresh that could widen it
+ * would walk straight around it.
+ */
+function mintTokens(grant: {
+  clientId: string
+  userId: string
+  accessScopes: string[]
+  refreshScopes: string[] | null
+  resource: string
+  grantId: string
+  rotatedFrom?: string
+}): { rows: IssuedTokenData; issued: IssuedTokens } {
+  const shared = {
+    clientId: grant.clientId,
+    userId: grant.userId,
+    resource: grant.resource,
+    grantId: grant.grantId,
+  }
+
+  const accessToken = ACCESS_TOKEN_PREFIX + generateSecureToken()
+  const rows: IssuedTokenData = [
+    {
+      ...shared,
+      tokenHash: hashToken(accessToken),
+      kind: 'access',
+      scopes: grant.accessScopes,
+      expiresAt: new Date(Date.now() + ACCESS_TOKEN_TTL_MS),
+    },
+  ]
+
+  let refreshToken: string | null = null
+  if (grant.refreshScopes) {
+    refreshToken = generateSecureToken()
+    rows.push({
+      ...shared,
+      tokenHash: hashToken(refreshToken),
+      kind: 'refresh',
+      scopes: grant.refreshScopes,
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+      rotatedFrom: grant.rotatedFrom ?? null,
+    })
+  }
+
+  return {
+    rows,
+    issued: {
+      accessToken,
+      refreshToken,
+      tokenType: 'Bearer',
+      expiresIn: Math.floor(ACCESS_TOKEN_TTL_MS / 1000),
+      scopes: grant.accessScopes,
+      resource: grant.resource,
+    },
+  }
 }

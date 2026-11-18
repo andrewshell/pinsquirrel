@@ -1,11 +1,31 @@
 import type {
   OAuthToken,
   CreateOAuthTokenData,
+  IssuedTokenData,
   OAuthTokenRepository,
 } from '@pinsquirrel/domain'
-import { and, eq, gt, isNotNull, isNull, lt, or } from 'drizzle-orm'
+import {
+  and,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  or,
+  sql,
+} from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { oauthTokens } from '../schema/oauth-tokens'
+import { retryOnDeadlock } from './deadlock'
+import {
+  changedRows,
+  holdUserWhileIssuing,
+  inBatches,
+  insertTokens,
+  issueOrRefuse,
+  revokeUserTokens,
+} from './oauth-issuance'
 
 export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
   constructor(private db: MySql2Database) {}
@@ -35,33 +55,8 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
       .where(and(eq(oauthTokens.userId, userId), this.stillLive()))
   }
 
-  async findByRotatedFrom(tokenId: string): Promise<OAuthToken | null> {
-    const result = await this.db
-      .select()
-      .from(oauthTokens)
-      .where(eq(oauthTokens.rotatedFrom, tokenId))
-      .limit(1)
-    return result[0] || null
-  }
-
   async create(data: CreateOAuthTokenData): Promise<OAuthToken> {
-    const id = crypto.randomUUID()
-    const now = new Date()
-
-    await this.db.insert(oauthTokens).values({
-      id,
-      tokenHash: data.tokenHash,
-      kind: data.kind,
-      clientId: data.clientId,
-      userId: data.userId,
-      scopes: data.scopes,
-      resource: data.resource,
-      expiresAt: data.expiresAt,
-      revokedAt: null,
-      rotatedAt: null,
-      rotatedFrom: data.rotatedFrom ?? null,
-      createdAt: now,
-    })
+    const [id] = await insertTokens(this.db, [data])
 
     const [created] = await this.db
       .select()
@@ -84,43 +79,78 @@ export class DrizzleOAuthTokenRepository implements OAuthTokenRepository {
     userId: string,
     clientId: string
   ): Promise<number> {
-    const result = await this.db
-      .update(oauthTokens)
-      .set({ revokedAt: new Date() })
-      .where(
-        and(
-          eq(oauthTokens.userId, userId),
-          eq(oauthTokens.clientId, clientId),
-          isNull(oauthTokens.revokedAt)
-        )
+    return retryOnDeadlock(() =>
+      this.db.transaction(tx =>
+        revokeUserTokens(tx, userId, eq(oauthTokens.clientId, clientId))
       )
-    return result[0].affectedRows
+    )
   }
 
-  async markRotated(id: string): Promise<boolean> {
-    const result = await this.db
-      .update(oauthTokens)
-      .set({ rotatedAt: new Date() })
-      .where(
-        and(
-          eq(oauthTokens.id, id),
-          isNull(oauthTokens.rotatedAt),
-          isNull(oauthTokens.revokedAt)
-        )
+  async revokeByGrant(userId: string, grantId: string): Promise<number> {
+    return retryOnDeadlock(() =>
+      this.db.transaction(tx =>
+        revokeUserTokens(tx, userId, eq(oauthTokens.grantId, grantId))
       )
-    return result[0].affectedRows > 0
+    )
+  }
+
+  async rotate(tokenId: string, successors: IssuedTokenData): Promise<boolean> {
+    const [{ userId, grantId }] = successors
+
+    const rotation = () =>
+      this.db.transaction(async tx => {
+        if (!(await holdUserWhileIssuing(tx, userId))) {
+          return false
+        }
+
+        const result = await tx
+          .update(oauthTokens)
+          .set({
+            rotatedAt: new Date(),
+            grantId: sql`coalesce(${oauthTokens.grantId}, ${grantId})`,
+          })
+          .where(
+            and(
+              eq(oauthTokens.id, tokenId),
+              isNull(oauthTokens.rotatedAt),
+              isNull(oauthTokens.revokedAt)
+            )
+          )
+        if (result[0].affectedRows === 0) {
+          return false
+        }
+
+        await insertTokens(tx, successors)
+        return true
+      })
+
+    return issueOrRefuse(rotation, false)
   }
 
   async deleteExpiredTokens(): Promise<number> {
-    const result = await this.db
-      .delete(oauthTokens)
-      .where(
-        or(
-          lt(oauthTokens.expiresAt, new Date()),
-          isNotNull(oauthTokens.revokedAt)
+    const dead = or(
+      lt(oauthTokens.expiresAt, new Date()),
+      isNotNull(oauthTokens.revokedAt)
+    )
+    // Found with a read that locks nothing, then deleted by primary key. One
+    // DELETE over the whole table locks every gap in it, and a refresh that
+    // has retired its token cannot then insert the successors. PLAN.md
+    // decision 41.
+    const found = await this.db
+      .select({ id: oauthTokens.id })
+      .from(oauthTokens)
+      .where(dead)
+
+    let deleted = 0
+    for (const batch of inBatches(found.map(row => row.id))) {
+      deleted += await retryOnDeadlock(() =>
+        changedRows(
+          this.db,
+          sql`delete ${oauthTokens} from ${oauthTokens} force index (primary) where ${and(inArray(oauthTokens.id, batch), dead)}`
         )
       )
-    return result[0].affectedRows
+    }
+    return deleted
   }
 
   /** Not expired, not revoked, not already exchanged for a successor. */

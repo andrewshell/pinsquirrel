@@ -134,10 +134,9 @@ oauthToken.post('/token', async c => {
 /**
  * RFC 7009 revocation, the client-side half of "disconnect".
  *
- * It shares `revokeToken` with the profile page's grant list (Phase 6f): a
- * user revoking from the UI and a client handing its token back are the same
- * operation, and a refresh token takes its whole grant family with it either
- * way.
+ * A refresh token takes its grant with it: the access tokens of the same
+ * approval, and no other connection of that client. The profile page's Revoke
+ * is the wider one, and ends every grant the user gave the client.
  *
  * Always 200. An unknown token, an already dead one, and one belonging to
  * another client all answer identically, because reporting which was which
