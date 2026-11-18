@@ -555,6 +555,19 @@ SAMEORIGIN`, and a `SameSite=Lax` session cookie is not sent from a `chrome-exte
     also allows thirty an hour per /48, checked together with the /64 budget. A registration
     carries at most ten redirect URIs of at most 512 characters each, the width of the
     column an authorization code stores its redirect URI in.
+35. **Every client is held to one set of rules, and its identifier is an exact string.** DCR,
+    CIMD and static clients all pass `requireClientRules` before a row is written: public
+    (`none`) only, the implemented grant types only, and redirect URIs that are https or
+    loopback http with no fragment. A CIMD document used to be stored as published, which
+    made it the way around the rules a registration is held to. `client_id` is `utf8mb4_bin`
+    on `oauth_clients` and on the codes and tokens that reference it, the service ignores a
+    row whose id is not exactly the one asked for, and a CIMD `client_id` must be the
+    spelling `URL` parsing produces. Under the default collation, two URLs that differ in
+    case or accents, and so name different hosts, were one row. The token endpoint never
+    fetches a document: a client with no row has no code or token to exchange, so it gets
+    `invalid_client` at once. The incomplete-client sweep takes `cimd` rows as well as `dcr`
+    ones, since the consent page creates a `cimd` row before anyone approves; a swept client
+    is fetched again on its next authorization request.
 
 ## Reference
 

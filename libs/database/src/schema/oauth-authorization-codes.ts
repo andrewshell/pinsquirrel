@@ -16,6 +16,7 @@ export const oauthAuthorizationCodes = mysqlTable(
     // only in the redirect that carried it.
     codeHash: varchar('code_hash', { length: 64 }).notNull().unique(),
     clientId: varchar('client_id', { length: 255 })
+      .collate('utf8mb4_bin')
       .notNull()
       .references(() => oauthClients.clientId, { onDelete: 'cascade' }),
     userId: varchar('user_id', { length: 36 })

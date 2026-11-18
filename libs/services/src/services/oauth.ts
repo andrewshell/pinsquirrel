@@ -19,11 +19,11 @@ import {
   OAuthInvalidScopeError,
   OAuthInvalidTargetError,
   OAuthUnauthorizedClientError,
+  ResponseTooLargeError,
 } from '@pinsquirrel/domain'
 import { generateSecureToken, hashToken } from '../utils/crypto.js'
 import {
   canonicalizeRedirectUri,
-  isLoopbackRedirectHost,
   matchRedirectUri,
   normalizeOAuthUri,
   redirectUriMatches,
@@ -33,6 +33,8 @@ import {
   authorizationRequestSchema,
   clientIdMetadataDocumentSchema,
   clientRegistrationSchema,
+  isUsableRedirectUri,
+  MAX_CLIENT_ID_LENGTH,
   refreshTokenGrantSchema,
   type ClientIdMetadataDocument,
 } from '../validation/oauth.js'
@@ -99,10 +101,6 @@ const DEFAULT_SCOPES = ['pins:read', 'tags:read']
 /** How long a fetched CIMD document is trusted before it is fetched again. */
 const CIMD_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
-/**
- * The most a CIMD document may weigh. Real ones are a few hundred bytes; the
- * cap exists because the fetcher has none and the URL is caller-supplied.
- */
 const MAX_CIMD_DOCUMENT_BYTES = 16 * 1024
 
 /** What this server issues tokens for. */
@@ -348,7 +346,7 @@ export class OAuthService {
     }
     const request = parsed.data
 
-    const client = await this.resolveClientForGrant(request.client_id)
+    const client = await this.requireStoredClient(request.client_id)
 
     const code = await this.codeRepository.consume(hashToken(request.code))
     if (!code) {
@@ -415,7 +413,7 @@ export class OAuthService {
     }
     const request = parsed.data
 
-    const client = await this.resolveClientForGrant(request.client_id)
+    const client = await this.requireStoredClient(request.client_id)
 
     const token = await this.tokenRepository.findByTokenHash(
       hashToken(request.refresh_token)
@@ -544,29 +542,7 @@ export class OAuthService {
     }
     const request = parsed.data
 
-    const authMethod = request.token_endpoint_auth_method ?? 'none'
-    if (authMethod !== 'none') {
-      // The metadata document advertises `none` and nothing else. Advertise
-      // what is implemented; a secret this server never checks is worse than
-      // no secret at all.
-      throw new OAuthInvalidClientMetadataError(
-        'This server registers public clients only (token_endpoint_auth_method must be none)'
-      )
-    }
-
-    const grantTypes = request.grant_types ?? DEFAULT_GRANT_TYPES
-    const unsupported = grantTypes.filter(
-      grant => !DEFAULT_GRANT_TYPES.includes(grant)
-    )
-    if (unsupported.length > 0) {
-      throw new OAuthInvalidClientMetadataError(
-        `Unsupported grant type: ${unsupported.join(', ')}`
-      )
-    }
-
-    const redirectUris = request.redirect_uris.map(uri =>
-      requireUsableRedirectUri(uri)
-    )
+    const { redirectUris, grantTypes, authMethod } = requireClientRules(request)
 
     const clientId = dcrClientId({
       clientName: request.client_name ?? null,
@@ -615,9 +591,9 @@ export class OAuthService {
     }[]
   ): Promise<void> {
     for (const client of clients) {
-      const redirectUris = client.redirectUris.map(uri =>
-        requireUsableRedirectUri(uri)
-      )
+      const { redirectUris, grantTypes, authMethod } = requireClientRules({
+        redirect_uris: client.redirectUris,
+      })
 
       const existing = await this.clientRepository.findByClientId(
         client.clientId
@@ -628,8 +604,8 @@ export class OAuthService {
           clientId: client.clientId,
           clientName: client.clientName,
           redirectUris,
-          grantTypes: DEFAULT_GRANT_TYPES,
-          tokenEndpointAuthMethod: 'none',
+          grantTypes,
+          tokenEndpointAuthMethod: authMethod,
           registrationType: 'static',
           metadataUrl: null,
           metadataFetchedAt: null,
@@ -868,42 +844,37 @@ export class OAuthService {
    * `dcr` or `static` registration and is a row lookup.
    */
   async resolveClient(clientId: string): Promise<OAuthClient> {
+    if (clientId.length > MAX_CLIENT_ID_LENGTH) {
+      throw new OAuthInvalidClientError('client_id is too long')
+    }
+
     if (looksLikeUrl(clientId)) {
       return this.resolveClientIdMetadataDocument(clientId)
     }
 
-    const client = await this.clientRepository.findByClientId(clientId)
+    const client = await this.findClient(clientId)
     if (!client) {
       throw new OAuthInvalidClientError('Unknown client_id')
     }
     return client
   }
 
-  /**
-   * The client behind a `client_id` on a token request.
-   *
-   * A row this server already has is good enough here, however old its cached
-   * metadata is. What the token endpoint does with the client is compare its
-   * identifier against the one on the code or the refresh token; the redirect
-   * URI is checked against the code, and the audience against the grant.
-   * Nothing reads the redirect URIs or the grant types off the client, so a
-   * re-fetch could not change the answer.
-   *
-   * It could easily change the timing. Claude gives a token exchange 10
-   * seconds and a refresh 30, and a CIMD fetch has a 10 second timeout of its
-   * own, so a stale cache behind a slow or unreachable client host would spend
-   * the entire budget waiting for a document whose contents do not matter. The
-   * authorization request is where the document is validated and refreshed;
-   * that page is not on the budget.
-   */
-  private async resolveClientForGrant(clientId: string): Promise<OAuthClient> {
-    const known = await this.clientRepository.findByClientId(clientId)
-    if (known) return known
+  private async findClient(clientId: string): Promise<OAuthClient | null> {
+    const client = await this.clientRepository.findByClientId(clientId)
+    return client?.clientId === clientId ? client : null
+  }
 
-    // No row at all. There is no grant to exchange either, but resolving
-    // properly is what turns that into `invalid_client` rather than a
-    // confusing `invalid_grant`.
-    return this.resolveClient(clientId)
+  /**
+   * A stale row is not re-fetched here: Claude gives a token exchange 10
+   * seconds and a refresh 30, and a CIMD fetch has a 10 second timeout of its
+   * own. The authorization request is where the document is refreshed.
+   */
+  private async requireStoredClient(clientId: string): Promise<OAuthClient> {
+    const known = await this.findClient(clientId)
+    if (!known) {
+      throw new OAuthInvalidClientError('Unknown client_id')
+    }
+    return known
   }
 
   /**
@@ -914,27 +885,29 @@ export class OAuthService {
    * `validateUrlForFetching` rejects the obviously bad strings before DNS, and
    * `NodeHttpFetcher` re-checks the address it actually connects to on every
    * hop. Three rules are CIMD's own: https only, a path (an origin names no
-   * document), and a size cap, since the fetcher has none.
+   * document), and a size cap.
    */
   private async resolveClientIdMetadataDocument(
     clientId: string
   ): Promise<OAuthClient> {
     const url = this.validateMetadataUrl(clientId)
 
-    const cached = await this.clientRepository.findByClientId(clientId)
+    const cached = await this.findClient(clientId)
     if (cached && isFresh(cached.metadataFetchedAt)) {
       return cached
     }
 
     const document = await this.fetchClientIdMetadataDocument(url, clientId)
+    const { redirectUris, grantTypes, authMethod } =
+      requireClientRules(document)
     const fetchedAt = new Date()
 
     if (cached) {
       const updated = await this.clientRepository.update(cached.id, {
         clientName: document.client_name ?? null,
-        redirectUris: document.redirect_uris,
-        grantTypes: document.grant_types ?? DEFAULT_GRANT_TYPES,
-        tokenEndpointAuthMethod: document.token_endpoint_auth_method ?? 'none',
+        redirectUris,
+        grantTypes,
+        tokenEndpointAuthMethod: authMethod,
         metadataUrl: clientId,
         metadataFetchedAt: fetchedAt,
       })
@@ -944,9 +917,9 @@ export class OAuthService {
     return this.clientRepository.create({
       clientId,
       clientName: document.client_name ?? null,
-      redirectUris: document.redirect_uris,
-      grantTypes: document.grant_types ?? DEFAULT_GRANT_TYPES,
-      tokenEndpointAuthMethod: document.token_endpoint_auth_method ?? 'none',
+      redirectUris,
+      grantTypes,
+      tokenEndpointAuthMethod: authMethod,
       registrationType: 'cimd',
       metadataUrl: clientId,
       metadataFetchedAt: fetchedAt,
@@ -973,6 +946,19 @@ export class OAuthService {
       )
     }
 
+    // draft-ietf-oauth-client-id-metadata-document, section 3: no fragment or
+    // userinfo, and client ids compare as exact strings, never normalized.
+    if (
+      url.href !== clientId ||
+      clientId.includes('#') ||
+      url.username !== '' ||
+      url.password !== ''
+    ) {
+      throw new OAuthInvalidClientError(
+        'A client_id URL must be in canonical form, with no fragment or userinfo'
+      )
+    }
+
     try {
       // The string-level SSRF pre-check: literal private addresses,
       // `localhost`, `.local`. The connect-time check is the fetcher's.
@@ -992,18 +978,20 @@ export class OAuthService {
   ): Promise<ClientIdMetadataDocument> {
     let body: string
     try {
-      body = await this.httpFetcher.fetch(url, { redirect: 'error' })
-    } catch {
+      body = await this.httpFetcher.fetch(url, {
+        redirect: 'error',
+        maxBytes: MAX_CIMD_DOCUMENT_BYTES,
+      })
+    } catch (error) {
+      if (error instanceof ResponseTooLargeError) {
+        throw new OAuthInvalidClientMetadataError(
+          'The client metadata document is too large'
+        )
+      }
       // Whatever went wrong out there, the client_id is unusable here. The
       // reason is not echoed back: it describes somebody else's server.
       throw new OAuthInvalidClientError(
         'The client metadata document could not be fetched'
-      )
-    }
-
-    if (Buffer.byteLength(body, 'utf8') > MAX_CIMD_DOCUMENT_BYTES) {
-      throw new OAuthInvalidClientMetadataError(
-        'The client metadata document is too large'
       )
     }
 
@@ -1105,29 +1093,39 @@ function narrowedScopes(scope: string, granted: string[]): string[] {
  * an audience failure. Divergent normalization here looks like random
  * connection breakage from the outside.
  */
-/**
- * A redirect URI a client may register.
- *
- * https anywhere, and plaintext only on loopback, where there is no network
- * to intercept and RFC 8252 expects it. A plaintext URI on a real host would
- * carry an authorization code across the internet in the clear.
- */
-function requireUsableRedirectUri(uri: string): string {
-  let url: URL
-  try {
-    url = new URL(uri)
-  } catch {
-    throw new OAuthInvalidClientMetadataError(`Unusable redirect_uri: ${uri}`)
+function requireClientRules(metadata: {
+  redirect_uris: string[]
+  grant_types?: string[]
+  token_endpoint_auth_method?: string
+}): { redirectUris: string[]; grantTypes: string[]; authMethod: 'none' } {
+  if ((metadata.token_endpoint_auth_method ?? 'none') !== 'none') {
+    throw new OAuthInvalidClientMetadataError(
+      'This server registers public clients only (token_endpoint_auth_method must be none)'
+    )
   }
 
-  if (url.protocol === 'https:') return uri
-  if (url.protocol === 'http:' && isLoopbackRedirectHost(url.hostname)) {
-    return uri
-  }
-
-  throw new OAuthInvalidClientMetadataError(
-    `redirect_uri must be https, or http on loopback: ${uri}`
+  const grantTypes = metadata.grant_types ?? DEFAULT_GRANT_TYPES
+  const unsupported = grantTypes.filter(
+    grant => !DEFAULT_GRANT_TYPES.includes(grant)
   )
+  if (unsupported.length > 0) {
+    throw new OAuthInvalidClientMetadataError(
+      `Unsupported grant type: ${unsupported.join(', ')}`
+    )
+  }
+
+  const unusable = metadata.redirect_uris.find(uri => !isUsableRedirectUri(uri))
+  if (unusable !== undefined) {
+    throw new OAuthInvalidClientMetadataError(
+      `redirect_uri must be https, or http on loopback, with no fragment: ${unusable}`
+    )
+  }
+
+  return {
+    redirectUris: metadata.redirect_uris,
+    grantTypes,
+    authMethod: 'none',
+  }
 }
 
 /**

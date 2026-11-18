@@ -1,4 +1,7 @@
-import { OAuthClientMetadataSchema } from '@modelcontextprotocol/sdk/shared/auth.js'
+import {
+  OAuthClientMetadataSchema,
+  SafeUrlSchema,
+} from '@modelcontextprotocol/sdk/shared/auth.js'
 import { z } from 'zod'
 import { isLoopbackRedirectHost } from './oauth-uri.js'
 
@@ -14,6 +17,16 @@ import { isLoopbackRedirectHost } from './oauth-uri.js'
  * publishes it framework-agnostically (Decision 12). Only the parts this
  * server needs to be stricter about are re-stated here.
  */
+
+export const MAX_CLIENT_ID_LENGTH = 255
+const MAX_CLIENT_NAME_LENGTH = 255
+const MAX_REDIRECT_URI_LENGTH = 512
+
+const MAX_PARAMETER_LENGTH = 1024
+
+const clientIdValue = z.string().min(1).max(MAX_CLIENT_ID_LENGTH)
+const redirectUriValue = z.string().min(1).max(MAX_REDIRECT_URI_LENGTH)
+const parameterValue = z.string().max(MAX_PARAMETER_LENGTH)
 
 /**
  * RFC 7636 4.1: 43-128 characters from the unreserved set. Applied to both
@@ -39,12 +52,12 @@ const pkceValue = z
  */
 export const authorizationRequestSchema = z.object({
   response_type: z.literal('code'),
-  client_id: z.string().min(1),
-  redirect_uri: z.string().min(1),
+  client_id: clientIdValue,
+  redirect_uri: redirectUriValue,
   code_challenge: pkceValue,
   code_challenge_method: z.literal('S256'),
-  scope: z.string().optional(),
-  state: z.string().optional(),
+  scope: parameterValue.optional(),
+  state: parameterValue.optional(),
   resource: z.string().min(1),
 })
 
@@ -56,8 +69,8 @@ export type AuthorizationRequestParams = z.infer<
 export const authorizationCodeGrantSchema = z.object({
   grant_type: z.literal('authorization_code'),
   code: z.string().min(1),
-  redirect_uri: z.string().min(1),
-  client_id: z.string().min(1),
+  redirect_uri: redirectUriValue,
+  client_id: clientIdValue,
   code_verifier: pkceValue,
   resource: z.string().min(1).optional(),
 })
@@ -70,8 +83,8 @@ export type AuthorizationCodeGrantParams = z.infer<
 export const refreshTokenGrantSchema = z.object({
   grant_type: z.literal('refresh_token'),
   refresh_token: z.string().min(1),
-  client_id: z.string().min(1),
-  scope: z.string().optional(),
+  client_id: clientIdValue,
+  scope: parameterValue.optional(),
   resource: z.string().min(1).optional(),
 })
 
@@ -88,9 +101,12 @@ export const tokenRequestSchema = z.discriminatedUnion('grant_type', [
 
 export type TokenRequestParams = z.infer<typeof tokenRequestSchema>
 
-/** The width of the column an authorization code stores its redirect URI in. */
-const MAX_REDIRECT_URI_LENGTH = 512
 const MAX_REDIRECT_URIS = 10
+
+const clientMetadataSchema = OAuthClientMetadataSchema.extend({
+  client_name: z.string().max(MAX_CLIENT_NAME_LENGTH).optional(),
+  redirect_uris: z.array(SafeUrlSchema.max(MAX_REDIRECT_URI_LENGTH)),
+})
 
 /**
  * The RFC 7591 registration body posted to `/oauth/register`.
@@ -99,13 +115,8 @@ const MAX_REDIRECT_URIS = 10
  * a client with nowhere to send the user cannot complete an authorization and
  * the row would only ever be swept. The bounds are Decision 34.
  */
-export const clientRegistrationSchema = OAuthClientMetadataSchema.extend({
-  redirect_uris: z
-    .array(
-      OAuthClientMetadataSchema.shape.redirect_uris.element.max(
-        MAX_REDIRECT_URI_LENGTH
-      )
-    )
+export const clientRegistrationSchema = clientMetadataSchema.extend({
+  redirect_uris: clientMetadataSchema.shape.redirect_uris
     .min(1, 'at least one redirect_uri is required')
     .max(MAX_REDIRECT_URIS),
 })
@@ -122,12 +133,14 @@ export type ClientRegistrationMetadata = z.infer<
  * document was fetched from is the check that makes CIMD safe. A document that
  * omits it could be any client's.
  */
-export const clientIdMetadataDocumentSchema = OAuthClientMetadataSchema.extend({
-  client_id: z.string().min(1),
-}).refine(metadata => metadata.redirect_uris.length > 0, {
-  message: 'at least one redirect_uri is required',
-  path: ['redirect_uris'],
-})
+export const clientIdMetadataDocumentSchema = clientMetadataSchema
+  .extend({
+    client_id: clientIdValue,
+  })
+  .refine(metadata => metadata.redirect_uris.length > 0, {
+    message: 'at least one redirect_uri is required',
+    path: ['redirect_uris'],
+  })
 
 export type ClientIdMetadataDocument = z.infer<
   typeof clientIdMetadataDocumentSchema
@@ -135,10 +148,11 @@ export type ClientIdMetadataDocument = z.infer<
 
 /**
  * A redirect URI this server is willing to send a browser to: https, or http
- * on a loopback host. Same rule the registration path applies, stated here so
- * an operator's typo fails at boot rather than at the first consent screen.
+ * on a loopback host (RFC 8252 section 7.3). No fragment (RFC 6749 section
+ * 3.1.2).
  */
-function isUsableRedirectUri(uri: string): boolean {
+export function isUsableRedirectUri(uri: string): boolean {
+  if (uri.includes('#')) return false
   let url: URL
   try {
     url = new URL(uri)
@@ -165,18 +179,15 @@ function isUsableRedirectUri(uri: string): boolean {
 export const staticOAuthClientsSchema = z
   .array(
     z.object({
-      client_id: z
-        .string()
-        .min(1)
-        .refine(value => !/^https?:\/\//i.test(value), {
-          message:
-            'must not be an http(s) URL, which names a CIMD document rather than a stored client',
-        }),
-      client_name: z.string().min(1).optional(),
+      client_id: clientIdValue.refine(value => !/^https?:\/\//i.test(value), {
+        message:
+          'must not be an http(s) URL, which names a CIMD document rather than a stored client',
+      }),
+      client_name: z.string().min(1).max(MAX_CLIENT_NAME_LENGTH).optional(),
       redirect_uris: z
         .array(
-          z.string().min(1).refine(isUsableRedirectUri, {
-            message: 'must be https, or http on loopback',
+          redirectUriValue.refine(isUsableRedirectUri, {
+            message: 'must be https, or http on loopback, with no fragment',
           })
         )
         .min(1, 'at least one redirect_uri is required'),

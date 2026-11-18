@@ -4,7 +4,7 @@ import type {
   UpdateOAuthClientData,
   OAuthClientRepository,
 } from '@pinsquirrel/domain'
-import { and, eq, isNull, lt } from 'drizzle-orm'
+import { and, eq, inArray, isNull, lt } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import { oauthClients } from '../schema/oauth-clients'
 
@@ -102,15 +102,15 @@ export class DrizzleOAuthClientRepository implements OAuthClientRepository {
   async deleteExpiredIncompleteClients(
     registeredBefore: Date
   ): Promise<number> {
-    const result = await this.db.delete(oauthClients).where(
-      and(
-        // Only `dcr`: those are the rows an anonymous caller creates, and
-        // Claude creates a fresh one per connection.
-        eq(oauthClients.registrationType, 'dcr'),
-        isNull(oauthClients.completedAt),
-        lt(oauthClients.createdAt, registeredBefore)
+    const result = await this.db
+      .delete(oauthClients)
+      .where(
+        and(
+          inArray(oauthClients.registrationType, ['dcr', 'cimd']),
+          isNull(oauthClients.completedAt),
+          lt(oauthClients.createdAt, registeredBefore)
+        )
       )
-    )
     return result[0].affectedRows
   }
 }

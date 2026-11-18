@@ -4,6 +4,7 @@ import {
   FetchTimeoutError,
   HttpError,
   InvalidUrlError,
+  ResponseTooLargeError,
   isBlockedIpAddress,
 } from '@pinsquirrel/domain'
 import { Agent, fetch as undiciFetch } from 'undici'
@@ -26,7 +27,15 @@ type FetchLike = (
     dispatcher?: Agent
     redirect?: 'follow' | 'error'
   }
-) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>
+) => Promise<FetchResponse>
+
+interface FetchResponse {
+  ok: boolean
+  status: number
+  headers: { get(name: string): string | null }
+  body: (AsyncIterable<Uint8Array> & { cancel(): Promise<void> }) | null
+  text(): Promise<string>
+}
 
 /**
  * Thrown from the connect-time lookup, and recognised again in `fetch` — the
@@ -155,6 +164,38 @@ export class NodeHttpFetcher implements HttpFetcher {
       throw new HttpError(response.status, url)
     }
 
-    return response.text()
+    if (options.maxBytes === undefined) {
+      return response.text()
+    }
+    return readCapped(response, url, options.maxBytes)
   }
+}
+
+/**
+ * `Content-Length` describes the bytes on the wire, which for a compressed
+ * response says nothing about the decoded size, so it only short-cuts the
+ * obvious case; the count that decides is of the decoded stream.
+ */
+async function readCapped(
+  response: FetchResponse,
+  url: string,
+  maxBytes: number
+): Promise<string> {
+  const declared = Number(response.headers.get('content-length'))
+  if (declared > maxBytes) {
+    await response.body?.cancel()
+    throw new ResponseTooLargeError(url, maxBytes)
+  }
+  if (!response.body) return ''
+
+  const decoder = new TextDecoder()
+  let received = 0
+  let text = ''
+  // Leaving the loop early, by the throw, cancels the stream.
+  for await (const chunk of response.body) {
+    received += chunk.byteLength
+    if (received > maxBytes) throw new ResponseTooLargeError(url, maxBytes)
+    text += decoder.decode(chunk, { stream: true })
+  }
+  return text + decoder.decode()
 }

@@ -195,6 +195,10 @@ describe('validateUrlForFetching', () => {
       ['[fc00::1]', 'IPv6 unique local (fc00::/7)'],
       ['[fd12:3456:789a::1]', 'IPv6 unique local (fd00::/8)'],
       ['[fe80::1]', 'IPv6 link-local (fe80::/10)'],
+      ['[fec0::1]', 'IPv6 site-local (fec0::/10)'],
+      ['[64:ff9b::a9fe:a9fe]', 'NAT64 carrying 169.254.169.254'],
+      ['[2002:a00:1::1]', '6to4 carrying 10.0.0.1'],
+      ['100.64.0.1', 'shared address space (100.64.0.0/10)'],
       ['[febf::1]', 'top of IPv6 link-local'],
       ['[::ffff:127.0.0.1]', 'IPv4-mapped loopback'],
       ['[::ffff:169.254.169.254]', 'IPv4-mapped cloud metadata'],
@@ -211,7 +215,6 @@ describe('validateUrlForFetching', () => {
       ],
       // `URL` rewrites a mapped address to its dotted-quad form.
       ['[::ffff:1.1.1.1]', 'IPv4-mapped public address', '[::ffff:101:101]'],
-      ['[fec0::1]', 'site-local, outside fe80::/10', '[fec0::1]'],
     ])(
       'should allow public IPv6 address %s (%s)',
       (address, _reason, hostname) => {

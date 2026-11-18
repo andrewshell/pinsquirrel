@@ -1,9 +1,22 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { createServer, type Server } from 'node:http'
+import type { AddressInfo } from 'node:net'
+import { gzipSync } from 'node:zlib'
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  beforeAll,
+  afterAll,
+} from 'vitest'
 import {
   FetchTimeoutError,
   HttpError,
   InvalidUrlError,
+  ResponseTooLargeError,
 } from '@pinsquirrel/domain'
+import { fetch as undiciFetch } from 'undici'
 import { NodeHttpFetcher } from './node-http-fetcher.js'
 
 describe('NodeHttpFetcher', () => {
@@ -167,6 +180,113 @@ describe('NodeHttpFetcher', () => {
       // The dispatcher is not incidental: it carries the address check that
       // runs when the connection is actually made.
       dispatcher: expect.anything() as unknown,
+    })
+  })
+
+  describe('with maxBytes', () => {
+    const CAP = 16 * 1024
+    const READ_AHEAD_SLACK = 64 * 1024
+
+    function streamOf(total: number) {
+      const chunk = new Uint8Array(1024).fill(0x61)
+      let pulled = 0
+      const body = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (pulled >= total) {
+            controller.close()
+            return
+          }
+          pulled += chunk.byteLength
+          controller.enqueue(chunk)
+        },
+      })
+      return { body, pulled: () => pulled }
+    }
+
+    it('returns a body within the limit', async () => {
+      const { body } = streamOf(4 * 1024)
+      mockFetch.mockResolvedValue({ ok: true, headers: new Headers(), body })
+
+      const result = await fetcher.fetch('https://example.com', {
+        maxBytes: CAP,
+      })
+
+      expect(result).toBe('a'.repeat(4 * 1024))
+    })
+
+    it('stops reading a body once it passes the limit', async () => {
+      const stream = streamOf(1024 * 1024)
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: new Headers(),
+        body: stream.body,
+      })
+
+      await expect(
+        fetcher.fetch('https://example.com', { maxBytes: CAP })
+      ).rejects.toBeInstanceOf(ResponseTooLargeError)
+      expect(stream.pulled()).toBeLessThanOrEqual(CAP + READ_AHEAD_SLACK)
+    })
+
+    it('refuses a declared Content-Length over the limit without reading', async () => {
+      const stream = streamOf(1024 * 1024)
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: new Headers({ 'Content-Length': String(1024 * 1024) }),
+        body: stream.body,
+      })
+
+      await expect(
+        fetcher.fetch('https://example.com', { maxBytes: CAP })
+      ).rejects.toBeInstanceOf(ResponseTooLargeError)
+      expect(stream.pulled()).toBeLessThanOrEqual(1024)
+    })
+
+    describe('against a real server sending gzip', () => {
+      const decoded = 8 * 1024 * 1024
+      const gzipped = gzipSync(Buffer.alloc(decoded, 0x61))
+      let server: Server
+      let url: string
+
+      const unguarded = new NodeHttpFetcher(
+        (target, init) =>
+          undiciFetch(target, { ...init, dispatcher: undefined }),
+        5000
+      )
+
+      beforeAll(async () => {
+        server = createServer((_req, res) => {
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Content-Encoding': 'gzip',
+            'Content-Length': String(gzipped.byteLength),
+          })
+          res.end(gzipped)
+        })
+        await new Promise<void>(resolve =>
+          server.listen(0, '127.0.0.1', resolve)
+        )
+        const { port } = server.address() as AddressInfo
+        url = `http://127.0.0.1:${String(port)}/doc`
+      })
+
+      afterAll(async () => {
+        await new Promise<void>(resolve => {
+          server.close(() => {
+            resolve()
+          })
+        })
+      })
+
+      it('decodes the whole body when no limit is given', async () => {
+        expect((await unguarded.fetch(url)).length).toBe(decoded)
+      })
+
+      it('refuses a body that decodes past the limit', async () => {
+        await expect(
+          unguarded.fetch(url, { maxBytes: CAP })
+        ).rejects.toBeInstanceOf(ResponseTooLargeError)
+      })
     })
   })
 })

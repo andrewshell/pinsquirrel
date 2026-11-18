@@ -33,6 +33,7 @@ import {
   OAuthInvalidScopeError,
   OAuthInvalidTargetError,
   OAuthUnauthorizedClientError,
+  ResponseTooLargeError,
   Role,
   UserStatus,
   ValidationError,
@@ -236,6 +237,7 @@ describe('OAuthService.resolveClient', () => {
     expect(ctx.fetcher.fetch).toHaveBeenCalledWith(CIMD_URL, {
       // A metadata URL that redirects is a misconfigured client.
       redirect: 'error',
+      maxBytes: 16 * 1024,
     })
     expect(ctx.clientRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -276,6 +278,51 @@ describe('OAuthService.resolveClient', () => {
     )
   })
 
+  it('never refreshes a row stored under a different client id', async () => {
+    const requested = 'https://claude.example/C.json'
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({
+        clientId: 'https://claude.example/c.json',
+        metadataFetchedAt: new Date(Date.now() - 48 * 60 * 60 * 1000),
+      })
+    )
+    vi.mocked(ctx.fetcher.fetch).mockResolvedValue(
+      JSON.stringify({ ...cimdDocument, client_id: requested })
+    )
+
+    const client = await ctx.service.resolveClient(requested)
+
+    expect(ctx.clientRepository.update).not.toHaveBeenCalled()
+    expect(ctx.clientRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ clientId: requested })
+    )
+    expect(client.clientId).toBe(requested)
+  })
+
+  it('never serves a fresh row stored under a different client id', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({ clientId: 'DCR_ABC', registrationType: 'dcr' })
+    )
+
+    await expect(ctx.service.resolveClient('dcr_abc')).rejects.toBeInstanceOf(
+      OAuthInvalidClientError
+    )
+  })
+
+  it.each([
+    ['an upper-case host', 'https://CLAUDE.example/c.json'],
+    ['a host that is not ASCII', 'https://clàude.example/c.json'],
+    ['a fragment', 'https://claude.example/c.json#x'],
+    ['an empty fragment', 'https://claude.example/c.json#'],
+    ['userinfo', 'https://user@claude.example/c.json'],
+    ['a default port', 'https://claude.example:443/c.json'],
+  ])('refuses a CIMD URL with %s', async (_, clientId) => {
+    await expect(ctx.service.resolveClient(clientId)).rejects.toBeInstanceOf(
+      OAuthInvalidClientError
+    )
+    expect(ctx.fetcher.fetch).not.toHaveBeenCalled()
+  })
+
   // The URL rules, all of them before anything is fetched.
   it('refuses a CIMD URL that is not https', async () => {
     await expect(
@@ -302,8 +349,8 @@ describe('OAuthService.resolveClient', () => {
   })
 
   it('refuses a document larger than a client metadata document ever is', async () => {
-    vi.mocked(ctx.fetcher.fetch).mockResolvedValue(
-      JSON.stringify({ ...cimdDocument, padding: 'x'.repeat(20000) })
+    vi.mocked(ctx.fetcher.fetch).mockRejectedValue(
+      new ResponseTooLargeError(CIMD_URL, 16 * 1024)
     )
 
     await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(
@@ -354,6 +401,83 @@ describe('OAuthService.resolveClient', () => {
     )
   })
 
+  it.each([
+    [
+      'a plaintext redirect URI that is not loopback',
+      { redirect_uris: ['http://client.example/cb'] },
+    ],
+    ['a custom-scheme redirect URI', { redirect_uris: ['myapp:/cb'] }],
+    [
+      'a redirect URI with a fragment',
+      { redirect_uris: ['https://client.example/cb#x'] },
+    ],
+    [
+      'auth method private_key_jwt',
+      { token_endpoint_auth_method: 'private_key_jwt' },
+    ],
+    [
+      'auth method client_secret_basic',
+      { token_endpoint_auth_method: 'client_secret_basic' },
+    ],
+    [
+      'a grant type this server does not implement',
+      { grant_types: ['authorization_code', 'client_credentials'] },
+    ],
+  ])('refuses a document with %s and stores nothing', async (_, patch) => {
+    vi.mocked(ctx.fetcher.fetch).mockResolvedValue(
+      JSON.stringify({ ...cimdDocument, ...patch })
+    )
+
+    await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(
+      OAuthInvalidClientMetadataError
+    )
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses to refresh a cached row from a document that breaks the rules', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient({
+        metadataFetchedAt: new Date(Date.now() - 48 * 60 * 60 * 1000),
+      })
+    )
+    vi.mocked(ctx.fetcher.fetch).mockResolvedValue(
+      JSON.stringify({ ...cimdDocument, redirect_uris: ['myapp:/cb'] })
+    )
+
+    await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(
+      OAuthInvalidClientMetadataError
+    )
+    expect(ctx.clientRepository.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses a client_id longer than its column without fetching it', async () => {
+    const prefix = 'https://example.com/'
+    const clientId = prefix + 'a'.repeat(256 - prefix.length)
+
+    await expect(ctx.service.resolveClient(clientId)).rejects.toBeInstanceOf(
+      OAuthInvalidClientError
+    )
+    expect(ctx.fetcher.fetch).not.toHaveBeenCalled()
+    expect(ctx.clientRepository.findByClientId).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a client_name longer than its column', { client_name: 'n'.repeat(256) }],
+    [
+      'a redirect URI longer than its column',
+      { redirect_uris: [`https://client.example/${'a'.repeat(500)}`] },
+    ],
+  ])('refuses a document with %s and stores nothing', async (_, patch) => {
+    vi.mocked(ctx.fetcher.fetch).mockResolvedValue(
+      JSON.stringify({ ...cimdDocument, ...patch })
+    )
+
+    await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(
+      OAuthInvalidClientMetadataError
+    )
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
   it('refuses a document it could not fetch at all', async () => {
     vi.mocked(ctx.fetcher.fetch).mockRejectedValue(new Error('ECONNREFUSED'))
 
@@ -391,6 +515,23 @@ describe('OAuthService.resolveAuthorizationRequest', () => {
 
   // Nothing is redirected to a URI the client did not register, because the
   // redirect is where the code would be delivered.
+  it.each([
+    ['client_id', `https://example.com/${'a'.repeat(240)}`],
+    ['redirect_uri', `http://localhost:54321/${'a'.repeat(500)}`],
+    ['state', 's'.repeat(1025)],
+    ['scope', 'pins:read '.repeat(103)],
+  ])(
+    'rejects a %s longer than it may be as a validation failure',
+    async (field, value) => {
+      await expect(
+        ctx.service.resolveAuthorizationRequest(
+          authorizeParams({ [field]: value })
+        )
+      ).rejects.toBeInstanceOf(ValidationError)
+      expect(ctx.fetcher.fetch).not.toHaveBeenCalled()
+    }
+  )
+
   it('rejects a redirect URI the client never registered', async () => {
     await expect(
       ctx.service.resolveAuthorizationRequest(
@@ -595,6 +736,9 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
 
   beforeEach(() => {
     ctx = setup()
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient()
+    )
     vi.mocked(ctx.codeRepository.consume).mockResolvedValue(makeCode())
     vi.mocked(ctx.tokenRepository.create).mockImplementation(data =>
       Promise.resolve(makeToken(data))
@@ -750,6 +894,9 @@ describe('OAuthService.exchangeRefreshToken', () => {
 
   beforeEach(() => {
     ctx = setup()
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
+      makeClient()
+    )
     vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
       storedRefresh()
     )
@@ -1098,6 +1245,15 @@ describe('OAuthService.registerClient', () => {
     ).rejects.toBeInstanceOf(OAuthInvalidClientMetadataError)
   })
 
+  it('refuses a redirect URI with a fragment', async () => {
+    await expect(
+      ctx.service.registerClient(
+        registration({ redirect_uris: ['https://example.com/callback#x'] })
+      )
+    ).rejects.toBeInstanceOf(OAuthInvalidClientMetadataError)
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
   it('refuses an authentication method this server does not advertise', async () => {
     await expect(
       ctx.service.registerClient(
@@ -1112,6 +1268,23 @@ describe('OAuthService.registerClient', () => {
         registration({ grant_types: ['client_credentials'] })
       )
     ).rejects.toBeInstanceOf(OAuthInvalidClientMetadataError)
+  })
+
+  it('refuses a client_name longer than its column before creating a row', async () => {
+    await expect(
+      ctx.service.registerClient(registration({ client_name: 'n'.repeat(256) }))
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses a redirect URI longer than its column before creating a row', async () => {
+    const prefix = 'http://localhost:54321/'
+    const uri = prefix + 'a'.repeat(513 - prefix.length)
+
+    await expect(
+      ctx.service.registerClient(registration({ redirect_uris: [uri] }))
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
   it('rejects a malformed registration as a validation failure', async () => {
@@ -1437,6 +1610,15 @@ describe('OAuthService.reconcileStaticClients', () => {
     expect(ctx.clientRepository.delete).not.toHaveBeenCalled()
   })
 
+  it('refuses a redirect URI with a fragment', async () => {
+    await expect(
+      ctx.service.reconcileStaticClients([
+        { ...acme, redirectUris: ['https://acme.example.com/callback#x'] },
+      ])
+    ).rejects.toThrow(OAuthInvalidClientMetadataError)
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
   it('refuses a redirect URI this server would never redirect to', async () => {
     await expect(
       ctx.service.reconcileStaticClients([
@@ -1507,9 +1689,7 @@ describe('OAuthService token requests and the latency budget', () => {
     expect(ctx.fetcher.fetch).not.toHaveBeenCalled()
   })
 
-  // The authorization request is where the document is validated, so a client
-  // this server has never seen still has to be fetched there.
-  it('still fetches the document for a client it has no row for', async () => {
+  it('refuses a code exchange for a client it has no row for, without fetching or storing it', async () => {
     vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(null)
 
     await expect(
@@ -1517,12 +1697,28 @@ describe('OAuthService token requests and the latency budget', () => {
         grant_type: 'authorization_code',
         code: 'raw-code',
         redirect_uri: 'http://localhost:54321/callback',
-        client_id: CIMD_URL,
+        client_id: 'https://unknown.example/client.json',
         code_verifier: CODE_VERIFIER,
       })
-    ).resolves.toBeDefined()
+    ).rejects.toBeInstanceOf(OAuthInvalidClientError)
 
-    expect(ctx.fetcher.fetch).toHaveBeenCalled()
+    expect(ctx.fetcher.fetch).not.toHaveBeenCalled()
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses a refresh for a client it has no row for, without fetching or storing it', async () => {
+    vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(null)
+
+    await expect(
+      ctx.service.exchangeRefreshToken({
+        grant_type: 'refresh_token',
+        refresh_token: 'raw-refresh',
+        client_id: 'https://unknown.example/client.json',
+      })
+    ).rejects.toBeInstanceOf(OAuthInvalidClientError)
+
+    expect(ctx.fetcher.fetch).not.toHaveBeenCalled()
+    expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
   // The cache is what keeps the consent page off the network on every visit.
