@@ -2,7 +2,7 @@ import type { RateLimiter } from '../middleware/rate-limiter'
 
 /**
  * Under `app.request()` there is no socket and no trusted proxy header, so
- * `getClientIp` reports this for every request. It is the key every IP-keyed
+ * `clientAddressKey` reports this for every request. It is the key every IP-keyed
  * limiter in a route test buckets under.
  */
 export const TEST_CLIENT_IP = 'unknown'

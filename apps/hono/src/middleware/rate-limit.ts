@@ -88,6 +88,38 @@ export function getClientIp(c: Context): string {
   return peer ?? 'unknown'
 }
 
+const IPV4_MAPPED = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i
+
+function ipv6Groups(part: string): string[] {
+  if (part === '') return []
+  return part
+    .split(':')
+    .flatMap(group => (group.includes('.') ? ['0', '0'] : [group]))
+}
+
+/**
+ * The caller an IP-keyed limit counts. One IPv6 subscriber holds a whole /64,
+ * so the key is that prefix, and an IPv4-mapped address is its IPv4 address.
+ */
+export function clientAddressKey(c: Context): string {
+  const address = getClientIp(c)
+  if (isIP(address) !== 6) return address
+  const mapped = IPV4_MAPPED.exec(address)
+  if (mapped) return mapped[1]
+  const [head = '', tail] = address.split('::')
+  const leading = ipv6Groups(head)
+  const trailing = tail === undefined ? [] : ipv6Groups(tail)
+  const groups = [
+    ...leading,
+    ...Array<string>(8 - leading.length - trailing.length).fill('0'),
+    ...trailing,
+  ]
+  const prefix = groups
+    .slice(0, 4)
+    .map(group => parseInt(group, 16).toString(16))
+  return `${prefix.join(':')}::/64`
+}
+
 export const signinLimiter = new RateLimiter({
   maxAttempts: 5,
   windowMs: 15 * 60 * 1000,
@@ -227,8 +259,7 @@ export function rateLimitByIp(
   message = 'Too many requests. Please try again later.'
 ): MiddlewareHandler {
   return async (c, next) => {
-    const ip = getClientIp(c)
-    const result = limiter.hit(ip)
+    const result = limiter.hit(clientAddressKey(c))
     if (result.limited) {
       return refuse(c, message, result.retryAfterMs)
     }
@@ -278,5 +309,5 @@ export function rateLimitByClientId(
 }
 
 export function signinRateLimitKey(c: Context, username: string): string {
-  return `${getClientIp(c)}:${username.toLowerCase()}`
+  return `${clientAddressKey(c)}:${username.toLowerCase()}`
 }

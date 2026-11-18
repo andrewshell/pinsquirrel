@@ -251,6 +251,40 @@ describe('rateLimitByIp', () => {
     expect(res.headers.get('Retry-After')).toBeTruthy()
   })
 
+  // One IPv6 subscriber holds a whole /64, so every address in it is the same
+  // caller.
+  it('counts every address in one IPv6 /64 as one caller', async () => {
+    await app.request('/test', { method: 'POST' }, from('2001:db8:1:2::1'))
+    await app.request('/test', { method: 'POST' }, from('2001:db8:1:2:ffff::9'))
+
+    const res = await app.request(
+      '/test',
+      { method: 'POST' },
+      from('2001:0db8:0001:0002:abcd:1:2:3')
+    )
+    expect(res.status).toBe(429)
+  })
+
+  it('keeps different IPv6 /64s apart', async () => {
+    await app.request('/test', { method: 'POST' }, from('2001:db8:1:2::1'))
+    await app.request('/test', { method: 'POST' }, from('2001:db8:1:2::2'))
+
+    const res = await app.request(
+      '/test',
+      { method: 'POST' },
+      from('2001:db8:1:3::1')
+    )
+    expect(res.status).toBe(200)
+  })
+
+  it('counts an IPv4-mapped address as the IPv4 address', async () => {
+    await app.request('/test', { method: 'POST' }, from('1.2.3.4'))
+    await app.request('/test', { method: 'POST' }, from('::ffff:1.2.3.4'))
+
+    const res = await app.request('/test', { method: 'POST' }, from('1.2.3.4'))
+    expect(res.status).toBe(429)
+  })
+
   it('allows different IPs independently', async () => {
     await app.request('/test', { method: 'POST' }, from('1.1.1.1'))
     await app.request('/test', { method: 'POST' }, from('1.1.1.1'))
@@ -272,6 +306,19 @@ describe('signinRateLimitKey', () => {
     await app.request('/test', undefined, from('1.2.3.4'))
 
     expect(key).toBe('1.2.3.4:username')
+  })
+
+  it('keys an IPv6 caller on its /64', async () => {
+    const app = new Hono()
+    let key = ''
+    app.get('/test', c => {
+      key = signinRateLimitKey(c, 'alice')
+      return c.text('ok')
+    })
+
+    await app.request('/test', undefined, from('2001:db8:1:2:3:4:5:6'))
+
+    expect(key).toBe('2001:db8:1:2::/64:alice')
   })
 })
 

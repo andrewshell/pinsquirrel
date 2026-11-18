@@ -20,7 +20,7 @@ import {
   signinIpLimiter,
   signinUsernameLimiter,
   signinRateLimitKey,
-  getClientIp,
+  clientAddressKey,
   signupLimiter,
   forgotPasswordLimiter,
   rateLimitByIp,
@@ -78,7 +78,7 @@ auth.post('/signin', async c => {
   const usernameKey = username.toLowerCase()
   const attempt = reserve([
     [signinLimiter, rateLimitKey],
-    [signinIpLimiter, getClientIp(c)],
+    [signinIpLimiter, clientAddressKey(c)],
     [signinUsernameLimiter, usernameKey],
   ])
   if (attempt.limited) {
