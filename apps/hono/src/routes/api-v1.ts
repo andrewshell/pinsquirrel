@@ -16,6 +16,7 @@ import {
   tagWithCountSchema,
   paginatedPinsSchema,
   errorSchema,
+  oauthErrorSchema,
   pinFilterFromInput,
 } from '@pinsquirrel/services'
 import { pinService, tagService } from '../lib/services'
@@ -35,7 +36,7 @@ function security(scope: string): Record<string, string[]>[] {
 
 function insufficientScope(scope: string) {
   return {
-    content: { 'application/json': { schema: errorSchema } },
+    content: { 'application/json': { schema: oauthErrorSchema } },
     description: `The token was not granted ${scope}`,
   }
 }
@@ -59,7 +60,7 @@ apiV1.openAPIRegistry.registerPath({
       description: 'Validation error',
     },
     401: {
-      content: { 'application/json': { schema: errorSchema } },
+      content: { 'application/json': { schema: oauthErrorSchema } },
       description: 'Unauthorized',
     },
     403: insufficientScope('pins:read'),
@@ -89,7 +90,7 @@ apiV1.openAPIRegistry.registerPath({
       description: 'Pin details',
     },
     401: {
-      content: { 'application/json': { schema: errorSchema } },
+      content: { 'application/json': { schema: oauthErrorSchema } },
       description: 'Unauthorized',
     },
     403: insufficientScope('pins:read'),
@@ -127,7 +128,7 @@ apiV1.openAPIRegistry.registerPath({
       description: 'Validation error',
     },
     401: {
-      content: { 'application/json': { schema: errorSchema } },
+      content: { 'application/json': { schema: oauthErrorSchema } },
       description: 'Unauthorized',
     },
     403: insufficientScope('tags:read'),
@@ -162,7 +163,7 @@ apiV1.openAPIRegistry.registerPath({
       description: 'Validation error',
     },
     401: {
-      content: { 'application/json': { schema: errorSchema } },
+      content: { 'application/json': { schema: oauthErrorSchema } },
       description: 'Unauthorized',
     },
     403: insufficientScope('pins:read'),

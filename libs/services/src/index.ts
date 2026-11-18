@@ -97,6 +97,7 @@ export {
   paginationSchema,
   paginatedPinsSchema,
   errorSchema,
+  oauthErrorSchema,
 } from './validation/responses.js'
 
 // Utilities
