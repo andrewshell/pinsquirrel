@@ -818,6 +818,31 @@ describe('revocation', () => {
   })
 })
 
+describe('two connections of one client', () => {
+  const toolsList = (token: string) =>
+    mcpRequest(token, { jsonrpc: '2.0', id: 1, method: 'tools/list' })
+
+  it('ends only the connection whose refresh token is handed back', async () => {
+    const laptop = await connect({ resource: mcpResource })
+    const desktop = await connect({ resource: mcpResource })
+
+    const res = await request(
+      pathOf(metadata.revocation_endpoint),
+      form({ token: laptop.refresh_token ?? '', client_id: clientId })
+    )
+    expect(res.status).toBe(200)
+
+    expect((await toolsList(laptop.access_token)).status).toBe(401)
+    expect((await toolsList(desktop.access_token)).status).toBe(200)
+    const refreshed = await exchange({
+      grant_type: 'refresh_token',
+      refresh_token: desktop.refresh_token ?? '',
+      client_id: clientId,
+    })
+    expect(refreshed.status).toBe(200)
+  })
+})
+
 describe('expiry', () => {
   it('refuses an access token whose lifetime has run out', async () => {
     // The one place this test reaches a repository directly: it is seeding
@@ -831,6 +856,7 @@ describe('expiry', () => {
       userId,
       scopes: ['pins:read', 'tags:read'],
       resource: mcpResource,
+      grantId: randomUUID(),
       expiresAt: new Date(Date.now() - 1000),
     })
 

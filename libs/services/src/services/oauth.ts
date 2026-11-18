@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from 'node:crypto'
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 import type {
   AccessControl,
   HttpFetcher,
@@ -317,6 +317,7 @@ export class OAuthService {
         codeChallenge: resolved.codeChallenge,
         scopes: resolved.scopes,
         resource: resolved.resource,
+        grantId: randomUUID(),
         expiresAt,
       },
       input.sessionId
@@ -409,6 +410,7 @@ export class OAuthService {
       userId: code.userId,
       scopes: code.scopes,
       resource: code.resource,
+      grantId: code.grantId ?? randomUUID(),
     })
   }
 
@@ -422,7 +424,7 @@ export class OAuthService {
    *
    * A token presented after it was rotated means the chain leaked. There is no
    * way to tell a client replaying its own token from somebody else holding a
-   * copy, so the whole grant dies and the user re-consents.
+   * copy, so the grant it belongs to dies and the user re-consents.
    */
   async exchangeRefreshToken(params: unknown): Promise<IssuedTokens> {
     const parsed = refreshTokenGrantSchema.safeParse(params)
@@ -451,7 +453,7 @@ export class OAuthService {
     }
 
     if (token.rotatedAt) {
-      await this.revokeGrantFamily(token.userId, token.clientId)
+      await this.revokeGrantOf(token)
       throw new OAuthInvalidGrantError(
         'That refresh token was already exchanged; the grant has been revoked'
       )
@@ -475,23 +477,25 @@ export class OAuthService {
     if (!(await this.tokenRepository.markRotated(token.id))) {
       // Lost the race with a concurrent refresh of the same token. The other
       // one is already issuing a successor, so this one is a replay.
-      await this.revokeGrantFamily(token.userId, token.clientId)
+      await this.revokeGrantOf(token)
       throw new OAuthInvalidGrantError(
         'That refresh token was already exchanged; the grant has been revoked'
       )
     }
 
+    const grantId = token.grantId ?? randomUUID()
     const issued = await this.issueTokens({
       client,
       userId: token.userId,
       scopes,
       resource: token.resource,
+      grantId,
       rotatedFrom: token.id,
     })
 
     const parent = await this.tokenRepository.findById(token.id)
     if (!parent || parent.revokedAt) {
-      await this.revokeGrantFamily(token.userId, token.clientId)
+      await this.revokeGrantOf({ ...token, grantId })
       throw new OAuthInvalidGrantError(
         'The grant was revoked during the refresh'
       )
@@ -709,12 +713,13 @@ export class OAuthService {
   }
 
   /**
-   * Take an application's access away.
+   * Take an application's access away, on every device it was approved on.
    *
-   * Revoking one token would leave the rest of the grant alive, so the access
-   * token and the refresh token go together: a client whose refresh token
-   * survived would simply mint another access token, and one whose access
-   * token survived keeps working until it expires.
+   * The profile page lists applications, so its Revoke takes every grant the
+   * user has given that client. Revoking one token would leave the rest
+   * alive: a client whose refresh token survived would simply mint another
+   * access token, and one whose access token survived keeps working until it
+   * expires.
    */
   async revokeGrant(
     ac: AccessControl,
@@ -727,7 +732,9 @@ export class OAuthService {
       )
     }
 
-    if ((await this.revokeGrantFamily(userId, clientId)) === 0) {
+    if (
+      (await this.tokenRepository.revokeByUserAndClient(userId, clientId)) === 0
+    ) {
       throw new OAuthInvalidGrantError('No such grant')
     }
   }
@@ -757,9 +764,10 @@ export class OAuthService {
     }
 
     if (token.kind === 'refresh') {
-      // A refresh token stands for the whole grant; leaving its access tokens
-      // alive would keep the client working for the rest of the hour.
-      await this.revokeGrantFamily(token.userId, token.clientId)
+      // A refresh token stands for its grant (RFC 7009 2.1); leaving the
+      // grant's access tokens alive would keep the client working for the
+      // rest of the hour.
+      await this.revokeGrantOf(token)
       return
     }
 
@@ -772,19 +780,29 @@ export class OAuthService {
   ): Promise<void> {
     const user = await this.userRepository.findById(userId)
     if (!user || !isAdmitted(user)) {
-      await this.revokeGrantFamily(userId, clientId)
+      await this.tokenRepository.revokeByUserAndClient(userId, clientId)
       throw new OAuthInvalidGrantError(
         'The account behind this grant is not active'
       )
     }
   }
 
-  /** Kill every live token a user holds for one client. */
-  private async revokeGrantFamily(
-    userId: string,
-    clientId: string
-  ): Promise<number> {
-    return this.tokenRepository.revokeByUserAndClient(userId, clientId)
+  /**
+   * Kill the grant a token belongs to. A token from before grants had ids
+   * cannot be told apart from the user's other tokens for that client, so all
+   * of them go.
+   */
+  private async revokeGrantOf(
+    token: Pick<OAuthToken, 'userId' | 'clientId' | 'grantId'>
+  ): Promise<void> {
+    if (token.grantId) {
+      await this.tokenRepository.revokeByGrant(token.userId, token.grantId)
+    } else {
+      await this.tokenRepository.revokeByUserAndClient(
+        token.userId,
+        token.clientId
+      )
+    }
   }
 
   /**
@@ -799,6 +817,7 @@ export class OAuthService {
     userId: string
     scopes: string[]
     resource: string
+    grantId: string
     rotatedFrom?: string
   }): Promise<IssuedTokens> {
     const accessToken = ACCESS_TOKEN_PREFIX + generateSecureToken()
@@ -811,6 +830,7 @@ export class OAuthService {
       userId: grant.userId,
       scopes: grant.scopes,
       resource: grant.resource,
+      grantId: grant.grantId,
       expiresAt,
     })
 
@@ -830,6 +850,7 @@ export class OAuthService {
         userId: grant.userId,
         scopes: grant.scopes,
         resource: grant.resource,
+        grantId: grant.grantId,
         expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
         rotatedFrom: grant.rotatedFrom ?? null,
       })

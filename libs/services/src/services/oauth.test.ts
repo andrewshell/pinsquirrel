@@ -17,10 +17,8 @@ import type {
   HttpFetcher,
   OAuthToken,
   User,
-  OAuthAuthorizationCodeRepository,
   OAuthClient,
   OAuthClientRepository,
-  OAuthTokenRepository,
   UserRepository,
 } from '@pinsquirrel/domain'
 import {
@@ -38,7 +36,10 @@ import {
   UserStatus,
   ValidationError,
 } from '@pinsquirrel/domain'
-import { createMockUserRepository } from '../test-utils.js'
+import {
+  createInMemoryOAuthStore,
+  createMockUserRepository,
+} from '../test-utils.js'
 import { OAuthService } from './oauth.js'
 
 const MCP_RESOURCE = 'https://pinsquirrel.com/mcp'
@@ -130,6 +131,7 @@ function makeCode(
     codeChallenge: CODE_CHALLENGE,
     scopes: ['pins:read', 'tags:read'],
     resource: MCP_RESOURCE,
+    grantId: 'grant-1',
     expiresAt: new Date(Date.now() + 60_000),
     consumedAt: null,
     createdAt: new Date(),
@@ -138,11 +140,12 @@ function makeCode(
 }
 
 function makeToken(
-  data: CreateOAuthTokenData,
+  data: Omit<CreateOAuthTokenData, 'grantId'>,
   overrides: Partial<OAuthToken> = {}
 ): OAuthToken {
   return {
     id: `token-${data.kind}`,
+    grantId: 'grant-1',
     revokedAt: null,
     rotatedAt: null,
     rotatedFrom: data.rotatedFrom ?? null,
@@ -151,6 +154,39 @@ function makeToken(
     ...overrides,
   }
 }
+
+type Store = ReturnType<typeof createInMemoryOAuthStore>
+
+/**
+ * One device's share of a client: an access token and a refresh token under
+ * their own grant. The raw tokens are `<device>-access` and
+ * `<device>-refresh`.
+ */
+function seedDevice(
+  store: Store,
+  device: string,
+  overrides: Partial<OAuthToken> = {}
+): void {
+  for (const kind of ['access', 'refresh'] as const) {
+    store.tokens.push(
+      makeToken(
+        {
+          tokenHash: `hashed_${device}-${kind}`,
+          kind,
+          clientId: CIMD_URL,
+          userId: user.id,
+          scopes: ['pins:read', 'tags:read', 'offline_access'],
+          resource: MCP_RESOURCE,
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+        { id: `${device}-${kind}`, grantId: `grant-${device}`, ...overrides }
+      )
+    )
+  }
+}
+
+const liveTokenIds = (store: Store): string[] =>
+  store.tokens.filter(token => !token.revokedAt).map(token => token.id)
 
 function setup() {
   const clientRepository = {
@@ -163,26 +199,8 @@ function setup() {
     deleteExpiredIncompleteClients: vi.fn(),
   } as unknown as OAuthClientRepository
 
-  const codeRepository = {
-    findById: vi.fn(),
-    findByCodeHash: vi.fn(),
-    create: vi.fn(),
-    consume: vi.fn(),
-    delete: vi.fn(),
-    deleteExpiredCodes: vi.fn(),
-  } as unknown as OAuthAuthorizationCodeRepository
-
-  const tokenRepository = {
-    findById: vi.fn(),
-    findByTokenHash: vi.fn(),
-    findActiveByUserId: vi.fn(),
-    findByRotatedFrom: vi.fn(),
-    create: vi.fn(),
-    revoke: vi.fn(),
-    revokeByUserAndClient: vi.fn(),
-    markRotated: vi.fn(),
-    deleteExpiredTokens: vi.fn(),
-  } as unknown as OAuthTokenRepository
+  const store = createInMemoryOAuthStore()
+  const { codeRepository, tokenRepository } = store
 
   const userRepository: UserRepository = createMockUserRepository()
   vi.mocked(userRepository.findById).mockResolvedValue(user)
@@ -205,6 +223,7 @@ function setup() {
 
   return {
     service,
+    store,
     clientRepository,
     codeRepository,
     tokenRepository,
@@ -625,14 +644,24 @@ describe('OAuthService.authorize', () => {
   beforeEach(() => {
     ctx = setup()
     ac = new AccessControl(user)
-    vi.mocked(ctx.codeRepository.create).mockImplementation(data =>
-      Promise.resolve({
-        id: 'code-1',
-        consumedAt: null,
-        createdAt: new Date(),
-        ...data,
+  })
+
+  it('starts a new grant with every approval', async () => {
+    const approve = () =>
+      ctx.service.authorize(ac, {
+        params: authorizeParams(),
+        userId: user.id,
+        sessionId: SESSION_ID,
+        approved: true,
       })
-    )
+
+    await approve()
+    await approve()
+
+    const [first, second] = ctx.store.codes.map(code => code.grantId)
+    expect(first).toMatch(/^[0-9a-f-]{36}$/)
+    expect(second).toMatch(/^[0-9a-f-]{36}$/)
+    expect(second).not.toBe(first)
   })
 
   it('issues a code to the approved redirect URI and returns it once', async () => {
@@ -777,21 +806,19 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     }
   }
 
+  const offlineScopes = ['pins:read', 'offline_access']
+
   beforeEach(() => {
     ctx = setup()
     vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
       makeClient()
     )
-    vi.mocked(ctx.codeRepository.consume).mockResolvedValue(makeCode())
-    vi.mocked(ctx.tokenRepository.create).mockImplementation(data =>
-      Promise.resolve(makeToken(data))
-    )
+    ctx.store.codes.push(makeCode())
   })
 
   it('exchanges a code for an access token bound to the requested resource', async () => {
     const issued = await ctx.service.exchangeAuthorizationCode(tokenParams())
 
-    expect(ctx.codeRepository.consume).toHaveBeenCalledWith('hashed_raw-code')
     expect(issued.tokenType).toBe('Bearer')
     // Identifiable on sight if it is ever leaked or logged.
     expect(issued.accessToken.startsWith('pso_')).toBe(true)
@@ -799,7 +826,8 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     expect(issued.resource).toBe(MCP_RESOURCE)
     expect(issued.expiresIn).toBeGreaterThan(0)
 
-    expect(ctx.tokenRepository.create).toHaveBeenCalledWith(
+    expect(ctx.store.codes[0].consumedAt).toBeInstanceOf(Date)
+    expect(ctx.store.tokens).toEqual([
       expect.objectContaining({
         kind: 'access',
         tokenHash: `hashed_${issued.accessToken}`,
@@ -807,26 +835,24 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
         userId: user.id,
         scopes: ['pins:read', 'tags:read'],
         resource: MCP_RESOURCE,
-      })
-    )
+      }),
+    ])
   })
 
   it('issues no refresh token when offline_access was not granted', async () => {
     const issued = await ctx.service.exchangeAuthorizationCode(tokenParams())
 
     expect(issued.refreshToken).toBeNull()
-    expect(ctx.tokenRepository.create).toHaveBeenCalledOnce()
+    expect(ctx.store.tokens).toHaveLength(1)
   })
 
   it('issues a refresh token bound to the same resource when offline_access was granted', async () => {
-    vi.mocked(ctx.codeRepository.consume).mockResolvedValue(
-      makeCode({ scopes: ['pins:read', 'offline_access'] })
-    )
+    ctx.store.codes[0].scopes = offlineScopes
 
     const issued = await ctx.service.exchangeAuthorizationCode(tokenParams())
 
     expect(issued.refreshToken).toBeTruthy()
-    expect(ctx.tokenRepository.create).toHaveBeenCalledWith(
+    expect(ctx.store.tokens).toContainEqual(
       expect.objectContaining({
         kind: 'refresh',
         tokenHash: `hashed_${issued.refreshToken ?? ''}`,
@@ -835,34 +861,61 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
     )
   })
 
-  // Single use is the repository's guarantee; a spent, expired or unknown code
-  // all arrive here the same way and all mean the same thing to the client.
-  it('refuses a code that was already spent, expired or never existed', async () => {
-    vi.mocked(ctx.codeRepository.consume).mockResolvedValue(null)
+  it('hands the grant the code started on to both tokens', async () => {
+    ctx.store.codes[0].scopes = offlineScopes
+    ctx.store.codes[0].grantId = 'grant-from-consent'
+
+    await ctx.service.exchangeAuthorizationCode(tokenParams())
+
+    expect(ctx.store.tokens.map(token => [token.kind, token.grantId])).toEqual([
+      ['access', 'grant-from-consent'],
+      ['refresh', 'grant-from-consent'],
+    ])
+  })
+
+  // An unknown, an expired and a spent code all mean the same thing to the
+  // client, and are answered the same way.
+  it('refuses a code that never existed', async () => {
+    await expect(
+      ctx.service.exchangeAuthorizationCode(tokenParams({ code: 'unknown' }))
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+    expect(ctx.store.tokens).toEqual([])
+  })
+
+  it('refuses an expired code', async () => {
+    ctx.store.codes[0].expiresAt = new Date(Date.now() - 1000)
 
     await expect(
       ctx.service.exchangeAuthorizationCode(tokenParams())
     ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
-    expect(ctx.tokenRepository.create).not.toHaveBeenCalled()
+    expect(ctx.store.tokens).toEqual([])
+  })
+
+  it('refuses a code that was already spent', async () => {
+    await ctx.service.exchangeAuthorizationCode(tokenParams())
+
+    await expect(
+      ctx.service.exchangeAuthorizationCode(tokenParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+    expect(ctx.store.tokens).toHaveLength(1)
   })
 
   it.each(notAdmitted)(
-    'refuses a code for a user %s and revokes the grant',
+    'refuses a code for a user %s and revokes what the client holds',
     async (_label, account) => {
       vi.mocked(ctx.userRepository.findById).mockResolvedValue(account)
+      seedDevice(ctx.store, 'laptop')
 
       await expect(
         ctx.service.exchangeAuthorizationCode(tokenParams())
       ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
-      expect(ctx.tokenRepository.create).not.toHaveBeenCalled()
-      expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
-        user.id,
-        CIMD_URL
-      )
+      expect(ctx.store.tokens).toHaveLength(2)
+      expect(liveTokenIds(ctx.store)).toEqual([])
     }
   )
 
-  it('refuses a verifier that does not hash to the stored challenge', async () => {
+  // A failed check must not leave the code alive to try again with.
+  it('refuses a verifier that does not hash to the stored challenge, and spends the code', async () => {
     await expect(
       ctx.service.exchangeAuthorizationCode(
         tokenParams({
@@ -870,7 +923,8 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
         })
       )
     ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
-    expect(ctx.tokenRepository.create).not.toHaveBeenCalled()
+    expect(ctx.store.tokens).toEqual([])
+    expect(ctx.store.codes[0].consumedAt).toBeInstanceOf(Date)
   })
 
   it('refuses a code presented by a different client', async () => {
@@ -883,6 +937,7 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
         tokenParams({ client_id: 'dcr_other' })
       )
     ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+    expect(ctx.store.tokens).toEqual([])
   })
 
   it('refuses a redirect URI that is not the one the code was issued to', async () => {
@@ -891,6 +946,7 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
         tokenParams({ redirect_uri: 'http://localhost:54321/elsewhere' })
       )
     ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+    expect(ctx.store.tokens).toEqual([])
   })
 
   // RFC 8707: a repeated `resource` has to be the one the code was bound to,
@@ -901,6 +957,7 @@ describe('OAuthService.exchangeAuthorizationCode', () => {
         tokenParams({ resource: API_RESOURCE })
       )
     ).rejects.toBeInstanceOf(OAuthInvalidTargetError)
+    expect(ctx.store.tokens).toEqual([])
   })
 
   it('accepts the resource repeated in a different but equivalent spelling', async () => {
@@ -924,49 +981,34 @@ describe('OAuthService.exchangeRefreshToken', () => {
   let ctx: ReturnType<typeof setup>
 
   const refreshScopes = ['pins:read', 'tags:read', 'offline_access']
+  const longAgo = () => new Date(Date.now() - 5 * 60 * 1000)
 
   function refreshParams(
     overrides: Record<string, unknown> = {}
   ): Record<string, unknown> {
     return {
       grant_type: 'refresh_token',
-      refresh_token: 'raw-refresh',
+      refresh_token: 'laptop-refresh',
       client_id: CIMD_URL,
       ...overrides,
     }
   }
 
-  function storedRefresh(overrides: Partial<OAuthToken> = {}): OAuthToken {
-    return makeToken(
-      {
-        tokenHash: 'hashed_raw-refresh',
-        kind: 'refresh',
-        clientId: CIMD_URL,
-        userId: user.id,
-        scopes: refreshScopes,
-        resource: MCP_RESOURCE,
-        expiresAt: new Date(Date.now() + 60_000),
-      },
-      { id: 'refresh-1', ...overrides }
-    )
+  const presented = () => {
+    const token = ctx.store.tokens.find(t => t.id === 'laptop-refresh')
+    if (!token) throw new Error('The presented token was not seeded')
+    return token
   }
+
+  const successors = () =>
+    ctx.store.tokens.filter(token => token.id.startsWith('token-'))
 
   beforeEach(() => {
     ctx = setup()
     vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
       makeClient()
     )
-    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
-      storedRefresh()
-    )
-    vi.mocked(ctx.tokenRepository.markRotated).mockResolvedValue(true)
-    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(
-      storedRefresh({ rotatedAt: new Date() })
-    )
-    vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockResolvedValue(2)
-    vi.mocked(ctx.tokenRepository.create).mockImplementation(data =>
-      Promise.resolve(makeToken(data))
-    )
+    seedDevice(ctx.store, 'laptop')
   })
 
   // OAuth 2.1 requires rotation for public clients, and both CIMD and DCR
@@ -975,12 +1017,13 @@ describe('OAuthService.exchangeRefreshToken', () => {
     const issued = await ctx.service.exchangeRefreshToken(refreshParams())
 
     expect(issued.refreshToken).toBeTruthy()
-    expect(issued.refreshToken).not.toBe('raw-refresh')
-    expect(ctx.tokenRepository.markRotated).toHaveBeenCalledWith('refresh-1')
-    expect(ctx.tokenRepository.create).toHaveBeenCalledWith(
+    expect(issued.refreshToken).not.toBe('laptop-refresh')
+    expect(presented().rotatedAt).toBeInstanceOf(Date)
+    expect(successors()).toContainEqual(
       expect.objectContaining({
         kind: 'refresh',
-        rotatedFrom: 'refresh-1',
+        tokenHash: `hashed_${issued.refreshToken ?? ''}`,
+        rotatedFrom: 'laptop-refresh',
         resource: MCP_RESOURCE,
         scopes: refreshScopes,
       })
@@ -994,23 +1037,44 @@ describe('OAuthService.exchangeRefreshToken', () => {
     expect(issued.resource).toBe(MCP_RESOURCE)
   })
 
+  it('keeps the successors in the grant of the token presented', async () => {
+    await ctx.service.exchangeRefreshToken(refreshParams())
+
+    expect(successors().map(token => [token.kind, token.grantId])).toEqual([
+      ['access', 'grant-laptop'],
+      ['refresh', 'grant-laptop'],
+    ])
+  })
+
   // A token presented after it was rotated means the chain leaked: either the
   // client replayed it or somebody else has it, and there is no way to tell
-  // which. Killing the family is the only safe answer.
-  it('kills the whole grant when a rotated token is presented again', async () => {
-    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
-      storedRefresh({ rotatedAt: new Date() })
-    )
+  // which. The grant it belongs to dies; the same application on another
+  // device is a different grant.
+  it('kills the grant when a rotated token is presented again, and no other', async () => {
+    presented().rotatedAt = longAgo()
+    seedDevice(ctx.store, 'desktop')
 
     await expect(
       ctx.service.exchangeRefreshToken(refreshParams())
     ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
 
-    expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
-      user.id,
-      CIMD_URL
-    )
-    expect(ctx.tokenRepository.create).not.toHaveBeenCalled()
+    expect(liveTokenIds(ctx.store)).toEqual([
+      'desktop-access',
+      'desktop-refresh',
+    ])
+    expect(successors()).toEqual([])
+  })
+
+  it('kills everything the client holds when the replayed token has no grant id', async () => {
+    presented().rotatedAt = longAgo()
+    presented().grantId = null
+    seedDevice(ctx.store, 'desktop')
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+
+    expect(liveTokenIds(ctx.store)).toEqual([])
   })
 
   // Two refreshes racing on the same token: the marking is conditional, so
@@ -1021,56 +1085,47 @@ describe('OAuthService.exchangeRefreshToken', () => {
     await expect(
       ctx.service.exchangeRefreshToken(refreshParams())
     ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
-    expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalled()
+    expect(liveTokenIds(ctx.store)).toEqual([])
   })
 
-  it('takes back the new tokens when the grant was revoked mid-refresh', async () => {
-    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(
-      storedRefresh({ rotatedAt: new Date(), revokedAt: new Date() })
-    )
+  it('leaves no live successor when the grant was revoked mid-refresh', async () => {
+    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue({
+      ...presented(),
+      rotatedAt: new Date(),
+      revokedAt: new Date(),
+    })
 
     await expect(
       ctx.service.exchangeRefreshToken(refreshParams())
     ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
-    expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
-      user.id,
-      CIMD_URL
-    )
+    expect(successors().filter(token => !token.revokedAt)).toEqual([])
+  })
+
+  it('leaves no live successor when the retired token has gone missing', async () => {
+    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(null)
+
+    await expect(
+      ctx.service.exchangeRefreshToken(refreshParams())
+    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
+    expect(successors().filter(token => !token.revokedAt)).toEqual([])
   })
 
   it.each(notAdmitted)(
-    'refuses a user %s and revokes the grant',
+    'refuses a user %s and revokes what the client holds',
     async (_label, account) => {
       vi.mocked(ctx.userRepository.findById).mockResolvedValue(account)
 
       await expect(
         ctx.service.exchangeRefreshToken(refreshParams())
       ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
-      expect(ctx.tokenRepository.create).not.toHaveBeenCalled()
-      expect(ctx.tokenRepository.markRotated).not.toHaveBeenCalled()
-      expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
-        user.id,
-        CIMD_URL
-      )
+      expect(successors()).toEqual([])
+      expect(presented().rotatedAt).toBeNull()
+      expect(liveTokenIds(ctx.store)).toEqual([])
     }
   )
 
-  it('takes back the new tokens when the retired token has gone missing', async () => {
-    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(null)
-
-    await expect(
-      ctx.service.exchangeRefreshToken(refreshParams())
-    ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
-    expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
-      user.id,
-      CIMD_URL
-    )
-  })
-
   it('refuses a token the user revoked', async () => {
-    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
-      storedRefresh({ revokedAt: new Date() })
-    )
+    presented().revokedAt = new Date()
 
     await expect(
       ctx.service.exchangeRefreshToken(refreshParams())
@@ -1078,9 +1133,7 @@ describe('OAuthService.exchangeRefreshToken', () => {
   })
 
   it('refuses an expired token', async () => {
-    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
-      storedRefresh({ expiresAt: new Date(Date.now() - 1000) })
-    )
+    presented().expiresAt = new Date(Date.now() - 1000)
 
     await expect(
       ctx.service.exchangeRefreshToken(refreshParams())
@@ -1088,12 +1141,10 @@ describe('OAuthService.exchangeRefreshToken', () => {
   })
 
   it('refuses an access token presented as a refresh token', async () => {
-    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
-      storedRefresh({ kind: 'access' })
-    )
-
     await expect(
-      ctx.service.exchangeRefreshToken(refreshParams())
+      ctx.service.exchangeRefreshToken(
+        refreshParams({ refresh_token: 'laptop-access' })
+      )
     ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
   })
 
@@ -1110,10 +1161,10 @@ describe('OAuthService.exchangeRefreshToken', () => {
   })
 
   it('refuses a token nothing is stored for', async () => {
-    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(null)
-
     await expect(
-      ctx.service.exchangeRefreshToken(refreshParams())
+      ctx.service.exchangeRefreshToken(
+        refreshParams({ refresh_token: 'unknown' })
+      )
     ).rejects.toBeInstanceOf(OAuthInvalidGrantError)
   })
 
@@ -1542,6 +1593,16 @@ describe('OAuthService grants', () => {
     )
   })
 
+  it('revokes every grant of that client, and no other client', async () => {
+    seedDevice(ctx.store, 'laptop')
+    seedDevice(ctx.store, 'desktop')
+    seedDevice(ctx.store, 'other', { clientId: 'dcr_other' })
+
+    await ctx.service.revokeGrant(ac, user.id, CIMD_URL)
+
+    expect(liveTokenIds(ctx.store)).toEqual(['other-access', 'other-refresh'])
+  })
+
   it('revokes without looking up any single token', async () => {
     vi.mocked(ctx.tokenRepository.findById).mockResolvedValue(null)
     vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockResolvedValue(2)
@@ -1570,65 +1631,70 @@ describe('OAuthService grants', () => {
 describe('OAuthService.revokeToken', () => {
   let ctx: ReturnType<typeof setup>
 
-  function stored(overrides: Partial<OAuthToken> = {}): OAuthToken {
-    return makeToken(
-      {
-        tokenHash: 'hashed_raw',
-        kind: 'access',
-        clientId: CIMD_URL,
-        userId: user.id,
-        scopes: ['pins:read'],
-        resource: MCP_RESOURCE,
-        expiresAt: new Date(Date.now() + 60_000),
-      },
-      { id: 'access-1', ...overrides }
-    )
-  }
-
   beforeEach(() => {
     ctx = setup()
-    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(stored())
-    vi.mocked(ctx.tokenRepository.revoke).mockResolvedValue(true)
-    vi.mocked(ctx.tokenRepository.revokeByUserAndClient).mockResolvedValue(2)
+    seedDevice(ctx.store, 'laptop')
+    seedDevice(ctx.store, 'desktop')
   })
 
   it('revokes the access token a client hands back', async () => {
-    await ctx.service.revokeToken({ token: 'raw', client_id: CIMD_URL })
+    await ctx.service.revokeToken({
+      token: 'laptop-access',
+      client_id: CIMD_URL,
+    })
 
-    expect(ctx.tokenRepository.revoke).toHaveBeenCalledWith('access-1')
+    expect(liveTokenIds(ctx.store)).toEqual([
+      'laptop-refresh',
+      'desktop-access',
+      'desktop-refresh',
+    ])
   })
 
-  // RFC 7009: revoking a refresh token takes the access tokens with it, or
-  // the client keeps working for the rest of the hour.
-  it('takes the whole grant when the token handed back is a refresh token', async () => {
-    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(
-      stored({ id: 'refresh-1', kind: 'refresh' })
-    )
+  // RFC 7009: revoking a refresh token takes the access tokens of the same
+  // grant with it, or the client keeps working for the rest of the hour. The
+  // same application on another device is another grant.
+  it('takes the whole grant when the token handed back is a refresh token, and no other', async () => {
+    await ctx.service.revokeToken({
+      token: 'laptop-refresh',
+      client_id: CIMD_URL,
+    })
 
-    await ctx.service.revokeToken({ token: 'raw', client_id: CIMD_URL })
+    expect(liveTokenIds(ctx.store)).toEqual([
+      'desktop-access',
+      'desktop-refresh',
+    ])
+  })
 
-    expect(ctx.tokenRepository.revokeByUserAndClient).toHaveBeenCalledWith(
-      user.id,
-      CIMD_URL
-    )
+  it('takes everything the client holds when the refresh token has no grant id', async () => {
+    for (const token of ctx.store.tokens) {
+      if (token.id.startsWith('laptop-')) token.grantId = null
+    }
+
+    await ctx.service.revokeToken({
+      token: 'laptop-refresh',
+      client_id: CIMD_URL,
+    })
+
+    expect(liveTokenIds(ctx.store)).toEqual([])
   })
 
   // RFC 7009 4.1.1: an unknown token is a success, so revocation cannot be
   // used to find out which tokens exist.
   it('says nothing about a token it does not know', async () => {
-    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(null)
-
     await expect(
-      ctx.service.revokeToken({ token: 'raw' })
+      ctx.service.revokeToken({ token: 'unknown' })
     ).resolves.toBeUndefined()
-    expect(ctx.tokenRepository.revoke).not.toHaveBeenCalled()
+    expect(liveTokenIds(ctx.store)).toHaveLength(4)
   })
 
   it('leaves a token that belongs to another client alone, and still says nothing', async () => {
     await expect(
-      ctx.service.revokeToken({ token: 'raw', client_id: 'dcr_someone_else' })
+      ctx.service.revokeToken({
+        token: 'laptop-access',
+        client_id: 'dcr_someone_else',
+      })
     ).resolves.toBeUndefined()
-    expect(ctx.tokenRepository.revoke).not.toHaveBeenCalled()
+    expect(liveTokenIds(ctx.store)).toHaveLength(4)
   })
 })
 
@@ -1749,10 +1815,7 @@ describe('OAuthService token requests and the latency budget', () => {
     vi.mocked(ctx.clientRepository.findByClientId).mockResolvedValue(
       staleClient()
     )
-    vi.mocked(ctx.codeRepository.consume).mockResolvedValue(makeCode())
-    vi.mocked(ctx.tokenRepository.create).mockImplementation(data =>
-      Promise.resolve(makeToken(data))
-    )
+    ctx.store.codes.push(makeCode())
   })
 
   it('exchanges a code without waiting on the client metadata document', async () => {
@@ -1769,25 +1832,11 @@ describe('OAuthService token requests and the latency budget', () => {
   })
 
   it('refreshes without waiting on the client metadata document', async () => {
-    const stored = makeToken({
-      kind: 'refresh',
-      tokenHash: 'hashed_raw-refresh',
-      clientId: CIMD_URL,
-      userId: user.id,
-      scopes: ['pins:read', 'offline_access'],
-      resource: MCP_RESOURCE,
-      expiresAt: new Date(Date.now() + 60_000),
-    })
-    vi.mocked(ctx.tokenRepository.findByTokenHash).mockResolvedValue(stored)
-    vi.mocked(ctx.tokenRepository.markRotated).mockResolvedValue(true)
-    vi.mocked(ctx.tokenRepository.findById).mockResolvedValue({
-      ...stored,
-      rotatedAt: new Date(),
-    })
+    seedDevice(ctx.store, 'laptop')
 
     await ctx.service.exchangeRefreshToken({
       grant_type: 'refresh_token',
-      refresh_token: 'raw-refresh',
+      refresh_token: 'laptop-refresh',
       client_id: CIMD_URL,
     })
 
