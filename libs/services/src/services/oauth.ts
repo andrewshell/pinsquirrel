@@ -1124,9 +1124,11 @@ export class OAuthService {
         )
       }
       // Whatever went wrong out there, the client_id is unusable here. The
-      // reason is not echoed back: it describes somebody else's server.
+      // reason is not echoed back: it describes somebody else's server. It is
+      // kept as the cause, for the log.
       throw new OAuthInvalidClientError(
-        'The client metadata document could not be fetched'
+        'The client metadata document could not be fetched',
+        { cause: error }
       )
     }
 

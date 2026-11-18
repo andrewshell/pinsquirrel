@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import type { OAuthClient, User } from '@pinsquirrel/domain'
 import {
+  OAuthInvalidClientError,
   OAuthInvalidRequestError,
   Role,
   UserStatus,
@@ -21,6 +22,12 @@ const mockAuthorize = vi.fn()
 const mockIsValidSession = vi.fn()
 const mockFindSession = vi.fn()
 const mockFindUser = vi.fn()
+const mockLogWarn = vi.fn()
+
+vi.mock('../lib/logger.js', () => ({
+  logger: { info: vi.fn(), error: vi.fn(), debug: vi.fn(), warn: mockLogWarn },
+  safeError: (error: Error) => ({ message: error.message }),
+}))
 
 vi.mock('../lib/services', () => ({
   oauthService: {
@@ -395,6 +402,27 @@ describe('oauth authorize routes', () => {
       expect(location.searchParams.get('error')).toBe('invalid_scope')
       expect(location.searchParams.get('state')).toBe('the-state')
       expect(location.searchParams.get('iss')).toBe('http://localhost:8100')
+    })
+
+    it('logs why a client could not be resolved, without showing it', async () => {
+      mockResolveAuthorizationRequest.mockRejectedValue(
+        new OAuthInvalidClientError(
+          'The client metadata document could not be fetched',
+          { cause: new Error('ECONNREFUSED 10.0.0.1:443') }
+        )
+      )
+
+      const res = await get()
+
+      expect(res.status).toBe(400)
+      expect(await res.text()).not.toContain('ECONNREFUSED')
+      expect(mockLogWarn).toHaveBeenCalledWith(
+        {
+          error: 'invalid_client',
+          cause: { message: 'ECONNREFUSED 10.0.0.1:443' },
+        },
+        'The client metadata document could not be fetched'
+      )
     })
 
     it('renders a validation failure the same way', async () => {

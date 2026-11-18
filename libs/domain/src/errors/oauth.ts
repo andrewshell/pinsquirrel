@@ -16,9 +16,10 @@
 export class OAuthError extends Error {
   constructor(
     public readonly code: string,
-    message: string
+    message: string,
+    options?: ErrorOptions
   ) {
-    super(message)
+    super(message, options)
     this.name = 'OAuthError'
   }
 }
@@ -33,8 +34,11 @@ export class OAuthInvalidRequestError extends OAuthError {
 
 /** Client authentication failed, or the `client_id` is not registered. */
 export class OAuthInvalidClientError extends OAuthError {
-  constructor(message = 'Client authentication failed') {
-    super('invalid_client', message)
+  constructor(
+    message = 'Client authentication failed',
+    options?: ErrorOptions
+  ) {
+    super('invalid_client', message, options)
     this.name = 'OAuthInvalidClientError'
   }
 }

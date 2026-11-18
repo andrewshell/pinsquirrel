@@ -504,12 +504,17 @@ describe('OAuthService.resolveClient', () => {
     expect(ctx.clientRepository.create).not.toHaveBeenCalled()
   })
 
-  it('refuses a document it could not fetch at all', async () => {
-    vi.mocked(ctx.fetcher.fetch).mockRejectedValue(new Error('ECONNREFUSED'))
+  it('refuses a document it could not fetch at all, keeping why as the cause', async () => {
+    const failure = new Error('ECONNREFUSED')
+    vi.mocked(ctx.fetcher.fetch).mockRejectedValue(failure)
 
-    await expect(ctx.service.resolveClient(CIMD_URL)).rejects.toBeInstanceOf(
-      OAuthInvalidClientError
-    )
+    const refusal = await ctx.service
+      .resolveClient(CIMD_URL)
+      .catch((error: unknown) => error)
+
+    expect(refusal).toBeInstanceOf(OAuthInvalidClientError)
+    expect((refusal as Error).cause).toBe(failure)
+    expect((refusal as Error).message).not.toContain('ECONNREFUSED')
   })
 })
 

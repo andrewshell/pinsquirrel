@@ -5,6 +5,7 @@ import { AccessControl, OAuthError, ValidationError } from '@pinsquirrel/domain'
 import type { AuthorizationOutcome } from '@pinsquirrel/services'
 import { oauthService } from '../lib/services.js'
 import { describeValidationError } from '../lib/oauth-error.js'
+import { logger, safeError } from '../lib/logger.js'
 import { isEmbedRequest } from '../lib/embed'
 import { getString } from '../lib/form'
 import {
@@ -85,6 +86,12 @@ function renderRequestError(
   embed: boolean
 ) {
   if (error instanceof OAuthError) {
+    if (error.cause !== undefined) {
+      logger.warn(
+        { error: error.code, cause: safeError(error.cause) },
+        error.message
+      )
+    }
     return c.html(
       <OAuthErrorPage
         user={user}
