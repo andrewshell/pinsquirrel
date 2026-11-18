@@ -409,6 +409,11 @@ export async function initOptions(deps: OptionsDeps): Promise<void> {
     })
   }
 
+  storage.onChanged(keys => {
+    if (keys.includes('baseUrl') || keys.includes('refreshToken')) {
+      void showConnection().catch(report)
+    }
+  })
   ui.connectButton.addEventListener('click', () => void onConnect())
   deps.onConnectFinished(result => void onConnectFinished(result))
   ui.syncButton.addEventListener('click', () => void onSyncNow())

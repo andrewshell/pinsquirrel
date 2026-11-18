@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAccessToken, ReauthorizationRequiredError } from '../auth.ts'
 import type { ConnectResponse } from '../messages.ts'
+import * as storage from '../storage.ts'
 import { stubChrome, type ChromeStub } from '../test/chrome-mock.ts'
 import { loadOptionsDocument } from '../test/options-dom.ts'
 import type { TagWithCount } from '../types.ts'
@@ -644,5 +645,76 @@ describe('initOptions, when another page disconnected', () => {
     expect(settingsShown()).toBe(true)
     expect(element('#reconnect-notice').hidden).toBe(true)
     expect(status()).toBe('')
+  })
+})
+
+// Every open options page draws from one store. A change made by the worker
+// or by another page shows up here without a reload.
+describe('initOptions, when storage changes under an open page', () => {
+  it('goes to the settings view, without the notice, on a Disconnect elsewhere', async () => {
+    Object.assign(chrome.local.items, CONNECTED)
+    await initOptions(harness().deps)
+    expect(mainShown()).toBe(true)
+
+    await storage.clear()
+
+    await vi.waitFor(() => {
+      expect(settingsShown()).toBe(true)
+    })
+    expect(element('#reconnect-notice').hidden).toBe(true)
+  })
+
+  it('asks to reconnect when the worker loses the grant', async () => {
+    Object.assign(chrome.local.items, CONNECTED)
+    await initOptions(harness().deps)
+
+    await storage.remove([
+      'clientId',
+      'accessToken',
+      'refreshToken',
+      'expiresAt',
+    ])
+
+    await vi.waitFor(() => {
+      expect(settingsShown()).toBe(true)
+    })
+    expect(element('#reconnect-notice').hidden).toBe(false)
+  })
+
+  it('shows the tag list on a Connect finished for another page', async () => {
+    const { deps, getTags } = harness()
+    await initOptions(deps)
+
+    await storage.set(CONNECTED)
+
+    await vi.waitFor(() => {
+      expect(mainShown()).toBe(true)
+    })
+    expect(getTags).toHaveBeenCalledTimes(1)
+  })
+
+  it('loads the tags once when the tab answers and storage changes together', async () => {
+    const h = harness()
+    await initOptions(h.deps)
+
+    await storage.set(CONNECTED)
+    await h.tabAnswered({ ok: true })
+    await flush()
+
+    expect(mainShown()).toBe(true)
+    expect(h.getTags).toHaveBeenCalledTimes(1)
+  })
+
+  it('redraws nothing when a refresh rotates the tokens', async () => {
+    Object.assign(chrome.local.items, CONNECTED)
+    const { deps, getTags } = harness()
+    await initOptions(deps)
+
+    await storage.set({ accessToken: 'pso_next', refreshToken: 'psr_next' })
+    await flush()
+    await flush()
+
+    expect(mainShown()).toBe(true)
+    expect(getTags).toHaveBeenCalledTimes(1)
   })
 })

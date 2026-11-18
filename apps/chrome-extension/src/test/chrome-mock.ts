@@ -148,9 +148,34 @@ function eventStub<Args extends unknown[], R = void>(): EventStub<Args, R> & {
   }
 }
 
-/** The callback-free half of `chrome.storage.StorageArea`, backed by an object. */
+/**
+ * The callback-free half of `chrome.storage.StorageArea`, backed by an object.
+ *
+ * `onChanged` fires as Chrome's does: after the write, with only the keys
+ * whose value changed. A test that edits `items` directly fires nothing.
+ */
 function storageArea(area: StubbedStorageArea) {
+  const onChanged = eventStub<[Record<string, chrome.storage.StorageChange>]>()
+  const write = (mutate: () => void) => {
+    const before = { ...area.items }
+    mutate()
+    const changes: Record<string, chrome.storage.StorageChange> = {}
+    for (const key of new Set([
+      ...Object.keys(before),
+      ...Object.keys(area.items),
+    ])) {
+      if (JSON.stringify(before[key]) === JSON.stringify(area.items[key])) {
+        continue
+      }
+      changes[key] = { oldValue: before[key], newValue: area.items[key] }
+    }
+    if (Object.keys(changes).length > 0) {
+      setTimeout(() => onChanged.fire(changes), 0)
+    }
+    return Promise.resolve()
+  }
   return {
+    onChanged,
     get: (keys?: string | string[] | null) => {
       if (keys === undefined || keys === null) {
         return Promise.resolve({ ...area.items })
@@ -162,20 +187,18 @@ function storageArea(area: StubbedStorageArea) {
       }
       return Promise.resolve(found)
     },
-    set: (items: Record<string, unknown>) => {
-      Object.assign(area.items, items)
-      return Promise.resolve()
-    },
-    remove: (keys: string | string[]) => {
-      for (const key of typeof keys === 'string' ? [keys] : keys) {
-        delete area.items[key]
-      }
-      return Promise.resolve()
-    },
-    clear: () => {
-      for (const key of Object.keys(area.items)) delete area.items[key]
-      return Promise.resolve()
-    },
+    set: (items: Record<string, unknown>) =>
+      write(() => Object.assign(area.items, items)),
+    remove: (keys: string | string[]) =>
+      write(() => {
+        for (const key of typeof keys === 'string' ? [keys] : keys) {
+          delete area.items[key]
+        }
+      }),
+    clear: () =>
+      write(() => {
+        for (const key of Object.keys(area.items)) delete area.items[key]
+      }),
   }
 }
 
