@@ -310,6 +310,12 @@ export class AccountService {
     // Hash the new password
     const passwordHash = await hashPassword(input.newPassword)
 
+    // Spend the token before writing, so two submissions of one link cannot
+    // both set a password.
+    if (!(await this.passwordResetRepository.consume(resetToken.id))) {
+      throw new InvalidResetTokenError()
+    }
+
     // Persist only the fields this operation owns: the new password and, for a
     // brand-new (unverified) account, the verification status transition.
     // Never write username/emailHash from the stale snapshot, and never demote

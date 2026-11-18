@@ -221,6 +221,36 @@ describe('DrizzlePasswordResetRepository - Integration Tests', () => {
     })
   })
 
+  describe('consume', () => {
+    it('lets exactly one of two concurrent calls use a token', async () => {
+      const { id: userId } = await insertUser(testPool)
+      const token = await repository.create({
+        userId,
+        tokenHash: 'hashed_token_consume',
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      })
+
+      const results = await Promise.all([
+        repository.consume(token.id),
+        repository.consume(token.id),
+      ])
+
+      expect(results.filter(Boolean)).toHaveLength(1)
+      expect(await repository.findById(token.id)).toBeNull()
+    })
+
+    it('refuses an expired token', async () => {
+      const { id: userId } = await insertUser(testPool)
+      const token = await repository.create({
+        userId,
+        tokenHash: 'hashed_token_expired',
+        expiresAt: new Date(Date.now() - 1000),
+      })
+
+      expect(await repository.consume(token.id)).toBe(false)
+    })
+  })
+
   describe('deleteExpiredTokens', () => {
     it('should delete only expired tokens', async () => {
       const { id: userId } = await insertUser(testPool)

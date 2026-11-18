@@ -73,6 +73,7 @@ describe('AccountService', () => {
       deleteByUserId: vi.fn(),
       deleteExpiredTokens: vi.fn(),
       isValidToken: vi.fn(),
+      consume: vi.fn().mockResolvedValue(true),
     }
 
     mockEmailService = {
@@ -860,6 +861,36 @@ describe('AccountService', () => {
       ).rejects.toThrow(ResetTokenExpiredError)
 
       expect(mockUserRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('changes the password once when one token is submitted twice at once', async () => {
+      vi.mocked(mockPasswordResetRepository.findByTokenHash).mockResolvedValue(
+        mockPasswordResetToken
+      )
+      vi.mocked(mockPasswordResetRepository.isValidToken).mockResolvedValue(
+        true
+      )
+      vi.mocked(mockUserRepository.findById).mockResolvedValue(mockUser)
+      // The store lets one caller use a token; consume reports which one.
+      vi.mocked(mockPasswordResetRepository.consume)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false)
+
+      const results = await Promise.allSettled([
+        accountService.resetPassword({
+          token: 'mock-token',
+          newPassword: 'FirstPassword123!',
+        }),
+        accountService.resetPassword({
+          token: 'mock-token',
+          newPassword: 'SecondPassword456!',
+        }),
+      ])
+
+      expect(mockUserRepository.update).toHaveBeenCalledTimes(1)
+      const rejected = results.filter(r => r.status === 'rejected')
+      expect(rejected).toHaveLength(1)
+      expect(rejected[0].reason).toBeInstanceOf(InvalidResetTokenError)
     })
 
     it('should throw validation error for invalid password', async () => {
