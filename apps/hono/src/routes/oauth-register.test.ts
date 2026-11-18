@@ -160,5 +160,31 @@ describe('POST /oauth/register', () => {
       expect(res.headers.get('Retry-After')).toBeTruthy()
       expect(mockRegisterClient).not.toHaveBeenCalled()
     })
+
+    // A routed /48 holds 65,536 /64s, and each /64 has its own budget.
+    it('makes every /64 in one IPv6 /48 share a budget', async () => {
+      mockRegisterClient.mockResolvedValue(REGISTERED)
+      const from = (address: string) => ({
+        incoming: { socket: { remoteAddress: address } },
+      })
+
+      const statuses: number[] = []
+      for (let subnet = 0; subnet < 100; subnet++) {
+        const res = await app.request(
+          '/oauth/register',
+          json(METADATA),
+          from(`2001:db8:48:${subnet.toString(16)}::1`)
+        )
+        statuses.push(res.status)
+      }
+      const elsewhere = await app.request(
+        '/oauth/register',
+        json(METADATA),
+        from('2001:db8:49::1')
+      )
+
+      expect(statuses.at(-1)).toBe(429)
+      expect(elsewhere.status).toBe(201)
+    })
   })
 })
