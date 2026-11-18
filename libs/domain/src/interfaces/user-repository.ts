@@ -8,6 +8,12 @@ export interface UserRepository extends Repository<
   CreateUserData,
   UpdateUserData
 > {
+  /**
+   * Delete the user and everything they own, in one transaction. True when
+   * there was a user to delete. A `WriteConflictError` means nothing changed
+   * and the call can be retried.
+   */
+  delete(id: string): Promise<boolean>
   findByEmailHash(emailHash: string): Promise<User | null>
   findByUsername(username: string): Promise<User | null>
   findByStatus(status: UserStatus): Promise<User[]>

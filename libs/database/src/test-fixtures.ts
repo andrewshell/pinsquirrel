@@ -95,10 +95,12 @@ export async function insertPin(
 
 /**
  * An open transaction that InnoDB will not pick as the victim of a deadlock
- * with a repository call: it has changed more rows than the call will. It is
- * rolled back and released when the test ends. It changes a column with no
- * index: changing `username` left locks in that unique index, and a second
- * one waited on them to insert its rows.
+ * with a repository call: it has written more changes than the call will,
+ * deleting a user with all they own included. It changes each row three
+ * times: with three times the rows, the tests that open two of these timed
+ * out. It is rolled back and released when the test ends. It
+ * changes a column with no index: changing `username` left locks in that
+ * unique index, and a second one waited on them to insert its rows.
  */
 export async function heavyTransaction(pool: Pool): Promise<PoolConnection> {
   const bystanders = await Promise.all(
@@ -108,11 +110,13 @@ export async function heavyTransaction(pool: Pool): Promise<PoolConnection> {
   )
   const connection = await pool.getConnection()
   await connection.beginTransaction()
-  for (const bystander of bystanders) {
-    await connection.query(
-      "UPDATE users SET password_hash = CONCAT(password_hash, '.') WHERE id = ?",
-      [bystander.id]
-    )
+  for (const suffix of ['.', '', '.']) {
+    for (const bystander of bystanders) {
+      await connection.query(
+        "UPDATE users SET password_hash = CONCAT('hashed_password', ?) WHERE id = ?",
+        [suffix, bystander.id]
+      )
+    }
   }
   onTestFinished(async () => {
     await connection.rollback()

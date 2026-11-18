@@ -864,6 +864,16 @@ describe('DrizzleUserRepository - Integration Tests', () => {
         (users, { userId }) => users.removeRoleAndRevoke(userId, Role.User),
         { roles: [] },
       ],
+      [
+        'deleting the user',
+        (users, { userId }) => users.delete(userId),
+        {
+          passwordHash: undefined,
+          status: undefined,
+          roles: undefined,
+          resetTokens: 0,
+        },
+      ],
     ]
 
     beforeEach(async () => {
@@ -967,6 +977,25 @@ describe('DrizzleUserRepository - Integration Tests', () => {
         await change(repository, seeded)
 
         expect(await accountState(bystander.userId)).toEqual(untouched)
+      })
+    })
+
+    describe('delete', () => {
+      it("leaves the user's row unlocked while it waits for the user's sessions", async () => {
+        const seeded = await seed((await insertUser(testPool)).id)
+        const rival = await transactionHolding(
+          testPool,
+          'SELECT id FROM sessions WHERE user_id = ? FOR UPDATE',
+          [seeded.userId]
+        )
+
+        const deleting = repository.delete(seeded.userId)
+        await pause()
+        await rival.query(`${holdUser} NOWAIT`, [seeded.userId])
+        await rival.rollback()
+
+        expect(await deleting).toBe(true)
+        expect(await repository.findById(seeded.userId)).toBeNull()
       })
     })
 

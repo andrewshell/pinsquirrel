@@ -155,7 +155,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
       expect(await repository.findByCodeHash(data.codeHash)).toBeNull()
     })
 
-    it('should create nothing, and not fail, when the user is deleted between its session check and its insert', async () => {
+    it('should leave no code, and not fail, when the user is deleted between its session check and its insert', async () => {
       const stall = await testPool.getConnection()
       await stall.beginTransaction()
       await stall.query(
@@ -170,7 +170,7 @@ describe('DrizzleOAuthAuthorizationCodeRepository - Integration Tests', () => {
       await stall.commit()
       stall.release()
 
-      expect(await creating).toBeNull()
+      await creating
       expect(await deleting).toBe(true)
       expect(await repository.findByCodeHash(data.codeHash)).toBeNull()
     })

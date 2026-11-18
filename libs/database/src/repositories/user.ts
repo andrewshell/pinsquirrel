@@ -252,9 +252,19 @@ export class DrizzleUserRepository implements UserRepository {
     return await this.attachRoles(updated)
   }
 
+  /**
+   * The sessions go first, by statement and not by the cascade, which would
+   * lock the user's row before them: the order `revoking` keeps. PLAN.md
+   * decision 41.
+   */
   async delete(id: string): Promise<boolean> {
-    const result = await this.db.delete(users).where(eq(users.id, id))
-    return result[0].affectedRows > 0
+    return writeOrConflict(() =>
+      this.db.transaction(async tx => {
+        await tx.delete(sessions).where(eq(sessions.userId, id))
+        const [deleted] = await tx.delete(users).where(eq(users.id, id))
+        return deleted.affectedRows > 0
+      })
+    )
   }
 
   async deleteStaleUnverified(
