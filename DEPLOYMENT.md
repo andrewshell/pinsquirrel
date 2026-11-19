@@ -209,9 +209,12 @@ Node does not trust by default. Give the app that CA. Do not turn off certificat
    `/srv/pinsquirrel/certs/db-ca.crt` on the host.
 2. Mount it read-only into the container and point `NODE_EXTRA_CA_CERTS` at the path inside the
    container.
-3. Add `?ssl=%7B%22rejectUnauthorized%22%3Atrue%7D` to `DATABASE_URL`. That is
-   `{"rejectUnauthorized":true}`, URL-encoded, and it makes the MySQL driver use TLS and verify the
-   server certificate.
+3. Add `?ssl=%7B%22rejectUnauthorized%22%3Atrue%2C%22verifyIdentity%22%3Atrue%7D` to
+   `DATABASE_URL`. That is `{"rejectUnauthorized":true,"verifyIdentity":true}`, URL-encoded. It
+   makes the MySQL driver use TLS, check that the server certificate was signed by the CA, and
+   check that it was issued for the host in `DATABASE_URL`. Without `verifyIdentity` the driver
+   checks only the CA, so any certificate that CA signed would pass, such as one for another
+   database on the same account.
 
 ```yaml
 services:
@@ -220,14 +223,14 @@ services:
     volumes:
       - /srv/pinsquirrel/certs/db-ca.crt:/certs/db-ca.crt:ro
     environment:
-      - DATABASE_URL=mysql://username:password@db-host:3306/pinsquirrel?ssl=%7B%22rejectUnauthorized%22%3Atrue%7D
+      - DATABASE_URL=mysql://username:password@db-host:3306/pinsquirrel?ssl=%7B%22rejectUnauthorized%22%3Atrue%2C%22verifyIdentity%22%3Atrue%7D
       - NODE_EXTRA_CA_CERTS=/certs/db-ca.crt
       # NODE_ENV, BASE_URL and TRUST_PROXY as in Running it.
 ```
 
 Never set `NODE_TLS_REJECT_UNAUTHORIZED=0`. It turns off certificate checks for every outbound
-HTTPS request the app makes, such as the calls to Mailgun, not only the database connection. The
-start script prints a warning when it finds it set.
+HTTPS request the app makes, such as the calls to Mailgun and the fetches of OAuth client metadata.
+The start script prints a warning when it finds it set.
 
 If the host path of a file mount does not exist, Docker creates an empty directory there and
 mounts that instead. Node then has no extra CA to load, and migrations fail with
@@ -235,6 +238,10 @@ mounts that instead. Node then has no extra CA to load, and migrations fail with
 sees a file with `docker compose run --rm --entrypoint head pinsquirrel -1 /certs/db-ca.crt`,
 which prints `-----BEGIN CERTIFICATE-----`. That works even while the app container exits at
 start.
+
+If migrations fail with `Hostname/IP does not match certificate's altnames`, the certificate was
+not issued for the host in `DATABASE_URL`. Use the hostname the provider gives for the database,
+not an IP address or another alias for it.
 
 ## Rate limiting
 
