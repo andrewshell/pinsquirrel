@@ -3,14 +3,13 @@ set -e
 
 echo "Starting production deployment..."
 
-# Ensure NODE_ENV is set for production SSL configuration
 export NODE_ENV=${NODE_ENV:-production}
 echo "NODE_ENV: $NODE_ENV"
 
-# If NODE_TLS_REJECT_UNAUTHORIZED is not already set and we're in production,
-# check if it should be set for self-signed certificates
-if [ -z "$NODE_TLS_REJECT_UNAUTHORIZED" ] && [ "$NODE_ENV" = "production" ]; then
-  echo "Note: If using self-signed certificates, set NODE_TLS_REJECT_UNAUTHORIZED=0"
+if [ "$NODE_TLS_REJECT_UNAUTHORIZED" = "0" ]; then
+  echo "WARNING: NODE_TLS_REJECT_UNAUTHORIZED=0 disables certificate checks for every outbound"
+  echo "WARNING: request this app makes, not only the database connection. To trust a private CA,"
+  echo "WARNING: mount its certificate and set NODE_EXTRA_CA_CERTS to its path instead (see DEPLOYMENT.md)."
 fi
 
 # This image carries only the workspace packages the app needs at runtime, so
