@@ -138,7 +138,8 @@ production.
 
 | Variable               | Required             | Default                   | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | ---------------------- | -------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`         | yes                  | —                         | MySQL connection string, e.g. `mysql://username:password@hostname:3306/database`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `DATABASE_URL`         | yes                  | —                         | MySQL connection string, e.g. `mysql://username:password@hostname:3306/database`. For a database that requires TLS, see [Managed MySQL with TLS](#managed-mysql-with-tls)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `NODE_EXTRA_CA_CERTS`  | with a private CA    | —                         | Path inside the container to a PEM file of extra CA certificates that Node trusts in addition to its built-in list, e.g. `/certs/db-ca.crt`. Use it to trust a managed database's own CA. Never set `NODE_TLS_REJECT_UNAUTHORIZED=0` instead: it turns off certificate checks for every outbound request, and the start script prints a warning when it is set                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `NODE_ENV`             | yes in production    | `development`             | Anything other than `production` drops the `Secure` flag on the session cookie, so an unset value over HTTPS leaks the cookie                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `BASE_URL`             | yes in production    | `http://localhost:8100`   | The public origin, e.g. `https://pinsquirrel.com`. It is the OAuth issuer and the origin of both resource identifiers, so it is read from config rather than from the request — a spoofed `Host` header must not change what the server claims to be. Boot fails if it is unset when `NODE_ENV=production`, if it has a path, query, fragment or userinfo, or if it is `http://` in production on anything but a loopback host                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `PORT`                 | no                   | `8100`                    | HTTP listen port                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -198,6 +199,42 @@ seconds, and Docker does not always give you one: Docker Desktop 29 can kill a p
 `docker stop` after about 3 seconds, which cuts the drain short. Set `stop_grace_period: 10s`
 in compose, or run `docker stop -t 10`. Mail the app gives up on is logged as `Abandoned
 deferred account work at shutdown`; that user has to ask again.
+
+## Managed MySQL with TLS
+
+A managed MySQL service often requires TLS and signs its server certificate with its own CA, which
+Node does not trust by default. Give the app that CA. Do not turn off certificate checks.
+
+1. Download the CA certificate from the provider's control panel, for example to
+   `/srv/pinsquirrel/certs/db-ca.crt` on the host.
+2. Mount it read-only into the container and point `NODE_EXTRA_CA_CERTS` at the path inside the
+   container.
+3. Add `?ssl=%7B%22rejectUnauthorized%22%3Atrue%7D` to `DATABASE_URL`. That is
+   `{"rejectUnauthorized":true}`, URL-encoded, and it makes the MySQL driver use TLS and verify the
+   server certificate.
+
+```yaml
+services:
+  pinsquirrel:
+    image: ghcr.io/andrewshell/pinsquirrel:latest
+    volumes:
+      - /srv/pinsquirrel/certs/db-ca.crt:/certs/db-ca.crt:ro
+    environment:
+      - DATABASE_URL=mysql://username:password@db-host:3306/pinsquirrel?ssl=%7B%22rejectUnauthorized%22%3Atrue%7D
+      - NODE_EXTRA_CA_CERTS=/certs/db-ca.crt
+      # NODE_ENV, BASE_URL and TRUST_PROXY as in Running it.
+```
+
+Never set `NODE_TLS_REJECT_UNAUTHORIZED=0`. It turns off certificate checks for every outbound
+HTTPS request the app makes, such as the calls to Mailgun, not only the database connection. The
+start script prints a warning when it finds it set.
+
+If the host path of a file mount does not exist, Docker creates an empty directory there and
+mounts that instead. Node then has no extra CA to load, and migrations fail with
+`self-signed certificate in certificate chain`. Check the host path, and confirm the container
+sees a file with `docker compose run --rm --entrypoint head pinsquirrel -1 /certs/db-ca.crt`,
+which prints `-----BEGIN CERTIFICATE-----`. That works even while the app container exits at
+start.
 
 ## Rate limiting
 
