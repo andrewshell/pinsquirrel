@@ -53,6 +53,14 @@ COPY --from=hono-build /app/apps/hono/src/static ./apps/hono/src/static
 COPY --from=production-deps /app/package.json ./package.json
 COPY --from=production-deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
+# Fetch the pnpm that package.json's packageManager names at build time, so a
+# container start needs no registry. The cache sits outside root's home so a
+# container run with --user can read it, and with the network off for
+# Corepack a missing cache fails at once instead of downloading.
+ENV COREPACK_HOME=/opt/corepack
+RUN corepack install && chmod -R a+rX /opt/corepack
+ENV COREPACK_ENABLE_NETWORK=0
+
 # Copy database package for migrations
 COPY --from=hono-build /app/libs/database/package.json ./libs/database/package.json
 COPY --from=hono-build /app/libs/database/src/migrations ./libs/database/src/migrations
