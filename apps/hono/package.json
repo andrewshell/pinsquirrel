@@ -43,18 +43,18 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.3.3",
-    "@types/node": "^26.6.5",
+    "@tailwindcss/cli": "^4.3.5",
+    "@types/node": "^26.6.6",
     "@types/turndown": "^5.0.6",
-    "@vitest/coverage-v8": "^5.0.5",
-    "concurrently": "^10.0.6",
-    "eslint": "^10.13.0",
-    "prettier": "^3.9.10",
-    "tailwindcss": "^4.3.3",
+    "@vitest/coverage-v8": "^5.1.1",
+    "concurrently": "^10.0.7",
+    "eslint": "^10.15.0",
+    "prettier": "^3.10.1",
+    "tailwindcss": "^4.3.5",
     "tsup": "^9.0.0",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.1"
   },
   "engines": {
     "node": ">=26.0.0"
