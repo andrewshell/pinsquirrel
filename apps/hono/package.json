@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@hono/mcp": "^0.3.5",
-    "@hono/node-server": "^2.1.8",
+    "@hono/node-server": "^2.1.11",
     "@hono/zod-openapi": "^1.6.3",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@pinsquirrel/adapters": "workspace:*",
@@ -30,7 +30,7 @@
     "@pinsquirrel/mailgun": "workspace:*",
     "@pinsquirrel/services": "workspace:*",
     "@pinsquirrel/ui": "workspace:*",
-    "@scalar/hono-api-reference": "^0.12.20",
+    "@scalar/hono-api-reference": "^0.12.23",
     "cheerio": "^1.2.0",
     "dotenv": "^18.0.10",
     "drizzle-orm": "1.0.0-rc.5",
@@ -39,7 +39,7 @@
     "mysql2": "^3.24.6",
     "pino": "^10.4.0",
     "turndown": "^7.2.5",
-    "undici": "^8.12.4",
+    "undici": "^8.13.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
