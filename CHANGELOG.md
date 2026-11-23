@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.11.2](https://github.com/andrewshell/pinsquirrel/compare/v3.11.1...v3.11.2) (2026-11-23)
+
+
+### Bug Fixes
+
+* **hono:** stop recommending NODE_TLS_REJECT_UNAUTHORIZED and bake pnpm into the image ([cbae3e5](https://github.com/andrewshell/pinsquirrel/commit/cbae3e5bedcbee4638ec1a72690c12271a72dedd))
+* **hono:** warn when NODE_TLS_REJECT_UNAUTHORIZED disables TLS checks ([06159e5](https://github.com/andrewshell/pinsquirrel/commit/06159e570d98e77654cdbad2065cf03f37d59142))
+
 ## [3.11.1](https://github.com/andrewshell/pinsquirrel/compare/v3.11.0...v3.11.1) (2026-11-19)
 
 

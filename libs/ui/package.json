@@ -1,6 +1,6 @@
 {
   "name": "@pinsquirrel/ui",
-  "version": "3.11.1",
+  "version": "3.11.2",
   "description": "Shared Neo Brutalism UI primitives and design tokens for PinSquirrel",
   "type": "module",
   "main": "./src/index.ts",
@@ -23,12 +23,12 @@
     "hono": "^4.13.18"
   },
   "devDependencies": {
-    "@types/node": "^26.6.6",
-    "@vitest/coverage-v8": "^5.1.1",
-    "eslint": "^10.15.0",
-    "prettier": "^3.10.1",
+    "@types/node": "^26.6.5",
+    "@vitest/coverage-v8": "^5.0.5",
+    "eslint": "^10.13.0",
+    "prettier": "^3.9.10",
     "typescript": "^6.0.3",
-    "vitest": "^5.1.1"
+    "vitest": "^5.0.5"
   },
   "engines": {
     "node": ">=26.0.0"
