@@ -1,6 +1,6 @@
 {
   "name": "@pinsquirrel/adapters",
-  "version": "3.11.1",
+  "version": "3.11.2",
   "description": "Infrastructure adapters for external services and libraries",
   "type": "module",
   "main": "./src/index.ts",
